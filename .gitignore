@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+release
+/release-build/
+/LingoAct.exe
+/LingoAct.zip
+# Locally extracted zip build kept around to run directly.
+/LingoAct/
+.codex-tmp/
+supabase/.temp/
+.env
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Pushed separately: the GitHub CLI token has no `workflow` scope yet, so these
+# cannot be committed until `gh auth refresh -h github.com -s workflow` is run.
+# Remove these two lines and commit them the moment it is.
+.github/workflows/

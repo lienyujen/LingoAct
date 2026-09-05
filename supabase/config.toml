@@ -1,0 +1,25 @@
+project_id = "lingoact"
+
+[functions.create-session]
+verify_jwt = false
+
+[functions.participant-action]
+verify_jwt = false
+
+[functions.presenter-action]
+verify_jwt = false
+
+[functions.analyze-question]
+verify_jwt = false
+
+[functions.analyze-session]
+verify_jwt = false
+
+[functions.generate-exit-ticket]
+verify_jwt = false
+
+[functions.shorten-url]
+verify_jwt = false
+
+[functions.openai-realtime-session]
+verify_jwt = false

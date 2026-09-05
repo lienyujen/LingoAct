@@ -1,0 +1,4 @@
+interface:
+  display_name: "LingoAct Self Deployment"
+  short_description: "Deploy a private LingoAct stack step by step"
+  default_prompt: "Use $lingoact-self-deploy to guide me through deploying my own LingoAct services."

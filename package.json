@@ -1,0 +1,48 @@
+{
+  "name": "lingoact",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LingoAct real-time classroom interaction system",
+  "author": "Yujen Lien",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "desktop:dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env LINGOACT_DESKTOP_DEV=1 electron .\"",
+    "desktop:start": "pnpm build && electron .",
+    "desktop:package": "pnpm build && electron-builder --win portable --x64",
+    "desktop:package:plus": "pnpm build:plus && cross-env APP_EDITION=plus electron-builder --win portable --x64",
+    "build": "tsc -b && vite build",
+    "build:plus": "tsc -b && cross-env VITE_APP_EDITION=plus vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
+    "d3-cloud": "1.2.9",
+    "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
+    "lucide-react": "^1.26.0",
+    "opencc-js": "1.4.1",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "7.18.1"
+  },
+  "devDependencies": {
+    "@types/d3-cloud": "1.2.9",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "oxlint": "^1.75.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.5",
+    "wait-on": "^9.1.0"
+  }
+}

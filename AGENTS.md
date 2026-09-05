@@ -48,10 +48,27 @@ touching the publishable key the student page depends on.
 ## Current state
 
 The code is complete and proven — it is InterAct's, which has been used in real
-classes. What is **not** done:
+classes.
 
-- **No Supabase project is wired up yet.** There is no `.env`; the app will show
-  the backend setup screen until one exists. Creating it is the next step.
+The development backend is live: Supabase project `cgxhbpkndkzdmeswxgld` in
+`ap-northeast-1`, on an account kept entirely separate from InterAct's so the
+two never share a quota or an outage. Schema, three Storage buckets, twelve
+Realtime publications and all nine Edge Functions are deployed; `LINGOACT_OWNER_KEY`,
+`GEMINI_API_KEY`, `OPENAI_API_KEY` and `REURL_API_KEY` are all set and have been
+exercised against the live services, not merely configured. The student page is
+published at `lienyujen.github.io/LingoAct/` from the three GitHub Pages
+repository variables.
+
+Reurl refuses to shorten a URL that does not resolve, so the QR panel fails with
+a 502 whenever GitHub Pages is down or has never been deployed. The failure looks
+like a bad Reurl key and is not one.
+
+This project is for development only. Released builds ship with no project
+configured; each teacher supplies their own through the setup screen, which is
+why `release.yml` deliberately builds without a `.env`.
+
+What is **not** done:
+
 - **No release has been published**, and the version is `0.1.0` rather than
   InterAct's numbering.
 - **Nothing has been specialised for language teaching yet.** Everything still
@@ -69,3 +86,6 @@ classes. What is **not** done:
 - For a new self-hosted deployment, follow `skills/lingoact-self-deploy/SKILL.md`
   and keep each deployer's Supabase, Gemini, Reurl and GitHub credentials
   separate.
+- The Supabase access token, database password and owner key live in
+  `~/.lingoact/`, not in the repository. This tree sits inside a synced Dropbox
+  folder, so a gitignored secret would still leave the machine.

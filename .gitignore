@@ -32,7 +32,3 @@ supabase/.temp/
 *.sln
 *.sw?
 
-# Pushed separately: the GitHub CLI token has no `workflow` scope yet, so these
-# cannot be committed until `gh auth refresh -h github.com -s workflow` is run.
-# Remove these two lines and commit them the moment it is.
-.github/workflows/

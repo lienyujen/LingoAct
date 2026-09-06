@@ -232,6 +232,9 @@ create table if not exists public.quiz_items (
   type text not null check (type in ('multiple_choice', 'fill_blank', 'short_answer', 'ordering')),
   prompt_text text not null check (char_length(prompt_text) between 1 and 2000),
   options jsonb not null default '[]'::jsonb,
+  -- 配對 needs two lists: options holds the right-hand choices, shuffled, and
+  -- this holds the left-hand things being matched. Empty for every other type.
+  pair_prompts jsonb not null default '[]'::jsonb,
   points integer not null check (points between 1 and 100),
   translations jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
@@ -943,14 +946,17 @@ notify pgrst, 'reload schema';
 alter table public.quiz_items drop constraint if exists quiz_items_type_check;
 alter table public.quiz_items
   add constraint quiz_items_type_check
-  check (type in ('multiple_choice', 'fill_blank', 'short_answer', 'ordering'));
+  check (type in ('multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching'));
+
+alter table public.quiz_items
+  add column if not exists pair_prompts jsonb not null default '[]'::jsonb;
 
 notify pgrst, 'reload schema';
 
 alter table public.quizzes drop constraint if exists quizzes_requested_type_check;
 alter table public.quizzes
   add constraint quizzes_requested_type_check
-  check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'writing'));
+  check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching', 'writing'));
 
 alter table public.quizzes
   add column if not exists graded boolean not null default true;

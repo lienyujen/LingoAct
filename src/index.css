@@ -5071,3 +5071,68 @@ h2 {
   font-weight: 500;
   margin-left: 8px;
 }
+
+/* 配對, as a dropdown per row. Lines drawn between two columns are what a paper
+   worksheet does and what a tablet does worst — the gesture spans a scroll on a
+   phone, where these rows simply stack. */
+.quiz-matching {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.quiz-matching-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+}
+.quiz-matching-prompt {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.quiz-matching-select {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  min-height: 44px;
+  padding: 8px 10px;
+  width: 100%;
+}
+/* Using one choice twice is a wrong answer, not an invalid one, so it is
+   flagged rather than blocked — refusing it would cost a student the item they
+   were halfway through fixing. */
+.quiz-matching-select.is-repeated {
+  border-color: var(--energy);
+}
+.quiz-matching-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+
+/* The answer key for a 配對 item, read as pairs on the teacher's screen. */
+.presenter-quiz-pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.presenter-quiz-pair {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding: 6px 10px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+}
+.presenter-quiz-pair strong { color: var(--primary); }
+
+/* The take, while the question is still open: hear it back, or go again. */
+.audio-sent-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.audio-sent-row audio { max-width: 100%; }

@@ -4,6 +4,7 @@ import { ArrowsClockwise, CheckCircle, Clock, PaperPlaneTilt } from '@phosphor-i
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { QuizOrderingInput } from './QuizOrderingInput'
+import { QuizMatchingInput } from './QuizMatchingInput'
 import { localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { ParticipantQuizData } from '../types'
 
@@ -23,19 +24,28 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
   // Seeded from the shuffled fragments the server sent, so an untouched item is
   // still a submittable (probably wrong) answer rather than a blocked form.
   const [orderAnswers, setOrderAnswers] = useState<Record<string, string[]>>({})
+  // One chosen option per left-hand item, positionally. Starts empty so an
+  // untouched 配對 blocks submission rather than sending a row of first guesses.
+  const [matchAnswers, setMatchAnswers] = useState<Record<string, string[]>>({})
   const writing = data.quiz.graded === false
   const usesAiGrading = !writing && data.items.some((item) => item.type !== 'multiple_choice')
 
   useEffect(() => {
     setTextAnswers({})
     setChoiceAnswers({})
+    setMatchAnswers({})
   }, [data.quiz.id])
 
   const complete = useMemo(() => data.items.every((item) => {
     if (item.type === 'multiple_choice') return Boolean(choiceAnswers[item.id])
     if (item.type === 'ordering') return (orderAnswers[item.id] || item.options).length === item.options.length
+    // Every left-hand item needs a choice; a half-finished 配對 is not an answer.
+    if (item.type === 'matching') {
+      const chosen = matchAnswers[item.id] || []
+      return item.pair_prompts.length > 0 && item.pair_prompts.every((_, index) => Boolean(chosen[index]))
+    }
     return Boolean(textAnswers[item.id]?.trim())
-  }), [choiceAnswers, data.items, orderAnswers, textAnswers])
+  }), [choiceAnswers, data.items, matchAnswers, orderAnswers, textAnswers])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -44,6 +54,8 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
       if (item.type === 'multiple_choice') return { itemId: item.id, answerValues: [choiceAnswers[item.id]] }
       // The sequence itself is the answer, so it travels as ordered values.
       if (item.type === 'ordering') return { itemId: item.id, answerValues: orderAnswers[item.id] || item.options }
+      // Positional: the nth value is the choice for the nth left-hand item.
+      if (item.type === 'matching') return { itemId: item.id, answerValues: matchAnswers[item.id] || [] }
       return { itemId: item.id, answerText: textAnswers[item.id].trim() }
     }))
   }
@@ -120,6 +132,18 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
                   locale={locale}
                   values={orderAnswers[item.id] || item.options}
                   onChange={(next) => setOrderAnswers((current) => ({ ...current, [item.id]: next }))}
+                />
+              ) : item.type === 'matching' ? (
+                <QuizMatchingInput
+                  locale={locale}
+                  optionLabels={options}
+                  options={item.options}
+                  pairPrompts={item.pair_prompts}
+                  promptLabels={translation?.pair_prompts?.length === item.pair_prompts.length
+                    ? translation.pair_prompts
+                    : item.pair_prompts}
+                  values={matchAnswers[item.id] || []}
+                  onChange={(next) => setMatchAnswers((current) => ({ ...current, [item.id]: next }))}
                 />
               ) : item.type === 'fill_blank' ? (
                 <input value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={participantText(locale, 'quizFillPlaceholder')} />

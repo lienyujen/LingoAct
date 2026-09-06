@@ -410,6 +410,32 @@ export function ParticipantPage() {
     }
   }
 
+  // Throws away the take so the student can go again. 錄音朗讀 is practice:
+  // hear the model, hear yourself, try once more.
+  async function discardAudio() {
+    if (!participant || !participantToken || !question) return
+    setAudioBusy(true)
+    setError('')
+    try {
+      const { data, error: discardError } = await requireSupabase().functions.invoke('participant-action', {
+        body: {
+          action: 'discard_recording',
+          sessionId,
+          participantId: participant.id,
+          participantToken,
+          questionId: question.id,
+        },
+      })
+      if (discardError) throw new Error(await participantFunctionMessage(discardError, '無法重錄。'))
+      if (!data?.discarded) throw new Error(data?.message || '無法重錄。')
+      setAudioResponse(null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '無法重錄。')
+    } finally {
+      setAudioBusy(false)
+    }
+  }
+
   async function submitAudio(file: File, durationMs: number) {
     if (!participant || !participantToken || !question || !['pronunciation', 'oral_response'].includes(question.type)) {
       setError('找不到錄音權限，請重新掃描 QR Code 加入場次。')
@@ -678,6 +704,7 @@ export function ParticipantPage() {
         question={question}
         locale={locale}
         onSubmit={submitAnswer}
+        onDiscardAudio={discardAudio}
         onSubmitAudio={submitAudio}
       />}
       <ParticipantQuestionHistory

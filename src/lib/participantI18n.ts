@@ -65,10 +65,12 @@ const messages = {
     listeningUnlimited: '可以重複聆聽', listeningSlow: '慢速', listeningNormal: '正常速度', listeningLoading: '載入語音中…',
     listeningFailed: '語音載入失敗，請重新整理再試一次。', listeningHint: '戴上耳機或調高音量，按播放開始聆聽。',
     orderingHint: '拖曳左側把手，或用箭頭調整順序。', orderingDrag: '拖曳調整順序', orderingUp: '往上移', orderingDown: '往下移',
+    matchingChoose: '請選擇…', matchingHint: '每個項目各選一個配對。',
     writingHint: '把每個欄位寫完再送出。老師會直接看你寫的內容，這份不打分數。',
     writingSubmitted: '已送出，老師會看你寫的內容。',
     modelAudio: '原音示範', modelAudioHint: '先聽一次原音，再錄下自己的版本，然後比較兩者。', modelReplay: '可以重複聽',
     prepareStart: '開始準備', recordingLeft: '剩下', timeUp: '時間到', answerTimeLeft: '作答剩下', answerClosed: '作答時間已結束',
+    recordAgain: '重錄一次',
   },
   en: {
     language: 'Language', chinese: '繁體中文', english: 'English', courseEnded: 'Class ended', classDismissed: 'That’s a wrap!',
@@ -114,10 +116,12 @@ const messages = {
     listeningUnlimited: 'Listen as often as you like', listeningSlow: 'Slow', listeningNormal: 'Normal speed', listeningLoading: 'Loading audio…',
     listeningFailed: 'The audio failed to load. Please refresh and try again.', listeningHint: 'Put on headphones or turn the volume up, then press play.',
     orderingHint: 'Drag the handle, or use the arrows, to put these in order.', orderingDrag: 'Drag to reorder', orderingUp: 'Move up', orderingDown: 'Move down',
+    matchingChoose: 'Choose…', matchingHint: 'Pick one match for each item.',
     writingHint: 'Fill in every field, then send it. Your teacher reads what you wrote; this one is not scored.',
     writingSubmitted: 'Sent. Your teacher will read what you wrote.',
     modelAudio: 'Model reading', modelAudioHint: 'Listen to the model first, record your own, then compare the two.', modelReplay: 'Listen as often as you like',
     prepareStart: 'Start preparing', recordingLeft: 'left', timeUp: 'Time is up', answerTimeLeft: 'Time left', answerClosed: 'Answering has closed',
+    recordAgain: 'Record again',
   },
 } as const
 

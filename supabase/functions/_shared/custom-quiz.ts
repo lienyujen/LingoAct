@@ -1,10 +1,10 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 
-type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'writing'
+type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing'
 type ItemType = Exclude<RequestedType, 'random' | 'writing'>
 
-const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer', 'ordering'])
+const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching'])
 
 // Ordering items arrive from the model in the right order and must not reach the
 // class that way: quiz_items.options is readable by students, while the answer
@@ -34,9 +34,11 @@ const quizGenerationSchema = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          type: { type: 'string', enum: ['multiple_choice', 'fill_blank', 'short_answer', 'ordering'] },
+          type: { type: 'string', enum: ['multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching'] },
           prompt_text: { type: 'string' },
           options: { type: 'array', items: { type: 'string' } },
+          // 配對 only: the left-hand column. Every other type leaves it empty.
+          pair_prompts: { type: 'array', items: { type: 'string' } },
           accepted_answers: { type: 'array', items: { type: 'string' } },
           rubric: { type: 'string' },
           translation_en: {
@@ -45,11 +47,12 @@ const quizGenerationSchema = {
             properties: {
               prompt_text: { type: 'string' },
               options: { type: 'array', items: { type: 'string' } },
+              pair_prompts: { type: 'array', items: { type: 'string' } },
             },
-            required: ['prompt_text', 'options'],
+            required: ['prompt_text', 'options', 'pair_prompts'],
           },
         },
-        required: ['type', 'prompt_text', 'options', 'accepted_answers', 'rubric', 'translation_en'],
+        required: ['type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'rubric', 'translation_en'],
       },
     },
   },
@@ -203,7 +206,7 @@ export async function generateCustomQuiz(input: {
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{
@@ -260,6 +263,7 @@ ${input.sourceText}` }] : []),
     if (!promptText) throw new Error(`Item ${index + 1} has no prompt.`)
     // Ordering items carry more pieces than a multiple choice has options.
     const options = cleanStrings(item.options, type === 'ordering' ? 8 : 6)
+    const pairPrompts = type === 'matching' ? cleanStrings(item.pair_prompts, 6) : []
     const acceptedAnswers = cleanStrings(item.accepted_answers, 12)
     if (type === 'multiple_choice') {
       if (options.length < 2) throw new Error(`Item ${index + 1} needs at least two options.`)
@@ -268,13 +272,22 @@ ${input.sourceText}` }] : []),
       }
     }
     if (type === 'ordering' && options.length < 3) throw new Error(`Item ${index + 1} needs at least three fragments to order.`)
+    if (type === 'matching') {
+      if (pairPrompts.length < 3) throw new Error(`Item ${index + 1} needs at least three things to match.`)
+      // One right-hand item per left-hand item, or the pairing is ambiguous and
+      // the deterministic grading below would mark a defensible answer wrong.
+      if (options.length !== pairPrompts.length) throw new Error(`Item ${index + 1} has mismatched columns.`)
+    }
     if (type === 'fill_blank' && !acceptedAnswers.length) throw new Error(`Item ${index + 1} needs an accepted answer.`)
     const translation = (item.translation_en || {}) as Record<string, unknown>
     const translatedPrompt = typeof translation.prompt_text === 'string' ? translation.prompt_text.trim().slice(0, 2000) : ''
-    const translatedOptions = cleanStrings(translation.options, 6)
+    const translatedOptions = cleanStrings(translation.options, 8)
+    const translatedPairPrompts = cleanStrings(translation.pair_prompts, 6)
     // The permutation is applied to the translation as well, or an English
     // reader would be dragging fragments that no longer line up with the Chinese.
-    const permutation = type === 'ordering' ? shuffledIndices(options.length) : null
+    // Both types hide the answer in the same way: the right-hand column is
+    // shuffled, and the unshuffled original travels to the key table.
+    const permutation = type === 'ordering' || type === 'matching' ? shuffledIndices(options.length) : null
     const shownOptions = type === 'multiple_choice'
       ? options
       : permutation
@@ -293,15 +306,18 @@ ${input.sourceText}` }] : []),
       type,
       prompt_text: promptText,
       options: shownOptions,
+      pair_prompts: pairPrompts,
       points: basePoints + (index < remainder ? 1 : 0),
       translations: {
         en: {
           prompt_text: translatedPrompt || promptText,
           options: shownTranslatedOptions,
+          pair_prompts: translatedPairPrompts.length === pairPrompts.length ? translatedPairPrompts : pairPrompts,
         },
       },
-      // The correct sequence lives in the key table, which students cannot read.
-      accepted_answers: type === 'ordering' ? options : acceptedAnswers,
+      // The correct sequence — for 配對, the right-hand item for each left-hand
+      // one in left-hand order — lives in the key table, which students cannot read.
+      accepted_answers: type === 'ordering' || type === 'matching' ? options : acceptedAnswers,
       rubric: typeof item.rubric === 'string' ? item.rubric.trim().slice(0, 2000) : '',
     }
   })
@@ -363,7 +379,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       }
     })
 
-    const aiGradingInput = gradingInput.filter((item) => item.type !== 'multiple_choice' && item.type !== 'ordering')
+    const aiGradingInput = gradingInput.filter((item) => !['multiple_choice', 'ordering', 'matching'].includes(item.type))
     let output: {
       evaluations?: Array<{ item_id?: string; score?: number; feedback_zh_tw?: string; feedback_en?: string }>
       overall_feedback_zh_tw?: string
@@ -390,7 +406,25 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       let score = 0
       let feedbackZhTw = ''
       let feedbackEn = ''
-      if (item.type === 'ordering') {
+      if (item.type === 'matching') {
+        // Position by position: answer_values holds the student's choice for
+        // each left-hand item, in the order the left column was shown.
+        const expected = key.accepted_answers || []
+        const submitted = answer.answer_values || []
+        let correctPairs = 0
+        for (let at = 0; at < expected.length; at += 1) {
+          if (submitted[at] === expected[at]) correctPairs += 1
+        }
+        // Part marks, because getting four of five pairs right is not the same
+        // as getting none, and a vocabulary drill should show that difference.
+        score = expected.length ? Math.round((item.points * correctPairs) / expected.length * 100) / 100 : 0
+        feedbackZhTw = correctPairs === expected.length
+          ? '全部配對正確。'
+          : `配對正確 ${correctPairs}/${expected.length} 組。`
+        feedbackEn = correctPairs === expected.length
+          ? 'All pairs matched correctly.'
+          : `${correctPairs} of ${expected.length} pairs matched.`
+      } else if (item.type === 'ordering') {
         // Order is the whole answer, so this compares sequences rather than sets.
         const expected = key.accepted_answers || []
         const submitted = answer.answer_values || []

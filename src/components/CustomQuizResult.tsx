@@ -45,7 +45,20 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
               <strong>{item.prompt_text}</strong>
               {!writing && <small>{item.points} 分</small>}
             </div>
-            {writing ? null : item.type === 'multiple_choice' ? (
+            {writing ? null : item.type === 'matching' ? (
+              !showAnswers ? (
+                <p className="muted presenter-answer-hidden">配對答案已隱藏，勾選「顯示正確答案」即可檢視。</p>
+              ) : (
+                <div className="presenter-quiz-pairs">
+                  {item.pair_prompts.map((prompt, pairIndex) => (
+                    <div className="presenter-quiz-pair" key={prompt}>
+                      <span>{prompt}</span>
+                      <strong>{acceptedAnswers[pairIndex] || '—'}</strong>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : item.type === 'multiple_choice' ? (
               <div className="presenter-quiz-options">
                 {item.options.map((option) => {
                   const selected = showAnswers && acceptedAnswers.includes(option)

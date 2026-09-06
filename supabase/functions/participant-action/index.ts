@@ -200,6 +200,12 @@ Deno.serve(async (req) => {
       if (!items?.length || submittedAnswers.length !== items.length) {
         return jsonResponse({ message: '請完成所有題目後再送出。' }, 400)
       }
+      // Three types answer with a list rather than a sentence. 排序 and 配對
+      // answer positionally — the nth value is the answer to the nth fragment or
+      // left-hand item — so their lists must not be deduplicated: a student who
+      // matches two words to the same translation is wrong, not shorter, and
+      // collapsing the duplicate would silently shift every later pair.
+      const listAnswerTypes = new Set(['multiple_choice', 'ordering', 'matching'])
       const submittedByItem = new Map<string, { itemId: string; answerText?: string; answerValues?: string[] }>()
       for (const raw of submittedAnswers) {
         if (!raw || typeof raw !== 'object') return jsonResponse({ message: '作答資料格式不正確。' }, 400)
@@ -208,7 +214,11 @@ Deno.serve(async (req) => {
         if (!validUuid(itemId) || submittedByItem.has(itemId)) return jsonResponse({ message: '作答題號不正確。' }, 400)
         const answerText = typeof answer.answerText === 'string' ? answer.answerText.trim().slice(0, 4000) : ''
         const answerValues = Array.isArray(answer.answerValues)
-          ? [...new Set(answer.answerValues.filter((value): value is string => typeof value === 'string').map((value) => value.trim().slice(0, 500)).filter(Boolean))].slice(0, 6)
+          ? answer.answerValues
+            .filter((value): value is string => typeof value === 'string')
+            .map((value) => value.trim().slice(0, 500))
+            .filter(Boolean)
+            .slice(0, 8)
           : []
         submittedByItem.set(itemId, { itemId, answerText, answerValues })
       }
@@ -216,8 +226,25 @@ Deno.serve(async (req) => {
         const submitted = submittedByItem.get(item.id)
         if (!submitted) return jsonResponse({ message: '作答題目不完整。' }, 400)
         if (item.type === 'multiple_choice') {
-          if (!submitted.answerValues?.length || submitted.answerValues.some((value) => !item.options.includes(value))) {
+          // One choice may not be picked twice here, whatever the client sent.
+          const chosen = [...new Set(submitted.answerValues || [])]
+          if (!chosen.length || chosen.some((value) => !item.options.includes(value))) {
             return jsonResponse({ message: `第 ${item.position} 題的選項不正確。` }, 400)
+          }
+          submitted.answerValues = chosen
+        } else if (item.type === 'ordering') {
+          // Every fragment used exactly once, or the sequence is not a sequence.
+          const values = submitted.answerValues || []
+          const expected = (item.options as string[]) || []
+          if (values.length !== expected.length || [...values].sort().join('\u0000') !== [...expected].sort().join('\u0000')) {
+            return jsonResponse({ message: `第 ${item.position} 題的排序不完整。` }, 400)
+          }
+        } else if (item.type === 'matching') {
+          // One choice per left-hand item, each of them an offered option.
+          const values = submitted.answerValues || []
+          const pairPrompts = (item.pair_prompts as string[]) || []
+          if (values.length !== pairPrompts.length || values.some((value) => !item.options.includes(value))) {
+            return jsonResponse({ message: `請完成第 ${item.position} 題的配對。` }, 400)
           }
         } else if (!submitted.answerText) {
           return jsonResponse({ message: `請完成第 ${item.position} 題。` }, 400)
@@ -244,8 +271,8 @@ Deno.serve(async (req) => {
           return {
             attempt_id: attemptId,
             item_id: item.id,
-            answer_text: item.type === 'multiple_choice' ? null : submitted.answerText,
-            answer_values: item.type === 'multiple_choice' ? submitted.answerValues : null,
+            answer_text: listAnswerTypes.has(item.type) ? null : submitted.answerText,
+            answer_values: listAnswerTypes.has(item.type) ? submitted.answerValues : null,
           }
         }))
         if (answerError) throw answerError
@@ -262,7 +289,7 @@ Deno.serve(async (req) => {
         throw error
       }
 
-      if (quiz.graded === false || items.every((item) => item.type === 'multiple_choice')) {
+      if (quiz.graded === false || items.every((item) => ['multiple_choice', 'ordering', 'matching'].includes(item.type))) {
         await gradeCustomQuizAttempt(attemptId)
         const { data: gradedAttempt, error: gradedAttemptError } = await supabase.from('quiz_attempts')
           .select('*').eq('id', attemptId).single()
@@ -337,7 +364,7 @@ Deno.serve(async (req) => {
       }
       return jsonResponse({ response: saved })
     }
-    if (['prepare_recording_upload', 'submit_recording', 'get_recording_result'].includes(action)) {
+    if (['prepare_recording_upload', 'submit_recording', 'get_recording_result', 'discard_recording'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限驗證失敗，請重新掃描 QR Code 加入。' }, 403)
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
@@ -399,6 +426,35 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (activeSessionError) throw activeSessionError
       if (activeSession?.status !== 'active') return jsonResponse({ message: '課程已經結束，無法送出錄音。' }, 409)
+
+      // 錄音朗讀 is practice, not a test: the point is to hear the model, hear
+      // yourself, and go again. The take is replaced rather than kept beside the
+      // old one — the comparison that matters is against the model recording,
+      // which stays put, and keeping every attempt would fill the bucket with
+      // rehearsals nobody listens to.
+      if (action === 'discard_recording') {
+        if (question.status !== 'active') {
+          return jsonResponse({ message: '本題已停止作答，無法重錄。' }, 409)
+        }
+        const { data: existing, error: existingError } = await supabase
+          .from('audio_responses')
+          .select('id, storage_path')
+          .eq('question_id', questionId)
+          .eq('participant_id', participantId)
+          .maybeSingle()
+        if (existingError) throw existingError
+        if (existing) {
+          await removeRecording(existing.storage_path)
+          const { error: deleteError } = await supabase.from('audio_responses').delete().eq('id', existing.id)
+          if (deleteError) throw deleteError
+        }
+        // The placeholder in answers is what blocks a second upload, so it goes
+        // too — otherwise the student is told they have already submitted.
+        const { error: answerError } = await supabase.from('answers').delete()
+          .eq('question_id', questionId).eq('participant_id', participantId)
+        if (answerError) throw answerError
+        return jsonResponse({ discarded: true })
+      }
 
       if (action === 'prepare_recording_upload') {
         const fileSize = Number(input.fileSize)

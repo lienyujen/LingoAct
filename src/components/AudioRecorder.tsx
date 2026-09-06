@@ -11,6 +11,8 @@ type Props = {
   question: Question
   response: AudioResponse | null
   onSubmit: (file: File, durationMs: number) => Promise<void>
+  // Throws the take away so the student can record again.
+  onDiscard: () => Promise<void>
   locale?: ParticipantLocale
 }
 
@@ -23,7 +25,7 @@ function formatDuration(milliseconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
-export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh-TW' }: Props) {
+export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, locale = 'zh-TW' }: Props) {
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState('')
@@ -134,7 +136,13 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
     return (
       <div className="audio-response-card" aria-live="polite">
         {question.status === 'active' ? (
-          <p className="success">{participantText(locale, 'recordingSent')}</p>
+          <div className="audio-sent-row">
+            <p className="success">{participantText(locale, 'recordingSent')}</p>
+            {response.signed_url && <audio controls preload="metadata" src={response.signed_url} />}
+            <button className="ghost-button" disabled={busy} type="button" onClick={() => void onDiscard()}>
+              <ArrowCounterClockwise size={17} />{participantText(locale, 'recordAgain')}
+            </button>
+          </div>
         ) : response.analysis_status === 'success' && analysis ? (
           <>
             <div className="audio-feedback-heading">

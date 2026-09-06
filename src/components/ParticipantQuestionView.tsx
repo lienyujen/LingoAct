@@ -16,10 +16,11 @@ type Props = {
   audioResponse: AudioResponse | null
   onSubmit: (value: string | string[]) => void
   onSubmitAudio: (file: File, durationMs: number) => Promise<void>
+  onDiscardAudio: () => Promise<void>
   locale?: ParticipantLocale
 }
 
-export function ParticipantQuestionView({ question, answer, audioBusy, audioResponse, onSubmit, onSubmitAudio, locale = 'zh-TW' }: Props) {
+export function ParticipantQuestionView({ question, answer, audioBusy, audioResponse, onSubmit, onSubmitAudio, onDiscardAudio, locale = 'zh-TW' }: Props) {
   const [textAnswer, setTextAnswer] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
 
@@ -81,7 +82,7 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
         </p>
       )}
       {isAudioQuestion && (
-        <AudioRecorder busy={audioBusy} locale={locale} question={question} response={audioResponse} onSubmit={onSubmitAudio} />
+        <AudioRecorder busy={audioBusy} locale={locale} question={question} response={audioResponse} onDiscard={onDiscardAudio} onSubmit={onSubmitAudio} />
       )}
       {answer && !isAudioQuestion && <p className="success">{participantText(locale, 'submittedAnswer')}{answer.answer_values?.map(displayAnswer).join(listSeparator(locale)) || (answer.answer_value ? displayAnswer(answer.answer_value) : answer.answer_text)}</p>}
       {!answer && acceptingAnswers && question.type === 'short_answer' && (

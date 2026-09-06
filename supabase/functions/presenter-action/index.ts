@@ -600,7 +600,7 @@ Deno.serve(async (req) => {
       if (fromSharedFile && !validUuid(sharedFileId)) return jsonResponse({ message: '檔案資料不正確。' }, 400)
       if (!fromSharedFile && !fromListening && !validUuid(screenshotId)) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
       if (!direction) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
-      if (!['random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'writing'].includes(requestedType)) {
+      if (!['random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching', 'writing'].includes(requestedType)) {
         return jsonResponse({ message: '測驗題型設定不正確。' }, 400)
       }
       if (input.requestedCount !== null && input.requestedCount !== '' && input.requestedCount !== undefined && requestedCount === null) {
@@ -702,7 +702,7 @@ Deno.serve(async (req) => {
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
             direction,
             requestedCount,
-            requestedType: requestedType as 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'writing',
+            requestedType: requestedType as 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing',
           })
 
           if (!fromSharedFile && !fromListening) {
@@ -732,6 +732,7 @@ Deno.serve(async (req) => {
             type: item.type,
             prompt_text: item.prompt_text,
             options: item.options,
+            pair_prompts: item.pair_prompts,
             points: item.points,
             translations: item.translations,
           })))

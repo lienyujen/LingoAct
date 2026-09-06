@@ -44,6 +44,7 @@ const quizItemTypeLabels = {
   fill_blank: '填充題',
   short_answer: '簡答題',
   ordering: '排序題',
+  matching: '配對題',
 }
 
 const exitTicketCategoryLabels = {

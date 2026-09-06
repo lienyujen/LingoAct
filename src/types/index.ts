@@ -118,7 +118,7 @@ export type PresenterListeningClip = ListeningClip & {
 }
 // 'ordering' arrives with its fragments already shuffled; the correct sequence
 // stays in quiz_item_keys, which the anon role cannot read.
-export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering'
+export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching'
 // 'writing' is a mode rather than an item type: 寫作教練 lays out short_answer
 // fields and turns the marking off, so nothing downstream meets a new shape.
 export type QuizRequestedType = 'random' | QuizItemType | 'writing'
@@ -361,10 +361,13 @@ export type QuizItem = {
   type: QuizItemType
   prompt_text: string
   options: string[]
+  // 配對 only: the left-hand column, in the order it is shown. Empty otherwise.
+  pair_prompts: string[]
   points: number
   translations: Translated<{
     prompt_text?: string
     options?: string[]
+    pair_prompts?: string[]
   }>
   created_at: string
 }

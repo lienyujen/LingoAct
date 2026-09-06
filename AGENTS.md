@@ -130,11 +130,17 @@ What is **not** done:
 
 - **No release has been published**, and the version is `0.1.0` rather than
   InterAct's numbering.
-- Of the twelve teaching activities on the list, 配對, flashcard re-serving,
-  聽打接力 and 看圖說話 (AI images, v2) are still open. Flashcards additionally
-  need repeated tries at one item, which the unique constraint above forbids;
-  the least disruptive shape is a separate tries table, leaving
-  `quiz_item_answers` as the final answer that scoring already reads.
+- Of the twelve teaching activities, these are still open:
+  **數位 Flashcard** (nothing built; needs repeated tries at one item, which the
+  unique constraint above forbids — the least disruptive shape is a separate
+  tries table, leaving `quiz_item_answers` as the final answer scoring reads);
+  **聽打接力** (nothing built; needs per-sentence clips and pairing);
+  **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
+  still a whole passage; **看圖說話** lacks the AI four-panel image (v2);
+  **故事排序** orders text only, not images; **即時造句牆** collects the
+  sentences but nothing aggregates them; **AI寫作教練** is the simplified form
+  the teacher asked for, without the scaffolding questions the activity table
+  describes; **拍照描述** uploads a photo with no paired caption field.
 - `pnpm desktop:package` has not been run since `subset-font` was added. pnpm's
   symlinks may defeat the electron-builder `files` globs; the likely fix is
   `node-linker=hoisted` in `.npmrc`.

@@ -41,6 +41,7 @@ export function CustomQuizFields({
             <option value="fill_blank">填充題</option>
             <option value="short_answer">簡答題</option>
             <option value="ordering">排序題</option>
+            <option value="matching">配對題</option>
             <option value="writing">寫作教練（不評分）</option>
           </select>
         </label>

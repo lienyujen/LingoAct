@@ -1,6 +1,6 @@
-import { Check, Globe2 } from 'lucide-react'
+import { Check, Globe } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { participantText } from '../lib/participantI18n'
+import { GUIDANCE_LOCALES, guidanceLocaleShort, participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 
 type Props = {
@@ -14,10 +14,12 @@ export function ParticipantLanguageSwitcher({ locale, onChange }: Props) {
     <div className="participant-language-switcher">
       {open && (
         <div className="participant-language-menu" role="menu">
-          {(['zh-TW', 'en'] as const).map((code) => (
-            <button key={code} role="menuitemradio" aria-checked={locale === code} type="button" onClick={() => { onChange(code); setOpen(false) }}>
-              <span>{code === 'en' ? participantText(locale, 'english') : participantText(locale, 'chinese')}</span>
-              {locale === code && <Check size={16} />}
+          {GUIDANCE_LOCALES.map((option) => (
+            <button key={option.code} role="menuitemradio" aria-checked={locale === option.code} type="button" onClick={() => { onChange(option.code); setOpen(false) }}>
+              {/* Named in its own language: someone hunting for their own is not
+                  reading the page they are trying to get away from. */}
+              <span lang={option.code}>{option.label}</span>
+              {locale === option.code && <Check size={16} />}
             </button>
           ))}
         </div>
@@ -30,7 +32,7 @@ export function ParticipantLanguageSwitcher({ locale, onChange }: Props) {
         type="button"
         onClick={() => setOpen((current) => !current)}
       >
-        <Globe2 size={22} /><span>{locale === 'en' ? 'EN' : '中'}</span>
+        <Globe size={22} /><span>{guidanceLocaleShort(locale)}</span>
       </button>
     </div>
   )

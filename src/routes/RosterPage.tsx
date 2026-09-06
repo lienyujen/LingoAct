@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { ArrowDownWideNarrow, Hand, Users, X } from 'lucide-react'
+import { Hand, SortDescending, Users, X } from '@phosphor-icons/react'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
@@ -157,7 +157,7 @@ export function RosterPage() {
       <div className="roster-toolbar">
         <span className="roster-count">線上 {onlineCount}／共 {rows.length} 人</span>
         <button className="roster-sort" type="button" title="切換排序" onClick={cycleSort}>
-          <ArrowDownWideNarrow size={14} />{sortLabels[sort]}
+          <SortDescending size={14} />{sortLabels[sort]}
         </button>
       </div>
 

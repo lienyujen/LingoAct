@@ -1,4 +1,4 @@
-import { PartyPopper, Zap } from 'lucide-react'
+import { Confetti, Lightning } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { isBuzzerAccepting } from '../lib/buzzer'
@@ -81,7 +81,7 @@ export function BuzzerOverlay({ event, participantId, busy = false, onStart, onB
       <div className="buzzer-content">
         {finalized ? (
           <>
-            <PartyPopper size={participantId ? 54 : 68} />
+            <Confetti size={participantId ? 54 : 68} />
             <p>{isWinner ? '恭喜！' : '得獎的是'}</p>
             <strong>{event.payload.winner_name}</strong>
           </>
@@ -95,7 +95,7 @@ export function BuzzerOverlay({ event, participantId, busy = false, onStart, onB
               type="button"
               onClick={participantId ? buzz : start}
             >
-              <Zap fill="currentColor" size={84} />
+              <Lightning fill="currentColor" size={84} />
               <span>{pressed || busy ? '送出中' : participantId ? (accepting ? '搶答' : '準備中') : (accepting ? '進行中' : '開始搶答')}</span>
             </button>
             {!participantId && <small>{event.payload.candidate_count} 人可搶答</small>}

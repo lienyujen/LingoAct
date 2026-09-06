@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRight, UserRound, Waves } from 'lucide-react'
+import { ArrowRight, User, Waves } from '@phosphor-icons/react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { SetupNotice } from '../components/SetupNotice'
 import { StudentSocialLinks } from '../components/StudentSocialLinks'
@@ -81,7 +81,7 @@ export function JoinPage() {
       .then(({ data, error: lookupError }) => {
         if (cancelled) return
         setSession((data as Session | null) || null)
-        setSessionLookupError(lookupError ? (locale === 'en' ? 'Unable to load this session. Please refresh and try again.' : '暫時無法載入場次，請重新整理後再試。') : '')
+        setSessionLookupError(lookupError ? participantText(locale, 'sessionLoadFailed') : '')
         setSessionChecked(true)
       })
     return () => {
@@ -99,21 +99,21 @@ export function JoinPage() {
         // Fall through to the normal error message.
       }
     }
-    return joinError instanceof Error ? joinError.message : (locale === 'en' ? 'Unable to join.' : '加入失敗。')
+    return joinError instanceof Error ? joinError.message : participantText(locale, 'joinFailed')
   }
 
   async function join(event: FormEvent) {
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) {
-      setError(locale === 'en' ? 'Name is required.' : '姓名必填。')
+      setError(participantText(locale, 'nameRequired'))
       return
     }
 
     setBusy(true)
     setError('')
     try {
-      if (!session) throw new Error(locale === 'en' ? 'Session not found.' : '找不到這個場次。')
+      if (!session) throw new Error(participantText(locale, 'sessionNotFound'))
       const supabase = requireSupabase()
       const deviceId = getDeviceId()
       const { data, error: joinError } = await supabase.functions.invoke('participant-action', {
@@ -162,12 +162,10 @@ export function JoinPage() {
     return (
       <main className="center-page">
         <section className="panel form-panel">
-          <span className="form-heading-icon"><UserRound size={24} /></span>
-          <h1>{locale === 'en' ? 'Welcome back' : '歡迎回到課堂'}</h1>
+          <span className="form-heading-icon"><User size={24} /></span>
+          <h1>{participantText(locale, 'welcomeBack')}</h1>
           <p className="muted">
-            {locale === 'en'
-              ? `Signing you back in as ${localStorage.getItem(`lingoact_name_${session?.id}`) || ''}…`
-              : `正在以「${localStorage.getItem(`lingoact_name_${session?.id}`) || ''}」的身分回到課堂…`}
+            {participantText(locale, 'signingBackIn', { name: localStorage.getItem(`lingoact_name_${session?.id}`) || '' })}
           </p>
         </section>
       </main>
@@ -180,13 +178,11 @@ export function JoinPage() {
       <SetupNotice />
       <StudentSocialLinks />
       <form autoComplete="off" className="panel form-panel" onSubmit={join}>
-        <span className="form-heading-icon"><UserRound size={24} /></span>
-        <h1>{locale === 'en' ? `Join ${session?.title || 'session'}` : `加入${session?.title || '場次'}`}</h1>
-        <p className="muted">{session?.status === 'ended'
-          ? (locale === 'en' ? 'Enter your name to view the class materials' : '輸入姓名即可查看課程內容')
-          : (locale === 'en' ? 'Enter your name to join the interactive class' : '輸入姓名後即可進入互動課堂')}</p>
+        <span className="form-heading-icon"><User size={24} /></span>
+        <h1>{participantText(locale, 'joinTitle', { title: session?.title || participantText(locale, 'untitledSession') })}</h1>
+        <p className="muted">{participantText(locale, session?.status === 'ended' ? 'enterNameToView' : 'enterNameToJoin')}</p>
         <label>
-          {locale === 'en' ? 'Your name' : '你的姓名'}
+          {participantText(locale, 'yourName')}
           <input
             autoComplete="name"
             autoFocus
@@ -194,16 +190,12 @@ export function JoinPage() {
             name="participant-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder={locale === 'en' ? 'Enter your name' : '請輸入姓名'}
+            placeholder={participantText(locale, 'namePlaceholder')}
           />
         </label>
         {(error || sessionLookupError) && <p className="error">{error || sessionLookupError}</p>}
         <button disabled={busy || !session || Boolean(sessionLookupError)} type="submit">
-          {busy
-            ? (locale === 'en' ? 'Joining...' : '加入中...')
-            : session?.status === 'ended'
-              ? (locale === 'en' ? 'View class' : '查看課程')
-              : (locale === 'en' ? 'Join' : '加入')}
+          {participantText(locale, busy ? 'joining' : session?.status === 'ended' ? 'viewClass' : 'joinAction')}
           {!busy && <ArrowRight size={18} />}
         </button>
       </form>

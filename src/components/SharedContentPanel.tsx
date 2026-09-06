@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronUp, Clock3, Copy, ExternalLink, Send } from 'lucide-react'
+import { ArrowSquareOut, CaretDown, CaretUp, Check, Clock, Copy, PaperPlaneTilt } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { SharedContent } from '../types'
 import { participantText } from '../lib/participantI18n'
@@ -41,7 +41,7 @@ export function SharedContentPanel({ contents, defaultExpanded = false, heading,
   return (
     <section className="shared-content-section" aria-live="polite">
       <div className="shared-content-heading">
-        <div><Send size={18} /><h2>{heading || participantText(locale, 'presenterDispatch')}</h2></div>
+        <div><PaperPlaneTilt size={18} /><h2>{heading || participantText(locale, 'presenterDispatch')}</h2></div>
         {contents.length >= 2 && (
           <button
             aria-expanded={expanded}
@@ -49,7 +49,7 @@ export function SharedContentPanel({ contents, defaultExpanded = false, heading,
             type="button"
             onClick={() => setExpanded((current) => !current)}
           >
-            {expanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+            {expanded ? <CaretUp size={17} /> : <CaretDown size={17} />}
             {expanded ? participantText(locale, 'collapse') : `${participantText(locale, 'expandAll')} ${contents.length} ${participantText(locale, 'items')}`}
           </button>
         )}
@@ -67,11 +67,11 @@ export function SharedContentPanel({ contents, defaultExpanded = false, heading,
               )}
               {content.url && (
                 <a className="primary-link" href={content.url} rel="noopener noreferrer" target="_blank">
-                  <ExternalLink size={17} />{participantText(locale, 'openLink')}
+                  <ArrowSquareOut size={17} />{participantText(locale, 'openLink')}
                 </a>
               )}
               <time className="shared-content-time" dateTime={content.created_at} title={new Date(content.created_at).toLocaleString('zh-TW')}>
-                <Clock3 size={14} />{participantText(locale, 'dispatched')} {timeFormatter.format(new Date(content.created_at))}
+                <Clock size={14} />{participantText(locale, 'dispatched')} {timeFormatter.format(new Date(content.created_at))}
               </time>
             </div>
           </article>

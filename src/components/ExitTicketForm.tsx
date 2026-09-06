@@ -1,4 +1,4 @@
-import { Send, Star } from 'lucide-react'
+import { PaperPlaneTilt, Star } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { ExitTicket, ExitTicketCategory } from '../types'
@@ -12,13 +12,6 @@ type Props = {
   busy: boolean
   onSubmit: (value: { responseText: string; rating: number }) => void
   locale?: ParticipantLocale
-}
-
-const categoryLabels: Record<ExitTicketCategory, string> = {
-  lesson_summary: '課程總結',
-  learning_assessment: '學習程度評估',
-  course_satisfaction: '課程回饋',
-  student_question: '提出疑問',
 }
 
 export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, locale = 'zh-TW' }: Props) {
@@ -39,7 +32,7 @@ export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, local
     <section className="panel exit-ticket-panel">
       <div className="exit-ticket-heading">
         <h2>Exit Ticket</h2>
-        <span>{locale === 'en' ? ({ lesson_summary: 'Lesson summary', learning_assessment: 'Learning assessment', course_satisfaction: 'Class feedback', student_question: 'Student question' } as const)[category] : categoryLabels[category]}</span>
+        <span>{participantText(locale, ({ lesson_summary: 'lessonSummary', learning_assessment: 'learningAssessment', course_satisfaction: 'courseSatisfaction', student_question: 'studentQuestion' } as const)[category])}</span>
       </div>
       {ticket ? (
         <div className="exit-ticket-submitted">
@@ -78,7 +71,7 @@ export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, local
             />
           </label>
           <button disabled={busy || !rating} type="submit">
-            {!busy && <Send size={18} />}
+            {!busy && <PaperPlaneTilt size={18} />}
             {busy ? participantText(locale, 'sending') : participantText(locale, 'submitExit')}
           </button>
         </form>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { DragEvent } from 'react'
-import { Download, FileUp, FolderUp, LoaderCircle, Send, Sparkles, Square, Trash2, Upload, X } from 'lucide-react'
+import { CircleNotch, DownloadSimple, FileArrowUp, PaperPlaneTilt, Share, Sparkle, Square, Trash, UploadSimple, X } from '@phosphor-icons/react'
 import { downloadHref } from '../lib/fileLinks'
 import { isAnalyzableFile, quizSettingsFrom } from '../lib/customQuiz'
 import { CustomQuizFields } from './CustomQuizFields'
@@ -128,10 +128,10 @@ export function FileTransferModal({
 
         <div className="file-transfer-tabs">
           <button className={tab === 'share' ? 'is-active' : ''} type="button" onClick={() => setTab('share')}>
-            <FolderUp size={16} />教師檔案分享
+            <Share size={16} />教師檔案分享
           </button>
           <button className={tab === 'collect' ? 'is-active' : ''} type="button" onClick={() => setTab('collect')}>
-            <FileUp size={16} />學生檔案上傳
+            <FileArrowUp size={16} />學生檔案上傳
           </button>
         </div>
 
@@ -150,7 +150,7 @@ export function FileTransferModal({
               onDrop={onDrop}
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') inputRef.current?.click() }}
             >
-              {uploading ? <LoaderCircle className="spin" size={26} /> : <Upload size={26} />}
+              {uploading ? <CircleNotch className="spin" size={26} /> : <UploadSimple size={26} />}
               <strong>{uploading ? '上傳中...' : '拖曳檔案到這裡'}</strong>
               <span className="muted">或點選這個區塊從檔案總管選擇，可一次選多個</span>
             </div>
@@ -177,7 +177,7 @@ export function FileTransferModal({
                     <div className="file-list-actions">
                       {file.file_url && (
                         <a className="ghost-button" href={downloadHref(file.file_url, file.name)} rel="noreferrer" target="_blank">
-                          <Download size={15} />開啟
+                          <DownloadSimple size={15} />開啟
                         </a>
                       )}
                       <button
@@ -186,7 +186,7 @@ export function FileTransferModal({
                         type="button"
                         onClick={() => void guard(() => onDeleteSharedFile(file.id))}
                       >
-                        <Trash2 size={15} />移除
+                        <Trash size={15} />移除
                       </button>
                       {/* Only for formats Gemini can actually read: offering it on a
                           .pptx would fail after the question was already dispatched. */}
@@ -197,7 +197,7 @@ export function FileTransferModal({
                           type="button"
                           onClick={() => { setQuizFile(file); setQuizCount('auto'); setQuizType('random'); setQuizDirection('') }}
                         >
-                          <Sparkles size={15} />自訂測驗
+                          <Sparkle size={15} />自訂測驗
                         </button>
                       )}
                     </div>
@@ -226,12 +226,12 @@ export function FileTransferModal({
                 </button>
               ) : (
                 <button disabled={busy} type="button" onClick={() => void guard(() => onStartCollect(prompt))}>
-                  <Send size={16} />派送上傳功能
+                  <PaperPlaneTilt size={16} />派送上傳功能
                 </button>
               )}
               {collectQuestion && (
                 <button className="ghost-button" disabled={busy} type="button" onClick={() => void guard(onRefreshResponses)}>
-                  <LoaderCircle size={16} />重新整理
+                  <CircleNotch size={16} />重新整理
                 </button>
               )}
             </div>
@@ -248,7 +248,7 @@ export function FileTransferModal({
                             <a href={response.file_url} rel="noreferrer" target="_blank">
                               <img alt={response.name} className="file-response-thumb" src={response.file_url} />
                             </a>
-                          ) : <span className="file-response-thumb is-placeholder"><FileUp size={18} /></span>}
+                          ) : <span className="file-response-thumb is-placeholder"><FileArrowUp size={18} /></span>}
                           <div className="file-list-meta">
                             <strong>{response.participant_name}</strong>
                             <span className="muted">{response.name} · {formatSize(response.file_size)}</span>
@@ -271,7 +271,7 @@ export function FileTransferModal({
                           <div className="file-list-actions">
                             {response.file_url && (
                               <a className="ghost-button" href={downloadHref(response.file_url, response.name)} rel="noreferrer" target="_blank">
-                                <Download size={15} />下載
+                                <DownloadSimple size={15} />下載
                               </a>
                             )}
                             {response.analysis_status !== 'unsupported' && (
@@ -280,7 +280,7 @@ export function FileTransferModal({
                                 type="button"
                                 onClick={() => void guard(() => onAnalyzeResponse(response.id))}
                               >
-                                <Sparkles size={15} />{response.analysis_status === 'success' ? '重批' : 'AI 批改'}
+                                <Sparkle size={15} />{response.analysis_status === 'success' ? '重批' : 'AI 批改'}
                               </button>
                             )}
                             {response.analysis_status === 'success' && (
@@ -355,7 +355,7 @@ export function FileTransferModal({
                 <X size={17} />取消
               </button>
               <button disabled={busy || !quizDirection.trim()} type="submit">
-                <Sparkles size={17} />AI 出題並派送
+                <Sparkle size={17} />AI 出題並派送
               </button>
             </div>
           </form>

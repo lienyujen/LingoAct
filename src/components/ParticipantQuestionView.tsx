@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Send } from 'lucide-react'
+import { PaperPlaneTilt } from '@phosphor-icons/react'
 import { AudioRecorder } from './AudioRecorder'
 import { participantText } from '../lib/participantI18n'
-import type { ParticipantLocale } from '../lib/participantI18n'
+import type { ParticipantLocale, ParticipantMessageKey } from '../lib/participantI18n'
+import { listSeparator, localizedFields } from '../lib/localizedContent'
+import { useReadingFont } from '../lib/readingFont'
 import type { Answer, AudioResponse, Question } from '../types'
 
 type Props = {
@@ -25,20 +27,27 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
     setSelectedOptions([])
   }, [question?.id])
 
+  // Above the early return below: a hook that runs only on some renders changes
+  // the hook order between them, which React refuses outright.
+  const readingFamily = useReadingFont(question?.reading_font_url)
+
   // file_upload has its own panel further up the page, carrying the same prompt
   // and the screenshot; rendering here as well would print the question twice.
-  if (!question || ['send_screen', 'custom_quiz', 'file_upload'].includes(question.type)) return null
+  if (!question || ['send_screen', 'custom_quiz', 'file_upload', 'listening'].includes(question.type)) return null
   const isAudioQuestion = question.type === 'pronunciation' || question.type === 'oral_response'
-  const translation = locale === 'en' ? question.translations?.en : undefined
-  const englishTypeTitles: Partial<Record<Question['type'], string>> = {
-    poll: 'Poll',
-    multiple_choice: 'Multiple-choice question',
-    true_false: 'True or false',
-    short_answer: 'Short-answer question',
-    pronunciation: 'Pronunciation practice',
-    oral_response: 'Speaking response',
+  const translation = localizedFields(question.translations, locale)
+  // A question with no title of its own is described by its kind, and that
+  // description belongs to whoever is reading rather than to English.
+  const typeTitles: Partial<Record<Question['type'], ParticipantMessageKey>> = {
+    poll: 'typePoll',
+    multiple_choice: 'typeMultipleChoice',
+    true_false: 'typeTrueFalse',
+    short_answer: 'typeShortAnswer',
+    pronunciation: 'typePronunciation',
+    oral_response: 'typeOralResponse',
   }
-  const fallbackTitle = locale === 'en' ? englishTypeTitles[question.type] : question.title
+  const typeKey = typeTitles[question.type]
+  const fallbackTitle = question.title || (typeKey ? participantText(locale, typeKey) : '')
   const prompt = translation?.prompt_text || translation?.title || question.prompt_text || fallbackTitle || participantText(locale, 'interactiveQuestion')
   const translatedOptions = translation?.options?.length === question.options.length ? translation.options : question.options
   const displayAnswer = (value: string) => {
@@ -54,12 +63,14 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
 
   return (
     <section className="panel participant-question">
-      <h2>{prompt}</h2>
+      {readingFamily
+        ? <h2 className="reading-text" style={{ fontFamily: readingFamily }}>{prompt}</h2>
+        : <h2>{prompt}</h2>}
       {question.status !== 'active' && <p className="muted">{participantText(locale, 'questionEnded')}</p>}
       {isAudioQuestion && (
         <AudioRecorder busy={audioBusy} locale={locale} question={question} response={audioResponse} onSubmit={onSubmitAudio} />
       )}
-      {answer && !isAudioQuestion && <p className="success">{participantText(locale, 'submittedAnswer')}{answer.answer_values?.map(displayAnswer).join(locale === 'en' ? ', ' : '、') || (answer.answer_value ? displayAnswer(answer.answer_value) : answer.answer_text)}</p>}
+      {answer && !isAudioQuestion && <p className="success">{participantText(locale, 'submittedAnswer')}{answer.answer_values?.map(displayAnswer).join(listSeparator(locale)) || (answer.answer_value ? displayAnswer(answer.answer_value) : answer.answer_text)}</p>}
       {!answer && question.status === 'active' && question.type === 'short_answer' && (
         <form className="short-answer-form" onSubmit={submitShortAnswer}>
           <textarea
@@ -68,7 +79,7 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
             onChange={(event) => setTextAnswer(event.target.value)}
             placeholder={participantText(locale, 'answerPlaceholder')}
           />
-          <button type="submit"><Send size={18} />{participantText(locale, 'submitAnswer')}</button>
+          <button type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'submitAnswer')}</button>
         </form>
       )}
       {!answer && !isAudioQuestion && question.status === 'active' && question.type !== 'short_answer' && question.allow_multiple && (
@@ -98,7 +109,7 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
               )
             })}
           </div>
-          <button disabled={!selectedOptions.length} type="submit"><Send size={18} />{participantText(locale, 'submitAnswer')}</button>
+          <button disabled={!selectedOptions.length} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'submitAnswer')}</button>
         </form>
       )}
       {!answer && !isAudioQuestion && question.status === 'active' && question.type !== 'short_answer' && !question.allow_multiple && (

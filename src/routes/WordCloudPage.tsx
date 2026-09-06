@@ -1,4 +1,4 @@
-import { Cloud, MessageSquareText } from 'lucide-react'
+import { ChatText, Cloud } from '@phosphor-icons/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
@@ -151,7 +151,7 @@ export function WordCloudPage() {
           <h1>{session?.title || '載入場次...'}</h1>
         </div>
         <div className="word-cloud-tools">
-          <span><MessageSquareText size={16} />{visibleMessages.length} 則彈幕</span>
+          <span><ChatText size={16} />{visibleMessages.length} 則彈幕</span>
           <div className="segmented-control" aria-label="文字雲統計範圍">
             {rangeOptions.map((option) => (
               <button

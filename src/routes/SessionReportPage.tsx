@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, BookOpen, ChartNoAxesCombined, Clock, Download, ListChecks, LoaderCircle, MessageSquareText, RefreshCw, Users } from 'lucide-react'
+import { ArrowLeft, ArrowsClockwise, BookOpen, ChartLineUp, ChatText, CircleNotch, Clock, DownloadSimple, ListChecks, Users } from '@phosphor-icons/react'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { useSessionReportBack } from '../lib/sessionReportNavigation'
 import { requireSupabase } from '../lib/supabase'
@@ -26,6 +26,7 @@ const questionTypeLabels: Record<Question['type'], string> = {
   oral_response: '口語表達',
   custom_quiz: '自訂測驗',
   file_upload: '上傳作答',
+  listening: '聽力',
 }
 
 async function fetchAllRows<T>(table: string, sessionId: string, orderColumn: string) {
@@ -256,7 +257,7 @@ export function SessionReportPage() {
   if (loading) {
     return (
       <main className="session-report-page report-loading">
-        <LoaderCircle className="spin" size={34} />
+        <CircleNotch className="spin" size={34} />
         <h1>{generateRequested ? 'AI 正在分析整節課' : '正在讀取課堂報告'}</h1>
         <p className="muted">
           {generateRequested ? '彙整字幕逐字稿、文字派送、題目、作答、彈幕與參與資料...' : '載入已產生的課堂分析與互動資料...'}
@@ -291,7 +292,7 @@ export function SessionReportPage() {
         </fieldset>
         <div className="report-actions">
           <button type="button" onClick={() => void generateReport(thinkingLevel)}>
-            <RefreshCw size={17} />產生課堂報告
+            <ArrowsClockwise size={17} />產生課堂報告
           </button>
           <button className="ghost-button" type="button" onClick={() => void returnToSessionManager()}>
             <ArrowLeft size={17} />返回場次管理
@@ -316,7 +317,7 @@ export function SessionReportPage() {
             <ArrowLeft size={17} />返回場次管理
           </button>
           <button type="button" onClick={exportExcel} disabled={exporting}>
-            {exporting ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />}
+            {exporting ? <CircleNotch className="spin" size={17} /> : <DownloadSimple size={17} />}
             {exporting ? '匯出中...' : '匯出 Excel'}
           </button>
         </div>
@@ -326,9 +327,9 @@ export function SessionReportPage() {
 
       <section className="report-metrics" aria-label="課堂互動統計">
         <article><Users size={20} /><span>參與者</span><strong>{metrics.participant_count}</strong></article>
-        <article><MessageSquareText size={20} /><span>彈幕次數</span><strong>{metrics.message_count}</strong></article>
+        <article><ChatText size={20} /><span>彈幕次數</span><strong>{metrics.message_count}</strong></article>
         <article><ListChecks size={20} /><span>題目／作答</span><strong>{metrics.question_count}／{metrics.answer_count}</strong></article>
-        <article><ChartNoAxesCombined size={20} /><span>平均作答率</span><strong>{formatPercent(metrics.average_response_rate)}</strong></article>
+        <article><ChartLineUp size={20} /><span>平均作答率</span><strong>{formatPercent(metrics.average_response_rate)}</strong></article>
         <article><Clock size={20} /><span>課堂長度</span><strong>{metrics.duration_minutes} 分</strong></article>
       </section>
 

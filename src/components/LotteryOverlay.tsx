@@ -1,4 +1,4 @@
-import { PartyPopper } from 'lucide-react'
+import { Confetti } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LotterySessionEvent } from '../types'
@@ -66,7 +66,7 @@ export function LotteryOverlay({ event, participantId, onSelect }: Props) {
     <div className={`lottery-overlay${revealed ? ' revealed' : ''}${interactive ? ' interactive' : ''}`} aria-live="assertive">
       <div className="lottery-rays" />
       <div className="lottery-content">
-        <PartyPopper size={isWinnerDevice ? 54 : 68} />
+        <Confetti size={isWinnerDevice ? 54 : 68} />
         <p>{revealed ? (isWinnerDevice ? '恭喜！' : '抽中的是') : '抽籤中'}</p>
         {interactive ? (
           <button

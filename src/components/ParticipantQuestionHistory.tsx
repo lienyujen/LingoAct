@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, ChevronUp, Clock3, History, Mic2 } from 'lucide-react'
+import { CaretDown, CaretUp, CheckCircle, Clock, ClockCounterClockwise, MicrophoneStage } from '@phosphor-icons/react'
 import type { ParticipantLocale } from '../lib/participantI18n'
+import { participantText } from '../lib/participantI18n'
+import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { Answer, AudioResponse, ParticipantQuizData, Question, Screenshot } from '../types'
 
 type Props = {
@@ -16,20 +18,21 @@ type Props = {
 }
 
 function answerText(question: Question, answer: Answer, locale: ParticipantLocale) {
-  const translatedOptions = locale === 'en' && question.translations?.en?.options?.length === question.options.length
-    ? question.translations.en.options
+  const translation = localizedFields(question.translations, locale)
+  const translatedOptions = translation?.options?.length === question.options.length
+    ? translation.options
     : question.options
   const display = (value: string) => {
     const index = question.options.indexOf(value)
     return index >= 0 ? translatedOptions[index] : value
   }
-  if (answer.answer_values?.length) return answer.answer_values.map(display).join(locale === 'en' ? ', ' : '、')
+  if (answer.answer_values?.length) return answer.answer_values.map(display).join(listSeparator(locale))
   if (answer.answer_value) return display(answer.answer_value)
   return answer.answer_text || ''
 }
 
 function questionTitle(question: Question, locale: ParticipantLocale) {
-  const translation = locale === 'en' ? question.translations?.en : undefined
+  const translation = localizedFields(question.translations, locale)
   return translation?.prompt_text || translation?.title || question.prompt_text || translation?.title || question.title
 }
 
@@ -55,7 +58,6 @@ export function ParticipantQuestionHistory({
   }, [newestId])
 
   if (!history.length) return null
-  const english = locale === 'en'
 
   async function toggleQuestion(question: Question) {
     const opening = !openIds.has(question.id)
@@ -69,12 +71,12 @@ export function ParticipantQuestionHistory({
   }
 
   return (
-    <section className="participant-history-section" aria-label={english ? 'Answered questions' : '已作答題目'}>
+    <section className="participant-history-section" aria-label={participantText(locale, 'answeredQuestions')}>
       <div className="participant-history-heading">
-        <div><History size={19} /><h2>{english ? 'Answered questions' : '已作答題目'}</h2></div>
+        <div><ClockCounterClockwise size={19} /><h2>{participantText(locale, 'answeredQuestions')}</h2></div>
         <button className="ghost-button" type="button" aria-expanded={sectionExpanded} onClick={() => setSectionExpanded((current) => !current)}>
-          {sectionExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-          {sectionExpanded ? (english ? 'Collapse' : '收合') : `${english ? 'Expand' : '展開'} ${history.length}`}
+          {sectionExpanded ? <CaretUp size={17} /> : <CaretDown size={17} />}
+          {sectionExpanded ? participantText(locale, 'collapseShort') : `${participantText(locale, 'expandShort')} ${history.length}`}
         </button>
       </div>
       {sectionExpanded && (
@@ -89,34 +91,34 @@ export function ParticipantQuestionHistory({
             return (
               <article className="participant-history-item" key={question.id}>
                 <button className="participant-history-toggle" type="button" aria-expanded={open} onClick={() => void toggleQuestion(question)}>
-                  <span>{english ? `Question ${history.length - index}` : `第 ${history.length - index} 題`}</span>
+                  <span>{participantText(locale, 'questionNumber', { n: history.length - index })}</span>
                   <strong>{questionTitle(question, locale)}</strong>
-                  {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  {open ? <CaretUp size={18} /> : <CaretDown size={18} />}
                 </button>
                 {open && (
                   <div className="participant-history-body">
-                    {screenshot && <img alt={english ? 'Dispatched question' : '派送題目'} src={screenshot.public_url} />}
-                    {loading && <p className="muted"><Clock3 size={16} />{english ? 'Loading your answer…' : '正在載入你的作答…'}</p>}
+                    {screenshot && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
+                    {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}
                     {question.type === 'custom_quiz' && quiz?.attempt ? (
                       <div className="participant-history-quiz">
-                        <p><CheckCircle2 size={17} />{english ? 'Submitted score' : '作答分數'}：{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score}</p>
+                        <p><CheckCircle size={17} />{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score}</p>
                         {quiz.items.map((item, itemIndex) => {
                           const response = quiz.answers.find((entry) => entry.item_id === item.id)
-                          const prompt = locale === 'en' ? item.translations?.en?.prompt_text || item.prompt_text : item.prompt_text
+                          const prompt = localizedFields(item.translations, locale)?.prompt_text || item.prompt_text
                           const submitted = response?.answer_values?.join(', ') || response?.answer_text || '-'
-                          const feedback = locale === 'en' ? response?.feedback?.en || response?.feedback?.zh_tw : response?.feedback?.zh_tw
-                          return <div key={item.id}><strong>{itemIndex + 1}. {prompt}</strong><p>{english ? 'Your answer' : '你的答案'}：{submitted}</p>{feedback && <small>{feedback}</small>}</div>
+                          const feedback = localizedFeedback(response?.feedback, locale)
+                          return <div key={item.id}><strong>{itemIndex + 1}. {prompt}</strong><p>{participantText(locale, 'yourAnswerLabel')}{submitted}</p>{feedback && <small>{feedback}</small>}</div>
                         })}
                       </div>
                     ) : question.type === 'pronunciation' || question.type === 'oral_response' ? (
                       audio && <div className="participant-history-audio">
-                        <p><Mic2 size={17} />{english ? 'Recording submitted' : '已送出錄音'}{audio.score !== null ? ` · ${audio.score} ${english ? 'points' : '分'}` : ''}</p>
+                        <p><MicrophoneStage size={17} />{participantText(locale, 'recordingSubmitted')}{audio.score !== null ? ` · ${audio.score} ${participantText(locale, 'points')}` : ''}</p>
                         {audio.signed_url && <audio controls preload="metadata" src={audio.signed_url} />}
-                        {audio.analysis_json?.summary && <p>{locale === 'en' ? audio.analysis_json.translations?.en?.summary || audio.analysis_json.summary : audio.analysis_json.summary}</p>}
-                        {audio.transcript && <small>{english ? 'Transcript' : '逐字稿'}：{audio.transcript}</small>}
+                        {audio.analysis_json?.summary && <p>{localizedFields(audio.analysis_json.translations, locale)?.summary || audio.analysis_json.summary}</p>}
+                        {audio.transcript && <small>{participantText(locale, 'transcriptLabel')}{audio.transcript}</small>}
                       </div>
                     ) : answer ? (
-                      <p className="participant-history-answer"><CheckCircle2 size={17} />{english ? 'Your answer' : '你的答案'}：<strong>{answerText(question, answer, locale)}</strong></p>
+                      <p className="participant-history-answer"><CheckCircle size={17} />{participantText(locale, 'yourAnswerLabel')}<strong>{answerText(question, answer, locale)}</strong></p>
                     ) : null}
                   </div>
                 )}

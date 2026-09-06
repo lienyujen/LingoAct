@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Download, FileUp, LoaderCircle, Sparkles, Upload } from 'lucide-react'
+import { Camera, CircleNotch, DownloadSimple, FileArrowUp, Sparkle, UploadSimple } from '@phosphor-icons/react'
 import { requireSupabase } from '../lib/supabase'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -59,7 +59,7 @@ export function ParticipantSharedFiles({ sessionId, locale }: Props) {
 
   return (
     <section className="panel participant-shared-files">
-      <h2><Download size={17} />{participantText(locale, 'teacherFiles')}</h2>
+      <h2><DownloadSimple size={17} />{participantText(locale, 'teacherFiles')}</h2>
       <ul>
         {files.map((file) => (
           <li key={file.id}>
@@ -169,14 +169,14 @@ export function ParticipantFileUpload({
 
   return (
     <section className="panel participant-file-upload">
-      <h2><FileUp size={17} />{participantText(locale, 'fileUpload')}</h2>
+      <h2><FileArrowUp size={17} />{participantText(locale, 'fileUpload')}</h2>
       {imageUrl && <img alt={participantText(locale, 'imageAlt')} className="participant-image participant-file-image" src={imageUrl} />}
       {promptText && <p className="participant-file-prompt">{promptText}</p>}
       {active ? (
         <>
           <div className="participant-upload-actions">
             <button disabled={busy} type="button" onClick={() => inputRef.current?.click()}>
-              {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
+              {busy ? <CircleNotch className="spin" size={17} /> : <UploadSimple size={17} />}
               {busy ? participantText(locale, 'fileUploading') : participantText(locale, 'chooseFile')}
             </button>
             {hasCamera && (
@@ -213,7 +213,7 @@ export function ParticipantFileUpload({
       {error && <p className="error">{error}</p>}
       {uploaded.length > 0 && (
         <ul className="participant-uploaded-list">
-          {uploaded.map((name, index) => <li key={`${index}-${name}`}><Sparkles size={13} />{name}</li>)}
+          {uploaded.map((name, index) => <li key={`${index}-${name}`}><Sparkle size={13} />{name}</li>)}
         </ul>
       )}
     </section>

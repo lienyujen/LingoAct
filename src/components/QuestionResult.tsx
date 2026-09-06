@@ -1,4 +1,4 @@
-import { AudioLines, CheckCircle2, Dice5, Download, FileUp, LoaderCircle, Sparkles } from 'lucide-react'
+import { CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Sparkle, Waveform } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
@@ -60,7 +60,7 @@ function QuestionStatusActions({
           type="button"
           onClick={() => onDrawUnanswered(question.id)}
         >
-          <Dice5 size={20} />
+          <DiceFive size={20} />
         </button>
       )}
       <span className={`status ${question.status}`}>{question.status}</span>
@@ -94,9 +94,9 @@ function AiAnalysisPanel({
   return (
     <section className="panel ai-analysis-panel">
       <div className="panel-heading">
-        <h2><Sparkles size={18} />AI 完整分析</h2>
+        <h2><Sparkle size={18} />AI 完整分析</h2>
         <button disabled={!canAnalyze || analysisBusy} type="button" onClick={onAnalyze}>
-          <Sparkles size={16} />
+          <Sparkle size={16} />
           {analysisBusy
             ? gradeProgress ? `批改中 ${gradeProgress.done}/${gradeProgress.total}...` : '分析中...'
             : isUpload
@@ -131,7 +131,7 @@ function AiAnalysisPanel({
                 <span>信心：{analysis.question_understanding.confidence}</span>
                 {canApplySuggestion && (
                   <button className="ghost-button" type="button" onClick={() => onSetCorrectAnswer(suggestion)}>
-                    <CheckCircle2 size={16} />採用為正確答案
+                    <CheckCircle size={16} />採用為正確答案
                   </button>
                 )}
               </div>
@@ -244,7 +244,7 @@ function UploadResults({
                   <a href={preview.file_url} rel="noreferrer" target="_blank">
                     <img alt={preview.name} className="file-response-thumb" src={preview.file_url} />
                   </a>
-                ) : <span className="file-response-thumb is-placeholder"><FileUp size={18} /></span>}
+                ) : <span className="file-response-thumb is-placeholder"><FileArrowUp size={18} /></span>}
                 <div className="file-list-meta">
                   <strong>{anonymousEnabled ? `匿名作答 ${index + 1}` : lead.participant_name}</strong>
                   <span className="muted">
@@ -270,12 +270,12 @@ function UploadResults({
                       rel="noreferrer"
                       target="_blank"
                     >
-                      <Download size={15} />下載{files.length > 1 ? ` ${fileIndex + 1}` : ''}
+                      <DownloadSimple size={15} />下載{files.length > 1 ? ` ${fileIndex + 1}` : ''}
                     </a>
                   ))}
                   {lead.analysis_status !== 'unsupported' && (
                     <button disabled={busy} type="button" onClick={() => onAnalyzeFile(lead.id)}>
-                      {busy ? <LoaderCircle className="spin" size={15} /> : <Sparkles size={15} />}
+                      {busy ? <CircleNotch className="spin" size={15} /> : <Sparkle size={15} />}
                       {lead.analysis_status === 'success' ? '重批' : 'AI 批改'}
                     </button>
                   )}
@@ -368,7 +368,7 @@ export function QuestionResult(props: Props) {
       <>
         <section className="panel result-panel upload-results-panel">
           <div className="panel-heading">
-            <h2><FileUp size={20} />{question.title}</h2>
+            <h2><FileArrowUp size={20} />{question.title}</h2>
             <QuestionStatusActions {...props} question={question} />
           </div>
           {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
@@ -389,7 +389,7 @@ export function QuestionResult(props: Props) {
     return (
       <section className="panel result-panel audio-results-panel">
         <div className="panel-heading">
-          <h2><AudioLines size={20} />{question.title}</h2>
+          <h2><Waveform size={20} />{question.title}</h2>
           <QuestionStatusActions {...props} question={question} />
         </div>
         {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}

@@ -1,4 +1,4 @@
-import { AlertTriangle, LoaderCircle, PauseCircle, X } from 'lucide-react'
+import { CircleNotch, PauseCircle, Warning, X } from '@phosphor-icons/react'
 
 type Props = {
   busy?: boolean
@@ -29,7 +29,7 @@ export function ConfirmDialog({
     <div className="modal-backdrop confirm-backdrop" role="presentation">
       <section aria-labelledby="confirm-dialog-title" aria-modal="true" className="modal confirm-dialog" role="dialog">
         <div className="confirm-dialog-heading">
-          <span><AlertTriangle size={22} /></span>
+          <span><Warning size={22} /></span>
           <div>
             <h2 id="confirm-dialog-title">{title}</h2>
             <p>{description}</p>
@@ -42,12 +42,12 @@ export function ConfirmDialog({
           <button className="ghost-button" disabled={busy} type="button" onClick={onCancel}>取消</button>
           {secondaryLabel && onSecondary && (
             <button className="pause-button" disabled={busy} type="button" onClick={onSecondary}>
-              {busy ? <LoaderCircle className="spin" size={18} /> : <PauseCircle size={18} />}
+              {busy ? <CircleNotch className="spin" size={18} /> : <PauseCircle size={18} />}
               {secondaryLabel}
             </button>
           )}
           <button className="danger-button" disabled={busy} type="button" onClick={onConfirm}>
-            {busy ? <LoaderCircle className="spin" size={18} /> : <AlertTriangle size={18} />}
+            {busy ? <CircleNotch className="spin" size={18} /> : <Warning size={18} />}
             {busy ? '處理中...' : confirmLabel}
           </button>
         </div>

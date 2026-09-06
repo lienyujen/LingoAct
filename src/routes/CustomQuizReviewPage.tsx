@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BrainCircuit, X } from 'lucide-react'
+import { Brain, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
 import { QuizAnswerEditor } from '../components/CustomQuizResult'
 import type { QuizReviewProps } from '../components/CustomQuizResult'
@@ -90,7 +90,7 @@ export function CustomQuizReviewPage() {
     <main className="custom-quiz-native-page">
       <header>
         <div>
-          <p className="eyebrow"><BrainCircuit size={18} />自訂測驗檢視與答案調整</p>
+          <p className="eyebrow"><Brain size={18} />自訂測驗檢視與答案調整</p>
           <h1>{results?.quiz?.title || (results ? 'AI 正在出題中，請稍候...' : '正在載入自訂測驗...')}</h1>
         </div>
         <button aria-label="關閉測驗檢視視窗" className="icon-button" title="關閉" type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>

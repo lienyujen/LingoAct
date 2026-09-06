@@ -16,6 +16,7 @@ import { QuestionResult } from '../components/QuestionResult'
 import { CustomQuizResult } from '../components/CustomQuizResult'
 import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
+import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { FileTransferModal } from '../components/FileTransferModal'
 import { finalizeLottery } from '../lib/lottery'
 import { getPresenterToken } from '../lib/presenterAuth'
@@ -91,6 +92,7 @@ export function PresenterPage() {
   const [controlsOpen, setControlsOpen] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
+  const [listeningOpen, setListeningOpen] = useState(false)
   const [textDispatchError, setTextDispatchError] = useState('')
   const [fileTransferOpen, setFileTransferOpen] = useState(false)
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([])
@@ -328,11 +330,11 @@ export function PresenterPage() {
   useEffect(() => {
     if (!window.lingoActDesktop || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
-      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen,
+      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, selectionMode, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, selectionMode, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return
@@ -1596,6 +1598,7 @@ export function PresenterPage() {
             setFileTransferOpen(true)
             void refreshSharedFiles()
           }}
+          onOpenListeningStudio={() => setListeningOpen(true)}
           onOpenTextDispatch={() => {
             setTextDispatchError('')
             setTextDispatchOpen(true)
@@ -1713,6 +1716,13 @@ export function PresenterPage() {
           onStopCollect={stopFileCollect}
         />
       )}
+      <ListeningStudioModal
+        open={listeningOpen}
+        presenterToken={getPresenterToken(sessionId) || ''}
+        sessionId={sessionId}
+        teachingLanguage={session?.teaching_language || 'zh-tw'}
+        onClose={() => setListeningOpen(false)}
+      />
       <TextDispatchModal
         busy={busy}
         error={textDispatchError}

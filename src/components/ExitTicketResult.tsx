@@ -1,4 +1,4 @@
-import { MessageSquareText, Star } from 'lucide-react'
+import { ChatText, Star } from '@phosphor-icons/react'
 import type { ExitTicket, ExitTicketCategory } from '../types'
 
 const categoryLabels: Record<ExitTicketCategory, string> = {
@@ -40,7 +40,7 @@ export function ExitTicketResult({ anonymousEnabled, category, onlineCount, prom
         ))}
       </div>
       <div className="exit-ticket-response-heading">
-        <MessageSquareText size={18} />
+        <ChatText size={18} />
         <div><span>{categoryLabels[category]}</span><p>{prompt}</p></div>
       </div>
       {tickets.some((ticket) => ticket.response_text) ? (

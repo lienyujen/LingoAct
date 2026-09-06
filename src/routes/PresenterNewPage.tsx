@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRight, DoorClosed, FileChartColumn, ListRestart, LoaderCircle, Settings, LogIn, RefreshCw, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowRight, ArrowsClockwise, CircleNotch, Door, ChartBar, Gear, SignIn, Sparkle, Trash, X } from '@phosphor-icons/react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SetupNotice } from '../components/SetupNotice'
@@ -148,19 +148,19 @@ export function PresenterNewPage() {
           {session.status === 'active' ? (
             <>
               <button type="button" onClick={() => rejoinSession(session)} disabled={managementBusy}>
-                <LogIn size={17} />重新加入場次
+                <SignIn size={17} />重新加入場次
               </button>
               <button className="ghost-button" type="button" onClick={() => setPendingAction({ type: 'end', session })} disabled={managementBusy}>
-                <DoorClosed size={17} />關閉場次
+                <Door size={17} />關閉場次
               </button>
             </>
           ) : (
             <button type="button" onClick={() => navigate(`/session-report/${session.id}`)} disabled={managementBusy}>
-              <FileChartColumn size={17} />檢視課堂報告
+              <ChartBar size={17} />檢視課堂報告
             </button>
           )}
           <button className="danger-ghost-button" type="button" onClick={() => setPendingAction({ type: 'delete', session })} disabled={managementBusy}>
-            <Trash2 size={17} />移除場次
+            <Trash size={17} />移除場次
           </button>
         </div>
       </article>
@@ -171,7 +171,7 @@ export function PresenterNewPage() {
     <main className="center-page presenter-new-page">
       <SetupNotice />
       <form className="panel form-panel" onSubmit={createSession}>
-        <span className="form-heading-icon"><Sparkles size={24} /></span>
+        <span className="form-heading-icon"><Sparkle size={24} /></span>
         <h1>建立新場次</h1>
         <p className="muted">建立場次，讓學生掃碼即可加入</p>
         <label>
@@ -184,10 +184,10 @@ export function PresenterNewPage() {
           {!busy && <ArrowRight size={18} />}
         </button>
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={openManagement}>
-          <ListRestart size={18} />管理場次
+          <ArrowsClockwise size={18} />管理場次
         </button>
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={() => setSystemSetupOpen(true)}>
-          <Settings size={18} />系統設定
+          <Gear size={18} />系統設定
         </button>
         <p className="app-credit">
           <a href="https://github.com/lienyujen/LingoAct/blob/main/LICENSE" rel="noreferrer" target="_blank">LingoAct</a>
@@ -214,7 +214,7 @@ export function PresenterNewPage() {
               </div>
               <div className="session-manager-heading-actions">
                 <button aria-label="重新整理" className="icon-button ghost-button" disabled={managementBusy} title="重新整理" type="button" onClick={loadManagedSessions}>
-                  <RefreshCw className={managementBusy ? 'spin' : undefined} size={18} />
+                  <ArrowsClockwise className={managementBusy ? 'spin' : undefined} size={18} />
                 </button>
                 <button aria-label="關閉管理場次" className="icon-button ghost-button" disabled={managementBusy} type="button" onClick={() => setManagementOpen(false)}>
                   <X size={18} />
@@ -224,7 +224,7 @@ export function PresenterNewPage() {
             {managementError && <p className="error">{managementError}</p>}
             {managementNotice && <p className="success">{managementNotice}</p>}
             {managementBusy && !managedSessions.length ? (
-              <div className="session-manager-loading"><LoaderCircle className="spin" size={24} />讀取場次中...</div>
+              <div className="session-manager-loading"><CircleNotch className="spin" size={24} />讀取場次中...</div>
             ) : (
               <div className="session-manager-content">
                 <section>

@@ -1,4 +1,4 @@
-import { Headphones, Pause, Play, Volume2 } from 'lucide-react'
+import { Headphones, Pause, Play, SpeakerHigh } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { captionLanguageLabel } from '../lib/captionLanguages'
 import { requireSupabase } from '../lib/supabase'
@@ -211,7 +211,7 @@ export function ParticipantInterpretationAudio({ enabled, languages, sessionId, 
           type="button"
           onClick={() => void testHeadphones()}
         >
-          <Volume2 className="interpretation-playing-icon" size={18} />
+          <SpeakerHigh className="interpretation-playing-icon" size={18} />
         </button>
       </div>
       <label>

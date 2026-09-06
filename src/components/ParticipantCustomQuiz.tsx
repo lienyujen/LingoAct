@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { CheckCircle2, Clock3, RefreshCw, Send } from 'lucide-react'
+import { ArrowsClockwise, CheckCircle, Clock, PaperPlaneTilt } from '@phosphor-icons/react'
 import type { ParticipantLocale } from '../lib/participantI18n'
+import { participantText } from '../lib/participantI18n'
+import { QuizOrderingInput } from './QuizOrderingInput'
+import { localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { ParticipantQuizData } from '../types'
 
 export type QuizSubmission = Array<{ itemId: string; answerText?: string; answerValues?: string[] }>
@@ -17,7 +20,9 @@ type Props = {
 export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }: Props) {
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({})
   const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>({})
-  const english = locale === 'en'
+  // Seeded from the shuffled fragments the server sent, so an untouched item is
+  // still a submittable (probably wrong) answer rather than a blocked form.
+  const [orderAnswers, setOrderAnswers] = useState<Record<string, string[]>>({})
   const usesAiGrading = data.items.some((item) => item.type !== 'multiple_choice')
 
   useEffect(() => {
@@ -25,16 +30,21 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
     setChoiceAnswers({})
   }, [data.quiz.id])
 
-  const complete = useMemo(() => data.items.every((item) => item.type === 'multiple_choice'
-    ? Boolean(choiceAnswers[item.id])
-    : Boolean(textAnswers[item.id]?.trim())), [choiceAnswers, data.items, textAnswers])
+  const complete = useMemo(() => data.items.every((item) => {
+    if (item.type === 'multiple_choice') return Boolean(choiceAnswers[item.id])
+    if (item.type === 'ordering') return (orderAnswers[item.id] || item.options).length === item.options.length
+    return Boolean(textAnswers[item.id]?.trim())
+  }), [choiceAnswers, data.items, orderAnswers, textAnswers])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!complete || busy) return
-    await onSubmit(data.items.map((item) => item.type === 'multiple_choice'
-      ? { itemId: item.id, answerValues: [choiceAnswers[item.id]] }
-      : { itemId: item.id, answerText: textAnswers[item.id].trim() }))
+    await onSubmit(data.items.map((item) => {
+      if (item.type === 'multiple_choice') return { itemId: item.id, answerValues: [choiceAnswers[item.id]] }
+      // The sequence itself is the answer, so it travels as ordered values.
+      if (item.type === 'ordering') return { itemId: item.id, answerValues: orderAnswers[item.id] || item.options }
+      return { itemId: item.id, answerText: textAnswers[item.id].trim() }
+    }))
   }
 
   if (data.attempt) {
@@ -43,25 +53,25 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
     return (
       <section className="panel participant-question participant-custom-quiz">
         <div className="quiz-status-heading">
-          {graded ? <CheckCircle2 size={24} /> : failed ? <RefreshCw size={24} /> : <Clock3 size={24} />}
+          {graded ? <CheckCircle size={24} /> : failed ? <ArrowsClockwise size={24} /> : <Clock size={24} />}
           <div>
             <h2>{data.quiz.title}</h2>
-            <p>{graded ? (english ? 'Grading completed' : '評分完成') : failed ? (english ? 'Grading was interrupted' : '評分暫時失敗') : usesAiGrading ? (english ? 'Submitted. AI is grading in the background…' : '已送出，AI 正在背景評分…') : (english ? 'Submitted. Calculating the score…' : '已送出，正在計算分數…')}</p>
+            <p>{participantText(locale, graded ? 'gradingCompleted' : failed ? 'gradingInterrupted' : usesAiGrading ? 'gradingInBackground' : 'calculatingScore')}</p>
           </div>
           {graded && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
         </div>
-        {data.attempt.feedback && <p className="quiz-overall-feedback">{english ? data.attempt.feedback.en || data.attempt.feedback.zh_tw : data.attempt.feedback.zh_tw}</p>}
+        {data.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(data.attempt.feedback, locale)}</p>}
         {graded && data.items.map((item, index) => {
           const response = data.answers.find((answer) => answer.item_id === item.id)
-          const translation = english ? item.translations?.en : undefined
+          const translation = localizedFields(item.translations, locale)
           return (
             <article className="quiz-graded-item" key={item.id}>
               <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong><span>{response?.score ?? 0}/{item.points}</span></div>
-              <p>{english ? response?.feedback?.en || response?.feedback?.zh_tw : response?.feedback?.zh_tw}</p>
+              <p>{localizedFeedback(response?.feedback, locale)}</p>
             </article>
           )
         })}
-        {failed && <button disabled={busy} type="button" onClick={() => void onRetry()}><RefreshCw size={18} />{english ? 'Retry grading' : '重新評分'}</button>}
+        {failed && <button disabled={busy} type="button" onClick={() => void onRetry()}><ArrowsClockwise size={18} />{participantText(locale, 'retryGrading')}</button>}
       </section>
     )
   }
@@ -70,15 +80,15 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
     <section className="panel participant-question participant-custom-quiz">
       <h2>{data.quiz.title}</h2>
       <p className="muted">{usesAiGrading
-        ? (english ? 'Answer every question, then submit once. AI will grade written answers and provide feedback.' : '請完成所有題目後一次送出；填充與簡答題會由 AI 評分並提供回饋。')
-        : (english ? 'Answer every question, then submit once. Multiple-choice questions are scored immediately from the answer key without AI.' : '請完成所有題目後一次送出；選擇題會直接依答案計分，不會呼叫 AI 評分。')}</p>
+        ? participantText(locale, 'quizHintAi')
+        : participantText(locale, 'quizHintKey')}</p>
       <form className="custom-quiz-form" onSubmit={submit}>
         {data.items.map((item, index) => {
-          const translation = english ? item.translations?.en : undefined
+          const translation = localizedFields(item.translations, locale)
           const options = translation?.options?.length === item.options.length ? translation.options : item.options
           return (
             <fieldset className="custom-quiz-item" key={item.id}>
-              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}<small>{item.points} {english ? 'pts' : '分'}</small></legend>
+              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}<small>{item.points} {participantText(locale, 'points')}</small></legend>
               {item.type === 'multiple_choice' ? (
                 <div className="quiz-choice-list">
                   {item.options.map((option, optionIndex) => (
@@ -88,15 +98,22 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
                     </label>
                   ))}
                 </div>
+              ) : item.type === 'ordering' ? (
+                <QuizOrderingInput
+                  labels={(orderAnswers[item.id] || item.options).map((value) => options[item.options.indexOf(value)] ?? value)}
+                  locale={locale}
+                  values={orderAnswers[item.id] || item.options}
+                  onChange={(next) => setOrderAnswers((current) => ({ ...current, [item.id]: next }))}
+                />
               ) : item.type === 'fill_blank' ? (
-                <input value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={english ? 'Enter your answer' : '請輸入答案'} />
+                <input value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={participantText(locale, 'quizFillPlaceholder')} />
               ) : (
-                <textarea maxLength={4000} value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={english ? 'Write your answer' : '請輸入簡答內容'} />
+                <textarea maxLength={4000} value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={participantText(locale, 'quizShortPlaceholder')} />
               )}
             </fieldset>
           )
         })}
-        <button disabled={!complete || busy} type="submit"><Send size={18} />{busy ? (english ? 'Submitting…' : '送出中…') : (english ? 'Submit answers' : '送出答案')}</button>
+        <button disabled={!complete || busy} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, busy ? 'submitting' : 'submitAnswers')}</button>
       </form>
     </section>
   )

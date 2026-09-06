@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRight, LogIn } from 'lucide-react'
+import { ArrowRight, SignIn } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import { SetupNotice } from '../components/SetupNotice'
 
@@ -24,7 +24,7 @@ export function HomePage() {
         <div className="home-actions">
           <form className="join-form" onSubmit={join}>
             <input value={sessionId} onChange={(event) => setSessionId(event.target.value)} placeholder="輸入場次代碼" />
-            <button type="submit"><LogIn size={18} />加入場次<ArrowRight size={17} /></button>
+            <button type="submit"><SignIn size={18} />加入場次<ArrowRight size={17} /></button>
           </form>
         </div>
       </section>

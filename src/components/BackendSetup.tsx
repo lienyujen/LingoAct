@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, CircleDashed, ExternalLink, KeyRound, LoaderCircle, Rocket, Save, Server, XCircle } from 'lucide-react'
+import { ArrowSquareOut, CheckCircle, CircleDashed, CircleNotch, FloppyDisk, HardDrives, Key, Rocket, XCircle } from '@phosphor-icons/react'
 import { backendConfig, clearBackendConfig, requireSupabase, saveBackendConfig, testBackendConfig } from '../lib/supabase'
 import { canDeployBackend, checkToken, deployableFunctions, deployFunction, runSchema, setOwnerKey, setSecrets, verifyBackend } from '../lib/backendDeploy'
 import { generateOwnerKey, getOwnerKey, saveOwnerKey } from '../lib/ownerKey'
@@ -211,7 +211,7 @@ export function BackendSetup({ onCancel }: Props) {
 
   const panel = (
     <section className="panel backend-setup">
-        <span className="form-heading-icon"><Server size={24} /></span>
+        <span className="form-heading-icon"><HardDrives size={24} /></span>
         <h1>{embedded ? '系統設定' : '連接你的 Supabase 專案'}</h1>
         <p className="muted">
           LingoAct 使用你自己的 Supabase 專案存放課堂資料，資料不會經過其他人。
@@ -279,18 +279,18 @@ export function BackendSetup({ onCancel }: Props) {
             </>
           )}
         </p>
-        {ownerNotice && <p className="success"><CheckCircle2 size={15} /> {ownerNotice}</p>}
+        {ownerNotice && <p className="success"><CheckCircle size={15} /> {ownerNotice}</p>}
 
         {error && <p className="error">{error}</p>}
-        {notice && <p className="success"><CheckCircle2 size={15} /> {notice}</p>}
+        {notice && <p className="success"><CheckCircle size={15} /> {notice}</p>}
 
         <div className="backend-setup-actions">
           <button className="ghost-button" disabled={testing} type="button" onClick={() => void runTest()}>
-            {testing ? <LoaderCircle className="spin" size={17} /> : <KeyRound size={17} />}
+            {testing ? <CircleNotch className="spin" size={17} /> : <Key size={17} />}
             {testing ? '測試中...' : '測試連線'}
           </button>
           <button disabled={testing} type="button" onClick={save}>
-            <Save size={17} />{tested ? '儲存並開始使用' : '直接儲存'}
+            <FloppyDisk size={17} />{tested ? '儲存並開始使用' : '直接儲存'}
           </button>
         </div>
 
@@ -298,9 +298,9 @@ export function BackendSetup({ onCancel }: Props) {
           <summary>還沒建立後端？讓 LingoAct 幫你部署</summary>
           <p className="muted">
             在 <a href="https://supabase.com/dashboard" rel="noreferrer" target="_blank">
-              Supabase 後台 <ExternalLink size={12} />
+              Supabase 後台 <ArrowSquareOut size={12} />
             </a> 免費建立專案後，到 <a href="https://supabase.com/dashboard/account/tokens" rel="noreferrer" target="_blank">
-              Access Tokens <ExternalLink size={12} />
+              Access Tokens <ArrowSquareOut size={12} />
             </a> 產生一組權杖貼在下方，LingoAct 會自動建立資料表、部署後端函式並設定金鑰。
           </p>
 
@@ -324,7 +324,7 @@ export function BackendSetup({ onCancel }: Props) {
           </label>
           <p className="field-hint">
             課堂報告、題目分析與測驗批改都需要它。前往 <a href="https://aistudio.google.com/apikey" rel="noreferrer" target="_blank">
-              Google AI Studio <ExternalLink size={12} />
+              Google AI Studio <ArrowSquareOut size={12} />
             </a> 免費建立，有免費額度可用。
           </p>
 
@@ -334,7 +334,7 @@ export function BackendSetup({ onCancel }: Props) {
           </label>
           <p className="field-hint">
             如需使用即時口譯與多語字幕才要填。前往 <a href="https://platform.openai.com/api-keys" rel="noreferrer" target="_blank">
-              OpenAI Platform <ExternalLink size={12} />
+              OpenAI Platform <ArrowSquareOut size={12} />
             </a> 取得。<strong>依音訊時長計費</strong>，每種口譯語言各建立一條連線，需付費帳號且用量等級要足夠。
           </p>
 
@@ -344,12 +344,12 @@ export function BackendSetup({ onCancel }: Props) {
           </label>
           <p className="field-hint">
             讓 QR Code 的網址變短、比較好掃。前往 <a href="https://reurl.cc" rel="noreferrer" target="_blank">
-              reurl.cc <ExternalLink size={12} />
+              reurl.cc <ArrowSquareOut size={12} />
             </a> 免費註冊並取得縮網址 API key。不填也能用，只是網址較長。
           </p>
 
           <button className="backend-deploy-button" disabled={deploying || !canDeployBackend} type="button" onClick={() => void deployBackend()}>
-            {deploying ? <LoaderCircle className="spin" size={17} /> : <Rocket size={17} />}
+            {deploying ? <CircleNotch className="spin" size={17} /> : <Rocket size={17} />}
             {deploying ? '部署中...' : '開始自動部署'}
           </button>
 
@@ -359,9 +359,9 @@ export function BackendSetup({ onCancel }: Props) {
             <ul className="deploy-steps">
               {steps.map((step) => (
                 <li key={step.slug} className={`is-${step.status}`}>
-                  {step.status === 'done' && <CheckCircle2 size={14} />}
+                  {step.status === 'done' && <CheckCircle size={14} />}
                   {step.status === 'failed' && <XCircle size={14} />}
-                  {step.status === 'running' && <LoaderCircle className="spin" size={14} />}
+                  {step.status === 'running' && <CircleNotch className="spin" size={14} />}
                   {step.status === 'pending' && <CircleDashed size={14} />}
                   <span>{step.slug}</span>
                   {step.message && <em>{step.message}</em>}
@@ -370,7 +370,7 @@ export function BackendSetup({ onCancel }: Props) {
             </ul>
           )}
           <button className="danger-ghost-button" disabled={deploying} type="button" onClick={() => void regenerateOwnerKey()}>
-            <KeyRound size={17} />重新產生管理金鑰（切斷其他電腦）
+            <Key size={17} />重新產生管理金鑰（切斷其他電腦）
           </button>
         </details>
 

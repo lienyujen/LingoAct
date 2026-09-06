@@ -1,4 +1,4 @@
-import { Plus, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
 import type { QuestionType, QuizRequestedType } from '../types'
 import { CustomQuizFields } from './CustomQuizFields'
@@ -117,7 +117,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
                   type="button"
                   onClick={() => setOptions((current) => current.filter((_, optionIndex) => optionIndex !== index))}
                 >
-                  <Trash2 size={16} />
+                  <Trash size={16} />
                 </button>
               </div>
             ))}
@@ -157,7 +157,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
             <X size={17} />取消
           </button>
           <button disabled={type === 'custom_quiz' && !quizDirection.trim()} type="submit">
-            {type === 'custom_quiz' ? <Sparkles size={17} /> : <Send size={17} />}
+            {type === 'custom_quiz' ? <Sparkle size={17} /> : <PaperPlaneTilt size={17} />}
             {type === 'custom_quiz' ? 'AI 出題並派送' : '派送'}
           </button>
         </div>

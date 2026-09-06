@@ -1,4 +1,4 @@
-import { Languages, Mic, RefreshCw, Settings, X } from 'lucide-react'
+import { ArrowsClockwise, Gear, Microphone, Translate, X } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES, defaultInterpretationLanguages } from '../lib/captionLanguages'
@@ -130,7 +130,7 @@ export function PresenterSettingsModal({
       <form className="modal presenter-settings-modal" onSubmit={submit}>
         <div className="modal-heading">
           <div>
-            <h2><Settings size={20} />教師端設定</h2>
+            <h2><Gear size={20} />教師端設定</h2>
             <p className="muted">設定課程錄製、字幕外觀與學生端即時口譯語音</p>
           </div>
           <button className="ghost-button icon-button" aria-label="關閉設定" title="關閉" type="button" onClick={onClose}>
@@ -140,9 +140,9 @@ export function PresenterSettingsModal({
 
         <section className="presenter-settings-section">
           <div className="presenter-settings-section-heading">
-            <span><Mic size={17} />麥克風</span>
+            <span><Microphone size={17} />麥克風</span>
             <button className="ghost-button settings-refresh-button" type="button" onClick={onRefreshMicrophones} disabled={busy}>
-              <RefreshCw size={15} />重新掃描
+              <ArrowsClockwise size={15} />重新掃描
             </button>
           </div>
           <label>
@@ -166,7 +166,7 @@ export function PresenterSettingsModal({
         </section>
 
         <section className="presenter-settings-section">
-          <div className="presenter-settings-section-heading"><span><Languages size={17} />課程錄製、字幕與即時口譯語音</span></div>
+          <div className="presenter-settings-section-heading"><span><Translate size={17} />課程錄製、字幕與即時口譯語音</span></div>
           <p className="muted">錄製與字幕顯示分開控制；可只錄製供課後重點整理，不顯示即時字幕。所有功能預設關閉。</p>
           <div className="caption-language-row">
             <label>
@@ -247,7 +247,7 @@ export function PresenterSettingsModal({
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onClose}>取消</button>
           <button disabled={busy || (interpretationAudioEnabled && !interpretationLanguages.length)} type="submit">
-            <Settings size={17} />{busy ? '儲存中...' : '儲存設定'}
+            <Gear size={17} />{busy ? '儲存中...' : '儲存設定'}
           </button>
         </div>
       </form>

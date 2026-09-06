@@ -1,4 +1,4 @@
-import { AudioLines, Captions, CircleDot, Cloud, Dice5, DoorOpen, Eye, EyeOff, FolderUp, MessageSquare, MonitorUp, Send, Settings, Shapes, Sparkles, Square, Users } from 'lucide-react'
+import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Shapes, Share, Sparkle, Square, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import type { Session } from '../types'
 
@@ -13,6 +13,7 @@ type Props = {
   onCaptureScreen?: () => void
   onDrawLottery: () => void
   onStartBuzzer: () => void
+  onOpenListeningStudio: () => void
   onOpenTextDispatch: () => void
   onOpenFileTransfer: () => void
   onOpenRoster: () => void
@@ -36,6 +37,7 @@ export function PresenterControlPanel({
   onCaptureScreen,
   onDrawLottery,
   onStartBuzzer,
+  onOpenListeningStudio,
   onOpenTextDispatch,
   onOpenFileTransfer,
   onOpenRoster,
@@ -65,7 +67,7 @@ export function PresenterControlPanel({
             type="button"
             onClick={onStartBuzzer}
           >
-            <CircleDot size={19} />
+            <BellRinging size={19} />
           </button>
           <button
             aria-label="抽籤"
@@ -75,7 +77,7 @@ export function PresenterControlPanel({
             type="button"
             onClick={onDrawLottery}
           >
-            <Dice5 size={19} />
+            <DiceFive size={19} />
           </button>
           {isPlusEdition && (
             <button
@@ -85,11 +87,64 @@ export function PresenterControlPanel({
               type="button"
               onClick={onOpenSettings}
             >
-              <Settings size={19} />
+              <Gear size={19} />
             </button>
           )}
         </div>
       </div>
+
+      <div className="control-section">
+        <p className="control-section-label"><Shapes size={15} />課堂活動</p>
+        <div className="control-action-grid">
+          {onCaptureScreen && (
+            <button className="control-action share-action" type="button" onClick={onCaptureScreen} disabled={busy}>
+              <span className="control-action-icon"><MonitorArrowUp size={18} /></span>
+              截圖派題
+            </button>
+          )}
+          <button className="control-action listening-control-action" type="button" onClick={onOpenListeningStudio} disabled={busy}>
+            <span className="control-action-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v4" /></svg>
+            </span>
+            聽力播音室
+          </button>
+          <button className="control-action share-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
+            <span className="control-action-icon"><PaperPlaneTilt size={18} /></span>
+            文字派送
+          </button>
+          <button className="control-action energy-control-action" type="button" onClick={onOpenWordCloud} disabled={busy}>
+            <span className="control-action-icon"><Cloud size={18} /></span>
+            彈幕文字雲
+          </button>
+          {isPlusEdition && (
+            <>
+              <button className="control-action share-action" type="button" onClick={onOpenFileTransfer} disabled={busy}>
+                <span className="control-action-icon"><Share size={18} /></span>
+                檔案傳送
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="control-section">
+        <p className="control-section-label"><Sparkle size={15} />課堂收尾</p>
+        <div className="control-footer-actions">
+          <button className="stop-question-button" type="button" onClick={onStopQuestion} disabled={busy || !session.current_question_id}>
+            <Square size={16} />
+            停止作答
+          </button>
+          <button className="exit-ticket-button" type="button" onClick={onGenerateExitTicket} disabled={busy || Boolean(session.exit_ticket_prompt)}>
+            <Sparkle size={17} />
+            {session.exit_ticket_prompt ? 'Exit Ticket 已派送' : 'AI 生成 Exit Ticket'}
+          </button>
+        </div>
+      </div>
+
+      <button className="end-class-button" type="button" onClick={onEndClass} disabled={busy}>
+        <DoorOpen size={16} />
+        下課並產生報告
+      </button>
 
       <div className="control-section">
         <p className="control-section-label"><Eye size={15} />課堂設定</p>
@@ -101,7 +156,7 @@ export function PresenterControlPanel({
             onClick={onToggleDanmaku}
             disabled={busy}
           >
-            {session.danmaku_enabled ? <Eye size={16} /> : <EyeOff size={16} />}
+            {session.danmaku_enabled ? <Eye size={16} /> : <EyeSlash size={16} />}
             <span>彈幕</span>
             <b>{session.danmaku_enabled ? '開啟' : '關閉'}</b>
           </button>
@@ -112,43 +167,34 @@ export function PresenterControlPanel({
             onClick={onToggleAnonymous}
             disabled={busy}
           >
-            <MessageSquare size={16} />
+            <Chat size={16} />
             <span>匿名</span>
             <b>{session.anonymous_enabled ? '開啟' : '關閉'}</b>
           </button>
-        </div>
-      </div>
-
-      <div className="control-section">
-        <p className="control-section-label"><Shapes size={15} />課堂活動</p>
-        <div className="control-action-grid">
-          {onCaptureScreen && (
-            <button className="control-action share-action" type="button" onClick={onCaptureScreen} disabled={busy}>
-              <span className="control-action-icon"><MonitorUp size={18} /></span>
-              截圖派題
-            </button>
-          )}
-          <button className="control-action share-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
-            <span className="control-action-icon"><Send size={18} /></span>
-            文字派送
-          </button>
-          <button className="control-action energy-control-action" type="button" onClick={onOpenWordCloud} disabled={busy}>
-            <span className="control-action-icon"><Cloud size={18} /></span>
-            彈幕文字雲
-          </button>
           {isPlusEdition && (
             <>
-              <button className="control-action share-action" type="button" onClick={onOpenFileTransfer} disabled={busy}>
-                <span className="control-action-icon"><FolderUp size={18} /></span>
-                檔案傳送
+              <button
+                aria-pressed={session.recording_enabled}
+                className={`control-toggle${session.recording_enabled ? ' is-active' : ''}`}
+                type="button"
+                onClick={onToggleRecording}
+                disabled={busy || session.caption_status === 'starting'}
+              >
+                <Waveform size={16} />
+                <span>錄製</span>
+                <b>{session.caption_status === 'starting' ? '連線中' : session.recording_enabled ? '開啟' : '關閉'}</b>
               </button>
-              <button className={`control-action caption-control-action${session.recording_enabled ? ' is-active' : ''}`} type="button" onClick={onToggleRecording} disabled={busy || session.caption_status === 'starting'}>
-                <span className="control-action-icon"><AudioLines size={18} /></span>
-                {session.caption_status === 'starting' ? '錄製連線中' : session.recording_enabled ? '停止課程錄製' : '開始課程錄製'}
-              </button>
-              <button className={`control-action caption-control-action${session.captions_enabled ? ' is-active' : ''}`} type="button" onClick={onToggleCaptionVisibility} disabled={busy || !session.recording_enabled || session.caption_status === 'starting'} title={session.recording_enabled ? '控制教師與學生端的即時字幕顯示' : '請先開啟課程錄製'}>
-                <span className="control-action-icon"><Captions size={18} /></span>
-                {session.captions_enabled ? '關閉字幕' : '開啟字幕'}
+              <button
+                aria-pressed={session.captions_enabled}
+                className={`control-toggle${session.captions_enabled ? ' is-active' : ''}`}
+                type="button"
+                onClick={onToggleCaptionVisibility}
+                disabled={busy || !session.recording_enabled || session.caption_status === 'starting'}
+                title={session.recording_enabled ? '控制教師與學生端的即時字幕顯示' : '請先開啟課程錄製'}
+              >
+                <ClosedCaptioning size={16} />
+                <span>字幕</span>
+                <b>{session.captions_enabled ? '開啟' : '關閉'}</b>
               </button>
             </>
           )}
@@ -156,24 +202,7 @@ export function PresenterControlPanel({
         {isPlusEdition && captionError && <p className="error caption-control-error">{captionError}</p>}
       </div>
 
-      <div className="control-section">
-        <p className="control-section-label"><Sparkles size={15} />課堂收尾</p>
-        <div className="control-footer-actions">
-          <button className="stop-question-button" type="button" onClick={onStopQuestion} disabled={busy || !session.current_question_id}>
-            <Square size={16} />
-            停止作答
-          </button>
-          <button className="exit-ticket-button" type="button" onClick={onGenerateExitTicket} disabled={busy || Boolean(session.exit_ticket_prompt)}>
-            <Sparkles size={17} />
-            {session.exit_ticket_prompt ? 'Exit Ticket 已派送' : 'AI 生成 Exit Ticket'}
-          </button>
-        </div>
-      </div>
 
-      <button className="end-class-button" type="button" onClick={onEndClass} disabled={busy}>
-        <DoorOpen size={16} />
-        下課並產生報告
-      </button>
     </section>
   )
 }

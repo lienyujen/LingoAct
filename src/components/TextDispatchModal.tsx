@@ -1,4 +1,4 @@
-import { Link, Send, X } from 'lucide-react'
+import { Link, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
@@ -64,7 +64,7 @@ export function TextDispatchModal({ busy, error, open, onCancel, onSend }: Props
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>取消</button>
           <button disabled={busy || (!body.trim() && !url.trim())} type="submit">
-            <Send size={17} />{busy ? '派送中...' : '立即派送'}
+            <PaperPlaneTilt size={17} />{busy ? '派送中...' : '立即派送'}
           </button>
         </div>
       </form>

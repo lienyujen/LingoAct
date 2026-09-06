@@ -1,4 +1,4 @@
-import { ArrowLeft, GripHorizontal, Minus, X } from 'lucide-react'
+import { ArrowLeft, DotsSixVertical, Minus, X } from '@phosphor-icons/react'
 
 interface DesktopWindowChromeProps {
   confirmClose?: boolean
@@ -19,7 +19,7 @@ export function DesktopWindowChrome({ confirmClose = true, onBack }: DesktopWind
   return (
     <header className="desktop-window-chrome">
       <div className="desktop-drag-handle" title="拖曳視窗">
-        <GripHorizontal size={16} />
+        <DotsSixVertical size={16} />
         <span>LingoAct</span>
       </div>
       <div className="desktop-window-actions">

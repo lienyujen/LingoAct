@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { BookOpen, PartyPopper, Send, Sparkles, Waves } from 'lucide-react'
+import { BookOpen, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-icons/react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
+import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
 import type { QuizSubmission } from '../components/ParticipantCustomQuiz'
@@ -17,8 +18,7 @@ import { StudentSocialLinks } from '../components/StudentSocialLinks'
 import { ParticipantLanguageSwitcher } from '../components/ParticipantLanguageSwitcher'
 import { isBuzzerAccepting } from '../lib/buzzer'
 import {
-  MESSAGE_MAX_CJK_CHARACTERS,
-  MESSAGE_MAX_ENGLISH_WORDS,
+  MESSAGE_MAX_DENSE_CHARACTERS,
   MESSAGE_MAX_RAW_CHARACTERS,
   messageFitsLimit,
   messageUsage,
@@ -26,9 +26,12 @@ import {
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
 import { trackParticipantPresence } from '../lib/participantPresence'
-import { participantLocaleFromStorage, participantText } from '../lib/participantI18n'
+import { contentLocaleKey, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
+import { exitTicketPrompt } from '../lib/sessionContent'
+import { fetchListeningClip } from '../lib/listening'
+import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantLocale } from '../lib/participantI18n'
-import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, LotterySessionEvent, Participant, ParticipantQuizData, Question, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent } from '../types'
+import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent } from '../types'
 
 async function participantFunctionMessage(error: unknown, fallback: string) {
   const context = (error as { context?: Response } | null)?.context
@@ -57,6 +60,7 @@ export function ParticipantPage() {
   const [quizBusy, setQuizBusy] = useState(false)
   const [quizLoadError, setQuizLoadError] = useState('')
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null)
+  const [listeningClip, setListeningClip] = useState<ListeningClip | null>(null)
   const [exitTicket, setExitTicket] = useState<ExitTicket | null>(null)
   const [sessionSummary, setSessionSummary] = useState<SessionAnalysis | null>(null)
   const [sharedContents, setSharedContents] = useState<SharedContent[]>([])
@@ -85,7 +89,7 @@ export function ParticipantPage() {
     if (session?.status !== 'active' || !participant?.id || !participantToken) return
     return trackParticipantPresence({ sessionId, participantId: participant.id, participantToken })
   }, [participant?.id, participantToken, session?.status, sessionId])
-  const localizedSummary = locale === 'en' ? sessionSummary?.translations?.en || sessionSummary : sessionSummary
+  const localizedSummary = sessionSummary?.translations?.[contentLocaleKey(locale)] || sessionSummary
   const participantName = participant?.name || localStorage.getItem(`lingoact_name_${sessionId}`) || ''
 
   function changeLocale(nextLocale: ParticipantLocale) {
@@ -182,7 +186,7 @@ export function ParticipantPage() {
           setQuizData(null)
           setQuizLoadError(await participantFunctionMessage(
             quizError,
-            locale === 'en' ? 'Unable to load this quiz. Please refresh or scan the QR code again.' : '無法載入測驗，請重新整理；若仍無法顯示，請重新掃描 QR Code 加入。',
+            participantText(locale, 'quizLoadFailed'),
           ))
         } else if (loadedQuiz?.generating) {
           setQuizData(null)
@@ -196,7 +200,7 @@ export function ParticipantPage() {
         loadedQuizQuestionId.current = ''
         setQuizData(null)
         setQuizLoadError(nextQuestion?.type === 'custom_quiz'
-          ? (locale === 'en' ? 'Your participant access has expired. Please scan the QR code again.' : '學員權限已失效，請重新掃描 QR Code 加入。')
+          ? participantText(locale, 'accessExpired')
           : '')
       }
 
@@ -206,6 +210,16 @@ export function ParticipantPage() {
         setScreenshot(data as Screenshot | null)
       } else {
         setScreenshot(null)
+      }
+
+      if (nextQuestion?.listening_clip_id) {
+        // Failing to load the clip must not take the rest of the page with it:
+        // the student can still read the prompt and answer.
+        const clip = await fetchListeningClip(nextQuestion.listening_clip_id).catch(() => null)
+        if (requestId !== loadSequence.current) return
+        setListeningClip(clip)
+      } else {
+        setListeningClip(null)
       }
     } else {
       setQuestion(null)
@@ -313,7 +327,7 @@ export function ParticipantPage() {
     const content = message.trim()
     if (!participant || session?.status !== 'active' || !content) return
     if (!messageFitsLimit(content)) {
-      setError(`彈幕上限為 ${MESSAGE_MAX_CJK_CHARACTERS} 個中文字或 ${MESSAGE_MAX_ENGLISH_WORDS} 個英文單字。`)
+      setError(participantText(locale, 'limit'))
       return
     }
     setError('')
@@ -501,15 +515,15 @@ export function ParticipantPage() {
         <SetupNotice />
         <StudentSocialLinks />
         <section className="participant-ended-hero">
-          <span className="participant-ended-icon"><PartyPopper size={34} /></span>
+          <span className="participant-ended-icon"><Confetti size={34} /></span>
           <p className="eyebrow">{participantText(locale, 'courseEnded')}</p>
           <h1>{participantText(locale, 'classDismissed')}</h1>
-          <p>{participantName ? `${participantName}${locale === 'en' ? ', ' : '，'}${participantText(locale, 'thankYou')}` : participantText(locale, 'thankYou')}</p>
+          <p>{participantName ? participantText(locale, 'thankYouNamed', { name: participantName }) : participantText(locale, 'thankYou')}</p>
         </section>
         {sessionSummary && (
           <section className="panel participant-summary-panel" aria-live="polite">
             <div className="participant-summary-heading">
-              <span className="heading-icon"><Sparkles size={18} /></span>
+              <span className="heading-icon"><Sparkle size={18} /></span>
               <div>
                 <p className="eyebrow">{participantText(locale, 'aiSummary')}</p>
                 <h2>{participantText(locale, 'todayHighlights')}</h2>
@@ -595,7 +609,7 @@ export function ParticipantPage() {
       <StudentSocialLinks />
       <header className="participant-header">
         <h1>
-          <strong>{participant?.name || participantText(locale, 'attendee')}</strong>{locale === 'en' ? participantText(locale, 'welcome') : `，${participantText(locale, 'welcome')}`}{session?.title || participantText(locale, 'session')}
+          <strong>{participant?.name || participantText(locale, 'attendee')}</strong>{participantText(locale, 'welcomeToSession', { title: session?.title || participantText(locale, 'session') })}
         </h1>
       </header>
       {session && (
@@ -624,7 +638,7 @@ export function ParticipantPage() {
           <ExitTicketForm
             busy={exitTicketBusy}
             category={session.exit_ticket_category}
-            prompt={locale === 'en' ? session.exit_ticket_prompt_en || session.exit_ticket_prompt : session.exit_ticket_prompt}
+            prompt={exitTicketPrompt(session, locale) || ''}
             ticket={exitTicket}
             locale={locale}
             onSubmit={submitExitTicket}
@@ -635,13 +649,23 @@ export function ParticipantPage() {
       {screenshot && question?.type !== 'file_upload' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
+      {listeningClip && question && (
+        <ListeningPlayer
+          clip={listeningClip}
+          questionId={question.id}
+          replayLimit={question.replay_limit}
+          variant={question.type === 'pronunciation' ? 'model' : 'listening'}
+          prompt={localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
+          locale={locale}
+        />
+      )}
       {question?.type === 'custom_quiz' ? (quizData ? (
         <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
-          <h2>{locale === 'en' ? 'Custom quiz' : '自訂測驗'}</h2>
-          <p className={quizLoadError ? 'error' : 'muted'}>{quizLoadError || (locale === 'en' ? 'Preparing questions, please wait…' : '出題中，請稍候')}</p>
-          {quizLoadError && <button type="button" onClick={() => void loadAll()}>{locale === 'en' ? 'Try again' : '重新載入'}</button>}
+          <h2>{participantText(locale, 'customQuiz')}</h2>
+          <p className={quizLoadError ? 'error' : 'muted'}>{quizLoadError || participantText(locale, 'preparingQuestions')}</p>
+          {quizLoadError && <button type="button" onClick={() => void loadAll()}>{participantText(locale, 'tryAgain')}</button>}
         </section>
       )) : <ParticipantQuestionView
         answer={answer}
@@ -678,10 +702,10 @@ export function ParticipantPage() {
         </label>
         <p className={`message-limit${message && !messageFitsLimit(message) ? ' over-limit' : ''}`}>
           {participantText(locale, 'limit')}
-          {message && ` · ${participantText(locale, 'used')} ${Math.ceil(messageUsage(message).units)}/${MESSAGE_MAX_CJK_CHARACTERS}`}
+          {message && ` · ${participantText(locale, 'used')} ${Math.ceil(messageUsage(message).units)}/${MESSAGE_MAX_DENSE_CHARACTERS}`}
         </p>
         {error && <p className="error">{error}</p>}
-        <button disabled={!message.trim() || !messageFitsLimit(message)} type="submit"><Send size={18} />{participantText(locale, 'send')}</button>
+        <button disabled={!message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
       </form>
       <LotteryOverlay event={lotteryEvent} participantId={participant?.id} />
       <BuzzerOverlay

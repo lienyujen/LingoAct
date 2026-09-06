@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { BrainCircuit, Check, Clock3, Maximize2, Save, X } from 'lucide-react'
+import { ArrowsOut, Brain, Check, Clock, FloppyDisk, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question } from '../types'
 
 type Props = {
@@ -70,7 +70,7 @@ export function QuizAnswerEditor({ showAnswers, busyItemId, draftAnswers, result
                   type="button"
                   onClick={() => void onUpdateAnswer(item.id, (draftAnswers[item.id] ?? acceptedAnswers.join('\n')).split('\n').map((answer) => answer.trim()).filter(Boolean))}
                 >
-                  <Save size={16} />儲存參考答案
+                  <FloppyDisk size={16} />儲存參考答案
                 </button>
               </div>
             )}
@@ -142,10 +142,10 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">
-        <div><p className="eyebrow"><BrainCircuit size={17} />自訂測驗</p><h2>{results.quiz.title || question.title}</h2></div>
+        <div><p className="eyebrow"><Brain size={17} />自訂測驗</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
           <span>{results.attempts.length}/{onlineCount} 人作答</span>
-          <button aria-label="放大檢視測驗" className="icon-button" title="放大檢視測驗" type="button" onClick={openExpandedReview}><Maximize2 size={20} /></button>
+          <button aria-label="放大檢視測驗" className="icon-button" title="放大檢視測驗" type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>
         </div>
       </div>
       <div className="quiz-result-stats">
@@ -159,7 +159,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
       </label>
       {error && <p className="error">{error}</p>}
       <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>
-      {grading.length > 0 && <p className="quiz-grading-note"><Clock3 size={16} />AI 正在背景評分，完成後會自動更新。</p>}
+      {grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />AI 正在背景評分，完成後會自動更新。</p>}
       <div className="quiz-attempt-list">
         {results.attempts.map((attempt, index) => (
           <article key={attempt.id}>
@@ -173,7 +173,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         <div className="custom-quiz-review-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpanded(false) }}>
           <section aria-label="自訂測驗放大檢視" aria-modal="true" className="custom-quiz-review-modal" role="dialog">
             <header>
-              <div><p className="eyebrow"><BrainCircuit size={17} />自訂測驗檢視與答案調整</p><h2>{results.quiz.title || question.title}</h2></div>
+              <div><p className="eyebrow"><Brain size={17} />自訂測驗檢視與答案調整</p><h2>{results.quiz.title || question.title}</h2></div>
               <button aria-label="關閉放大視窗" className="icon-button" title="關閉" type="button" onClick={() => setExpanded(false)}><X size={22} /></button>
             </header>
             <div className={`custom-quiz-review-content${results.screenshot ? '' : ' is-single'}`}>

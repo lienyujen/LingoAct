@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, History, RotateCcw } from 'lucide-react'
+import { ArrowCounterClockwise, CaretDown, CaretUp, ClockCounterClockwise } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
 import type { Question } from '../types'
 
@@ -36,17 +36,17 @@ export function QuestionHistory({
         type="button"
         onClick={() => setOpen((current) => !current)}
       >
-        <History size={17} />
+        <ClockCounterClockwise size={17} />
         <span>歷史題目</span>
         <strong>{history.length}</strong>
-        {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+        {open ? <CaretUp size={17} /> : <CaretDown size={17} />}
       </button>
 
       {open && (
         <div className="question-history-list">
           {selectedQuestionId !== activeQuestionId && activeQuestionId && (
             <button className="question-history-return" type="button" onClick={() => onSelect(activeQuestionId)}>
-              <RotateCcw size={15} />回到目前題目
+              <ArrowCounterClockwise size={15} />回到目前題目
             </button>
           )}
           {history.map(({ question, number }) => (

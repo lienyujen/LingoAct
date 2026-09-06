@@ -1,3 +1,9 @@
+// AI-generated translations of stored content, keyed by content locale — 'en',
+// 'ja', 'zh_tw'. It was a single optional 'en' field while English was the only
+// language a student could read in; the key is now whichever guidance language
+// was asked for, and an absent one means the original text is shown.
+export type Translated<T> = Record<string, T | undefined>
+
 export type Session = {
   id: string
   title: string
@@ -7,8 +13,16 @@ export type Session = {
   anonymous_enabled: boolean
   current_question_id: string | null
   short_join_url: string | null
+  // The language being taught, the language it is explained in, and how far
+  // along the class is. Independent of one another: a beginners Japanese class
+  // in Taiwan teaches ja, explains in zh-TW and sits at JLPT N5.
+  teaching_language: string
+  guidance_language: string
+  level_framework: string | null
+  level_code: string | null
   exit_ticket_prompt: string | null
   exit_ticket_prompt_en: string | null
+  exit_ticket_prompt_translations?: Record<string, string> | null
   exit_ticket_category: ExitTicketCategory | null
   exit_ticket_response_type: ExitTicketResponseType | null
   recording_enabled: boolean
@@ -71,8 +85,37 @@ export type Screenshot = {
   created_at: string
 }
 
-export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload'
-export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer'
+export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'listening'
+
+export type ListeningKind = 'passage' | 'dialogue' | 'scene'
+
+// What a student is allowed to know about a clip. The transcript and the source
+// screenshot are missing on purpose: the database does not grant them to the
+// anon role, because between them they are the answer to the exercise.
+export type ListeningClip = {
+  id: string
+  session_id: string
+  kind: ListeningKind
+  language: string
+  duration_ms: number | null
+  public_url: string
+  created_at: string
+}
+
+// The teacher's view, assembled server-side where the transcript is readable.
+export type PresenterListeningClip = ListeningClip & {
+  annotation: 'none' | 'zhuyin' | 'pinyin'
+  annotation_text: string | null
+  font_url: string | null
+  screenshot_id: string | null
+  source: 'screenshot' | 'text'
+  script: 'traditional' | 'simplified' | null
+  transcript: string
+  voices: { instruction?: string; speakers?: string[] }
+}
+// 'ordering' arrives with its fragments already shuffled; the correct sequence
+// stays in quiz_item_keys, which the anon role cannot read.
+export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering'
 export type QuizRequestedType = 'random' | QuizItemType
 export type ExitTicketCategory = 'lesson_summary' | 'learning_assessment' | 'course_satisfaction' | 'student_question'
 export type ExitTicketResponseType = 'text' | 'rating'
@@ -133,18 +176,26 @@ export type Question = {
   id: string
   session_id: string
   screenshot_id: string | null
+  // Always null for a listening question, and that is the point: the clip is
+  // reached through listening_clip_id, which carries no image.
+  listening_clip_id: string | null
+  // Null means unlimited, which suits practice. A listening test that can be
+  // replayed without limit is a transcription exercise.
+  replay_limit: number | null
+  // Set only on a read-aloud item, where the words are meant to be seen. The
+  // subset is cut from the clip's own characters, so a listening item never
+  // carries it.
+  reading_font_url?: string | null
   type: QuestionType
   status: 'draft' | 'active' | 'stopped' | 'closed'
   title: string
   prompt_text: string | null
   options: string[]
-  translations: {
-    en?: {
-      title?: string
-      prompt_text?: string | null
-      options?: string[]
-    }
-  }
+  translations: Translated<{
+    title?: string
+    prompt_text?: string | null
+    options?: string[]
+  }>
   allow_multiple: boolean
   correct_answer: string | null
   correct_answers: string[]
@@ -178,7 +229,7 @@ export type AudioAnalysis = {
   strengths: string[]
   improvements: string[]
   limitations: string[]
-  translations?: { en?: Omit<AudioAnalysis, 'translations'> }
+  translations?: Translated<Omit<AudioAnalysis, 'translations'>>
 }
 
 export type AudioResponse = {
@@ -275,7 +326,7 @@ export type SessionAnalysis = {
     follow_up_questions: string[]
   }
   limitations: string[]
-  translations?: { en?: Omit<SessionAnalysis, 'translations'> }
+  translations?: Translated<Omit<SessionAnalysis, 'translations'>>
 }
 
 export type Quiz = {
@@ -298,12 +349,10 @@ export type QuizItem = {
   prompt_text: string
   options: string[]
   points: number
-  translations: {
-    en?: {
-      prompt_text?: string
-      options?: string[]
-    }
-  }
+  translations: Translated<{
+    prompt_text?: string
+    options?: string[]
+  }>
   created_at: string
 }
 

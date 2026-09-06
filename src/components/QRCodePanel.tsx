@@ -1,5 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react'
-import { Minus, QrCode, X } from 'lucide-react'
+import { Minus, QrCode, X } from '@phosphor-icons/react'
 import type { HTMLAttributes } from 'react'
 
 type Props = {

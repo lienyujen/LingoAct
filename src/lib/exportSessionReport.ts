@@ -36,12 +36,14 @@ const questionTypeLabels = {
   oral_response: '口語表達',
   custom_quiz: '自訂測驗',
   file_upload: '上傳作答',
+  listening: '聽力',
 }
 
 const quizItemTypeLabels = {
   multiple_choice: '選擇題',
   fill_blank: '填充題',
   short_answer: '簡答題',
+  ordering: '排序題',
 }
 
 const exitTicketCategoryLabels = {

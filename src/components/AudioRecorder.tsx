@@ -1,8 +1,9 @@
-import { CircleStop, Mic, RotateCcw } from 'lucide-react'
+import { ArrowCounterClockwise, Microphone, StopCircle } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { recordingToWav } from '../lib/audio'
 import type { AudioResponse, Question } from '../types'
 import { participantText } from '../lib/participantI18n'
+import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantLocale } from '../lib/participantI18n'
 
 type Props = {
@@ -106,7 +107,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
 
   if (response) {
     const originalAnalysis = response.analysis_json
-    const analysis = locale === 'en' ? originalAnalysis?.translations?.en || originalAnalysis : originalAnalysis
+    const analysis = localizedFields(originalAnalysis?.translations, locale) || originalAnalysis
     return (
       <div className="audio-response-card" aria-live="polite">
         {question.status === 'active' ? (
@@ -149,7 +150,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
         type="button"
         onClick={recording ? stopRecording : startRecording}
       >
-        {recording ? <CircleStop size={28} /> : busy ? <RotateCcw className="spin" size={28} /> : <Mic size={28} />}
+        {recording ? <StopCircle size={28} /> : busy ? <ArrowCounterClockwise className="spin" size={28} /> : <Microphone size={28} />}
         <span>{recording ? `${participantText(locale, 'stopRecording')} ${formatDuration(elapsed)}` : busy ? participantText(locale, 'uploading') : participantText(locale, 'startRecording')}</span>
       </button>
       {error && <p className="error">{error}</p>}

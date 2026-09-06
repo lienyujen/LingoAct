@@ -18,7 +18,9 @@ const stopWords = new Set([
   'the', 'and', 'that', 'this', 'with', 'from', 'have', 'just', 'very', 'teacher',
 ])
 
-const palette = ['#68a4ff', '#ffd166', '#ff7f6e', '#55d6a7', '#f4f7ff', '#b7c8ff']
+// Bright enough to read on the near-black stage, and hued around the plum the
+// rest of the app now uses rather than the blues it inherited.
+const palette = ['#e08ab5', '#e8b45c', '#5fc9c2', '#7fc98f', '#f2eef4', '#b79ad0']
 
 function hashText(text: string) {
   let hash = 2166136261
@@ -88,7 +90,7 @@ export function WordCloudCanvas({ messages }: { messages: Message[] }) {
       .words(words)
       .padding((word) => word.size > 58 ? 8 : 5)
       .rotate(0)
-      .font('Inter, Noto Sans TC, Microsoft JhengHei, sans-serif')
+      .font('"Segoe UI Variable Text", "Segoe UI", Noto Sans TC, Microsoft JhengHei, sans-serif')
       .fontWeight((word) => word.size > 48 ? 800 : 700)
       .fontSize((word) => word.size)
       .random(seededRandom(seed))

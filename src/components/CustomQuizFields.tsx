@@ -19,40 +19,48 @@ export function CustomQuizFields({
   onDirectionChange,
   onTypeChange,
 }: Props) {
+  const writing = quizType === 'writing'
+
   return (
     <div className="custom-quiz-editor">
       <div className="custom-quiz-settings-row">
         <label>
-          題數
+          {writing ? '欄位數' : '題數'}
           <select value={count} onChange={(event) => onCountChange(event.target.value)}>
             <option value="auto">自動判斷</option>
             {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
-              <option key={value} value={value}>{value} 題</option>
+              <option key={value} value={value}>{value} {writing ? '欄' : '題'}</option>
             ))}
           </select>
         </label>
         <label>
-          題型
+          {writing ? '型式' : '題型'}
           <select value={quizType} onChange={(event) => onTypeChange(event.target.value as QuizRequestedType)}>
             <option value="random">隨機／AI自動判斷</option>
             <option value="multiple_choice">選擇題</option>
             <option value="fill_blank">填充題</option>
             <option value="short_answer">簡答題</option>
+            <option value="ordering">排序題</option>
+            <option value="writing">寫作教練（不評分）</option>
           </select>
         </label>
       </div>
       <label className="question-prompt-field">
-        出題方向
+        {writing ? '寫作方向' : '出題方向'}
         <textarea
           maxLength={2000}
           required
           rows={4}
           value={direction}
-          placeholder="請說明測驗對象、欲測能力與題目難度"
+          placeholder={writing
+            ? '請說明寫作對象、主題與希望學生用到的詞語或句型'
+            : '請說明測驗對象、欲測能力與題目難度'}
           onChange={(event) => onDirectionChange(event.target.value)}
         />
       </label>
-      <p className="muted custom-quiz-hint">也可以直接在出題方向指定題數與題型；題數選「自動判斷」、題型選「隨機」即可。</p>
+      <p className="muted custom-quiz-hint">{writing
+        ? 'AI 只負責開出要寫的欄位，學生填完送回後由你直接看，不會用 AI 批改。'
+        : '也可以直接在出題方向指定題數與題型；題數選「自動判斷」、題型選「隨機」即可。'}</p>
     </div>
   )
 }

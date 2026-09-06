@@ -91,15 +91,29 @@ why `release.yml` deliberately builds without a `.env`.
   against the database's clock, anchored on `started_at` — a countdown the
   client alone could be talked out of is not a deadline. Audio is deliberately
   outside that rule; see the migration for why.
+- **寫作教練**, which is the custom-quiz machinery with the marking switched
+  off: `quizzes.graded` false, items generated as writing fields rather than
+  questions, and the attempt reaching a `submitted` state that carries no
+  score. The teacher reads the writing on screen or in the workbook. Grading a
+  class's free writing would be the most expensive call this app makes, and it
+  is not what was asked for.
+
+Self-paced activities ride on that same machinery rather than needing anything
+new: `sessions.current_question_id` holds one question for the whole class, but
+a quiz behind it carries many items and one attempt per student, so everyone
+moves through it at their own speed. What it does *not* yet do is serve an item
+twice — `quiz_item_answers` is unique per (attempt, item) — which is the one
+thing flashcards will need.
 
 What is **not** done:
 
 - **No release has been published**, and the version is `0.1.0` rather than
   InterAct's numbering.
 - Of the twelve teaching activities on the list, 配對, flashcard re-serving,
-  聽打接力, 看圖說話 (AI images, v2) and the 寫作教練 are still open. Before
-  building the self-paced ones, note that `sessions.current_question_id` holds a
-  single question: the whole class is on the same item by construction.
+  聽打接力 and 看圖說話 (AI images, v2) are still open. Flashcards additionally
+  need repeated tries at one item, which the unique constraint above forbids;
+  the least disruptive shape is a separate tries table, leaving
+  `quiz_item_answers` as the final answer that scoring already reads.
 - `pnpm desktop:package` has not been run since `subset-font` was added. pnpm's
   symlinks may defeat the electron-builder `files` globs; the likely fix is
   `node-linker=hoisted` in `.npmrc`.

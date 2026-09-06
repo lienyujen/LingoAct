@@ -996,7 +996,7 @@ h2 {
   background: var(--surface-strong);
   border: 1px solid rgb(255 255 255 / 18%);
   border-radius: 999px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
   color: #fff;
   display: inline-flex;
   gap: 7px;
@@ -1008,7 +1008,7 @@ h2 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
   display: grid;
   min-width: 170px;
   overflow: hidden;
@@ -1668,7 +1668,7 @@ h2 {
 }
 
 .quiz-result-stats > div {
-  background: var(--surface-soft);
+  background: var(--surface-subtle);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -1704,7 +1704,7 @@ h2 {
 }
 
 .presenter-quiz-review-item {
-  background: var(--surface-soft);
+  background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 14px;
   display: grid;
@@ -1839,7 +1839,7 @@ h2 {
 
 .custom-quiz-source-panel,
 .custom-quiz-question-panel {
-  background: var(--surface-soft);
+  background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 16px;
   min-height: 0;
@@ -1860,7 +1860,7 @@ h2 {
 }
 
 .custom-quiz-native-page {
-  background: var(--background);
+  background: var(--bg);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
@@ -3899,7 +3899,7 @@ h2 {
 
 .file-transfer-tabs button.is-active {
   background: var(--surface);
-  border-color: var(--accent);
+  border-color: var(--primary);
   color: var(--text);
   font-weight: 600;
 }
@@ -3936,8 +3936,8 @@ h2 {
 }
 
 .file-dropzone.is-dragging {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: var(--primary);
 }
 
 .file-transfer-controls {
@@ -4967,4 +4967,28 @@ h2 {
 .question-clock.spent {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+/* 寫作教練 results: the writing itself is what the teacher came to read, so it
+   gets room to be read rather than being squeezed onto the name row. */
+.quiz-written-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.quiz-written-answer span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.quiz-written-answer p,
+.quiz-written-back {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--border-strong);
+  background: var(--surface-subtle);
+  white-space: pre-wrap;
+  line-height: 1.65;
 }

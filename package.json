@@ -15,7 +15,7 @@
     "desktop:package:plus": "pnpm build:plus && cross-env APP_EDITION=plus electron-builder --win portable --x64",
     "build": "tsc -b && vite build",
     "build:plus": "tsc -b && cross-env VITE_APP_EDITION=plus vite build",
-    "lint": "oxlint",
+    "lint": "oxlint && node scripts/check-css-tokens.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -329,6 +329,7 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
   const questionById = new Map(data.questions.map((question) => [question.id, question]))
   const quizItemById = new Map(data.customQuizResults.items.map((item) => [item.id, item]))
   const quizAttemptById = new Map(data.customQuizResults.attempts.map((attempt) => [attempt.id, attempt]))
+  const quizById = new Map(data.customQuizResults.quizzes.map((quiz) => [quiz.id, quiz]))
   const answers = workbook.addWorksheet('答案')
   answers.columns = [
     { header: '題次', key: 'questionNumber', width: 8 },
@@ -359,14 +360,18 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
     if (!attempt || !item) continue
     const itemPoints = Number(item.points) || 0
     const score = typeof answer.score === 'number' ? answer.score : null
+    // 寫作教練 is never marked, so a missing score here is the finished state,
+    // not a pending one. Reporting it as 評分中 would leave the teacher waiting
+    // for a column that is never going to fill in.
+    const writing = quizById.get(item.quiz_id)?.graded === false
     answers.addRow({
       questionNumber: `${questionNumber.get(attempt.question_id) || ''}-${item.position}`,
-      questionType: `自訂測驗／${quizItemTypeLabels[item.type]}`,
+      questionType: writing ? '寫作教練' : `自訂測驗／${quizItemTypeLabels[item.type]}`,
       participantName: attempt.participant_name,
       answerValue: answer.answer_values?.join('、') || '',
       answerText: answer.answer_text || '',
-      correctness: score === null ? '評分中' : score >= itemPoints ? '正確／滿分' : score > 0 ? '部分得分' : '錯誤／零分',
-      score: score === null ? '' : `${score}/${itemPoints}`,
+      correctness: writing ? '不評分' : score === null ? '評分中' : score >= itemPoints ? '正確／滿分' : score > 0 ? '部分得分' : '錯誤／零分',
+      score: writing || score === null ? '' : `${score}/${itemPoints}`,
       feedback: answer.feedback?.zh_tw || answer.feedback?.en || '',
       submittedAt: formatDate(answer.created_at),
     })
@@ -387,16 +392,18 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
     { header: '送出時間', key: 'submittedAt', width: 22 },
     { header: '評分完成時間', key: 'gradedAt', width: 22 },
   ]
-  const quizById = new Map(data.customQuizResults.quizzes.map((quiz) => [quiz.id, quiz]))
   for (const attempt of data.customQuizResults.attempts) {
     const quiz = quizById.get(attempt.quiz_id)
+    const writing = quiz?.graded === false
     quizScores.addRow({
       questionNumber: questionNumber.get(attempt.question_id) || '',
       quizTitle: quiz?.title || '',
       participantName: attempt.participant_name,
-      status: attempt.status === 'graded' ? '已評分' : attempt.status === 'grading' ? '評分中' : '評分失敗',
-      totalScore: attempt.total_score ?? '',
-      maxScore: attempt.max_score,
+      status: attempt.status === 'submitted'
+        ? '已回收（不評分）'
+        : attempt.status === 'graded' ? '已評分' : attempt.status === 'grading' ? '評分中' : '評分失敗',
+      totalScore: writing ? '' : attempt.total_score ?? '',
+      maxScore: writing ? '' : attempt.max_score,
       feedback: attempt.feedback?.zh_tw || attempt.feedback?.en || '',
       error: attempt.error_message || '',
       submittedAt: formatDate(attempt.submitted_at),

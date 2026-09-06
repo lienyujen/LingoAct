@@ -23,7 +23,8 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
   // Seeded from the shuffled fragments the server sent, so an untouched item is
   // still a submittable (probably wrong) answer rather than a blocked form.
   const [orderAnswers, setOrderAnswers] = useState<Record<string, string[]>>({})
-  const usesAiGrading = data.items.some((item) => item.type !== 'multiple_choice')
+  const writing = data.quiz.graded === false
+  const usesAiGrading = !writing && data.items.some((item) => item.type !== 'multiple_choice')
 
   useEffect(() => {
     setTextAnswers({})
@@ -50,17 +51,30 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
   if (data.attempt) {
     const graded = data.attempt.status === 'graded'
     const failed = data.attempt.status === 'failed'
+    const submitted = data.attempt.status === 'submitted'
     return (
       <section className="panel participant-question participant-custom-quiz">
         <div className="quiz-status-heading">
-          {graded ? <CheckCircle size={24} /> : failed ? <ArrowsClockwise size={24} /> : <Clock size={24} />}
+          {graded || submitted ? <CheckCircle size={24} /> : failed ? <ArrowsClockwise size={24} /> : <Clock size={24} />}
           <div>
             <h2>{data.quiz.title}</h2>
-            <p>{participantText(locale, graded ? 'gradingCompleted' : failed ? 'gradingInterrupted' : usesAiGrading ? 'gradingInBackground' : 'calculatingScore')}</p>
+            <p>{participantText(locale, submitted
+              ? 'writingSubmitted'
+              : graded ? 'gradingCompleted' : failed ? 'gradingInterrupted' : usesAiGrading ? 'gradingInBackground' : 'calculatingScore')}</p>
           </div>
           {graded && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
         </div>
         {data.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(data.attempt.feedback, locale)}</p>}
+        {submitted && data.items.map((item, index) => {
+          const response = data.answers.find((answer) => answer.item_id === item.id)
+          const translation = localizedFields(item.translations, locale)
+          return (
+            <article className="quiz-graded-item" key={item.id}>
+              <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong></div>
+              <p className="quiz-written-back">{response?.answer_text}</p>
+            </article>
+          )
+        })}
         {graded && data.items.map((item, index) => {
           const response = data.answers.find((answer) => answer.item_id === item.id)
           const translation = localizedFields(item.translations, locale)
@@ -79,16 +93,18 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
   return (
     <section className="panel participant-question participant-custom-quiz">
       <h2>{data.quiz.title}</h2>
-      <p className="muted">{usesAiGrading
-        ? participantText(locale, 'quizHintAi')
-        : participantText(locale, 'quizHintKey')}</p>
+      <p className="muted">{writing
+        ? participantText(locale, 'writingHint')
+        : usesAiGrading
+          ? participantText(locale, 'quizHintAi')
+          : participantText(locale, 'quizHintKey')}</p>
       <form className="custom-quiz-form" onSubmit={submit}>
         {data.items.map((item, index) => {
           const translation = localizedFields(item.translations, locale)
           const options = translation?.options?.length === item.options.length ? translation.options : item.options
           return (
             <fieldset className="custom-quiz-item" key={item.id}>
-              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}<small>{item.points} {participantText(locale, 'points')}</small></legend>
+              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}{!writing && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
               {item.type === 'multiple_choice' ? (
                 <div className="quiz-choice-list">
                   {item.options.map((option, optionIndex) => (

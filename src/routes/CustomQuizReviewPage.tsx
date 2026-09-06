@@ -77,6 +77,9 @@ export function CustomQuizReviewPage() {
     }
   }
 
+  // 寫作教練 has no answer key to reveal or correct, so this window becomes a
+  // reading of the fields rather than an editor for them.
+  const writing = results?.quiz?.graded === false
   const reviewProps: QuizReviewProps | null = results ? {
     busyItemId,
     draftAnswers,
@@ -84,13 +87,14 @@ export function CustomQuizReviewPage() {
     onDraftChange: (itemId, value) => setDraftAnswers((current) => ({ ...current, [itemId]: value })),
     onUpdateAnswer: updateAnswer,
     showAnswers,
+    writing: Boolean(writing),
   } : null
 
   return (
     <main className="custom-quiz-native-page">
       <header>
         <div>
-          <p className="eyebrow"><Brain size={18} />自訂測驗檢視與答案調整</p>
+          <p className="eyebrow"><Brain size={18} />{writing ? '寫作欄位檢視' : '自訂測驗檢視與答案調整'}</p>
           <h1>{results?.quiz?.title || (results ? 'AI 正在出題中，請稍候...' : '正在載入自訂測驗...')}</h1>
         </div>
         <button aria-label="關閉測驗檢視視窗" className="icon-button" title="關閉" type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>
@@ -107,11 +111,13 @@ export function CustomQuizReviewPage() {
             </aside>
           )}
           <section className="custom-quiz-question-panel">
-            <h2>題目與正確答案</h2>
-            <label className="show-answers-toggle">
-              <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
-              顯示正確答案，若 AI 錯判答案請自行更正
-            </label>
+            <h2>{writing ? '寫作欄位' : '題目與正確答案'}</h2>
+            {!writing && (
+              <label className="show-answers-toggle">
+                <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
+                顯示正確答案，若 AI 錯判答案請自行更正
+              </label>
+            )}
             <QuizAnswerEditor {...reviewProps} />
           </section>
         </div>

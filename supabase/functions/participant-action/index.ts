@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
         throw error
       }
 
-      if (items.every((item) => item.type === 'multiple_choice')) {
+      if (quiz.graded === false || items.every((item) => item.type === 'multiple_choice')) {
         await gradeCustomQuizAttempt(attemptId)
         const { data: gradedAttempt, error: gradedAttemptError } = await supabase.from('quiz_attempts')
           .select('*').eq('id', attemptId).single()

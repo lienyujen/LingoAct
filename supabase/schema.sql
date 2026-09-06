@@ -217,7 +217,10 @@ create table if not exists public.quizzes (
   title text not null,
   direction text not null,
   requested_count integer null check (requested_count between 1 and 10),
-  requested_type text not null check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering')),
+  requested_type text not null check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'writing')),
+  -- False for 寫作教練, where the AI lays out what to write and then gets out
+  -- of the way: no model is asked to mark a class's worth of free writing.
+  graded boolean not null default true,
   total_points integer not null default 100 check (total_points = 100),
   created_at timestamptz not null default now()
 );
@@ -249,7 +252,10 @@ create table if not exists public.quiz_attempts (
   quiz_id uuid not null references public.quizzes(id) on delete cascade,
   participant_id uuid not null references public.participants(id) on delete cascade,
   participant_name text not null,
-  status text not null default 'grading' check (status in ('grading', 'graded', 'failed')),
+  -- 'submitted' is the terminal state of an ungraded attempt: a writing
+  -- exercise is finished the moment it arrives, and calling that 'graded'
+  -- would be a lie the results screen then has to work around.
+  status text not null default 'grading' check (status in ('grading', 'graded', 'submitted', 'failed')),
   total_score numeric(6,2) null check (total_score between 0 and 100),
   max_score integer not null default 100 check (max_score = 100),
   feedback jsonb null,
@@ -920,6 +926,14 @@ notify pgrst, 'reload schema';
 alter table public.quizzes drop constraint if exists quizzes_requested_type_check;
 alter table public.quizzes
   add constraint quizzes_requested_type_check
-  check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering'));
+  check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'writing'));
+
+alter table public.quizzes
+  add column if not exists graded boolean not null default true;
+
+alter table public.quiz_attempts drop constraint if exists quiz_attempts_status_check;
+alter table public.quiz_attempts
+  add constraint quiz_attempts_status_check
+  check (status in ('grading', 'graded', 'submitted', 'failed'));
 
 notify pgrst, 'reload schema';

@@ -1,8 +1,8 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 
-type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering'
-type ItemType = Exclude<RequestedType, 'random'>
+type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'writing'
+type ItemType = Exclude<RequestedType, 'random' | 'writing'>
 
 const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer', 'ordering'])
 
@@ -179,9 +179,12 @@ export async function generateCustomQuiz(input: {
   const countInstruction = input.requestedCount
     ? `必須產生恰好 ${input.requestedCount} 題。`
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
-  const typeInstruction = input.requestedType === 'random'
-    ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
-    : `每一題都必須是 ${input.requestedType}。`
+  const writing = input.requestedType === 'writing'
+  const typeInstruction = writing
+    ? '這是寫作練習，不是測驗。每一題都必須是 short_answer，題幹是一個要學生動筆寫的欄位：寫清楚這一欄要寫什麼、大約多長、可以用到哪些詞語或句型。不要出有標準答案的題目，accepted_answers 與 rubric 一律留空。'
+    : input.requestedType === 'random'
+      ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
+      : `每一題都必須是 ${input.requestedType}。`
   const requestedLanguage = /(?:英文|英語|english)/i.test(input.direction)
     ? 'English'
     : /(?:繁體中文|正體中文|traditional chinese|zh-tw)/i.test(input.direction)
@@ -245,7 +248,8 @@ ${input.sourceText}` }] : []),
     const item = raw as Record<string, unknown>
     const type = item.type as ItemType
     if (!itemTypes.has(type)) throw new Error(`AI returned an invalid type for item ${index + 1}.`)
-    if (input.requestedType !== 'random' && type !== input.requestedType) throw new Error('AI did not follow the requested question type.')
+    const effectiveType = writing ? 'short_answer' : input.requestedType
+    if (effectiveType !== 'random' && type !== effectiveType) throw new Error('AI did not follow the requested question type.')
     const promptText = typeof item.prompt_text === 'string' ? item.prompt_text.trim().slice(0, 2000) : ''
     if (!promptText) throw new Error(`Item ${index + 1} has no prompt.`)
     // Ordering items carry more pieces than a multiple choice has options.
@@ -309,6 +313,24 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
   try {
     const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts').select('*').eq('id', attemptId).single()
     if (attemptError || !attempt) throw attemptError || new Error('Quiz attempt not found.')
+
+    // 寫作教練 hands the writing straight back to the teacher. Marking it would
+    // be the most expensive call this app makes, and it is not what was asked
+    // for — so the attempt is simply complete, with no score to report.
+    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded').eq('id', attempt.quiz_id).single()
+    if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
+    if (quiz.graded === false) {
+      const { error: submitError } = await supabase.from('quiz_attempts').update({
+        status: 'submitted',
+        total_score: null,
+        error_message: null,
+        graded_at: new Date().toISOString(),
+      }).eq('id', attemptId)
+      if (submitError) throw submitError
+      await supabase.from('answers').update({ answer_text: '[寫作已送出]' })
+        .eq('question_id', attempt.question_id).eq('participant_id', attempt.participant_id)
+      return
+    }
     const [{ data: items, error: itemError }, { data: answers, error: answerError }] = await Promise.all([
       supabase.from('quiz_items').select('*').eq('quiz_id', attempt.quiz_id).order('position'),
       supabase.from('quiz_item_answers').select('*').eq('attempt_id', attemptId),

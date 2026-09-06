@@ -116,7 +116,9 @@ export type PresenterListeningClip = ListeningClip & {
 // 'ordering' arrives with its fragments already shuffled; the correct sequence
 // stays in quiz_item_keys, which the anon role cannot read.
 export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering'
-export type QuizRequestedType = 'random' | QuizItemType
+// 'writing' is a mode rather than an item type: 寫作教練 lays out short_answer
+// fields and turns the marking off, so nothing downstream meets a new shape.
+export type QuizRequestedType = 'random' | QuizItemType | 'writing'
 export type ExitTicketCategory = 'lesson_summary' | 'learning_assessment' | 'course_satisfaction' | 'student_question'
 export type ExitTicketResponseType = 'text' | 'rating'
 
@@ -342,6 +344,9 @@ export type Quiz = {
   direction: string
   requested_count: number | null
   requested_type: QuizRequestedType
+  // False for 寫作教練. The results view reads this to know whether a missing
+  // score means 'still marking' or 'nothing to mark'.
+  graded: boolean
   total_points: number
   created_at: string
 }
@@ -361,7 +366,9 @@ export type QuizItem = {
   created_at: string
 }
 
-export type QuizAttemptStatus = 'grading' | 'graded' | 'failed'
+// 'submitted' is where an ungraded attempt ends: received, with no score to
+// wait for and none coming.
+export type QuizAttemptStatus = 'grading' | 'graded' | 'submitted' | 'failed'
 
 export type QuizAttempt = {
   id: string

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsOut, Brain, Check, Clock, FloppyDisk, X } from '@phosphor-icons/react'
-import type { PresenterQuizResults, Question } from '../types'
+import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 
 type Props = {
   anonymousEnabled: boolean
@@ -14,6 +14,9 @@ type Props = {
 export type QuizReviewProps = {
   // Hidden by default: the presenter reviews these on a screen the class can see.
   showAnswers: boolean
+  // A writing exercise has no answer key to reveal or correct, so the review
+  // list becomes a plain reading of the fields the class was given.
+  writing: boolean
   busyItemId: string
   draftAnswers: Record<string, string>
   results: PresenterQuizResults
@@ -25,7 +28,7 @@ function acceptedAnswersFor(results: PresenterQuizResults, itemId: string) {
   return results.keys.find((key) => key.item_id === itemId)?.accepted_answers || []
 }
 
-export function QuizAnswerEditor({ showAnswers, busyItemId, draftAnswers, results, onDraftChange, onUpdateAnswer }: QuizReviewProps) {
+export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswers, results, onDraftChange, onUpdateAnswer }: QuizReviewProps) {
   return (
     <div className="presenter-quiz-review-list">
       {results.items.map((item, index) => {
@@ -35,9 +38,9 @@ export function QuizAnswerEditor({ showAnswers, busyItemId, draftAnswers, result
             <div className="presenter-quiz-question-heading">
               <span>{index + 1}</span>
               <strong>{item.prompt_text}</strong>
-              <small>{item.points} 分</small>
+              {!writing && <small>{item.points} 分</small>}
             </div>
-            {item.type === 'multiple_choice' ? (
+            {writing ? null : item.type === 'multiple_choice' ? (
               <div className="presenter-quiz-options">
                 {item.options.map((option) => {
                   const selected = showAnswers && acceptedAnswers.includes(option)
@@ -104,11 +107,23 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   if (!results.quiz) {
     return <section className="panel result-panel"><p className="muted">AI 正在出題中，請稍候...</p></section>
   }
+  // 寫作教練 is not marked, so a missing score means there was never one to
+  // wait for. Everything below that reads as scoring is switched off rather
+  // than left showing dashes and a stuck "評分中" count.
+  const writing = results.quiz.graded === false
   const graded = results.attempts.filter((attempt) => attempt.status === 'graded')
   const grading = results.attempts.filter((attempt) => attempt.status === 'grading')
   const average = graded.length
     ? graded.reduce((sum, attempt) => sum + (attempt.total_score || 0), 0) / graded.length
     : null
+  const answersByAttempt = new Map<string, QuizItemAnswer[]>()
+  for (const answer of results.answers) {
+    const list = answersByAttempt.get(answer.attempt_id)
+    if (list) list.push(answer)
+    else answersByAttempt.set(answer.attempt_id, [answer])
+  }
+  const itemPosition = new Map(results.items.map((item) => [item.id, item.position]))
+  const itemPrompt = new Map(results.items.map((item) => [item.id, item.prompt_text]))
 
   async function updateAnswer(itemId: string, acceptedAnswers: string[]) {
     setBusyItemId(itemId)
@@ -124,6 +139,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
 
   const reviewProps: QuizReviewProps = {
     showAnswers,
+    writing,
     busyItemId,
     draftAnswers,
     results,
@@ -142,38 +158,67 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">
-        <div><p className="eyebrow"><Brain size={17} />自訂測驗</p><h2>{results.quiz.title || question.title}</h2></div>
+        <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
           <span>{results.attempts.length}/{onlineCount} 人作答</span>
           <button aria-label="放大檢視測驗" className="icon-button" title="放大檢視測驗" type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>
         </div>
       </div>
       <div className="quiz-result-stats">
-        <div><strong>{results.items.length}</strong><span>題</span></div>
-        <div><strong>{average === null ? '—' : average.toFixed(1)}</strong><span>平均分數</span></div>
-        <div><strong>{grading.length}</strong><span>評分中</span></div>
+        <div><strong>{results.items.length}</strong><span>{writing ? '欄位' : '題'}</span></div>
+        {writing
+          ? <div><strong>{results.attempts.length}</strong><span>已回收</span></div>
+          : <>
+              <div><strong>{average === null ? '—' : average.toFixed(1)}</strong><span>平均分數</span></div>
+              <div><strong>{grading.length}</strong><span>評分中</span></div>
+            </>}
       </div>
-      <label className="show-answers-toggle">
-        <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
-        顯示正確答案，若 AI 錯判答案請自行更正
-      </label>
+      {!writing && (
+        <label className="show-answers-toggle">
+          <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
+          顯示正確答案，若 AI 錯判答案請自行更正
+        </label>
+      )}
       {error && <p className="error">{error}</p>}
       <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>
-      {grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />AI 正在背景評分，完成後會自動更新。</p>}
+      {!writing && grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />AI 正在背景評分，完成後會自動更新。</p>}
       <div className="quiz-attempt-list">
         {results.attempts.map((attempt, index) => (
           <article key={attempt.id}>
-            <div><strong>{anonymousEnabled ? `匿名學員 ${index + 1}` : attempt.participant_name}</strong><span>{attempt.status === 'graded' ? `${attempt.total_score}/${attempt.max_score}` : attempt.status === 'failed' ? '評分失敗' : '評分中'}</span></div>
-            {attempt.feedback?.zh_tw && <p>{attempt.feedback.zh_tw}</p>}
+            <div>
+              <strong>{anonymousEnabled ? `匿名學員 ${index + 1}` : attempt.participant_name}</strong>
+              <span>{writing
+                ? '已送出'
+                : attempt.status === 'graded'
+                  ? `${attempt.total_score}/${attempt.max_score}`
+                  : attempt.status === 'failed' ? '評分失敗' : '評分中'}</span>
+            </div>
+            {/* The writing itself is the result here — a score would be the one
+                thing the teacher did not ask for, and the words are the thing
+                they did. */}
+            {writing && (
+              <div className="quiz-written-answers">
+                {(answersByAttempt.get(attempt.id) || [])
+                  .slice()
+                  .sort((a, b) => (itemPosition.get(a.item_id) || 0) - (itemPosition.get(b.item_id) || 0))
+                  .map((answer) => (
+                    <div className="quiz-written-answer" key={answer.id}>
+                      <span>{itemPosition.get(answer.item_id)}. {itemPrompt.get(answer.item_id)}</span>
+                      <p>{answer.answer_text}</p>
+                    </div>
+                  ))}
+              </div>
+            )}
+            {!writing && attempt.feedback?.zh_tw && <p>{attempt.feedback.zh_tw}</p>}
           </article>
         ))}
-        {!results.attempts.length && <p className="muted">尚無學員作答。</p>}
+        {!results.attempts.length && <p className="muted">{writing ? '尚無學員回傳。' : '尚無學員作答。'}</p>}
       </div>
       {expanded && createPortal(
         <div className="custom-quiz-review-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpanded(false) }}>
           <section aria-label="自訂測驗放大檢視" aria-modal="true" className="custom-quiz-review-modal" role="dialog">
             <header>
-              <div><p className="eyebrow"><Brain size={17} />自訂測驗檢視與答案調整</p><h2>{results.quiz.title || question.title}</h2></div>
+              <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作欄位檢視' : '自訂測驗檢視與答案調整'}</p><h2>{results.quiz.title || question.title}</h2></div>
               <button aria-label="關閉放大視窗" className="icon-button" title="關閉" type="button" onClick={() => setExpanded(false)}><X size={22} /></button>
             </header>
             <div className={`custom-quiz-review-content${results.screenshot ? '' : ' is-single'}`}>
@@ -184,11 +229,13 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                 </aside>
               )}
               <div className="custom-quiz-question-panel">
-                <h3>題目與正確答案</h3>
-                <label className="show-answers-toggle">
-                  <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
-                  顯示正確答案，若 AI 錯判答案請自行更正
-                </label>
+                <h3>{writing ? '寫作欄位' : '題目與正確答案'}</h3>
+                {!writing && (
+                  <label className="show-answers-toggle">
+                    <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
+                    顯示正確答案，若 AI 錯判答案請自行更正
+                  </label>
+                )}
                 {error && <p className="error">{error}</p>}
                 <QuizAnswerEditor {...reviewProps} />
               </div>

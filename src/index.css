@@ -414,8 +414,8 @@ h2 {
 }
 
 .metric-icon {
-  background: var(--success-soft);
-  color: var(--success);
+  background: var(--primary-soft);
+  color: var(--primary);
   height: 34px;
   width: 34px;
 }
@@ -732,8 +732,8 @@ h2 {
 }
 
 .status.active {
-  background: var(--success-soft);
-  color: var(--success);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .status.stopped {
@@ -846,14 +846,14 @@ h2 {
 }
 
 .control-toggle.is-active {
-  background: var(--success-soft);
-  border-color: rgb(40 138 98 / 28%);
-  color: var(--success);
+  background: var(--primary-soft);
+  border-color: rgb(123 45 94 / 28%);
+  color: var(--primary);
 }
 
 .control-toggle.is-active b {
   background: var(--surface);
-  color: var(--success);
+  color: var(--primary);
 }
 
 .control-action-grid {
@@ -1072,17 +1072,6 @@ h2 {
 .control-footer-actions {
   display: grid;
   gap: 8px;
-}
-
-.stop-question-button {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
-}
-
-.stop-question-button:hover {
-  background: var(--surface-subtle);
-  border-color: var(--border-strong);
 }
 
 .exit-ticket-button {
@@ -2147,7 +2136,7 @@ h2 {
   background: transparent;
   border: 0;
   border-radius: 50%;
-  color: var(--success);
+  color: var(--primary);
   display: inline-flex;
   height: 36px;
   justify-content: center;
@@ -2157,7 +2146,7 @@ h2 {
 
 .participant-interpretation-heading .interpretation-speaker-test:hover,
 .participant-interpretation-heading .interpretation-speaker-test:focus-visible {
-  background: var(--success-soft);
+  background: var(--primary-soft);
 }
 
 .participant-interpretation-audio label {
@@ -2191,7 +2180,7 @@ h2 {
 }
 
 .interpretation-playing-icon {
-  color: var(--success);
+  color: var(--primary);
 }
 
 @media (max-width: 560px) {
@@ -2338,7 +2327,7 @@ h2 {
 }
 
 .participant-ended-shared-panel {
-  border-top: 4px solid var(--success);
+  border-top: 4px solid var(--share);
 }
 
 .participant-summary-heading {
@@ -4355,7 +4344,7 @@ h2 {
 }
 
 .roster-dot.is-online {
-  background: #2f6b52;
+  background: var(--primary);
 }
 
 .roster-empty {
@@ -4544,7 +4533,7 @@ h2 {
 }
 
 .roster-dot.is-online {
-  background: #2f6b52;
+  background: var(--primary);
 }
 
 .roster-empty {
@@ -4580,8 +4569,8 @@ h2 {
 }
 
 .file-verdict.is-correct {
-  background: var(--pale-green, #e9f4ef);
-  color: var(--success, #2f6b52);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .file-verdict.is-partial {
@@ -4991,4 +4980,41 @@ h2 {
   background: var(--surface-subtle);
   white-space: pre-wrap;
   line-height: 1.65;
+}
+
+/* Stop and reopen answering, in the heading of the question they act on. A
+   stopped question can always be reopened, so the pair is one control that
+   changes its mind rather than two that only go one way. */
+.question-answering-toggle {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+.question-answering-toggle:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.question-answering-toggle:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+/* Reopening is the one that puts the class back to work, so it leads. */
+.question-answering-toggle.is-resume {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.question-answering-toggle.is-resume:hover:not(:disabled) {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
 }

@@ -1,4 +1,4 @@
-import { CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Sparkle, Waveform } from '@phosphor-icons/react'
+import { CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Play, Sparkle, Square, Waveform } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
@@ -24,6 +24,10 @@ type Props = {
   onAnalyzeFile: (responseId: string) => void
   onDrawUnanswered: (questionId: string) => void
   onSetCorrectAnswer: (answer: string) => void
+  // Stopping and reopening belong to a question, not to the end of the lesson,
+  // so they live in its heading rather than in 課堂收尾.
+  onStopQuestion: () => Promise<void>
+  onResumeQuestion: () => Promise<void>
 }
 
 type AnalysisProps = Pick<Props,
@@ -44,8 +48,30 @@ function QuestionStatusActions({
   isCurrentQuestion,
   onlineCount,
   onDrawUnanswered,
+  onStopQuestion,
+  onResumeQuestion,
   question,
-}: Pick<Props, 'busy' | 'isCurrentQuestion' | 'onlineCount' | 'onDrawUnanswered'> & { question: Question }) {
+}: Pick<Props, 'busy' | 'isCurrentQuestion' | 'onlineCount' | 'onDrawUnanswered' | 'onStopQuestion' | 'onResumeQuestion'> & { question: Question }) {
+  const [toggling, setToggling] = useState(false)
+  const [toggleError, setToggleError] = useState('')
+
+  // Only the question the class is on can be stopped or reopened; an older one
+  // in the history is a record, not a control.
+  const stoppable = isCurrentQuestion && question.status === 'active'
+  const resumable = isCurrentQuestion && question.status === 'stopped'
+
+  async function toggleAnswering() {
+    setToggling(true)
+    setToggleError('')
+    try {
+      await (resumable ? onResumeQuestion() : onStopQuestion())
+    } catch (error) {
+      setToggleError(error instanceof Error ? error.message : '操作失敗。')
+    } finally {
+      setToggling(false)
+    }
+  }
+
   const canDrawUnanswered = isCurrentQuestion
     && question.type !== 'send_screen'
     && (question.status === 'stopped' || question.status === 'closed')
@@ -72,6 +98,18 @@ function QuestionStatusActions({
           onClick={() => onDrawUnanswered(question.id)}
         >
           <DiceFive size={20} />
+        </button>
+      )}
+      {(stoppable || resumable) && (
+        <button
+          className={resumable ? 'question-answering-toggle is-resume' : 'question-answering-toggle'}
+          disabled={busy || toggling}
+          title={toggleError || (resumable ? '讓學生可以再次作答' : '停止收答，之後仍可恢復')}
+          type="button"
+          onClick={() => void toggleAnswering()}
+        >
+          {resumable ? <Play size={15} weight="fill" /> : <Square size={15} />}
+          {resumable ? '恢復作答' : '停止作答'}
         </button>
       )}
       <span className={`status ${question.status}`}>{question.status}</span>

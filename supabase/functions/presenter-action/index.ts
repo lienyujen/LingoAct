@@ -1169,6 +1169,44 @@ Deno.serve(async (req) => {
       return jsonResponse({ question: data })
     }
 
+    // Stopping is how a teacher ends a question; reopening it is how they give
+    // the class another minute after someone asks. Without this the only way
+    // back was to dispatch the question again, which threw away the answers
+    // already in.
+    if (action === 'resume_question') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+
+      // Only the question the class is actually on. Reviving an older one would
+      // leave two questions accepting answers with the students' pages showing
+      // only the newer, so the earlier one would take answers nobody could see.
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('current_question_id, status')
+        .eq('id', sessionId)
+        .maybeSingle()
+      if (sessionError) throw sessionError
+      if (!session || session.status !== 'active') return jsonResponse({ message: '課堂已結束。' }, 409)
+      if (session.current_question_id !== questionId) {
+        return jsonResponse({ message: '這題已經不是目前的題目，請重新派送。' }, 409)
+      }
+
+      // started_at moves to now because it is what the answer clock counts
+      // from: a timed question reopened after its window had passed would
+      // otherwise come back already expired, refusing every answer it invited.
+      const { data, error } = await supabase
+        .from('questions')
+        .update({ status: 'active', stopped_at: null, started_at: new Date().toISOString() })
+        .eq('id', questionId)
+        .eq('session_id', sessionId)
+        .eq('status', 'stopped')
+        .select('*')
+        .maybeSingle()
+      if (error) throw error
+      if (!data) return jsonResponse({ message: '這題目前不是停止狀態。' }, 409)
+      return jsonResponse({ question: data })
+    }
+
     if (action === 'get_recording_results') {
       const questionId = input.questionId
       if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)

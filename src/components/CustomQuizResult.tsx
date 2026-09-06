@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowsOut, Brain, Check, Clock, FloppyDisk, X } from '@phosphor-icons/react'
+import { ArrowsOut, Brain, Check, Clock, FloppyDisk, Play, Square, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 
 type Props = {
@@ -8,7 +8,12 @@ type Props = {
   question: Question
   results: PresenterQuizResults | null
   onlineCount: number
+  isCurrentQuestion: boolean
   onUpdateAnswer: (itemId: string, acceptedAnswers: string[]) => Promise<void>
+  // The same pair the plain question panel carries, for the same reason: a
+  // quiz is stopped and reopened where it is shown, not from 課堂收尾.
+  onStopQuestion: () => Promise<void>
+  onResumeQuestion: () => Promise<void>
 }
 
 export type QuizReviewProps = {
@@ -84,8 +89,9 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
   )
 }
 
-export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, onUpdateAnswer }: Props) {
+export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onStopQuestion, onResumeQuestion }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const [toggling, setToggling] = useState(false)
   const [busyItemId, setBusyItemId] = useState('')
   const [error, setError] = useState('')
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
@@ -125,6 +131,21 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   const itemPosition = new Map(results.items.map((item) => [item.id, item.position]))
   const itemPrompt = new Map(results.items.map((item) => [item.id, item.prompt_text]))
 
+  const stoppable = isCurrentQuestion && question.status === 'active'
+  const resumable = isCurrentQuestion && question.status === 'stopped'
+
+  async function toggleAnswering() {
+    setToggling(true)
+    setError('')
+    try {
+      await (resumable ? onResumeQuestion() : onStopQuestion())
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '操作失敗。')
+    } finally {
+      setToggling(false)
+    }
+  }
+
   async function updateAnswer(itemId: string, acceptedAnswers: string[]) {
     setBusyItemId(itemId)
     setError('')
@@ -161,6 +182,18 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
           <span>{results.attempts.length}/{onlineCount} 人作答</span>
+          {(stoppable || resumable) && (
+            <button
+              className={resumable ? 'question-answering-toggle is-resume' : 'question-answering-toggle'}
+              disabled={toggling}
+              title={resumable ? '讓學生可以再次作答' : '停止收答，之後仍可恢復'}
+              type="button"
+              onClick={() => void toggleAnswering()}
+            >
+              {resumable ? <Play size={15} weight="fill" /> : <Square size={15} />}
+              {resumable ? '恢復作答' : '停止作答'}
+            </button>
+          )}
           <button aria-label="放大檢視測驗" className="icon-button" title="放大檢視測驗" type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>
         </div>
       </div>

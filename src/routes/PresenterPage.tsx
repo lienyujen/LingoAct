@@ -1009,6 +1009,22 @@ export function PresenterPage() {
     if (!data?.question) throw new Error(data?.message || '停止作答失敗。')
   }
 
+  async function resumeQuestion() {
+    if (!session?.current_question_id) return
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: {
+        action: 'resume_question',
+        sessionId,
+        presenterToken,
+        questionId: session.current_question_id,
+      },
+    })
+    if (error) throw error
+    if (!data?.question) throw new Error(data?.message || '恢復作答失敗。')
+  }
+
   async function setCorrectAnswer(answer: string) {
     if (!question || question.status === 'active') return
     const presenterToken = getPresenterToken(sessionId)
@@ -1592,7 +1608,6 @@ export function PresenterPage() {
           session={session}
           onDrawLottery={drawLottery}
           onStartBuzzer={startBuzzer}
-          onStopQuestion={stopQuestion}
           onToggleAnonymous={() => updateSession({ anonymous_enabled: !session.anonymous_enabled })}
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
           onCaptureScreen={window.lingoActDesktop ? captureWindowsScreen : undefined}
@@ -1623,10 +1638,13 @@ export function PresenterPage() {
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
             anonymousEnabled={session.anonymous_enabled}
+            isCurrentQuestion={question?.id === session.current_question_id}
             onlineCount={onlineParticipants.length}
             question={question}
             results={quizResults}
             onUpdateAnswer={updateCustomQuizAnswer}
+            onStopQuestion={stopQuestion}
+            onResumeQuestion={resumeQuestion}
           />
         ) : <QuestionResult
           anonymousEnabled={session.anonymous_enabled}
@@ -1643,6 +1661,8 @@ export function PresenterPage() {
           onlineCount={onlineParticipants.length}
           question={question}
           onAnalyze={analyzeQuestion}
+          onStopQuestion={stopQuestion}
+          onResumeQuestion={resumeQuestion}
           onAnalyzeFile={(responseId) => void analyzeFileResponse(responseId).catch((error) => {
             setAnalysisError(error instanceof Error ? error.message : 'AI 批改失敗。')
           })}

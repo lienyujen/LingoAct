@@ -1,4 +1,4 @@
-import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Shapes, Share, Sparkle, Square, Users, Waveform } from '@phosphor-icons/react'
+import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import type { Session } from '../types'
 
@@ -21,7 +21,6 @@ type Props = {
   onOpenSettings: () => void
   onToggleRecording: () => void
   onToggleCaptionVisibility: () => void
-  onStopQuestion: () => void
   onGenerateExitTicket: () => void
   onEndClass: () => void
 }
@@ -45,7 +44,6 @@ export function PresenterControlPanel({
   onOpenSettings,
   onToggleRecording,
   onToggleCaptionVisibility,
-  onStopQuestion,
   onGenerateExitTicket,
   onEndClass,
 }: Props) {
@@ -130,10 +128,6 @@ export function PresenterControlPanel({
       <div className="control-section">
         <p className="control-section-label"><Sparkle size={15} />課堂收尾</p>
         <div className="control-footer-actions">
-          <button className="stop-question-button" type="button" onClick={onStopQuestion} disabled={busy || !session.current_question_id}>
-            <Square size={16} />
-            停止作答
-          </button>
           <button className="exit-ticket-button" type="button" onClick={onGenerateExitTicket} disabled={busy || Boolean(session.exit_ticket_prompt)}>
             <Sparkle size={17} />
             {session.exit_ticket_prompt ? 'Exit Ticket 已派送' : 'AI 生成 Exit Ticket'}

@@ -73,12 +73,15 @@ why `release.yml` deliberately builds without a `.env`.
 - **A teaching track on the session**, chosen once when the class is created
   and settling everything downstream: the proficiency ladder, the reading
   annotation, the listening accent, and the language the AI writes questions in.
-  華語文 and 國語 are separate tracks, not one Chinese entry — they share an
+  華語文 and 國語文 are separate tracks, not one Chinese entry — they share an
   accent and almost nothing else, one being Mandarin taught to people who do not
-  speak it (TBCL) and the other to children who do (school year, always 注音).
-  英語 gets GEPT, 日語 JLPT, 韓語 TOPIK, 越南語 the six-level scale, the rest
-  CEFR. The teacher is never asked which framework: picking JLPT is not a choice
-  a 華語文 teacher should have to decline.
+  speak it (TBCL) and the other to children who do (國語 in 國小, 國文 from 國中,
+  laddered by the 108 curriculum through 高中 and always 注音). 英語 carries
+  three ladders, because a Taiwanese English class is aimed at one of three
+  things — the 108 curriculum, 全民英檢 or 多益. 日語 JLPT, 韓語 TOPIK, 越南語 the
+  six-level scale, the rest CEFR. A track offers only its own ladders, and a
+  level only counts if it belongs to the chosen one: picking JLPT is not a
+  choice a 華語文 teacher should have to decline.
 - **A guidance language** alongside it, varying independently: a beginners'
   Japanese class in Taiwan teaches ja and is explained in zh-TW. English is
   assumed nowhere; the student page speaks eight guidance languages, two

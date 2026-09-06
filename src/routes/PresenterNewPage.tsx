@@ -36,6 +36,7 @@ export function PresenterNewPage() {
   // joins and no activity has to ask again.
   const [teachingTrack, setTeachingTrack] = useState(DEFAULT_TRACK)
   const [guidanceLanguage, setGuidanceLanguage] = useState('zh-TW')
+  const [levelFramework, setLevelFramework] = useState(() => resolveTrack(DEFAULT_TRACK).frameworks[0] as string)
   const [levelCode, setLevelCode] = useState('')
   const [readingAnnotation, setReadingAnnotation] = useState('zhuyin')
   const [error, setError] = useState('')
@@ -67,6 +68,7 @@ export function PresenterNewPage() {
           title: title.trim() || '未命名場次',
           teachingLanguage: teachingTrack,
           guidanceLanguage,
+          levelFramework,
           levelCode: levelCode || null,
           readingAnnotation,
         },
@@ -194,15 +196,23 @@ export function PresenterNewPage() {
         <LanguagePairFields
           guidanceLanguage={guidanceLanguage}
           levelCode={levelCode}
+          levelFramework={levelFramework}
           readingAnnotation={readingAnnotation}
           teachingTrack={teachingTrack}
           onAnnotationChange={setReadingAnnotation}
+          onFrameworkChange={(id) => {
+            setLevelFramework(id)
+            // GEPT 中級 is not a TOEIC colour; carrying the code across would
+            // store a level the new ladder has never heard of.
+            setLevelCode('')
+          }}
           onGuidanceChange={setGuidanceLanguage}
           onLevelChange={setLevelCode}
           onTrackChange={(id) => {
             setTeachingTrack(id)
-            // The ladder changed with the track, so a level from the old one is
+            // The ladders changed with the track, so a level from the old one is
             // meaningless — TBCL 第3級 is not a school year.
+            setLevelFramework(resolveTrack(id).frameworks[0])
             setLevelCode('')
             setReadingAnnotation(resolveTrack(id).annotation)
           }}

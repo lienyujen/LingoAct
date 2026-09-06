@@ -764,12 +764,18 @@ alter table public.sessions
 alter table public.sessions
   add column if not exists level_framework text null;
 
--- 國語 is laddered by school year, which is not a proficiency test and was not
--- in the original list.
+-- The ladders Taiwanese teachers work to. 國語文 is defined by the 108
+-- curriculum rather than by a proficiency test, and English carries three:
+-- the curriculum, 全民英檢 and 多益, which is what a class is usually aimed at.
+-- A track offers only its own, and the application refuses any other pairing.
+update public.sessions set level_framework = 'guoyu108' where level_framework = 'grade';
+
 alter table public.sessions drop constraint if exists sessions_level_framework_check;
 alter table public.sessions
   add constraint sessions_level_framework_check
-  check (level_framework is null or level_framework in ('tbcl', 'grade', 'cefr', 'gept', 'jlpt', 'topik', 'ivpt'));
+  check (level_framework is null or level_framework in (
+    'tbcl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'topik', 'ivpt'
+  ));
 
 -- 注音 or 拼音, where that is a real question: fixed for 國語, chosen by a
 -- 華語文 teacher whose class may come from either, irrelevant to the rest.

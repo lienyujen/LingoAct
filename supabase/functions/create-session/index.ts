@@ -2,7 +2,7 @@ import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
 import { guidanceLanguages } from '../_shared/languages.ts'
-import { DEFAULT_TRACK, resolveTrack, teachingTrackIds } from '../_shared/teaching.ts'
+import { DEFAULT_TRACK, resolveFramework, resolveTrack, teachingTrackIds } from '../_shared/teaching.ts'
 import { FRAMEWORKS } from '../_shared/proficiency.ts'
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -59,12 +59,14 @@ Deno.serve(async (req) => {
     const teachingTrack = teachingTrackIds.has(input.teachingLanguage) ? input.teachingLanguage as string : DEFAULT_TRACK
     const guidanceLanguage = guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : 'zh-TW'
 
-    // The ladder is the track's, never the caller's: a 華語文 class is measured
-    // in TBCL and a 國語 class in school years, and no request should be able to
-    // pair one with the other's levels.
+    // A track offers only its own ladders — English has three, most languages
+    // one — and a level only counts if it belongs to the ladder that was
+    // chosen. Neither pairing is left to the caller: a nonsensical one produces
+    // questions at the wrong difficulty instead of failing loudly.
     const track = resolveTrack(teachingTrack)
+    const levelFramework = resolveFramework(teachingTrack, input.levelFramework)
     const levelCode = typeof input.levelCode === 'string'
-      && FRAMEWORKS[track.framework].levels.some((level) => level.code === input.levelCode)
+      && FRAMEWORKS[levelFramework].levels.some((level) => level.code === input.levelCode)
       ? input.levelCode as string
       : null
     const readingAnnotation = ['none', 'zhuyin', 'pinyin'].includes(input.readingAnnotation)
@@ -95,7 +97,7 @@ Deno.serve(async (req) => {
           interpretation_languages: interpretationAudioEnabled ? interpretationLanguages : [],
           teaching_language: teachingTrack,
           guidance_language: guidanceLanguage,
-          level_framework: track.framework,
+          level_framework: levelFramework,
           level_code: levelCode,
           reading_annotation: readingAnnotation,
         })

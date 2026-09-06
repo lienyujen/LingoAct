@@ -712,7 +712,7 @@ export function PresenterPage() {
     await updateSession({ captions_enabled: !session.captions_enabled })
   }
 
-  async function savePresenterSettings(settings: PresenterCaptionSettings, microphoneId: string, teaching: { teachingLanguage: string; guidanceLanguage: string; levelCode: string; readingAnnotation: string }) {
+  async function savePresenterSettings(settings: PresenterCaptionSettings, microphoneId: string, teaching: { teachingLanguage: string; guidanceLanguage: string; levelFramework: string; levelCode: string; readingAnnotation: string }) {
     if (!session) return
     const presenterToken = getPresenterToken(session.id)
     if (!presenterToken) {
@@ -734,6 +734,7 @@ export function PresenterPage() {
           presenterToken,
           teachingLanguage: teaching.teachingLanguage,
           guidanceLanguage: teaching.guidanceLanguage,
+          levelFramework: teaching.levelFramework,
           levelCode: teaching.levelCode || null,
           readingAnnotation: teaching.readingAnnotation,
           captionSourceLanguage: settings.sourceLanguage,

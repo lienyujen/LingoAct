@@ -5,7 +5,7 @@ import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
 import { guidanceLanguages } from '../_shared/languages.ts'
-import { resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
+import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
 
 type ParticipantRecord = { id: string; name: string }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -251,9 +251,10 @@ Deno.serve(async (req) => {
       if (typeof input.teachingLanguage === 'string') {
         if (!teachingTrackIds.has(input.teachingLanguage)) return jsonResponse({ message: '不支援這個教學語言。' }, 400)
         values.teaching_language = input.teachingLanguage
-        // The ladder follows the track: a 華語文 class is measured in TBCL and a
-        // 國語 class in school years, and neither teacher should have to say so.
-        values.level_framework = resolveTrack(input.teachingLanguage).framework
+        // The ladder is one of the track's own: TBCL for 華語文, the 108
+        // curriculum for 國語文, and for English whichever of 課綱 / 全民英檢 /
+        // 多益 the teacher is working towards.
+        values.level_framework = resolveFramework(input.teachingLanguage, input.levelFramework)
         values.level_code = null
       }
       if (input.levelCode === null || typeof input.levelCode === 'string') {

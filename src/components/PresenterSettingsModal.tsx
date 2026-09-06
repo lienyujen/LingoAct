@@ -1,6 +1,6 @@
 import { ArrowsClockwise, Gear, Microphone, Translate, X } from '@phosphor-icons/react'
 import { LanguagePairFields } from './LanguagePairFields'
-import { resolveTrack } from '../lib/teachingTracks'
+import { resolveFramework, resolveTrack } from '../lib/teachingTracks'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES, defaultInterpretationLanguages } from '../lib/captionLanguages'
@@ -28,7 +28,13 @@ type Props = {
   onSave: (
     settings: PresenterCaptionSettings,
     microphoneId: string,
-    teaching: { teachingLanguage: string; guidanceLanguage: string; levelCode: string; readingAnnotation: string },
+    teaching: {
+      teachingLanguage: string
+      guidanceLanguage: string
+      levelFramework: string
+      levelCode: string
+      readingAnnotation: string
+    },
   ) => void
 }
 
@@ -54,6 +60,9 @@ export function PresenterSettingsModal({
   const [interpretationLanguages, setInterpretationLanguages] = useState(session.interpretation_languages)
   const [teachingTrack, setTeachingTrack] = useState(resolveTrack(session.teaching_language).id)
   const [guidanceLanguage, setGuidanceLanguage] = useState(session.guidance_language || 'zh-TW')
+  const [levelFramework, setLevelFramework] = useState(
+    () => resolveFramework(session.teaching_language, session.level_framework) as string,
+  )
   const [levelCode, setLevelCode] = useState(session.level_code || '')
   const [readingAnnotation, setReadingAnnotation] = useState(
     session.reading_annotation || resolveTrack(session.teaching_language).annotation,
@@ -137,7 +146,7 @@ export function PresenterSettingsModal({
     onSave(
       { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages },
       microphoneId,
-      { teachingLanguage: teachingTrack, guidanceLanguage, levelCode, readingAnnotation },
+      { teachingLanguage: teachingTrack, guidanceLanguage, levelFramework, levelCode, readingAnnotation },
     )
   }
 
@@ -159,13 +168,19 @@ export function PresenterSettingsModal({
           <LanguagePairFields
             guidanceLanguage={guidanceLanguage}
             levelCode={levelCode}
+            levelFramework={levelFramework}
             readingAnnotation={readingAnnotation}
             teachingTrack={teachingTrack}
             onAnnotationChange={setReadingAnnotation}
+            onFrameworkChange={(id) => {
+              setLevelFramework(id)
+              setLevelCode('')
+            }}
             onGuidanceChange={setGuidanceLanguage}
             onLevelChange={setLevelCode}
             onTrackChange={(id) => {
               setTeachingTrack(id)
+              setLevelFramework(resolveTrack(id).frameworks[0])
               setLevelCode('')
               setReadingAnnotation(resolveTrack(id).annotation)
             }}

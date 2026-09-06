@@ -1,38 +1,45 @@
 import { GUIDANCE_LOCALES } from '../lib/participantI18n'
-import { TEACHING_TRACKS, resolveTrack } from '../lib/teachingTracks'
+import { TEACHING_TRACKS, resolveFramework, resolveTrack } from '../lib/teachingTracks'
 import { frameworkById } from '../lib/proficiency'
 
 type Props = {
   teachingTrack: string
   guidanceLanguage: string
+  levelFramework: string
   levelCode: string
   readingAnnotation: string
   onTrackChange: (id: string) => void
   onGuidanceChange: (code: string) => void
+  onFrameworkChange: (id: string) => void
   onLevelChange: (code: string) => void
   onAnnotationChange: (annotation: string) => void
 }
 
 // What the class is, settled before it starts.
 //
-// The track is the decision everything else follows from: it fixes the ladder,
-// the annotation and the language the AI writes in, so the ladder is shown here
-// as a consequence rather than offered as a second question. Asking "which
-// framework?" beside every audio clip was the mistake this replaces — a 華語文
-// teacher is never going to pick JLPT, and a level chosen per clip is not the
-// class's level.
+// The track is the decision everything else follows from: it fixes which
+// ladders are even on offer, the annotation, and the language the AI writes in.
+// Where a track has one ladder it is shown as a consequence rather than asked
+// as a second question; where it genuinely has several — English, where a class
+// may be working to the 課綱, or towards 全民英檢, or towards 多益 — those three
+// are offered and nothing else. Being shown every framework in the world beside
+// every audio clip was the mistake this replaces.
 export function LanguagePairFields({
   teachingTrack,
   guidanceLanguage,
+  levelFramework,
   levelCode,
   readingAnnotation,
   onTrackChange,
   onGuidanceChange,
+  onFrameworkChange,
   onLevelChange,
   onAnnotationChange,
 }: Props) {
   const track = resolveTrack(teachingTrack)
-  const framework = frameworkById(track.framework)
+  const activeId = resolveFramework(teachingTrack, levelFramework)
+  const framework = frameworkById(activeId)
+  const choices = track.frameworks.map((id) => frameworkById(id)).filter(Boolean)
 
   return (
     <div className="language-pair">
@@ -57,9 +64,33 @@ export function LanguagePairFields({
         </div>
       </div>
 
+      {choices.length > 1 && (
+        <div className="language-pair-field">
+          <span className="language-pair-label">能力基準</span>
+          <p className="language-pair-hint">這個班在準備的目標。同樣是英語，照課綱教和準備全民英檢、多益，出題的方向並不一樣。</p>
+          <div className="language-pair-options">
+            {choices.map((option) => (
+              <button
+                aria-pressed={activeId === option!.id}
+                className={activeId === option!.id ? 'language-chip selected' : 'language-chip'}
+                key={option!.id}
+                type="button"
+                onClick={() => onFrameworkChange(option!.id)}
+              >
+                <strong>{option!.short}</strong>
+                <small>{option!.name}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {framework && (
         <div className="language-pair-field">
-          <span className="language-pair-label">程度<em>依教學語言採用{framework.name}</em></span>
+          <span className="language-pair-label">
+            程度
+            {choices.length > 1 ? <em>{framework.name}</em> : <em>依教學語言採用{framework.name}</em>}
+          </span>
           <p className="language-pair-hint">出題會照這個程度控制用詞與句長，也決定題目可以照抄多少原文。</p>
           <div className="language-pair-options">
             <button
@@ -85,7 +116,7 @@ export function LanguagePairFields({
         </div>
       )}
 
-      {/* Only where it is a real question. 國語 is always 注音, and a German
+      {/* Only where it is a real question. 國語文 is always 注音, and a German
           class has nothing to annotate. */}
       {track.annotationChoice && (
         <div className="language-pair-field">

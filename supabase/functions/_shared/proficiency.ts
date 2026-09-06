@@ -6,7 +6,7 @@
 // for listening, reading and writing, so rendering them as "A1" would silently
 // ask for material too hard for the very learners who need it easiest.
 
-export type Framework = 'tbcl' | 'grade' | 'cefr' | 'gept' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'tbcl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
 
 export type Level = {
   code: string
@@ -18,23 +18,53 @@ export type Level = {
 }
 
 export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels: Level[] }> = {
-  // 國語: Mandarin taught to children who already speak it. The band here
-  // tracks reading and writing load, not spoken command — a first-grader
-  // converses fluently and reads a few hundred characters, so a question they
-  // could answer aloud can still be unreadable on the page.
-  grade: {
-    name: '十二年國民基本教育・國語文（年級）',
-    note: 'Taiwan\'s school-year ladder for Mandarin taught as a FIRST language. These are native speakers: do not simplify the spoken language as though for a foreign learner, and never explain what a common word means. What rises with the year is the characters they can read and the length and abstraction of what they can write.',
+  // 國語文 under Taiwan's 108 curriculum — 國語 in 國小, 國文 from 國中 up.
+  // These are native speakers, so the band tracks reading and writing load
+  // rather than spoken command: a first-grader converses fluently and reads a
+  // few hundred characters, so a question they could answer aloud can still be
+  // unreadable on the page. Competencies are defined per 學習階段, which is why
+  // each year names the stage it belongs to.
+  guoyu108: {
+    name: '十二年國民基本教育課程綱要・語文領域－國語文',
+    note: 'Taiwan\'s 108 curriculum for Mandarin taught as a FIRST language: 國語 in primary school, 國文 from junior high. These are native speakers. Do not simplify the spoken language as though for a foreign learner and never gloss an ordinary word — pitch the difficulty at the characters they can READ and the length and abstraction of what they can WRITE at this stage.',
     levels: [
-      { code: 'g1', label: '國小一年級', band: 1 },
-      { code: 'g2', label: '國小二年級', band: 2 },
-      { code: 'g3', label: '國小三年級', band: 3 },
-      { code: 'g4', label: '國小四年級', band: 3 },
-      { code: 'g5', label: '國小五年級', band: 4 },
-      { code: 'g6', label: '國小六年級', band: 4 },
-      { code: 'j1', label: '國中七年級', band: 5 },
-      { code: 'j2', label: '國中八年級', band: 5 },
-      { code: 'j3', label: '國中九年級', band: 6 },
+      { code: 'g1', label: '國小一年級（第一學習階段）', band: 1 },
+      { code: 'g2', label: '國小二年級（第一學習階段）', band: 2 },
+      { code: 'g3', label: '國小三年級（第二學習階段）', band: 2 },
+      { code: 'g4', label: '國小四年級（第二學習階段）', band: 3 },
+      { code: 'g5', label: '國小五年級（第三學習階段）', band: 3 },
+      { code: 'g6', label: '國小六年級（第三學習階段）', band: 4 },
+      { code: 'j1', label: '國中七年級（第四學習階段）', band: 4 },
+      { code: 'j2', label: '國中八年級（第四學習階段）', band: 5 },
+      { code: 'j3', label: '國中九年級（第四學習階段）', band: 5 },
+      { code: 'h1', label: '高中一年級（第五學習階段）', band: 5 },
+      { code: 'h2', label: '高中二年級（第五學習階段）', band: 6 },
+      { code: 'h3', label: '高中三年級（第五學習階段）', band: 6 },
+    ],
+  },
+  // 英語文 under the same curriculum, which starts in 國小三年級. The stage
+  // targets are the curriculum's own CEFR references, not a guess.
+  en108: {
+    name: '十二年國民基本教育課程綱要・語文領域－英語文',
+    note: 'Taiwan\'s 108 curriculum for English as a foreign language, beginning in the third year of primary school. Write for a Taiwanese classroom: the learners share Mandarin as a first language, and the curriculum expects roughly CEFR A2 by the end of junior high and B1 by the end of senior high.',
+    levels: [
+      { code: 'p34', label: '國小三、四年級（第二學習階段）', band: 1 },
+      { code: 'p56', label: '國小五、六年級（第三學習階段）', band: 1 },
+      { code: 'j', label: '國中（第四學習階段，約 CEFR A2）', band: 2 },
+      { code: 'h', label: '高中（第五學習階段，約 CEFR B1）', band: 3 },
+    ],
+  },
+  // 多益, named by certificate colour because that is how a Taiwanese class
+  // talks about a TOEIC target.
+  toeic: {
+    name: '多益普及測驗 TOEIC',
+    note: 'The English test most often sat in Taiwan, scored 10-990 and reported as a certificate colour. It is workplace English: favour offices, travel, correspondence and everyday transactions over academic prose.',
+    levels: [
+      { code: 'orange', label: 'TOEIC 橘色證書（10-215）', band: 1 },
+      { code: 'brown', label: 'TOEIC 棕色證書（220-465）', band: 2 },
+      { code: 'green', label: 'TOEIC 綠色證書（470-725）', band: 3 },
+      { code: 'blue', label: 'TOEIC 藍色證書（730-855）', band: 4 },
+      { code: 'gold', label: 'TOEIC 金色證書（860-990）', band: 5 },
     ],
   },
   tbcl: {
@@ -107,19 +137,6 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
       { code: 'C2', label: '越南語 C2（專業級）', band: 6 },
     ],
   },
-}
-
-// Which framework a teacher of each language will already be thinking in.
-export const DEFAULT_FRAMEWORK: Record<string, Framework> = {
-  'zh-tw': 'tbcl',
-  'zh-cn': 'tbcl',
-  en: 'gept',
-  ja: 'jlpt',
-  ko: 'topik',
-  vi: 'ivpt',
-  fr: 'cefr',
-  de: 'cefr',
-  es: 'cefr',
 }
 
 export function resolveLevel(framework: string | null, code: string | null) {

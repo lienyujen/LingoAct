@@ -4,7 +4,8 @@ import { levelInstruction } from '../_shared/proficiency.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
-import { guidanceLanguages, teachingLanguages } from '../_shared/languages.ts'
+import { guidanceLanguages } from '../_shared/languages.ts'
+import { resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
 
 type ParticipantRecord = { id: string; name: string }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -248,8 +249,21 @@ Deno.serve(async (req) => {
       // proficiency ladder, so a value silently dropped here would surface much
       // later as a clip in the wrong accent.
       if (typeof input.teachingLanguage === 'string') {
-        if (!teachingLanguages.has(input.teachingLanguage)) return jsonResponse({ message: '不支援這個教學語言。' }, 400)
+        if (!teachingTrackIds.has(input.teachingLanguage)) return jsonResponse({ message: '不支援這個教學語言。' }, 400)
         values.teaching_language = input.teachingLanguage
+        // The ladder follows the track: a 華語文 class is measured in TBCL and a
+        // 國語 class in school years, and neither teacher should have to say so.
+        values.level_framework = resolveTrack(input.teachingLanguage).framework
+        values.level_code = null
+      }
+      if (input.levelCode === null || typeof input.levelCode === 'string') {
+        values.level_code = input.levelCode || null
+      }
+      if (typeof input.readingAnnotation === 'string') {
+        if (!['none', 'zhuyin', 'pinyin'].includes(input.readingAnnotation)) {
+          return jsonResponse({ message: '不支援這個標音方式。' }, 400)
+        }
+        values.reading_annotation = input.readingAnnotation
       }
       if (typeof input.guidanceLanguage === 'string') {
         if (!guidanceLanguages.has(input.guidanceLanguage)) return jsonResponse({ message: '不支援這個導引語。' }, 400)
@@ -561,6 +575,16 @@ Deno.serve(async (req) => {
         ? requestedCountValue
         : null
       const requestedType = typeof input.requestedType === 'string' ? input.requestedType : 'random'
+
+      // Read once, applied to every source below. The teacher settled this when
+      // they created the class; making them restate it in 出題方向 each time is
+      // how a Japanese class ends up with Chinese questions.
+      const { data: classRow } = await supabase.from('sessions')
+        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+      const classInstruction = [
+        trackInstruction(classRow?.teaching_language),
+        levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
+      ].join('\n')
       // A quiz can be built from a screenshot or from a file the teacher shared;
       // the two differ only in where the source comes from and whether a
       // screenshot row is recorded alongside it.
@@ -595,12 +619,9 @@ Deno.serve(async (req) => {
           .select('transcript').eq('id', listeningClipId).eq('session_id', sessionId).maybeSingle()
         if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
         sourceText = clip.transcript
-        const { data: levelRow } = await supabase.from('sessions')
-          .select('level_framework, level_code').eq('id', sessionId).maybeSingle()
         extraInstruction = [
           'This is a LISTENING comprehension test. The learners hear the passage read aloud and never see it written down.',
           'Every question must be answerable from hearing alone. Do not ask about spelling, individual characters, punctuation or page layout, and do not tell the learner to "read" anything.',
-          levelInstruction(levelRow?.level_framework ?? null, levelRow?.level_code ?? null),
         ].join('\n')
       } else if (fromSharedFile) {
         const { data: sharedFile, error: sharedFileError } = await supabase.from('shared_files')
@@ -676,7 +697,8 @@ Deno.serve(async (req) => {
           const generated = await generateCustomQuiz({
             sourceUrl: sourceUrl || undefined,
             sourceText: sourceText || undefined,
-            extraInstruction: extraInstruction || undefined,
+            extraInstruction: [classInstruction, extraInstruction].filter(Boolean).join('\n'),
+            teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
             direction,
             requestedCount,
             requestedType: requestedType as 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'writing',

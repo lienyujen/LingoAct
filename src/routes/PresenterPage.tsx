@@ -10,6 +10,7 @@ import { QRCodePanel } from '../components/QRCodePanel'
 import { ExitTicketResult } from '../components/ExitTicketResult'
 import { LotteryOverlay } from '../components/LotteryOverlay'
 import { QuestionEditor } from '../components/QuestionEditor'
+import { resolveTrack } from '../lib/teachingTracks'
 import type { QuestionDraft } from '../components/QuestionEditor'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
@@ -711,7 +712,7 @@ export function PresenterPage() {
     await updateSession({ captions_enabled: !session.captions_enabled })
   }
 
-  async function savePresenterSettings(settings: PresenterCaptionSettings, microphoneId: string, languages: { teachingLanguage: string; guidanceLanguage: string }) {
+  async function savePresenterSettings(settings: PresenterCaptionSettings, microphoneId: string, teaching: { teachingLanguage: string; guidanceLanguage: string; levelCode: string; readingAnnotation: string }) {
     if (!session) return
     const presenterToken = getPresenterToken(session.id)
     if (!presenterToken) {
@@ -731,8 +732,10 @@ export function PresenterPage() {
           action: 'update_session',
           sessionId,
           presenterToken,
-          teachingLanguage: languages.teachingLanguage,
-          guidanceLanguage: languages.guidanceLanguage,
+          teachingLanguage: teaching.teachingLanguage,
+          guidanceLanguage: teaching.guidanceLanguage,
+          levelCode: teaching.levelCode || null,
+          readingAnnotation: teaching.readingAnnotation,
           captionSourceLanguage: settings.sourceLanguage,
           captionDisplayLanguage: settings.displayLanguage,
           captionFontSize: settings.fontSize,
@@ -1746,7 +1749,8 @@ export function PresenterPage() {
         open={listeningOpen}
         presenterToken={getPresenterToken(sessionId) || ''}
         sessionId={sessionId}
-        teachingLanguage={session?.teaching_language || 'zh-tw'}
+        readingAnnotation={session?.reading_annotation || resolveTrack(session?.teaching_language).annotation}
+        teachingLanguage={resolveTrack(session?.teaching_language).language}
         onClose={() => setListeningOpen(false)}
       />
       <TextDispatchModal
@@ -1767,7 +1771,7 @@ export function PresenterPage() {
           if (!settingsBusy) setSettingsOpen(false)
         }}
         onRefreshMicrophones={() => void refreshMicrophones()}
-        onSave={(settings, microphoneId, languages) => void savePresenterSettings(settings, microphoneId, languages)}
+        onSave={(settings, microphoneId, teaching) => void savePresenterSettings(settings, microphoneId, teaching)}
       />
       <ConfirmDialog
         busy={busy}

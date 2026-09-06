@@ -6,7 +6,7 @@
 // for listening, reading and writing, so rendering them as "A1" would silently
 // ask for material too hard for the very learners who need it easiest.
 
-export type Framework = 'tbcl' | 'cefr' | 'gept' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'tbcl' | 'grade' | 'cefr' | 'gept' | 'jlpt' | 'topik' | 'ivpt'
 
 export type Level = {
   code: string
@@ -18,6 +18,25 @@ export type Level = {
 }
 
 export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels: Level[] }> = {
+  // 國語: Mandarin taught to children who already speak it. The band here
+  // tracks reading and writing load, not spoken command — a first-grader
+  // converses fluently and reads a few hundred characters, so a question they
+  // could answer aloud can still be unreadable on the page.
+  grade: {
+    name: '十二年國民基本教育・國語文（年級）',
+    note: 'Taiwan\'s school-year ladder for Mandarin taught as a FIRST language. These are native speakers: do not simplify the spoken language as though for a foreign learner, and never explain what a common word means. What rises with the year is the characters they can read and the length and abstraction of what they can write.',
+    levels: [
+      { code: 'g1', label: '國小一年級', band: 1 },
+      { code: 'g2', label: '國小二年級', band: 2 },
+      { code: 'g3', label: '國小三年級', band: 3 },
+      { code: 'g4', label: '國小四年級', band: 3 },
+      { code: 'g5', label: '國小五年級', band: 4 },
+      { code: 'g6', label: '國小六年級', band: 4 },
+      { code: 'j1', label: '國中七年級', band: 5 },
+      { code: 'j2', label: '國中八年級', band: 5 },
+      { code: 'j3', label: '國中九年級', band: 6 },
+    ],
+  },
   tbcl: {
     name: '臺灣華語文能力基準 (TBCL)',
     note: 'Taiwan\'s national benchmarks for Chinese as a second language, three stages across seven levels. Levels 1 and 2 are below CEFR A1; do not treat them as A1.',

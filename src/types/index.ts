@@ -20,6 +20,9 @@ export type Session = {
   guidance_language: string
   level_framework: string | null
   level_code: string | null
+  // 注音 or 拼音 on a read-aloud item. Fixed for 國語, chosen for 華語文, 'none'
+  // for the languages where there is nothing to annotate.
+  reading_annotation: string
   exit_ticket_prompt: string | null
   exit_ticket_prompt_en: string | null
   exit_ticket_prompt_translations?: Record<string, string> | null

@@ -4,9 +4,27 @@
 // supabase/functions/_shared/proficiency.ts and stays there: it is prompt
 // material, the client never needs it, and one copy cannot drift from itself.
 
-export type Framework = 'tbcl' | 'cefr' | 'gept' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'tbcl' | 'grade' | 'cefr' | 'gept' | 'jlpt' | 'topik' | 'ivpt'
 
 export const FRAMEWORKS: { id: Framework; name: string; levels: { code: string; label: string }[] }[] = [
+  {
+    // 國語 is laddered by school year, not by a proficiency test: the pupils
+    // already speak the language, and what changes year to year is how much of
+    // it they can read and write.
+    id: 'grade',
+    name: '十二年國教・年級',
+    levels: [
+      { code: 'g1', label: '國小一年級' },
+      { code: 'g2', label: '國小二年級' },
+      { code: 'g3', label: '國小三年級' },
+      { code: 'g4', label: '國小四年級' },
+      { code: 'g5', label: '國小五年級' },
+      { code: 'g6', label: '國小六年級' },
+      { code: 'j1', label: '國中七年級' },
+      { code: 'j2', label: '國中八年級' },
+      { code: 'j3', label: '國中九年級' },
+    ],
+  },
   {
     id: 'tbcl',
     name: '臺灣華語文能力基準 TBCL',
@@ -79,23 +97,6 @@ export const FRAMEWORKS: { id: Framework; name: string; levels: { code: string; 
   },
 ]
 
-// Which ladder a teacher of each language is already thinking in, so the picker
-// opens on the right one rather than making them find it every time.
-const byLanguage: Record<string, Framework> = {
-  'zh-tw': 'tbcl',
-  en: 'gept',
-  ja: 'jlpt',
-  ko: 'topik',
-  vi: 'ivpt',
-  fr: 'cefr',
-  de: 'cefr',
-  es: 'cefr',
-}
-
-export function defaultFramework(teachingLanguage: string): Framework {
-  return byLanguage[teachingLanguage] || 'cefr'
-}
-
 export function frameworkById(id: string) {
   return FRAMEWORKS.find((framework) => framework.id === id)
 }
@@ -105,5 +106,7 @@ export function levelLabel(frameworkId: string | null, code: string | null) {
   const framework = frameworkById(frameworkId)
   const level = framework?.levels.find((candidate) => candidate.code === code)
   if (!framework || !level) return ''
-  return framework.id === 'tbcl' ? `TBCL ${level.label.split('・')[0]}` : `${framework.name.split('（')[0].split(' ').at(-1)} ${level.label}`
+  if (framework.id === 'tbcl') return `TBCL ${level.label.split('・')[0]}`
+  if (framework.id === 'grade') return level.label
+  return `${framework.name.split('（')[0].split(' ').at(-1)} ${level.label}`
 }

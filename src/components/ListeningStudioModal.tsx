@@ -7,12 +7,14 @@ import {
   dispatchListeningQuiz,
   synthesizeListening,
   uploadListeningScreenshot,
+  annotateReading,
+  applyAnnotation,
 } from '../lib/listening'
-import { FRAMEWORKS, defaultFramework, frameworkById } from '../lib/proficiency'
-import type { Framework } from '../lib/proficiency'
 import type { ListeningKind, PresenterListeningClip } from '../types'
 
 type Props = {
+  // 注音 or 拼音, decided with the rest of the class rather than per clip.
+  readingAnnotation: string
   open: boolean
   sessionId: string
   presenterToken: string
@@ -66,7 +68,7 @@ function PlayIcon({ size = 17 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
 }
 
-export function ListeningStudioModal({ open, sessionId, presenterToken, teachingLanguage, onClose }: Props) {
+export function ListeningStudioModal({ open, sessionId, presenterToken, teachingLanguage, readingAnnotation, onClose }: Props) {
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
   const [kind, setKind] = useState<ListeningKind>('passage')
@@ -74,8 +76,6 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
   const [speakers, setSpeakers] = useState<string[]>([])
   const [speakersTouched, setSpeakersTouched] = useState(false)
   const [screenshotId, setScreenshotId] = useState<string | null>(null)
-  const [framework, setFramework] = useState<Framework>(() => defaultFramework(teachingLanguage))
-  const [levelCode, setLevelCode] = useState('')
   const [clip, setClip] = useState<PresenterListeningClip | null>(null)
   const [replayLimit, setReplayLimit] = useState<number | null>(2)
   // Only the read-aloud dispatch uses these: a listening item is paced by its
@@ -102,17 +102,11 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
   }, [open])
 
   useEffect(() => {
-    setFramework(defaultFramework(teachingLanguage))
-  }, [teachingLanguage])
-
-  useEffect(() => {
     if (kind !== 'dialogue' || speakersTouched) return
     setSpeakers(speakersFromTranscript(transcript))
   }, [kind, transcript, speakersTouched])
 
   if (!open) return null
-
-  const levels = frameworkById(framework)?.levels || []
 
   async function readImage(file: File) {
     setError('')
@@ -179,6 +173,29 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
           requestedCount: null,
         })
       } else if (target === 'read_aloud') {
+        // Marked up on the way out, not when the clip was made: a clip can be
+        // dispatched as audio, as a quiz, or read aloud, and only the last of
+        // those needs — or may safely carry — the text and its font.
+        if (readingAnnotation !== 'none' && teachingLanguage.startsWith('zh')) {
+          setBusy('正在標音…')
+          try {
+            const marked = await annotateReading({
+              sessionId, presenterToken, text: clip.transcript,
+              mode: readingAnnotation as 'zhuyin' | 'pinyin',
+            })
+            await applyAnnotation({
+              sessionId, presenterToken, clipId: clip.id,
+              mode: readingAnnotation as 'zhuyin' | 'pinyin',
+              annotationText: marked.annotationText,
+            })
+          } catch (caught) {
+            // Losing the annotation is a shame; losing the activity is worse.
+            // The words still read, just without 注音 above them.
+            console.error('annotation failed', caught)
+            setError(caught instanceof Error ? `標音失敗，改以無標音派送：${caught.message}` : '標音失敗，改以無標音派送。')
+          }
+          setBusy('正在派送…')
+        }
         // The learner sees the words and hears the model, then records their
         // own take against it — so the clip stops being a test and becomes a
         // reference, and the transcript travels on the question.
@@ -288,22 +305,6 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
                   ))}
                 </div>
               )}
-
-              <div className="ls-level">
-                <label>
-                  <span>能力基準</span>
-                  <select value={framework} onChange={(event) => { setFramework(event.target.value as Framework); setLevelCode('') }}>
-                    {FRAMEWORKS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span>程度</span>
-                  <select value={levelCode} onChange={(event) => setLevelCode(event.target.value)}>
-                    <option value="">未指定</option>
-                    {levels.map((level) => <option key={level.code} value={level.code}>{level.label}</option>)}
-                  </select>
-                </label>
-              </div>
 
               {clip ? (
                 <div className="ls-player">

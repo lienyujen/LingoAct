@@ -747,7 +747,12 @@ $$;
 -- beginners' Japanese class in Taiwan teaches ja, explains in zh-TW, and sits at
 -- JLPT N5 — no one of those implies the others.
 alter table public.sessions
-  add column if not exists teaching_language text not null default 'zh-tw';
+  add column if not exists teaching_language text not null default 'huayu';
+-- Rows written before tracks existed hold 'zh-tw', which then meant the only
+-- Chinese there was: 華語文. The application resolves that alias rather than
+-- rewriting history, so an old session keeps working untouched.
+alter table public.sessions
+  alter column teaching_language set default 'huayu';
 
 alter table public.sessions
   add column if not exists guidance_language text not null default 'zh-TW';
@@ -757,7 +762,20 @@ alter table public.sessions
 -- in JLPT grades; flattening both to CEFR would lose TBCL levels 1 and 2, which
 -- sit below A1 and are exactly the levels where difficulty control matters most.
 alter table public.sessions
-  add column if not exists level_framework text null check (level_framework in ('tbcl', 'cefr', 'gept', 'jlpt', 'topik', 'ivpt'));
+  add column if not exists level_framework text null;
+
+-- 國語 is laddered by school year, which is not a proficiency test and was not
+-- in the original list.
+alter table public.sessions drop constraint if exists sessions_level_framework_check;
+alter table public.sessions
+  add constraint sessions_level_framework_check
+  check (level_framework is null or level_framework in ('tbcl', 'grade', 'cefr', 'gept', 'jlpt', 'topik', 'ivpt'));
+
+-- 注音 or 拼音, where that is a real question: fixed for 國語, chosen by a
+-- 華語文 teacher whose class may come from either, irrelevant to the rest.
+alter table public.sessions
+  add column if not exists reading_annotation text not null default 'zhuyin'
+  check (reading_annotation in ('none', 'zhuyin', 'pinyin'));
 
 alter table public.sessions
   add column if not exists level_code text null check (level_code is null or char_length(level_code) between 1 and 20);

@@ -4745,14 +4745,6 @@ h2 {
 .ls-voice input:focus { outline: none; }
 .ls-voice-name { font-size: 11px; font-weight: 700; color: var(--ls-muted); }
 
-.ls-level { display: flex; gap: 10px; }
-.ls-level label { display: flex; flex-direction: column; gap: 5px; flex-grow: 1; min-width: 0; }
-.ls-level span { font-size: 11px; font-weight: 800; color: var(--ls-muted); letter-spacing: .03em; }
-.ls-level select {
-  padding: 8px 10px; border-radius: 9px;
-  border: 1px solid var(--ls-line); background: var(--ls-card);
-  color: var(--ls-ink); font-family: inherit; font-size: 12.5px;
-}
 
 .ls-synth {
   padding: 12px; border-radius: 11px; cursor: pointer;
@@ -5069,3 +5061,13 @@ h2 {
   color: #fff;
 }
 .language-chip.selected small { color: rgb(255 255 255 / 78%); }
+
+/* The ladder is a consequence of the track, not a second question, so it is
+   shown as a quiet aside on the label rather than as another control. */
+.language-pair-label em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  margin-left: 8px;
+}

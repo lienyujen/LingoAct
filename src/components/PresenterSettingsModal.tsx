@@ -1,5 +1,6 @@
 import { ArrowsClockwise, Gear, Microphone, Translate, X } from '@phosphor-icons/react'
 import { LanguagePairFields } from './LanguagePairFields'
+import { resolveTrack } from '../lib/teachingTracks'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES, defaultInterpretationLanguages } from '../lib/captionLanguages'
@@ -24,7 +25,11 @@ type Props = {
   session: Session
   onClose: () => void
   onRefreshMicrophones: () => void
-  onSave: (settings: PresenterCaptionSettings, microphoneId: string, languages: { teachingLanguage: string; guidanceLanguage: string }) => void
+  onSave: (
+    settings: PresenterCaptionSettings,
+    microphoneId: string,
+    teaching: { teachingLanguage: string; guidanceLanguage: string; levelCode: string; readingAnnotation: string },
+  ) => void
 }
 
 const captionFontSizes = [28, 30, 32, 36, 42]
@@ -47,8 +52,12 @@ export function PresenterSettingsModal({
   const [position, setPosition] = useState(session.caption_position ?? 'bottom')
   const [interpretationAudioEnabled, setInterpretationAudioEnabled] = useState(session.interpretation_audio_enabled)
   const [interpretationLanguages, setInterpretationLanguages] = useState(session.interpretation_languages)
-  const [teachingLanguage, setTeachingLanguage] = useState(session.teaching_language || 'zh-tw')
+  const [teachingTrack, setTeachingTrack] = useState(resolveTrack(session.teaching_language).id)
   const [guidanceLanguage, setGuidanceLanguage] = useState(session.guidance_language || 'zh-TW')
+  const [levelCode, setLevelCode] = useState(session.level_code || '')
+  const [readingAnnotation, setReadingAnnotation] = useState(
+    session.reading_annotation || resolveTrack(session.teaching_language).annotation,
+  )
   const [microphoneId, setMicrophoneId] = useState(selectedMicrophoneId)
   const [microphoneLevel, setMicrophoneLevel] = useState(0)
   const [previewError, setPreviewError] = useState('')
@@ -128,7 +137,7 @@ export function PresenterSettingsModal({
     onSave(
       { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages },
       microphoneId,
-      { teachingLanguage, guidanceLanguage },
+      { teachingLanguage: teachingTrack, guidanceLanguage, levelCode, readingAnnotation },
     )
   }
 
@@ -149,9 +158,17 @@ export function PresenterSettingsModal({
           <div className="presenter-settings-section-heading"><span><Translate size={17} />課程語言</span></div>
           <LanguagePairFields
             guidanceLanguage={guidanceLanguage}
-            teachingLanguage={teachingLanguage}
+            levelCode={levelCode}
+            readingAnnotation={readingAnnotation}
+            teachingTrack={teachingTrack}
+            onAnnotationChange={setReadingAnnotation}
             onGuidanceChange={setGuidanceLanguage}
-            onTeachingChange={setTeachingLanguage}
+            onLevelChange={setLevelCode}
+            onTrackChange={(id) => {
+              setTeachingTrack(id)
+              setLevelCode('')
+              setReadingAnnotation(resolveTrack(id).annotation)
+            }}
           />
         </section>
 

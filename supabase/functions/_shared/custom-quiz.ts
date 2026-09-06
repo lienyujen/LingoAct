@@ -162,6 +162,9 @@ export async function generateCustomQuiz(input: {
   // Level expectations and the answer-leak rule, which vary by how far along the
   // learners are and so cannot be baked into the system instruction.
   extraInstruction?: string
+  // The class's own language, named for the model. Settled when the session was
+  // created, so the teacher does not have to say it in every 出題方向.
+  teachingLanguage?: string
 }) {
   if (!input.sourceUrl && !input.sourceText) throw new Error('No quiz source was supplied.')
   const apiKey = Deno.env.get('GEMINI_API_KEY')
@@ -185,14 +188,17 @@ export async function generateCustomQuiz(input: {
     : input.requestedType === 'random'
       ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
       : `每一題都必須是 ${input.requestedType}。`
+  // The class's language decides this, and the teacher's direction can still
+  // override it — a 華語文 teacher does sometimes want an English gloss. Reading
+  // it out of the direction text was the wrong way round: it made the default
+  // "whatever the material happens to be in", so a Japanese class working from
+  // a Chinese textbook page got Chinese questions.
   const requestedLanguage = /(?:英文|英語|english)/i.test(input.direction)
     ? 'English'
-    : /(?:繁體中文|正體中文|traditional chinese|zh-tw)/i.test(input.direction)
-      ? 'Traditional Chinese (Taiwan)'
-      : 'auto'
+    : input.teachingLanguage || 'auto'
   const languageInstruction = requestedLanguage === 'auto'
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
-    : `教師已指定測驗語言為 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則都必須使用 ${requestedLanguage}。`
+    : `本課程的教學語言是 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則都必須使用 ${requestedLanguage}，除非教師在出題方向中另外指定。`
 
   const requestPayload = {
     systemInstruction: {

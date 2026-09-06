@@ -1,7 +1,9 @@
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
-import { guidanceLanguages, teachingLanguages } from '../_shared/languages.ts'
+import { guidanceLanguages } from '../_shared/languages.ts'
+import { DEFAULT_TRACK, resolveTrack, teachingTrackIds } from '../_shared/teaching.ts'
+import { FRAMEWORKS } from '../_shared/proficiency.ts'
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const speakerLanguages = new Set(['zh-tw', 'en'])
@@ -49,12 +51,25 @@ Deno.serve(async (req) => {
       )))]
       : []
     const interpretationAudioEnabled = Boolean(input.interpretationAudioEnabled) && interpretationLanguages.length > 0
-    // The two axes a language class runs on. Anything unrecognised falls back to
-    // the column default rather than being written through: these drive the
-    // listening voice, the reading annotation and the proficiency ladder, and a
-    // junk value there would surface much later as a strange-sounding clip.
-    const teachingLanguage = teachingLanguages.has(input.teachingLanguage) ? input.teachingLanguage as string : 'zh-tw'
+    // What the class is. Anything unrecognised falls back to the default rather
+    // than being written through: the track drives the listening voice, the
+    // reading annotation, the proficiency ladder and the language questions are
+    // written in, and a junk value would surface much later as a clip in the
+    // wrong accent or a quiz in the wrong language.
+    const teachingTrack = teachingTrackIds.has(input.teachingLanguage) ? input.teachingLanguage as string : DEFAULT_TRACK
     const guidanceLanguage = guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : 'zh-TW'
+
+    // The ladder is the track's, never the caller's: a 華語文 class is measured
+    // in TBCL and a 國語 class in school years, and no request should be able to
+    // pair one with the other's levels.
+    const track = resolveTrack(teachingTrack)
+    const levelCode = typeof input.levelCode === 'string'
+      && FRAMEWORKS[track.framework].levels.some((level) => level.code === input.levelCode)
+      ? input.levelCode as string
+      : null
+    const readingAnnotation = ['none', 'zhuyin', 'pinyin'].includes(input.readingAnnotation)
+      ? input.readingAnnotation as string
+      : track.id === 'guoyu' ? 'zhuyin' : 'none'
     const presenterToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')
     const tokenHash = await hashPresenterToken(presenterToken)
     const supabase = getAdminClient()
@@ -78,8 +93,11 @@ Deno.serve(async (req) => {
           interpretation_enabled: interpretationAudioEnabled,
           interpretation_audio_enabled: interpretationAudioEnabled,
           interpretation_languages: interpretationAudioEnabled ? interpretationLanguages : [],
-          teaching_language: teachingLanguage,
+          teaching_language: teachingTrack,
           guidance_language: guidanceLanguage,
+          level_framework: track.framework,
+          level_code: levelCode,
+          reading_annotation: readingAnnotation,
         })
         .select('id, code')
         .single()

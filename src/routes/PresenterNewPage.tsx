@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SetupNotice } from '../components/SetupNotice'
 import { LanguagePairFields } from '../components/LanguagePairFields'
+import { DEFAULT_TRACK, resolveTrack } from '../lib/teachingTracks'
 import { BackendSetup } from '../components/BackendSetup'
 import { getPresenterToken, savePresenterToken } from '../lib/presenterAuth'
 import { hasOwnerKey } from '../lib/ownerKey'
@@ -30,10 +31,13 @@ async function getFunctionErrorMessage(error: unknown) {
 
 export function PresenterNewPage() {
   const [title, setTitle] = useState('')
-  // Chinese explained in Chinese, because that is the room this was built for.
-  // Both travel with the session, so the class is set up before anyone joins.
-  const [teachingLanguage, setTeachingLanguage] = useState('zh-tw')
+  // 華語文 explained in Chinese, because that is the room this was built for.
+  // All of it travels with the session, so the class is set up before anyone
+  // joins and no activity has to ask again.
+  const [teachingTrack, setTeachingTrack] = useState(DEFAULT_TRACK)
   const [guidanceLanguage, setGuidanceLanguage] = useState('zh-TW')
+  const [levelCode, setLevelCode] = useState('')
+  const [readingAnnotation, setReadingAnnotation] = useState('zhuyin')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [managementOpen, setManagementOpen] = useState(false)
@@ -61,8 +65,10 @@ export function PresenterNewPage() {
       const { data, error: createError } = await requireSupabase().functions.invoke('create-session', {
         body: {
           title: title.trim() || '未命名場次',
-          teachingLanguage,
+          teachingLanguage: teachingTrack,
           guidanceLanguage,
+          levelCode: levelCode || null,
+          readingAnnotation,
         },
         headers: { 'x-lingoact-client': 'windows-app' },
       })
@@ -187,9 +193,19 @@ export function PresenterNewPage() {
         </label>
         <LanguagePairFields
           guidanceLanguage={guidanceLanguage}
-          teachingLanguage={teachingLanguage}
+          levelCode={levelCode}
+          readingAnnotation={readingAnnotation}
+          teachingTrack={teachingTrack}
+          onAnnotationChange={setReadingAnnotation}
           onGuidanceChange={setGuidanceLanguage}
-          onTeachingChange={setTeachingLanguage}
+          onLevelChange={setLevelCode}
+          onTrackChange={(id) => {
+            setTeachingTrack(id)
+            // The ladder changed with the track, so a level from the old one is
+            // meaningless — TBCL 第3級 is not a school year.
+            setLevelCode('')
+            setReadingAnnotation(resolveTrack(id).annotation)
+          }}
         />
         {error && <p className="error">{error}</p>}
         <button disabled={busy} type="submit">

@@ -18,10 +18,11 @@ import type { Framework } from './proficiency'
 // 國語文 and 華語文 are separate tracks, not one Chinese entry. They share a
 // language and an accent and almost nothing else: 國語文 is Mandarin taught to
 // children who already speak it — 國語 in 國小, 國文 from 國中 up — laddered by
-// the 108 curriculum and always annotated in 注音; 華語文 is Mandarin taught to
-// people who do not, laddered by TBCL, annotated in 注音 or 拼音 depending on
-// who is in the room. A question written for one is wrong for the other even at
-// a comparable reading level.
+// the 108 curriculum, which is 素養導向 and so changes what a question must be
+// and not merely how hard it is; 華語文 is Mandarin taught to people who do not
+// speak it, laddered by TBCL or by the TOCFL test they sit, and annotated in
+// 注音 or 拼音 depending on who is in the room. A question written for one is
+// wrong for the other even at a comparable reading level.
 export type Annotation = 'none' | 'zhuyin' | 'pinyin'
 
 export type TeachingTrack = {
@@ -42,9 +43,11 @@ export const TEACHING_TRACKS: TeachingTrack[] = [
   {
     id: 'huayu',
     label: '華語文',
-    note: '第二語言・TBCL',
+    note: '第二語言・TBCL・華測',
     language: 'zh-tw',
-    frameworks: ['tbcl'],
+    // TBCL is the benchmark the teaching is written against; TOCFL is the test
+    // the learners sit. The same pairing as 課綱 and 全民英檢 on the English side.
+    frameworks: ['tbcl', 'tocfl'],
     annotation: 'zhuyin',
     // A class of beginners reading traditional script wants 注音; one coming
     // from simplified or from a romanised textbook wants 拼音.

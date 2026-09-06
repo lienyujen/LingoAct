@@ -29,7 +29,9 @@ export type TeachingTrack = {
 export const TEACHING_TRACKS: Record<string, TeachingTrack> = {
   huayu: {
     id: 'huayu',
-    frameworks: ['tbcl'],
+    // TBCL is the benchmark the teaching is written against; TOCFL is the test
+    // the learners sit — the same pairing as 課綱 and 全民英檢 on the English side.
+    frameworks: ['tbcl', 'tocfl'],
     language: 'zh-tw',
     promptLanguage: 'Traditional Chinese as written in Taiwan (臺灣繁體中文)',
     audience: 'The learners are studying Chinese as a second or foreign language. Everyday vocabulary a native child would know may still be new to them, and is fair to ask about.',

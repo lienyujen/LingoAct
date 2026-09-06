@@ -4,7 +4,7 @@
 // supabase/functions/_shared/proficiency.ts and stays there: it is prompt
 // material, the client never needs it, and one copy cannot drift from itself.
 
-export type Framework = 'tbcl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
 
 export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: { code: string; label: string }[] }[] = [
   {
@@ -41,6 +41,23 @@ export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: {
       { code: '5', label: '第5級・進階' },
       { code: '6', label: '第6級・精熟' },
       { code: '7', label: '第7級・精熟' },
+    ],
+  },
+  {
+    // The test TBCL's learners actually sit: 四等八級, with 準備級 below A1 for
+    // people who have only just started.
+    id: 'tocfl',
+    name: '華語文能力測驗 TOCFL',
+    short: 'TOCFL',
+    levels: [
+      { code: 'novice1', label: '準備級一級' },
+      { code: 'novice2', label: '準備級二級' },
+      { code: 'level1', label: '入門級・A1' },
+      { code: 'level2', label: '基礎級・A2' },
+      { code: 'level3', label: '進階級・B1' },
+      { code: 'level4', label: '高階級・B2' },
+      { code: 'level5', label: '流利級・C1' },
+      { code: 'level6', label: '精通級・C2' },
     ],
   },
   {
@@ -146,5 +163,6 @@ export function levelLabel(frameworkId: string | null, code: string | null) {
   // the test's name in front of it to mean anything on a report.
   if (framework.id === 'guoyu108' || framework.id === 'en108' || framework.id === 'toeic') return level.label
   if (framework.id === 'tbcl') return `TBCL ${level.label.split('・')[0]}`
+  if (framework.id === 'tocfl') return `TOCFL ${level.label.split('・')[0]}`
   return `${framework.short} ${level.label}`
 }

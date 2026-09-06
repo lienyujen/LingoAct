@@ -774,7 +774,7 @@ alter table public.sessions drop constraint if exists sessions_level_framework_c
 alter table public.sessions
   add constraint sessions_level_framework_check
   check (level_framework is null or level_framework in (
-    'tbcl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'topik', 'ivpt'
+    'tbcl', 'tocfl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'topik', 'ivpt'
   ));
 
 -- 注音 or 拼音, where that is a real question: fixed for 國語, chosen by a

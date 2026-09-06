@@ -6,7 +6,7 @@
 // for listening, reading and writing, so rendering them as "A1" would silently
 // ask for material too hard for the very learners who need it easiest.
 
-export type Framework = 'tbcl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
 
 export type Level = {
   code: string
@@ -17,6 +17,24 @@ export type Level = {
   band: number
 }
 
+// 素養導向: what the 108 curriculum asks an item to BE, not merely how hard it
+// should be. It applies to the two 課綱 ladders and to nothing else here — a
+// class preparing for 多益 or TOCFL wants items in that test's own idiom, and
+// dressing a TOEIC item up as a life-situation task would misprepare them.
+//
+// Taken from the Ministry's own criteria for 素養導向紙筆測驗: the item is set in
+// an authentic, contextualised situation; it asks the learner to integrate and
+// apply knowledge, skills and attitudes to a real problem; it values the
+// reasoning process, not only the answer. What it must not be is recall of a
+// fact from the passage, or a "situation" invented as decoration around a
+// conventional question.
+const COMPETENCY_ORIENTED = [
+  'This curriculum is 素養導向 (competency-oriented), which changes what the question must BE and not only how hard it is.',
+  'Set each item in a concrete, plausible situation the learner could actually meet — a notice, a message, a conversation, a choice to make — and ask them to DO something with the text: infer, compare, judge, decide, apply it elsewhere, or explain why.',
+  'Do not write items that can be answered by locating a fact and copying it back. Do not bolt an invented "situation" onto a recall question as decoration; if removing the situation leaves the question intact, it was decoration.',
+  'Where the material allows, reach for the reasoning behind an answer rather than the answer alone.',
+].join(' ')
+
 export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels: Level[] }> = {
   // 國語文 under Taiwan's 108 curriculum — 國語 in 國小, 國文 from 國中 up.
   // These are native speakers, so the band tracks reading and writing load
@@ -26,7 +44,11 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
   // each year names the stage it belongs to.
   guoyu108: {
     name: '十二年國民基本教育課程綱要・語文領域－國語文',
-    note: 'Taiwan\'s 108 curriculum for Mandarin taught as a FIRST language: 國語 in primary school, 國文 from junior high. These are native speakers. Do not simplify the spoken language as though for a foreign learner and never gloss an ordinary word — pitch the difficulty at the characters they can READ and the length and abstraction of what they can WRITE at this stage.',
+    note: [
+      'Taiwan\'s 108 curriculum for Mandarin taught as a FIRST language: 國語 in primary school, 國文 from junior high. These are native speakers. Do not simplify the spoken language as though for a foreign learner and never gloss an ordinary word — pitch the difficulty at the characters they can READ and the length and abstraction of what they can WRITE at this stage.',
+      COMPETENCY_ORIENTED,
+      'The curriculum organises this subject into six 學習表現: 聆聽, 口語表達, 標音符號與運用, 識字與寫字, 閱讀, 寫作. A written quiz lives mostly in 閱讀 — 擷取訊息, 統整解釋, 省思評鑑 — and in 寫作. Prefer those over character recognition drilled in isolation, which the curriculum treats as a means rather than an end.',
+    ].join('\n'),
     levels: [
       { code: 'g1', label: '國小一年級（第一學習階段）', band: 1 },
       { code: 'g2', label: '國小二年級（第一學習階段）', band: 2 },
@@ -46,7 +68,10 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
   // targets are the curriculum's own CEFR references, not a guess.
   en108: {
     name: '十二年國民基本教育課程綱要・語文領域－英語文',
-    note: 'Taiwan\'s 108 curriculum for English as a foreign language, beginning in the third year of primary school. Write for a Taiwanese classroom: the learners share Mandarin as a first language, and the curriculum expects roughly CEFR A2 by the end of junior high and B1 by the end of senior high.',
+    note: [
+      'Taiwan\'s 108 curriculum for English as a foreign language, beginning in the third year of primary school. Write for a Taiwanese classroom: the learners share Mandarin as a first language, and the curriculum expects roughly CEFR A2 by the end of junior high and B1 by the end of senior high.',
+      COMPETENCY_ORIENTED,
+    ].join('\n'),
     levels: [
       { code: 'p34', label: '國小三、四年級（第二學習階段）', band: 1 },
       { code: 'p56', label: '國小五、六年級（第三學習階段）', band: 1 },
@@ -78,6 +103,20 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
       { code: '5', label: 'TBCL 第5級（進階）', band: 3 },
       { code: '6', label: 'TBCL 第6級（精熟）', band: 4 },
       { code: '7', label: 'TBCL 第7級（精熟）', band: 5 },
+    ],
+  },
+  tocfl: {
+    name: '華語文能力測驗 (TOCFL)',
+    note: 'The test TBCL\'s learners actually sit, in four bands across eight levels, with 準備級 sitting below CEFR A1. Vocabulary is tightly specified at each level, so keep to the words a learner at this level is expected to hold.',
+    levels: [
+      { code: 'novice1', label: 'TOCFL 準備級一級（低於 CEFR A1）', band: 0 },
+      { code: 'novice2', label: 'TOCFL 準備級二級（低於 CEFR A1）', band: 0 },
+      { code: 'level1', label: 'TOCFL 入門級（CEFR A1，約 500 詞）', band: 1 },
+      { code: 'level2', label: 'TOCFL 基礎級（CEFR A2，約 1,270 詞）', band: 2 },
+      { code: 'level3', label: 'TOCFL 進階級（CEFR B1，約 3,245 詞）', band: 3 },
+      { code: 'level4', label: 'TOCFL 高階級（CEFR B2，約 4,316 詞）', band: 4 },
+      { code: 'level5', label: 'TOCFL 流利級（CEFR C1，約 5,456 詞）', band: 5 },
+      { code: 'level6', label: 'TOCFL 精通級（CEFR C2，約 11,092 詞）', band: 6 },
     ],
   },
   cefr: {

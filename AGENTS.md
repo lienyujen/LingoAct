@@ -75,13 +75,21 @@ why `release.yml` deliberately builds without a `.env`.
   annotation, the listening accent, and the language the AI writes questions in.
   華語文 and 國語文 are separate tracks, not one Chinese entry — they share an
   accent and almost nothing else, one being Mandarin taught to people who do not
-  speak it (TBCL) and the other to children who do (國語 in 國小, 國文 from 國中,
-  laddered by the 108 curriculum through 高中 and always 注音). 英語 carries
-  three ladders, because a Taiwanese English class is aimed at one of three
-  things — the 108 curriculum, 全民英檢 or 多益. 日語 JLPT, 韓語 TOPIK, 越南語 the
-  six-level scale, the rest CEFR. A track offers only its own ladders, and a
-  level only counts if it belongs to the chosen one: picking JLPT is not a
-  choice a 華語文 teacher should have to decline.
+  speak it and the other to children who do (國語 in 國小, 國文 from 國中,
+  through 高中, always 注音). A track carries the ladders that fit it and no
+  others: 華語文 has TBCL and the TOCFL test its learners sit, 英語 has the 108
+  curriculum, 全民英檢 and 多益, 日語 JLPT, 韓語 TOPIK, 越南語 the six-level
+  scale, the rest CEFR. Picking JLPT is not a choice a 華語文 teacher should
+  have to decline, but choosing between 全民英檢 and 多益 is one an English
+  teacher really makes.
+- **素養導向 belongs to the two 課綱 ladders and to nothing else.** The 108
+  curriculum asks an item to be set in a situation the learner could meet and to
+  require applying the text rather than locating a fact in it, so those two
+  ladders carry that instruction and the proficiency tests do not — a class
+  preparing for 多益 or TOCFL wants items in that test's own idiom. The
+  difference is visible: from one recycling notice, 國語 第五學習階段 produces
+  「小華週四晚上吃完外帶便當…他最適合在什麼時候拿去回收？」 while TOCFL 進階級
+  produces 「住戶如果想要丟棄…應該在什麼時候拿去回收？」.
 - **A guidance language** alongside it, varying independently: a beginners'
   Japanese class in Taiwan teaches ja and is explained in zh-TW. English is
   assumed nowhere; the student page speaks eight guidance languages, two

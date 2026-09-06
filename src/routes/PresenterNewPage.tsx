@@ -4,6 +4,7 @@ import { ArrowRight, ArrowsClockwise, CircleNotch, Door, ChartBar, Gear, SignIn,
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SetupNotice } from '../components/SetupNotice'
+import { LanguagePairFields } from '../components/LanguagePairFields'
 import { BackendSetup } from '../components/BackendSetup'
 import { getPresenterToken, savePresenterToken } from '../lib/presenterAuth'
 import { hasOwnerKey } from '../lib/ownerKey'
@@ -29,6 +30,10 @@ async function getFunctionErrorMessage(error: unknown) {
 
 export function PresenterNewPage() {
   const [title, setTitle] = useState('')
+  // Chinese explained in Chinese, because that is the room this was built for.
+  // Both travel with the session, so the class is set up before anyone joins.
+  const [teachingLanguage, setTeachingLanguage] = useState('zh-tw')
+  const [guidanceLanguage, setGuidanceLanguage] = useState('zh-TW')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [managementOpen, setManagementOpen] = useState(false)
@@ -56,6 +61,8 @@ export function PresenterNewPage() {
       const { data, error: createError } = await requireSupabase().functions.invoke('create-session', {
         body: {
           title: title.trim() || '未命名場次',
+          teachingLanguage,
+          guidanceLanguage,
         },
         headers: { 'x-lingoact-client': 'windows-app' },
       })
@@ -178,6 +185,12 @@ export function PresenterNewPage() {
           場次名稱
           <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：AI 教學工作坊" />
         </label>
+        <LanguagePairFields
+          guidanceLanguage={guidanceLanguage}
+          teachingLanguage={teachingLanguage}
+          onGuidanceChange={setGuidanceLanguage}
+          onTeachingChange={setTeachingLanguage}
+        />
         {error && <p className="error">{error}</p>}
         <button disabled={busy} type="submit">
           {busy ? '建立中...' : '建立場次'}

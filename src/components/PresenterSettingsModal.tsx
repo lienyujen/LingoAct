@@ -1,4 +1,5 @@
 import { ArrowsClockwise, Gear, Microphone, Translate, X } from '@phosphor-icons/react'
+import { LanguagePairFields } from './LanguagePairFields'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES, defaultInterpretationLanguages } from '../lib/captionLanguages'
@@ -23,7 +24,7 @@ type Props = {
   session: Session
   onClose: () => void
   onRefreshMicrophones: () => void
-  onSave: (settings: PresenterCaptionSettings, microphoneId: string) => void
+  onSave: (settings: PresenterCaptionSettings, microphoneId: string, languages: { teachingLanguage: string; guidanceLanguage: string }) => void
 }
 
 const captionFontSizes = [28, 30, 32, 36, 42]
@@ -46,6 +47,8 @@ export function PresenterSettingsModal({
   const [position, setPosition] = useState(session.caption_position ?? 'bottom')
   const [interpretationAudioEnabled, setInterpretationAudioEnabled] = useState(session.interpretation_audio_enabled)
   const [interpretationLanguages, setInterpretationLanguages] = useState(session.interpretation_languages)
+  const [teachingLanguage, setTeachingLanguage] = useState(session.teaching_language || 'zh-tw')
+  const [guidanceLanguage, setGuidanceLanguage] = useState(session.guidance_language || 'zh-TW')
   const [microphoneId, setMicrophoneId] = useState(selectedMicrophoneId)
   const [microphoneLevel, setMicrophoneLevel] = useState(0)
   const [previewError, setPreviewError] = useState('')
@@ -122,7 +125,11 @@ export function PresenterSettingsModal({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    onSave({ sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages }, microphoneId)
+    onSave(
+      { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages },
+      microphoneId,
+      { teachingLanguage, guidanceLanguage },
+    )
   }
 
   return (
@@ -131,12 +138,22 @@ export function PresenterSettingsModal({
         <div className="modal-heading">
           <div>
             <h2><Gear size={20} />教師端設定</h2>
-            <p className="muted">設定課程錄製、字幕外觀與學生端即時口譯語音</p>
+            <p className="muted">設定課程語言、錄製、字幕外觀與學生端即時口譯語音</p>
           </div>
           <button className="ghost-button icon-button" aria-label="關閉設定" title="關閉" type="button" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
+
+        <section className="presenter-settings-section">
+          <div className="presenter-settings-section-heading"><span><Translate size={17} />課程語言</span></div>
+          <LanguagePairFields
+            guidanceLanguage={guidanceLanguage}
+            teachingLanguage={teachingLanguage}
+            onGuidanceChange={setGuidanceLanguage}
+            onTeachingChange={setTeachingLanguage}
+          />
+        </section>
 
         <section className="presenter-settings-section">
           <div className="presenter-settings-section-heading">

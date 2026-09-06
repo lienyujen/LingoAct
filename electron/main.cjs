@@ -222,6 +222,16 @@ function stopOverlayKeepAlive() {
 function startOverlayKeepAlive() {
   stopOverlayKeepAlive()
   overlayKeepAliveTimer = setInterval(() => {
+    // Raising windows on a timer cancels whatever native popup the teacher has
+    // open: a <select> dropdown in the panel lives at most 750ms, which is why
+    // every dropdown in the desktop app appeared to close the moment it opened.
+    //
+    // While the panel is the focused window there is nothing here to defend
+    // against — it is already in front, and the slide deck this is fighting for
+    // z-order is not the window being used. The tick resumes the instant focus
+    // moves away, which is exactly when it matters.
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) return
+
     reinforcePresenterTopmost()
     if (overlayVisibilitySuppressed || !overlayWindow || overlayWindow.isDestroyed()) return
     const targetDisplay = displayForBounds(safeBounds(mainWindow))

@@ -21,6 +21,12 @@ export function JoinPage() {
   const [sessionLookupError, setSessionLookupError] = useState('')
   const [returning, setReturning] = useState(false)
   const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
+  // The teacher's 導引語 is the starting point, not a lock: a student who has
+  // chosen for themselves keeps their choice, which is why the stored value wins
+  // inside participantLocaleFromStorage.
+  useEffect(() => {
+    if (session?.guidance_language) setLocale(participantLocaleFromStorage(session.guidance_language))
+  }, [session?.guidance_language])
   const navigate = useNavigate()
   const location = useLocation()
 

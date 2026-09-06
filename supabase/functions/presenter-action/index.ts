@@ -4,6 +4,7 @@ import { levelInstruction } from '../_shared/proficiency.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
+import { guidanceLanguages, teachingLanguages } from '../_shared/languages.ts'
 
 type ParticipantRecord = { id: string; name: string }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -242,6 +243,18 @@ Deno.serve(async (req) => {
 
     if (action === 'update_session') {
       const values: Record<string, boolean | number | string | string[] | null> = {}
+      // The two axes a language class runs on. Rejected rather than ignored:
+      // these pick the listening voice, the reading annotation and the
+      // proficiency ladder, so a value silently dropped here would surface much
+      // later as a clip in the wrong accent.
+      if (typeof input.teachingLanguage === 'string') {
+        if (!teachingLanguages.has(input.teachingLanguage)) return jsonResponse({ message: '不支援這個教學語言。' }, 400)
+        values.teaching_language = input.teachingLanguage
+      }
+      if (typeof input.guidanceLanguage === 'string') {
+        if (!guidanceLanguages.has(input.guidanceLanguage)) return jsonResponse({ message: '不支援這個導引語。' }, 400)
+        values.guidance_language = input.guidanceLanguage
+      }
       if (typeof input.danmakuEnabled === 'boolean') values.danmaku_enabled = input.danmakuEnabled
       if (typeof input.anonymousEnabled === 'boolean') values.anonymous_enabled = input.anonymousEnabled
       if (typeof input.recordingEnabled === 'boolean') {

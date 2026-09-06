@@ -1,6 +1,7 @@
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
+import { guidanceLanguages, teachingLanguages } from '../_shared/languages.ts'
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const speakerLanguages = new Set(['zh-tw', 'en'])
@@ -48,6 +49,12 @@ Deno.serve(async (req) => {
       )))]
       : []
     const interpretationAudioEnabled = Boolean(input.interpretationAudioEnabled) && interpretationLanguages.length > 0
+    // The two axes a language class runs on. Anything unrecognised falls back to
+    // the column default rather than being written through: these drive the
+    // listening voice, the reading annotation and the proficiency ladder, and a
+    // junk value there would surface much later as a strange-sounding clip.
+    const teachingLanguage = teachingLanguages.has(input.teachingLanguage) ? input.teachingLanguage as string : 'zh-tw'
+    const guidanceLanguage = guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : 'zh-TW'
     const presenterToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')
     const tokenHash = await hashPresenterToken(presenterToken)
     const supabase = getAdminClient()
@@ -71,6 +78,8 @@ Deno.serve(async (req) => {
           interpretation_enabled: interpretationAudioEnabled,
           interpretation_audio_enabled: interpretationAudioEnabled,
           interpretation_languages: interpretationAudioEnabled ? interpretationLanguages : [],
+          teaching_language: teachingLanguage,
+          guidance_language: guidanceLanguage,
         })
         .select('id, code')
         .single()

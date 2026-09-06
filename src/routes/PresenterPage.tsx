@@ -711,7 +711,7 @@ export function PresenterPage() {
     await updateSession({ captions_enabled: !session.captions_enabled })
   }
 
-  async function savePresenterSettings(settings: PresenterCaptionSettings, microphoneId: string) {
+  async function savePresenterSettings(settings: PresenterCaptionSettings, microphoneId: string, languages: { teachingLanguage: string; guidanceLanguage: string }) {
     if (!session) return
     const presenterToken = getPresenterToken(session.id)
     if (!presenterToken) {
@@ -731,6 +731,8 @@ export function PresenterPage() {
           action: 'update_session',
           sessionId,
           presenterToken,
+          teachingLanguage: languages.teachingLanguage,
+          guidanceLanguage: languages.guidanceLanguage,
           captionSourceLanguage: settings.sourceLanguage,
           captionDisplayLanguage: settings.displayLanguage,
           captionFontSize: settings.fontSize,
@@ -1765,7 +1767,7 @@ export function PresenterPage() {
           if (!settingsBusy) setSettingsOpen(false)
         }}
         onRefreshMicrophones={() => void refreshMicrophones()}
-        onSave={(settings, microphoneId) => void savePresenterSettings(settings, microphoneId)}
+        onSave={(settings, microphoneId, languages) => void savePresenterSettings(settings, microphoneId, languages)}
       />
       <ConfirmDialog
         busy={busy}

@@ -84,6 +84,10 @@ export function ParticipantPage() {
   const location = useLocation()
   useSessionPresence(sessionId, session?.status === 'active' ? participant : null)
 
+  useEffect(() => {
+    if (session?.guidance_language) setLocale(participantLocaleFromStorage(session.guidance_language))
+  }, [session?.guidance_language])
+
   // Presence in the channel is live-only; this is what the report reads later.
   useEffect(() => {
     if (session?.status !== 'active' || !participant?.id || !participantToken) return

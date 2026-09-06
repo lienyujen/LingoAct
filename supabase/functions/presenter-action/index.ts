@@ -600,7 +600,7 @@ Deno.serve(async (req) => {
       if (fromSharedFile && !validUuid(sharedFileId)) return jsonResponse({ message: '檔案資料不正確。' }, 400)
       if (!fromSharedFile && !fromListening && !validUuid(screenshotId)) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
       if (!direction) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
-      if (!['random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching', 'writing'].includes(requestedType)) {
+      if (!['random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching', 'writing', 'flashcard'].includes(requestedType)) {
         return jsonResponse({ message: '測驗題型設定不正確。' }, 400)
       }
       if (input.requestedCount !== null && input.requestedCount !== '' && input.requestedCount !== undefined && requestedCount === null) {
@@ -702,7 +702,7 @@ Deno.serve(async (req) => {
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
             direction,
             requestedCount,
-            requestedType: requestedType as 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing',
+            requestedType: requestedType as 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing' | 'flashcard',
           })
 
           if (!fromSharedFile && !fromListening) {
@@ -721,7 +721,7 @@ Deno.serve(async (req) => {
             direction,
             requested_count: requestedCount,
             requested_type: requestedType,
-            graded: requestedType !== 'writing',
+            graded: !['writing', 'flashcard'].includes(requestedType),
           })
           if (quizError) throw quizError
 
@@ -817,7 +817,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ message: 'AI 出題暫時失敗，請重新派送。', generating: false }, 503)
         }
         if (pendingQuestion) {
-          return jsonResponse({ generating: true, quiz: null, items: [], attempts: [], answers: [], keys: [], screenshot: null }, 202)
+          return jsonResponse({ generating: true, quiz: null, items: [], attempts: [], answers: [], keys: [], tries: [], screenshot: null }, 202)
         }
         return jsonResponse({ message: '找不到自訂測驗。' }, 404)
       }
@@ -829,15 +829,28 @@ Deno.serve(async (req) => {
       if (itemError || attemptError || questionError) throw itemError || attemptError || questionError
       const itemIds = (items || []).map((item) => item.id)
       const attemptIds = (attempts || []).map((attempt) => attempt.id)
-      const [{ data: keys, error: keyError }, { data: answers, error: answerError }, { data: screenshot, error: screenshotError }] = await Promise.all([
+      const [{ data: keys, error: keyError }, { data: answers, error: answerError }, { data: screenshot, error: screenshotError }, { data: tries }] = await Promise.all([
         itemIds.length ? supabase.from('quiz_item_keys').select('*').in('item_id', itemIds) : Promise.resolve({ data: [], error: null }),
         attemptIds.length ? supabase.from('quiz_item_answers').select('*').in('attempt_id', attemptIds) : Promise.resolve({ data: [], error: null }),
         question.screenshot_id
           ? supabase.from('screenshots').select('*').eq('id', question.screenshot_id).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
+        // Only a 單字卡 deck produces more than one of these per card, and they
+        // are what it is for: which cards were known cold and which came back.
+        attemptIds.length
+          ? supabase.from('quiz_item_tries').select('id, attempt_id, item_id, correct, tried_at').in('attempt_id', attemptIds)
+          : Promise.resolve({ data: [], error: null }),
       ])
       if (keyError || answerError || screenshotError) throw keyError || answerError || screenshotError
-      return jsonResponse({ quiz, items: items || [], attempts: attempts || [], answers: answers || [], keys: keys || [], screenshot: screenshot || null })
+      return jsonResponse({
+        quiz,
+        items: items || [],
+        attempts: attempts || [],
+        answers: answers || [],
+        keys: keys || [],
+        tries: tries || [],
+        screenshot: screenshot || null,
+      })
     }
 
     if (action === 'update_custom_quiz_key') {

@@ -1,8 +1,8 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 
-type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing'
-type ItemType = Exclude<RequestedType, 'random' | 'writing'>
+type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing' | 'flashcard'
+type ItemType = Exclude<RequestedType, 'random' | 'writing' | 'flashcard'>
 
 const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching'])
 
@@ -185,8 +185,11 @@ export async function generateCustomQuiz(input: {
   const countInstruction = input.requestedCount
     ? `必須產生恰好 ${input.requestedCount} 題。`
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
+  const flashcard = input.requestedType === 'flashcard'
   const writing = input.requestedType === 'writing'
-  const typeInstruction = writing
+  const typeInstruction = flashcard
+    ? '這是單字卡練習，不是測驗。每一張卡片都必須是 multiple_choice，題幹只放要辨認的提示（一個詞、一個定義、一段情境描述或一個問句），選項放 3 到 4 個候選答案，accepted_answers 只放唯一正確的那一個。卡片之間互相獨立，不要互相參照；重點是能不能立刻反應出來，所以題幹要短，不要考長篇理解。'
+    : writing
     ? '這是寫作練習，不是測驗。每一題都必須是 short_answer，題幹是一個要學生動筆寫的欄位：寫清楚這一欄要寫什麼、大約多長、可以用到哪些詞語或句型。不要出有標準答案的題目，accepted_answers 與 rubric 一律留空。'
     : input.requestedType === 'random'
       ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
@@ -257,7 +260,7 @@ ${input.sourceText}` }] : []),
     const item = raw as Record<string, unknown>
     const type = item.type as ItemType
     if (!itemTypes.has(type)) throw new Error(`AI returned an invalid type for item ${index + 1}.`)
-    const effectiveType = writing ? 'short_answer' : input.requestedType
+    const effectiveType = writing ? 'short_answer' : flashcard ? 'multiple_choice' : input.requestedType
     if (effectiveType !== 'random' && type !== effectiveType) throw new Error('AI did not follow the requested question type.')
     const promptText = typeof item.prompt_text === 'string' ? item.prompt_text.trim().slice(0, 2000) : ''
     if (!promptText) throw new Error(`Item ${index + 1} has no prompt.`)

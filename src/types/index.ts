@@ -121,7 +121,10 @@ export type PresenterListeningClip = ListeningClip & {
 export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching'
 // 'writing' is a mode rather than an item type: 寫作教練 lays out short_answer
 // fields and turns the marking off, so nothing downstream meets a new shape.
-export type QuizRequestedType = 'random' | QuizItemType | 'writing'
+// 'writing' and 'flashcard' are modes rather than item types: 寫作教練 lays out
+// short_answer fields with the marking off, and a deck is multiple_choice cards
+// answered one at a time. Neither makes a new shape for anything downstream.
+export type QuizRequestedType = 'random' | QuizItemType | 'writing' | 'flashcard'
 export type ExitTicketCategory = 'lesson_summary' | 'learning_assessment' | 'course_satisfaction' | 'student_question'
 export type ExitTicketResponseType = 'text' | 'rating'
 
@@ -410,9 +413,21 @@ export type ParticipantQuizData = {
   answers: QuizItemAnswer[]
 }
 
+// One attempt at one card. A 單字卡 deck is the only thing that produces
+// several of these per item, and they are what the activity is for: which cards
+// a student knew cold and which they had to come back to.
+export type QuizItemTry = {
+  id: string
+  attempt_id: string
+  item_id: string
+  correct: boolean
+  tried_at: string
+}
+
 export type PresenterQuizResults = ParticipantQuizData & {
   attempts: QuizAttempt[]
   answers: QuizItemAnswer[]
+  tries: QuizItemTry[]
   keys: Array<{ item_id: string; accepted_answers: string[]; rubric: string }>
   screenshot: Screenshot | null
 }

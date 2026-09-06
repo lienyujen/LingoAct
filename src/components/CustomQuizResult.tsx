@@ -129,7 +129,10 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   // 寫作教練 is not marked, so a missing score means there was never one to
   // wait for. Everything below that reads as scoring is switched off rather
   // than left showing dashes and a stuck "評分中" count.
-  const writing = results.quiz.graded === false
+  const flashcard = results.quiz.requested_type === 'flashcard'
+  // 寫作教練 and a deck are both ungraded, but for different reasons and with
+  // different things worth showing, so they are not one branch.
+  const writing = results.quiz.graded === false && !flashcard
   const graded = results.attempts.filter((attempt) => attempt.status === 'graded')
   const grading = results.attempts.filter((attempt) => attempt.status === 'grading')
   const average = graded.length
@@ -142,6 +145,34 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     else answersByAttempt.set(answer.attempt_id, [answer])
   }
   const itemPosition = new Map(results.items.map((item) => [item.id, item.position]))
+
+  // Right at the first attempt is what a drill is actually measuring: not
+  // whether the deck was finished — everyone finishes, that is the design —
+  // but how much of it the student already knew.
+  const triesByAttempt = new Map<string, typeof results.tries>()
+  for (const attemptTry of results.tries || []) {
+    const list = triesByAttempt.get(attemptTry.attempt_id)
+    if (list) list.push(attemptTry)
+    else triesByAttempt.set(attemptTry.attempt_id, [attemptTry])
+  }
+  function firstTryRight(attemptId: string) {
+    const list = [...(triesByAttempt.get(attemptId) || [])]
+      .sort((a, b) => Date.parse(a.tried_at) - Date.parse(b.tried_at))
+    const firstSeen = new Set<string>()
+    let right = 0
+    for (const attemptTry of list) {
+      if (firstSeen.has(attemptTry.item_id)) continue
+      firstSeen.add(attemptTry.item_id)
+      if (attemptTry.correct) right += 1
+    }
+    return right
+  }
+  // Which cards the class keeps missing, which is the card to reteach.
+  const missesByItem = new Map<string, number>()
+  for (const attemptTry of results.tries || []) {
+    if (attemptTry.correct) continue
+    missesByItem.set(attemptTry.item_id, (missesByItem.get(attemptTry.item_id) || 0) + 1)
+  }
   const itemPrompt = new Map(results.items.map((item) => [item.id, item.prompt_text]))
 
   const stoppable = isCurrentQuestion && question.status === 'active'
@@ -192,7 +223,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">
-        <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
+        <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : flashcard ? '單字卡練習' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
           <span>{results.attempts.length}/{onlineCount} 人作答</span>
           {(stoppable || resumable) && (
@@ -211,29 +242,46 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         </div>
       </div>
       <div className="quiz-result-stats">
-        <div><strong>{results.items.length}</strong><span>{writing ? '欄位' : '題'}</span></div>
-        {writing
-          ? <div><strong>{results.attempts.length}</strong><span>已回收</span></div>
+        <div><strong>{results.items.length}</strong><span>{writing ? '欄位' : flashcard ? '張卡片' : '題'}</span></div>
+        {writing || flashcard
+          ? <div><strong>{results.attempts.length}</strong><span>{flashcard ? '人在練' : '已回收'}</span></div>
           : <>
               <div><strong>{average === null ? '—' : average.toFixed(1)}</strong><span>平均分數</span></div>
               <div><strong>{grading.length}</strong><span>評分中</span></div>
             </>}
       </div>
-      {!writing && (
+      {!writing && !flashcard && (
         <label className="show-answers-toggle">
           <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
           顯示正確答案，若 AI 錯判答案請自行更正
         </label>
       )}
       {error && <p className="error">{error}</p>}
-      <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>
+      {!flashcard && <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>}
+      {flashcard && (
+        <div className="flashcard-card-list">
+          {[...results.items]
+            .sort((a, b) => (missesByItem.get(b.id) || 0) - (missesByItem.get(a.id) || 0))
+            .map((item) => {
+              const misses = missesByItem.get(item.id) || 0
+              return (
+                <div className={misses ? 'flashcard-card-row is-missed' : 'flashcard-card-row'} key={item.id}>
+                  <span>{item.prompt_text}</span>
+                  <strong>{misses ? `答錯 ${misses} 次` : '沒人答錯'}</strong>
+                </div>
+              )
+            })}
+        </div>
+      )}
       {!writing && grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />AI 正在背景評分，完成後會自動更新。</p>}
       <div className="quiz-attempt-list">
         {results.attempts.map((attempt, index) => (
           <article key={attempt.id}>
             <div>
               <strong>{anonymousEnabled ? `匿名學員 ${index + 1}` : attempt.participant_name}</strong>
-              <span>{writing
+              <span>{flashcard
+                ? `第一次就對 ${firstTryRight(attempt.id)}/${results.items.length}`
+                : writing
                 ? '已送出'
                 : attempt.status === 'graded'
                   ? `${attempt.total_score}/${attempt.max_score}`

@@ -6,6 +6,7 @@ import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
+import { ParticipantFlashcards } from '../components/ParticipantFlashcards'
 import type { QuizSubmission } from '../components/ParticipantCustomQuiz'
 import { ParticipantInterpretationAudio } from '../components/ParticipantInterpretationAudio'
 import { ParticipantFileUpload, ParticipantSharedFiles } from '../components/ParticipantFilePanel'
@@ -412,6 +413,25 @@ export function ParticipantPage() {
 
   // Throws away the take so the student can go again. 錄音朗讀 is practice:
   // hear the model, hear yourself, try once more.
+  // One card, marked by the server. The browser decides only when a missed
+  // card comes back, never whether it was right.
+  async function submitFlashcardTry(itemId: string, answerValue: string) {
+    if (!participant || !participantToken || !question) throw new Error('找不到作答權限。')
+    const { data, error: tryError } = await requireSupabase().functions.invoke('participant-action', {
+      body: {
+        action: 'submit_flashcard_try',
+        sessionId,
+        participantId: participant.id,
+        participantToken,
+        questionId: question.id,
+        itemId,
+        answerValue,
+      },
+    })
+    if (tryError) throw new Error(await participantFunctionMessage(tryError, '無法送出這張卡片。'))
+    return data as { correct: boolean; correctAnswer: string | null }
+  }
+
   async function discardAudio() {
     if (!participant || !participantToken || !question) return
     setAudioBusy(true)
@@ -690,7 +710,9 @@ export function ParticipantPage() {
         />
       )}
       {question?.type === 'custom_quiz' ? (quizData ? (
-        <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
+        quizData.quiz.requested_type === 'flashcard'
+          ? <ParticipantFlashcards data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
           <h2>{participantText(locale, 'customQuiz')}</h2>

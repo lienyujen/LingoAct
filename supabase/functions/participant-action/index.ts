@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true })
     }
 
-    if (['get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading'].includes(action)) {
+    if (['get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限失效，請重新掃描 QR Code 加入場次。' }, 403)
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
@@ -174,6 +174,103 @@ Deno.serve(async (req) => {
       }
 
       if (!quiz) return jsonResponse({ message: '自訂測驗仍在出題中，請稍候。' }, 409)
+
+      // One card at a time, marked here rather than in the browser.
+      //
+      // The deck's answer key is granted to nobody, which is what stops a
+      // student reading it — so the only way a drill can say "wrong, try again"
+      // straight away is to ask the server, one card per round trip. That is
+      // also what makes the re-serve honest: the queue in the browser decides
+      // WHEN a card comes back, never whether it was right.
+      if (action === 'submit_flashcard_try') {
+        if (quiz.requested_type !== 'flashcard') {
+          return jsonResponse({ message: '這不是單字卡練習。' }, 400)
+        }
+        const { data: liveSession } = await supabase.from('sessions').select('status').eq('id', sessionId).maybeSingle()
+        if (liveSession?.status !== 'active' || question.status !== 'active') {
+          return jsonResponse({ message: '本題已停止作答。' }, 409)
+        }
+
+        const itemId = typeof input.itemId === 'string' ? input.itemId : ''
+        if (!validUuid(itemId)) return jsonResponse({ message: '卡片資料不正確。' }, 400)
+        const { data: item, error: itemLookupError } = await supabase.from('quiz_items')
+          .select('id, options, type').eq('id', itemId).eq('quiz_id', quiz.id).maybeSingle()
+        if (itemLookupError) throw itemLookupError
+        if (!item) return jsonResponse({ message: '找不到這張卡片。' }, 404)
+
+        const chosen = typeof input.answerValue === 'string' ? input.answerValue.trim().slice(0, 500) : ''
+        if (!chosen || !(item.options as string[]).includes(chosen)) {
+          return jsonResponse({ message: '選項不正確。' }, 400)
+        }
+
+        const { data: key, error: keyLookupError } = await supabase.from('quiz_item_keys')
+          .select('accepted_answers').eq('item_id', itemId).maybeSingle()
+        if (keyLookupError) throw keyLookupError
+        const accepted = (key?.accepted_answers as string[]) || []
+        const correct = accepted.includes(chosen)
+
+        // The attempt is opened by the first card rather than at submit time:
+        // a drill has no submit, it just runs until the deck is clear.
+        let attemptId = ''
+        const { data: existing } = await supabase.from('quiz_attempts')
+          .select('id').eq('question_id', questionId).eq('participant_id', participantId).maybeSingle()
+        if (existing) {
+          attemptId = existing.id
+        } else {
+          attemptId = crypto.randomUUID()
+          const { error: attemptError } = await supabase.from('quiz_attempts').insert({
+            id: attemptId,
+            session_id: sessionId,
+            question_id: questionId,
+            quiz_id: quiz.id,
+            participant_id: participantId,
+            participant_name: participant.name,
+            // A deck is never marked out of a hundred; what the teacher wants
+            // from it is which cards were missed and how often.
+            status: 'submitted',
+            total_score: null,
+            graded_at: new Date().toISOString(),
+          })
+          // Two cards answered at once would both try to open the attempt.
+          if (attemptError && attemptError.code !== '23505') throw attemptError
+          if (attemptError) {
+            const { data: raced } = await supabase.from('quiz_attempts')
+              .select('id').eq('question_id', questionId).eq('participant_id', participantId).single()
+            attemptId = raced.id
+          }
+          await supabase.from('answers').insert({
+            session_id: sessionId,
+            question_id: questionId,
+            participant_id: participantId,
+            participant_name: participant.name,
+            answer_text: '[單字卡練習中]',
+          })
+        }
+
+        const { error: tryError } = await supabase.from('quiz_item_tries').insert({
+          attempt_id: attemptId,
+          item_id: itemId,
+          answer_values: [chosen],
+          correct,
+        })
+        if (tryError) throw tryError
+
+        // quiz_item_answers keeps its meaning: the answer that stands. A card
+        // answered wrongly and then right ends up recorded as right, which is
+        // what the student ended on; the struggle is in the tries.
+        const { error: answerError } = await supabase.from('quiz_item_answers').upsert({
+          attempt_id: attemptId,
+          item_id: itemId,
+          answer_values: [chosen],
+          score: correct ? 1 : 0,
+        }, { onConflict: 'attempt_id,item_id' })
+        if (answerError) throw answerError
+
+        // Showing the right answer after a wrong try is what a flashcard IS —
+        // you turn it over. It reveals one card, to a student who has already
+        // answered it, in an activity that carries no mark.
+        return jsonResponse({ correct, correctAnswer: correct ? null : accepted[0] || null })
+      }
 
       const { data: activeSession, error: sessionError } = await supabase.from('sessions')
         .select('status').eq('id', sessionId).maybeSingle()

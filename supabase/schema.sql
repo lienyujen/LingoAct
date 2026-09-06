@@ -328,6 +328,28 @@ create index if not exists quiz_attempts_question_id_idx on public.quiz_attempts
 create index if not exists quiz_attempts_participant_id_idx on public.quiz_attempts (participant_id, submitted_at);
 create index if not exists quiz_attempts_quiz_id_idx on public.quiz_attempts (quiz_id, submitted_at);
 create index if not exists quiz_attempts_session_id_idx on public.quiz_attempts (session_id, submitted_at);
+-- 數位 Flashcard: every attempt at a card, not just the last one.
+--
+-- quiz_item_answers is unique per (attempt, item) — one answer per card, ever —
+-- which is right for a test and wrong for a drill, where the cards a student
+-- gets wrong are meant to come back. Tries live here so that constraint can
+-- stay: quiz_item_answers keeps its meaning as the final answer, which scoring
+-- already reads, and nothing that works today changes.
+create table if not exists public.quiz_item_tries (
+  id uuid primary key default gen_random_uuid(),
+  attempt_id uuid not null references public.quiz_attempts(id) on delete cascade,
+  item_id uuid not null references public.quiz_items(id) on delete cascade,
+  answer_text text null check (coalesce(char_length(answer_text), 0) <= 500),
+  answer_values text[] null,
+  -- Decided on the server against the key the student cannot read, so a drill
+  -- can give instant feedback without handing out the answers up front.
+  correct boolean not null,
+  tried_at timestamptz not null default now()
+);
+
+create index if not exists quiz_item_tries_attempt_id_idx on public.quiz_item_tries (attempt_id);
+create index if not exists quiz_item_tries_item_id_idx on public.quiz_item_tries (item_id);
+
 create index if not exists quiz_item_answers_attempt_id_idx on public.quiz_item_answers (attempt_id);
 create index if not exists quiz_item_answers_item_id_idx on public.quiz_item_answers (item_id);
 
@@ -401,6 +423,7 @@ alter table public.quiz_items enable row level security;
 alter table public.quiz_item_keys enable row level security;
 alter table public.quiz_attempts enable row level security;
 alter table public.quiz_item_answers enable row level security;
+alter table public.quiz_item_tries enable row level security;
 alter table public.shared_files enable row level security;
 alter table public.file_responses enable row level security;
 
@@ -570,9 +593,9 @@ grant select (id, session_id, kind, language, duration_ms, public_url, created_a
 grant all on public.listening_clips to service_role;
 
 revoke all on public.participant_session_keys, public.audio_responses, public.file_responses, public.quiz_item_keys,
-  public.quiz_attempts, public.quiz_item_answers from public, anon, authenticated;
+  public.quiz_attempts, public.quiz_item_answers, public.quiz_item_tries from public, anon, authenticated;
 grant all on public.participant_session_keys, public.audio_responses, public.shared_files, public.file_responses, public.quizzes, public.quiz_items,
-  public.quiz_item_keys, public.quiz_attempts, public.quiz_item_answers to service_role;
+  public.quiz_item_keys, public.quiz_attempts, public.quiz_item_answers, public.quiz_item_tries to service_role;
 
 do $$ begin
   if not exists (
@@ -956,7 +979,10 @@ notify pgrst, 'reload schema';
 alter table public.quizzes drop constraint if exists quizzes_requested_type_check;
 alter table public.quizzes
   add constraint quizzes_requested_type_check
-  check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching', 'writing'));
+  check (requested_type in (
+    'random', 'multiple_choice', 'fill_blank', 'short_answer',
+    'ordering', 'matching', 'writing', 'flashcard'
+  ));
 
 alter table public.quizzes
   add column if not exists graded boolean not null default true;

@@ -131,9 +131,6 @@ What is **not** done:
 - **No release has been published**, and the version is `0.1.0` rather than
   InterAct's numbering.
 - Of the twelve teaching activities, these are still open:
-  **數位 Flashcard** (nothing built; needs repeated tries at one item, which the
-  unique constraint above forbids — the least disruptive shape is a separate
-  tries table, leaving `quiz_item_answers` as the final answer scoring reads);
   **聽打接力** (nothing built; needs per-sentence clips and pairing);
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
   still a whole passage; **看圖說話** lacks the AI four-panel image (v2);

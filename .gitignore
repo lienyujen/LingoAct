@@ -32,3 +32,7 @@ supabase/.temp/
 *.sln
 *.sw?
 
+
+# 17MB of font binary, fetched by scripts/fetch-bopomofo-font.mjs rather than
+# carried in git history.
+/resources/fonts/

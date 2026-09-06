@@ -17,9 +17,20 @@ module.exports = {
     'electron/**/*',
     'package.json',
     // package.json's dependencies are renderer-only libraries already
-    // bundled into dist/**/*.js by Vite; electron/*.cjs only requires
-    // electron/node:path/node:fs, so none of node_modules ever runs.
+    // bundled into dist/**/*.js by Vite, so none of them needs shipping.
     '!node_modules/**/*',
+    // The one exception: the main process requires subset-font to cut a
+    // per-clip Bopomofo font, so its tree has to travel. pnpm links packages
+    // through .pnpm, which these patterns follow.
+    'node_modules/subset-font/**/*',
+    'node_modules/fontverter/**/*',
+    'node_modules/harfbuzzjs/**/*',
+    'node_modules/wawoff2/**/*',
+    'node_modules/woff2sfnt-sfnt2woff/**/*',
+    'node_modules/pako/**/*',
+    'node_modules/p-limit/**/*',
+    'node_modules/yocto-queue/**/*',
+    'node_modules/.pnpm/**/*',
   ],
   // The UI only ships zh-TW and en-US strings; without this, electron-builder
   // bundles all ~55 Chromium locale .pak files (~49MB of unused languages).
@@ -28,6 +39,13 @@ module.exports = {
     {
       from: 'build/icon.ico',
       to: 'icon.ico',
+    },
+    // Fetched by scripts/fetch-bopomofo-font.mjs, not carried in git. Apache
+    // 2.0 requires the licence and NOTICE to ship with the binary, so the whole
+    // folder goes.
+    {
+      from: 'resources/fonts',
+      to: 'fonts',
     },
   ],
   win: {

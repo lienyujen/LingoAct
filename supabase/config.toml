@@ -26,3 +26,12 @@ verify_jwt = false
 
 [functions.gemini-caption-relay]
 verify_jwt = false
+
+[functions.analyze-listening-source]
+verify_jwt = false
+
+[functions.synthesize-listening]
+verify_jwt = false
+
+[functions.annotate-reading]
+verify_jwt = false

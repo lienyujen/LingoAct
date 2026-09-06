@@ -19,16 +19,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.110.8",
     "d3-cloud": "1.2.9",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
-    "lucide-react": "^1.26.0",
     "opencc-js": "1.4.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "7.18.1"
+    "react-router-dom": "7.18.1",
+    "subset-font": "^2.7.0"
   },
   "devDependencies": {
     "@types/d3-cloud": "1.2.9",

@@ -1,10 +1,25 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 
-type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer'
+type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering'
 type ItemType = Exclude<RequestedType, 'random'>
 
-const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer'])
+const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer', 'ordering'])
+
+// Ordering items arrive from the model in the right order and must not reach the
+// class that way: quiz_items.options is readable by students, while the answer
+// key table is not. Shuffling here is what keeps the puzzle a puzzle.
+function shuffledIndices(length: number) {
+  const order = Array.from({ length }, (_, index) => index)
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  // A shuffle that happens to reproduce the original leaves the answer on screen.
+  const unchanged = order.every((value, index) => value === index)
+  if (unchanged && order.length > 1) [order[0], order[1]] = [order[1], order[0]]
+  return order
+}
 
 const quizGenerationSchema = {
   type: 'object',
@@ -19,7 +34,7 @@ const quizGenerationSchema = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          type: { type: 'string', enum: ['multiple_choice', 'fill_blank', 'short_answer'] },
+          type: { type: 'string', enum: ['multiple_choice', 'fill_blank', 'short_answer', 'ordering'] },
           prompt_text: { type: 'string' },
           options: { type: 'array', items: { type: 'string' } },
           accepted_answers: { type: 'array', items: { type: 'string' } },
@@ -137,19 +152,29 @@ async function requestQuizGeneration(
 
 export async function generateCustomQuiz(input: {
   // A screenshot or a file the teacher shared; both reach Gemini the same way.
-  sourceUrl: string
+  // A listening clip arrives as text instead: the class never sees the slide, so
+  // the transcript is the only material the questions may be built from.
+  sourceUrl?: string
+  sourceText?: string
   direction: string
   requestedCount: number | null
   requestedType: RequestedType
+  // Level expectations and the answer-leak rule, which vary by how far along the
+  // learners are and so cannot be baked into the system instruction.
+  extraInstruction?: string
 }) {
+  if (!input.sourceUrl && !input.sourceText) throw new Error('No quiz source was supplied.')
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   const [model, fallbackModel] = geminiModels('realtime')
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured.')
 
-  const imageResponse = await fetch(input.sourceUrl)
-  if (!imageResponse.ok) throw new Error(`Could not download the quiz source (${imageResponse.status}).`)
-  const mimeType = imageResponse.headers.get('content-type') || 'image/png'
-  const imageBase64 = bytesToBase64(new Uint8Array(await imageResponse.arrayBuffer()))
+  let sourcePart: Record<string, unknown> | null = null
+  if (input.sourceUrl) {
+    const imageResponse = await fetch(input.sourceUrl)
+    if (!imageResponse.ok) throw new Error(`Could not download the quiz source (${imageResponse.status}).`)
+    const mimeType = imageResponse.headers.get('content-type') || 'image/png'
+    sourcePart = { inlineData: { mimeType, data: bytesToBase64(new Uint8Array(await imageResponse.arrayBuffer())) } }
+  }
 
   const countInstruction = input.requestedCount
     ? `必須產生恰好 ${input.requestedCount} 題。`
@@ -169,14 +194,17 @@ export async function generateCustomQuiz(input: {
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{
       role: 'user',
       parts: [
         { text: JSON.stringify({ direction: input.direction, requested_count: input.requestedCount, requested_type: input.requestedType, requested_language: requestedLanguage }) },
-        { inlineData: { mimeType, data: imageBase64 } },
+        ...(input.extraInstruction ? [{ text: input.extraInstruction }] : []),
+        ...(sourcePart ? [sourcePart] : []),
+        ...(input.sourceText ? [{ text: `教材原文如下：
+${input.sourceText}` }] : []),
       ],
     }],
   }
@@ -220,7 +248,8 @@ export async function generateCustomQuiz(input: {
     if (input.requestedType !== 'random' && type !== input.requestedType) throw new Error('AI did not follow the requested question type.')
     const promptText = typeof item.prompt_text === 'string' ? item.prompt_text.trim().slice(0, 2000) : ''
     if (!promptText) throw new Error(`Item ${index + 1} has no prompt.`)
-    const options = cleanStrings(item.options, 6)
+    // Ordering items carry more pieces than a multiple choice has options.
+    const options = cleanStrings(item.options, type === 'ordering' ? 8 : 6)
     const acceptedAnswers = cleanStrings(item.accepted_answers, 12)
     if (type === 'multiple_choice') {
       if (options.length < 2) throw new Error(`Item ${index + 1} needs at least two options.`)
@@ -228,24 +257,41 @@ export async function generateCustomQuiz(input: {
         throw new Error(`Item ${index + 1} has an invalid answer key.`)
       }
     }
+    if (type === 'ordering' && options.length < 3) throw new Error(`Item ${index + 1} needs at least three fragments to order.`)
     if (type === 'fill_blank' && !acceptedAnswers.length) throw new Error(`Item ${index + 1} needs an accepted answer.`)
     const translation = (item.translation_en || {}) as Record<string, unknown>
     const translatedPrompt = typeof translation.prompt_text === 'string' ? translation.prompt_text.trim().slice(0, 2000) : ''
     const translatedOptions = cleanStrings(translation.options, 6)
+    // The permutation is applied to the translation as well, or an English
+    // reader would be dragging fragments that no longer line up with the Chinese.
+    const permutation = type === 'ordering' ? shuffledIndices(options.length) : null
+    const shownOptions = type === 'multiple_choice'
+      ? options
+      : permutation
+        ? permutation.map((from) => options[from])
+        : []
+    const alignedTranslation = translatedOptions.length === options.length ? translatedOptions : options
+    const shownTranslatedOptions = type === 'multiple_choice'
+      ? alignedTranslation
+      : permutation
+        ? permutation.map((from) => alignedTranslation[from])
+        : options
+
     return {
       id: crypto.randomUUID(),
       position: index + 1,
       type,
       prompt_text: promptText,
-      options: type === 'multiple_choice' ? options : [],
+      options: shownOptions,
       points: basePoints + (index < remainder ? 1 : 0),
       translations: {
         en: {
           prompt_text: translatedPrompt || promptText,
-          options: type === 'multiple_choice' && translatedOptions.length === options.length ? translatedOptions : options,
+          options: shownTranslatedOptions,
         },
       },
-      accepted_answers: acceptedAnswers,
+      // The correct sequence lives in the key table, which students cannot read.
+      accepted_answers: type === 'ordering' ? options : acceptedAnswers,
       rubric: typeof item.rubric === 'string' ? item.rubric.trim().slice(0, 2000) : '',
     }
   })
@@ -289,7 +335,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       }
     })
 
-    const aiGradingInput = gradingInput.filter((item) => item.type !== 'multiple_choice')
+    const aiGradingInput = gradingInput.filter((item) => item.type !== 'multiple_choice' && item.type !== 'ordering')
     let output: {
       evaluations?: Array<{ item_id?: string; score?: number; feedback_zh_tw?: string; feedback_en?: string }>
       overall_feedback_zh_tw?: string
@@ -316,7 +362,15 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       let score = 0
       let feedbackZhTw = ''
       let feedbackEn = ''
-      if (item.type === 'multiple_choice') {
+      if (item.type === 'ordering') {
+        // Order is the whole answer, so this compares sequences rather than sets.
+        const expected = key.accepted_answers || []
+        const submitted = answer.answer_values || []
+        const correct = expected.length === submitted.length && expected.every((value: string, at: number) => value === submitted[at])
+        score = correct ? item.points : 0
+        feedbackZhTw = correct ? '順序正確。' : `順序不對，正確順序：${expected.join(' → ')}`
+        feedbackEn = correct ? 'Correct order.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
+      } else if (item.type === 'multiple_choice') {
         const expected = [...new Set(key.accepted_answers || [])].sort()
         const submitted = [...new Set(answer.answer_values || [])].sort()
         const correct = expected.length === submitted.length && expected.every((value, index) => value === submitted[index])

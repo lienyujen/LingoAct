@@ -1,5 +1,6 @@
 import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
+import { levelInstruction } from '../_shared/proficiency.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
@@ -538,17 +539,43 @@ Deno.serve(async (req) => {
       // screenshot row is recorded alongside it.
       const sharedFileId = input.sharedFileId
       const fromSharedFile = sharedFileId !== undefined && sharedFileId !== null && sharedFileId !== ''
+      // A listening quiz is built from the clip's transcript and never from the
+      // slide behind it: the class hears the material, so no screenshot is
+      // recorded and none is attached to the question.
+      const listeningClipId = input.listeningClipId
+      const fromListening = listeningClipId !== undefined && listeningClipId !== null && listeningClipId !== ''
+      if (fromListening && !validUuid(listeningClipId)) return jsonResponse({ message: '語音素材不正確。' }, 400)
       if (fromSharedFile && !validUuid(sharedFileId)) return jsonResponse({ message: '檔案資料不正確。' }, 400)
-      if (!fromSharedFile && !validUuid(screenshotId)) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
+      if (!fromSharedFile && !fromListening && !validUuid(screenshotId)) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
       if (!direction) return jsonResponse({ message: '請提供有效的截圖與出題方向。' }, 400)
-      if (!['random', 'multiple_choice', 'fill_blank', 'short_answer'].includes(requestedType)) {
+      if (!['random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering'].includes(requestedType)) {
         return jsonResponse({ message: '測驗題型設定不正確。' }, 400)
       }
       if (input.requestedCount !== null && input.requestedCount !== '' && input.requestedCount !== undefined && requestedCount === null) {
         return jsonResponse({ message: '題數必須介於 1 到 10 題。' }, 400)
       }
       let sourceUrl = ''
-      if (fromSharedFile) {
+      let sourceText = ''
+      let extraInstruction = ''
+      let replayLimit: number | null = null
+      if (fromListening) {
+        const rawLimit = input.replayLimit
+        replayLimit = rawLimit === null || rawLimit === undefined || rawLimit === '' ? null : Number(rawLimit)
+        if (replayLimit !== null && (!Number.isInteger(replayLimit) || replayLimit < 1 || replayLimit > 10)) {
+          return jsonResponse({ message: '重播次數請填 1 到 10，或留空表示不限。' }, 400)
+        }
+        const { data: clip } = await supabase.from('listening_clips')
+          .select('transcript').eq('id', listeningClipId).eq('session_id', sessionId).maybeSingle()
+        if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+        sourceText = clip.transcript
+        const { data: levelRow } = await supabase.from('sessions')
+          .select('level_framework, level_code').eq('id', sessionId).maybeSingle()
+        extraInstruction = [
+          'This is a LISTENING comprehension test. The learners hear the passage read aloud and never see it written down.',
+          'Every question must be answerable from hearing alone. Do not ask about spelling, individual characters, punctuation or page layout, and do not tell the learner to "read" anything.',
+          levelInstruction(levelRow?.level_framework ?? null, levelRow?.level_code ?? null),
+        ].join('\n')
+      } else if (fromSharedFile) {
         const { data: sharedFile, error: sharedFileError } = await supabase.from('shared_files')
           .select('*').eq('id', sharedFileId).eq('session_id', sessionId).maybeSingle()
         if (sharedFileError) throw sharedFileError
@@ -584,7 +611,7 @@ Deno.serve(async (req) => {
 
       // Only a screenshot-sourced quiz has a screenshot to record; a file-sourced
       // one leaves screenshot_id null, which the result view already allows for.
-      if (!fromSharedFile) {
+      if (!fromSharedFile && !fromListening) {
         const { error: screenshotError } = await supabase.from('screenshots').insert({
           id: screenshotId,
           session_id: sessionId,
@@ -600,7 +627,9 @@ Deno.serve(async (req) => {
       const { data: pendingQuestion, error: questionError } = await supabase.from('questions').insert({
         id: questionId,
         session_id: sessionId,
-        screenshot_id: fromSharedFile ? null : screenshotId,
+        screenshot_id: fromSharedFile || fromListening ? null : screenshotId,
+        listening_clip_id: fromListening ? listeningClipId : null,
+        replay_limit: replayLimit,
         type: 'custom_quiz',
         status: 'active',
         title: '出題中，請稍候',
@@ -618,13 +647,15 @@ Deno.serve(async (req) => {
       const generateInBackground = async () => {
         try {
           const generated = await generateCustomQuiz({
-            sourceUrl,
+            sourceUrl: sourceUrl || undefined,
+            sourceText: sourceText || undefined,
+            extraInstruction: extraInstruction || undefined,
             direction,
             requestedCount,
             requestedType: requestedType as 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer',
           })
 
-          if (!fromSharedFile) {
+          if (!fromSharedFile && !fromListening) {
             const { error: screenshotUpdateError } = await supabase.from('screenshots').update({
               ai_status: 'success',
               screen_summary: { quiz_title: generated.title, item_count: generated.items.length },
@@ -671,7 +702,7 @@ Deno.serve(async (req) => {
           const detail = errorDetail(error, 'AI quiz generation failed.')
           console.error('custom quiz generation failed', detail)
           await Promise.all([
-            fromSharedFile ? Promise.resolve() : supabase.from('screenshots').update({
+            fromSharedFile || fromListening ? Promise.resolve() : supabase.from('screenshots').update({
               ai_status: 'failed',
               screen_summary: { error: detail.slice(0, 500) },
             }).eq('id', screenshotId),
@@ -818,6 +849,190 @@ Deno.serve(async (req) => {
         }
       }
       return jsonResponse({ success: true })
+    }
+
+    // The presenter reads clips through here rather than from the browser,
+    // because the transcript is deliberately not granted to the anon role: it is
+    // the answer key, and the teacher is the only one who may see it.
+    // Records the uploaded image so it can be read for its text, without
+    // dispatching anything. Every other path that writes a screenshots row also
+    // puts a question in front of the class; a listening clip must not, because
+    // the image is the very thing the class is not allowed to see.
+    if (action === 'record_listening_screenshot') {
+      const screenshotId = input.screenshotId
+      const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
+      if (!validUuid(screenshotId)) return jsonResponse({ message: '截圖識別碼不正確。' }, 400)
+      if (storagePath !== `sessions/${sessionId}/screenshots/${screenshotId}.${storagePath.split('.').at(-1)}` ||
+          !/\.(png|jpg|webp)$/.test(storagePath)) {
+        return jsonResponse({ message: '截圖路徑不正確。' }, 400)
+      }
+
+      const { data: objectList, error: objectError } = await supabase.storage
+        .from('lingoact-screenshots')
+        .list(`sessions/${sessionId}/screenshots`, { search: `${screenshotId}.`, limit: 2 })
+      if (objectError) throw objectError
+      if (!objectList?.some((object) => storagePath.endsWith(`/${object.name}`))) {
+        return jsonResponse({ message: '找不到已上傳的截圖。' }, 400)
+      }
+
+      const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
+      const { error: insertError } = await supabase.from('screenshots').insert({
+        id: screenshotId,
+        session_id: sessionId,
+        storage_path: storagePath,
+        public_url: publicData.publicUrl,
+        ai_status: 'skipped',
+      })
+      if (insertError) throw insertError
+      return jsonResponse({ screenshotId, publicUrl: publicData.publicUrl })
+    }
+
+    // Finishes an annotation in one write: the marked-up text and, for zhuyin,
+    // the font subset cut on the teacher's machine. Both or neither — a clip
+    // carrying variation selectors but no font would render every polyphonic
+    // character with its default reading, which is worse than no annotation at
+    // all because it looks correct.
+    if (action === 'set_clip_annotation') {
+      const clipId = input.listeningClipId
+      const annotation = ['none', 'zhuyin', 'pinyin'].includes(input.annotation) ? input.annotation : 'none'
+      const annotationText = typeof input.annotationText === 'string' ? input.annotationText : ''
+      const fontBase64 = typeof input.fontBase64 === 'string' ? input.fontBase64 : ''
+      if (!validUuid(clipId)) return jsonResponse({ message: '語音素材不正確。' }, 400)
+
+      const { data: clip } = await supabase
+        .from('listening_clips')
+        .select('id, content_hash')
+        .eq('id', clipId)
+        .eq('session_id', sessionId)
+        .maybeSingle()
+      if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+
+      if (annotation === 'zhuyin' && !fontBase64) {
+        return jsonResponse({ message: '注音標記需要一併提供字型子集。' }, 400)
+      }
+
+      let fontPath = null
+      let fontUrl = null
+      if (annotation === 'zhuyin') {
+        const bytes = Uint8Array.from(atob(fontBase64), (character) => character.charCodeAt(0))
+        if (bytes.length > 2 * 1024 * 1024) {
+          return jsonResponse({ message: '字型子集過大，請縮短文字。' }, 413)
+        }
+        fontPath = `${sessionId}/${clip.content_hash}.woff2`
+        const { error: uploadError } = await supabase.storage
+          .from('lingoact-listening')
+          .upload(fontPath, bytes, { contentType: 'font/woff2', upsert: true })
+        if (uploadError) throw uploadError
+        const { data: publicUrl } = supabase.storage.from('lingoact-listening').getPublicUrl(fontPath)
+        fontUrl = publicUrl.publicUrl
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from('listening_clips')
+        .update({
+          annotation,
+          annotation_text: annotation === 'none' ? null : annotationText,
+          font_path: fontPath,
+          font_url: fontUrl,
+        })
+        .eq('id', clipId)
+        .select('*')
+        .single()
+      if (updateError) throw updateError
+      return jsonResponse({ clip: updated })
+    }
+
+    if (action === 'list_listening_clips') {
+      const { data: clips, error: listError } = await supabase
+        .from('listening_clips')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (listError) throw listError
+      return jsonResponse({ clips: clips || [] })
+    }
+
+    // Its own action rather than a branch of create_question. That one demands a
+    // screenshot and writes screenshot_id onto the question; a listening question
+    // carrying one would let the class read the passage out of the public bucket
+    // instead of hearing it. Keeping them apart makes that mistake impossible
+    // rather than merely unlikely.
+    if (action === 'create_listening_question') {
+      const clipId = input.listeningClipId
+      if (!validUuid(clipId)) return jsonResponse({ message: '缺少語音素材。' }, 400)
+
+      const rawLimit = input.replayLimit
+      const replayLimit = rawLimit === null || rawLimit === undefined || rawLimit === '' ? null : Number(rawLimit)
+      if (replayLimit !== null && (!Number.isInteger(replayLimit) || replayLimit < 1 || replayLimit > 10)) {
+        return jsonResponse({ message: '重播次數請填 1 到 10，或留空表示不限。' }, 400)
+      }
+
+      const { data: clip } = await supabase
+        .from('listening_clips')
+        .select('id, transcript, annotation, annotation_text, font_url')
+        .eq('id', clipId)
+        .eq('session_id', sessionId)
+        .maybeSingle()
+      if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+
+      // Reading aloud inverts a listening item: the learner must see the words
+      // and hear a model, so the transcript moves onto the question — the one
+      // place students may read — and the clip becomes the reference recording.
+      const readAloud = input.mode === 'read_aloud'
+
+      const teacherPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      // The annotated form when there is one, so a beginner reading aloud gets the
+      // zhuyin or pinyin the teacher chose rather than bare characters.
+      const readingText = clip.annotation === 'zhuyin' || clip.annotation === 'pinyin'
+        ? (clip.annotation_text || clip.transcript)
+        : clip.transcript
+      const promptText = readAloud ? readingText.slice(0, 1000) : teacherPrompt
+      const title = readAloud ? '朗讀發音' : '聽力'
+      let translations = {}
+      try {
+        translations = await translateQuestion(title, promptText, [])
+      } catch (translationError) {
+        console.error('listening question translation failed', translationError instanceof Error ? translationError.message : translationError)
+      }
+
+      const { error: stopError } = await supabase
+        .from('questions')
+        .update({ status: 'stopped', stopped_at: new Date().toISOString() })
+        .eq('session_id', sessionId)
+        .eq('status', 'active')
+      if (stopError) throw stopError
+
+      const { data: question, error: questionError } = await supabase
+        .from('questions')
+        .insert({
+          session_id: sessionId,
+          screenshot_id: null,
+          listening_clip_id: clipId,
+          // Practice, not assessment: a learner comparing themselves to a model
+          // should hear it as often as they need.
+          replay_limit: readAloud ? null : replayLimit,
+          type: readAloud ? 'pronunciation' : 'listening',
+          status: 'active',
+          title,
+          prompt_text: promptText || null,
+          // Only a read-aloud item carries the font. The subset is cut from the
+          // clip's characters, so handing it to a listening item would reveal
+          // which characters the passage uses.
+          reading_font_url: readAloud && clip.annotation !== 'none' ? clip.font_url : null,
+          translations,
+        })
+        .select('*')
+        .single()
+      if (questionError) throw questionError
+
+      const { error: sessionError } = await supabase
+        .from('sessions')
+        .update({ current_question_id: question.id })
+        .eq('id', sessionId)
+        .eq('status', 'active')
+      if (sessionError) throw sessionError
+      return jsonResponse({ question })
     }
 
     if (action === 'create_question') {

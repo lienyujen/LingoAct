@@ -653,6 +653,43 @@ ipcMain.handle('supabase:management', async (_event, request) => {
   }
 })
 
+
+// Cutting a font down to one clip's characters.
+//
+// This runs here rather than in an Edge Function because the source face is
+// 17 MB: shipping it to a server and back for every clip would cost more than
+// the class ever downloads. The teacher's machine already has it, harfbuzz
+// takes about 130 ms, and what leaves the building is the ~20 KB the students
+// actually need.
+//
+// The subset keeps the font's IVS table, which is the whole point — the
+// transcript selects readings with variation selectors, and a subset that
+// dropped them would silently render every polyphonic character with its
+// default reading.
+const bopomofoFontPath = () => (
+  app.isPackaged
+    ? path.join(process.resourcesPath, 'fonts', 'BpmfZihiKaiStd-Regular.ttf')
+    : path.join(__dirname, '..', 'resources', 'fonts', 'BpmfZihiKaiStd-Regular.ttf')
+)
+
+ipcMain.handle('bopomofo:subset', async (_event, text) => {
+  if (typeof text !== 'string' || !text.trim()) {
+    return { ok: false, message: '沒有要嵌入字型的文字。' }
+  }
+  const fontPath = bopomofoFontPath()
+  if (!fs.existsSync(fontPath)) {
+    return { ok: false, message: '找不到注音字型檔，請執行 node scripts/fetch-bopomofo-font.mjs。' }
+  }
+  try {
+    const subsetFont = require('subset-font')
+    const source = fs.readFileSync(fontPath)
+    const subset = await subsetFont(source, text, { targetFormat: 'woff2' })
+    return { ok: true, woff2: subset.toString('base64'), bytes: subset.length }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '字型子集化失敗。' }
+  }
+})
+
 ipcMain.handle('window:set-expanded', (_event, expanded, settingsOpen = false, interactiveOpen = false) => {
   // Reapplying always-on-top closes native Windows select popups. Temporarily
   // suspend the presenter topmost reinforcement while settings are interactive.

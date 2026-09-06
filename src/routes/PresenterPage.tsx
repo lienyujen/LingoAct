@@ -10,6 +10,7 @@ import { QRCodePanel } from '../components/QRCodePanel'
 import { ExitTicketResult } from '../components/ExitTicketResult'
 import { LotteryOverlay } from '../components/LotteryOverlay'
 import { QuestionEditor } from '../components/QuestionEditor'
+import type { QuestionDraft } from '../components/QuestionEditor'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
 import { QuestionResult } from '../components/QuestionResult'
@@ -31,7 +32,7 @@ import { createCaptionTextNormalizer } from '../lib/traditionalChinese'
 import { SOURCE_CAPTION_LANGUAGE, resolvedCaptionLanguage } from '../lib/captionLanguages'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
-import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, FileResponse, SharedFile, LotterySessionEvent, Participant, PresenterQuizResults, Question, QuestionAnalysis, QuestionType, Session, SessionEvent } from '../types'
+import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, FileResponse, SharedFile, LotterySessionEvent, Participant, PresenterQuizResults, Question, QuestionAnalysis, Session, SessionEvent } from '../types'
 import { useParams } from 'react-router-dom'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -771,7 +772,8 @@ export function PresenterPage() {
     void interpretationAudioContextRef.current?.close()
   }, [clearCaptionDisplayTimers])
 
-  async function uploadQuestionScreenshot(file: File, type: QuestionType, options: string[], allowMultiple: boolean, promptText: string, quizSettings?: CustomQuizSettings) {
+  async function uploadQuestionScreenshot(file: File, draft: QuestionDraft) {
+    const { type, options, allowMultiple, promptText, quizSettings } = draft
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
     setBusy(true)
@@ -818,6 +820,8 @@ export function PresenterPage() {
           options,
           allowMultiple,
           promptText,
+          prepareSeconds: draft.prepareSeconds,
+          answerSeconds: draft.answerSeconds,
         },
       })
       if (error) throw new Error(await edgeFunctionErrorMessage(error, '截圖派題失敗。'))
@@ -968,13 +972,13 @@ export function PresenterPage() {
     cropCapture(rect)
   }
 
-  async function createScreenshotQuestion(type: QuestionType, options: string[], allowMultiple: boolean, promptText: string, quizSettings?: CustomQuizSettings) {
+  async function createScreenshotQuestion(draft: QuestionDraft) {
     if (!captureFile) return
 
     setAnalysisError('')
     setEditorOpen(false)
     try {
-      await uploadQuestionScreenshot(captureFile, type, options, allowMultiple, promptText, quizSettings)
+      await uploadQuestionScreenshot(captureFile, draft)
       setCaptureFile(null)
       setCapturePreviewUrl(null)
     } catch (error) {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { TimingRow } from './TimingRow'
 import type { ClipboardEvent } from 'react'
 import {
   analyzeListeningSource,
@@ -77,6 +78,10 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
   const [levelCode, setLevelCode] = useState('')
   const [clip, setClip] = useState<PresenterListeningClip | null>(null)
   const [replayLimit, setReplayLimit] = useState<number | null>(2)
+  // Only the read-aloud dispatch uses these: a listening item is paced by its
+  // own audio, and a quiz runs through the attempt flow.
+  const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
+  const [answerSeconds, setAnswerSeconds] = useState<number | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [onAir, setOnAir] = useState(false)
@@ -159,12 +164,12 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
     }
   }
 
-  async function dispatch(asQuiz: boolean) {
+  async function dispatch(target: 'audio' | 'quiz' | 'read_aloud') {
     if (!clip) return
     setError('')
-    setBusy(asQuiz ? '正在出題…' : '正在派送…')
+    setBusy(target === 'quiz' ? '正在出題…' : '正在派送…')
     try {
-      if (asQuiz) {
+      if (target === 'quiz') {
         await dispatchListeningQuiz({
           sessionId,
           presenterToken,
@@ -172,6 +177,20 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
           replayLimit,
           direction: '根據學生聽到的內容出理解題',
           requestedCount: null,
+        })
+      } else if (target === 'read_aloud') {
+        // The learner sees the words and hears the model, then records their
+        // own take against it — so the clip stops being a test and becomes a
+        // reference, and the transcript travels on the question.
+        await dispatchListeningQuestion({
+          sessionId,
+          presenterToken,
+          listeningClipId: clip.id,
+          replayLimit: null,
+          promptText: '',
+          mode: 'read_aloud',
+          prepareSeconds,
+          answerSeconds,
         })
       } else {
         await dispatchListeningQuestion({
@@ -302,6 +321,14 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
               )}
 
               {clip && (
+                <div className="ls-timing">
+                  <TimingRow label="準備時間" offLabel="不準備" presets={[null, 10, 20, 30]} value={prepareSeconds} onChange={setPrepareSeconds} />
+                  <TimingRow label="朗讀時間" offLabel="不限時" presets={[null, 30, 60, 90]} value={answerSeconds} onChange={setAnswerSeconds} />
+                  <p className="ls-note">只有「派朗讀練習」會用到這兩個時間。</p>
+                </div>
+              )}
+
+              {clip && (
                 <div className="ls-replay">
                   <span>可聽次數</span>
                   <span className="ls-spacer" />
@@ -320,8 +347,9 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
         </div>
 
         <footer className="ls-foot">
-          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch(false)}>只派語音</button>
-          <button className="ls-primary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch(true)}>派聽力測驗</button>
+          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>只派語音</button>
+          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>派朗讀練習</button>
+          <button className="ls-primary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>派聽力測驗</button>
         </footer>
       </div>
     </div>

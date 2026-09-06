@@ -2,6 +2,7 @@ import { CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Sparkl
 import { useMemo, useState } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
+import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
 import type { Answer, AudioResponse, FileResponse, Question, QuestionAnalysis } from '../types'
 
 type Props = {
@@ -49,8 +50,18 @@ function QuestionStatusActions({
     && question.type !== 'send_screen'
     && (question.status === 'stopped' || question.status === 'closed')
 
+  // The teacher is running the clock the class is watching, so they need to see
+  // the same number: without it they are deciding when to move on blind, which
+  // is the whole reason a timed question was set.
+  const secondsLeft = useSecondsLeft(isCurrentQuestion && question.status === 'active' ? answerDeadline(question) : null)
+
   return (
     <div className="question-heading-actions">
+      {secondsLeft !== null && (
+        <span className={secondsLeft === 0 ? 'question-clock spent' : 'question-clock'}>
+          {secondsLeft === 0 ? '時間到' : `${secondsLeft} 秒`}
+        </span>
+      )}
       {canDrawUnanswered && (
         <button
           aria-label="抽選本題未作答學生"

@@ -37,6 +37,8 @@ const messages = {
     completeness: '完成度', doneWell: '做得好的地方', nextStep: '下一步建議', transcript: '查看辨識內容', noTranscript: '未辨識到語音內容',
     assessmentFailed: '錄音已收到，但 AI 評測未完成。請告知講師。', assessmentPending: 'AI 評測仍在處理中，請稍候。',
     recordingHint: '最長 3 分鐘。請在安靜處錄音，完成後按停止。', stopRecording: '停止錄音', uploading: '上傳並分析中...', startRecording: '開始錄音',
+    recordingHintTimed: '這題限時 {seconds} 秒，按下按鈕就開始錄音。',
+    recordingHintPrepare: '按下按鈕後有 {prepare} 秒準備，接著自動錄音 {seconds} 秒。',
     interpretation: '即時語音口譯', headphoneLanguage: '耳機語言', testHeadphones: '測試耳機', stopListening: '停止聆聽', startListening: '開始聆聽口譯',
     connecting: '正在連接教師端口譯...', waitingTeacher: '已連線，等待教師說話...', playing: '口譯播放中', connectionFailed: '口譯連線失敗，請重試。',
     audioNotEnabled: '音訊輸出未啟用；請點右上角喇叭後重新開始聆聽。', headphoneHint: '建議戴上耳機，選擇語言後開始聆聽。',
@@ -64,6 +66,7 @@ const messages = {
     listeningFailed: '語音載入失敗，請重新整理再試一次。', listeningHint: '戴上耳機或調高音量，按播放開始聆聽。',
     orderingHint: '拖曳左側把手，或用箭頭調整順序。', orderingDrag: '拖曳調整順序', orderingUp: '往上移', orderingDown: '往下移',
     modelAudio: '原音示範', modelAudioHint: '先聽一次原音，再錄下自己的版本，然後比較兩者。', modelReplay: '可以重複聽',
+    prepareStart: '開始準備', recordingLeft: '剩下', timeUp: '時間到', answerTimeLeft: '作答剩下', answerClosed: '作答時間已結束',
   },
   en: {
     language: 'Language', chinese: '繁體中文', english: 'English', courseEnded: 'Class ended', classDismissed: 'That’s a wrap!',
@@ -81,6 +84,8 @@ const messages = {
     completeness: 'Completeness', doneWell: 'What you did well', nextStep: 'Next steps', transcript: 'View transcript', noTranscript: 'No speech was recognized',
     assessmentFailed: 'Recording received, but AI assessment was not completed. Please tell the instructor.', assessmentPending: 'AI assessment is still processing.',
     recordingHint: 'Up to 3 minutes. Record in a quiet place and press stop when finished.', stopRecording: 'Stop recording', uploading: 'Uploading and analyzing...', startRecording: 'Start recording',
+    recordingHintTimed: 'You have {seconds} seconds for this one. Recording starts as soon as you press the button.',
+    recordingHintPrepare: 'You get {prepare} seconds to prepare, then {seconds} seconds of recording starts on its own.',
     interpretation: 'Live voice interpretation', headphoneLanguage: 'Headphone language', testHeadphones: 'Test headphones', stopListening: 'Stop listening', startListening: 'Start interpretation',
     connecting: 'Connecting to the instructor’s interpretation...', waitingTeacher: 'Connected. Waiting for the instructor to speak...', playing: 'Playing interpretation', connectionFailed: 'Interpretation connection failed. Please retry.',
     audioNotEnabled: 'Audio output is not enabled. Tap the speaker icon and start listening again.', headphoneHint: 'Wear headphones, choose a language, then start listening.',
@@ -108,6 +113,7 @@ const messages = {
     listeningFailed: 'The audio failed to load. Please refresh and try again.', listeningHint: 'Put on headphones or turn the volume up, then press play.',
     orderingHint: 'Drag the handle, or use the arrows, to put these in order.', orderingDrag: 'Drag to reorder', orderingUp: 'Move up', orderingDown: 'Move down',
     modelAudio: 'Model reading', modelAudioHint: 'Listen to the model first, record your own, then compare the two.', modelReplay: 'Listen as often as you like',
+    prepareStart: 'Start preparing', recordingLeft: 'left', timeUp: 'Time is up', answerTimeLeft: 'Time left', answerClosed: 'Answering has closed',
   },
 } as const
 

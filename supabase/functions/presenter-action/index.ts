@@ -8,6 +8,20 @@ import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/own
 type ParticipantRecord = { id: string; name: string }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const questionTypes = new Set(['send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'file_upload'])
+// Types that can carry a clock, and the subset where preparing to speak is part
+// of the exercise. A screen send has no answer, an upload takes as long as the
+// photo takes, and a custom quiz is answered through its own attempt flow.
+const timedTypes = new Set(['poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response'])
+const spokenTypes = new Set(['pronunciation', 'oral_response'])
+
+// Null means untimed; undefined means the value was out of range, which the
+// caller turns into a 400 so the teacher sees a message rather than a failed
+// insert tripping the column's check constraint as a 500.
+function timingSeconds(value: unknown, max: number) {
+  if (value === null || value === undefined) return null
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 5 || value > max) return undefined
+  return value
+}
 const speakerLanguages = new Set(['zh-tw', 'en'])
 // 'source' is the presenter asking for the transcript unaltered.
 const captionDisplayLanguages = new Set(['zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr', 'source'])
@@ -981,6 +995,12 @@ Deno.serve(async (req) => {
       // place students may read — and the clip becomes the reference recording.
       const readAloud = input.mode === 'read_aloud'
 
+      const prepareSeconds = readAloud ? timingSeconds(input.prepareSeconds, 300) : null
+      const answerSeconds = readAloud ? timingSeconds(input.answerSeconds, 600) : null
+      if (prepareSeconds === undefined || answerSeconds === undefined) {
+        return jsonResponse({ message: '時間設定不正確。' }, 400)
+      }
+
       const teacherPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
       // The annotated form when there is one, so a beginner reading aloud gets the
       // zhuyin or pinyin the teacher chose rather than bare characters.
@@ -1020,6 +1040,8 @@ Deno.serve(async (req) => {
           // clip's characters, so handing it to a listening item would reveal
           // which characters the passage uses.
           reading_font_url: readAloud && clip.annotation !== 'none' ? clip.font_url : null,
+          prepare_seconds: prepareSeconds,
+          answer_seconds: answerSeconds,
           translations,
         })
         .select('*')
@@ -1049,6 +1071,14 @@ Deno.serve(async (req) => {
 
       const options = normalizedOptions(input.options)
       const allowMultiple = Boolean(input.allowMultiple) && ['poll', 'multiple_choice'].includes(type)
+      // Only a spoken answer has preparation, and only a type students answer
+      // has a clock at all; storing either on any other type would leave a
+      // limit behind that nothing reads.
+      const prepareSeconds = timedTypes.has(type) && spokenTypes.has(type) ? timingSeconds(input.prepareSeconds, 300) : null
+      const answerSeconds = timedTypes.has(type) ? timingSeconds(input.answerSeconds, 600) : null
+      if (prepareSeconds === undefined || answerSeconds === undefined) {
+        return jsonResponse({ message: '時間設定不正確。' }, 400)
+      }
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
       const titles: Record<string, string> = {
         send_screen: '派送畫面',
@@ -1106,6 +1136,8 @@ Deno.serve(async (req) => {
           options,
           translations,
           allow_multiple: allowMultiple,
+          prepare_seconds: prepareSeconds,
+          answer_seconds: answerSeconds,
         })
         .select('*')
         .single()

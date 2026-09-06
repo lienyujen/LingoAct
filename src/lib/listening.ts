@@ -89,6 +89,11 @@ export async function dispatchListeningQuestion(input: {
   listeningClipId: string
   replayLimit: number | null
   promptText: string
+  // Read aloud turns the clip into a model recording the learner speaks against,
+  // instead of a passage they are tested on.
+  mode?: 'read_aloud'
+  prepareSeconds?: number | null
+  answerSeconds?: number | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: { action: 'create_listening_question', ...input },

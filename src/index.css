@@ -4861,3 +4861,110 @@ h2 {
   letter-spacing: .02em;
   text-wrap: pretty;
 }
+
+/* The preparation clock. Big enough to read from across a desk, because the
+   student is thinking about what to say, not watching the screen. */
+.audio-countdown {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.audio-countdown strong {
+  color: var(--primary);
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* The answer clock on a timed question. Shares the recorder countdown's shape
+   so the two read as one idea, but sits inline above the choices rather than
+   filling the panel: the student needs to see the options at the same time. */
+.answer-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.answer-countdown strong {
+  color: var(--primary);
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+/* Once the clock is spent the row is a statement, not a number. */
+.answer-countdown.spent {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Timing presets in the dispatch dialog. Chips rather than a number field: the
+   teacher is setting this mid-class, and a row of taps beats typing into a
+   spinner while thirty students wait. */
+.timing-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.timing-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.timing-label {
+  color: var(--muted);
+  font-size: 13px;
+  min-width: 4.5em;
+}
+.timing-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.timing-preset {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.timing-preset:hover {
+  border-color: var(--primary);
+}
+.timing-preset.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* The studio's timing block sits with the clip's other dispatch settings. */
+.ls-timing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 0;
+}
+
+/* The clock in a question's heading, for the teacher running it. */
+.question-clock {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.question-clock.spent {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

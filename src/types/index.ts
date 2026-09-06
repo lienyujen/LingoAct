@@ -186,6 +186,11 @@ export type Question = {
   // subset is cut from the clip's own characters, so a listening item never
   // carries it.
   reading_font_url?: string | null
+  // Null on both means untimed, which is every question that came before.
+  // Thinking time and answering time are separate: planning is the exercise in
+  // a spoken challenge, and absent entirely from a vocabulary race.
+  prepare_seconds?: number | null
+  answer_seconds?: number | null
   type: QuestionType
   status: 'draft' | 'active' | 'stopped' | 'closed'
   title: string

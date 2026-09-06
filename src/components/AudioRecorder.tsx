@@ -14,7 +14,9 @@ type Props = {
   locale?: ParticipantLocale
 }
 
-const MAX_DURATION_MS = 180_000
+// The ceiling when a question sets no limit of its own. A timed challenge
+// replaces it with its own, shorter one.
+const DEFAULT_MAX_MS = 180_000
 
 function formatDuration(milliseconds: number) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000))
@@ -25,11 +27,19 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState('')
+  // Counts down while the student plans; recording then begins on its own, which
+  // is what makes it a challenge rather than a form.
+  const [prepareLeft, setPrepareLeft] = useState<number | null>(null)
+
+  const answerSeconds = question.answer_seconds ?? null
+  const prepareSeconds = question.prepare_seconds ?? null
+  const maxDurationMs = answerSeconds ? answerSeconds * 1000 : DEFAULT_MAX_MS
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const startedAtRef = useRef(0)
   const chunksRef = useRef<Blob[]>([])
   const cancelledRef = useRef(false)
+  const startRecordingRef = useRef<() => Promise<void>>(async () => {})
 
   function releaseMicrophone() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -47,10 +57,23 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
     const timer = window.setInterval(() => {
       const next = Date.now() - startedAtRef.current
       setElapsed(next)
-      if (next >= MAX_DURATION_MS && recorderRef.current?.state === 'recording') recorderRef.current.stop()
+      if (next >= maxDurationMs && recorderRef.current?.state === 'recording') recorderRef.current.stop()
     }, 200)
     return () => window.clearInterval(timer)
-  }, [recording])
+  }, [maxDurationMs, recording])
+
+  // The preparation clock. Reaching zero starts the recording rather than merely
+  // unlocking the button: a challenge that waits for another tap is not timed.
+  useEffect(() => {
+    if (prepareLeft === null) return
+    if (prepareLeft <= 0) {
+      setPrepareLeft(null)
+      void startRecordingRef.current()
+      return
+    }
+    const timer = window.setTimeout(() => setPrepareLeft((current) => (current === null ? null : current - 1)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [prepareLeft])
 
   async function startRecording() {
     setError('')
@@ -75,7 +98,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
         releaseMicrophone()
       }
       recorder.onstop = async () => {
-        const durationMs = Math.min(MAX_DURATION_MS, Date.now() - startedAtRef.current)
+        const durationMs = Math.min(maxDurationMs, Date.now() - startedAtRef.current)
         setRecording(false)
         releaseMicrophone()
         if (cancelledRef.current) return
@@ -141,17 +164,40 @@ export function AudioRecorder({ busy, question, response, onSubmit, locale = 'zh
     )
   }
 
+  startRecordingRef.current = startRecording
+
+  const preparing = prepareLeft !== null
+  // A timed challenge counts down; an untimed recording counts up, because there
+  // is nothing to count towards.
+  const remainingMs = answerSeconds ? Math.max(0, maxDurationMs - elapsed) : null
+
   return (
     <div className="audio-recorder">
-      <p className="muted">{participantText(locale, 'recordingHint')}</p>
+      <p className="muted">{answerSeconds === null
+        ? participantText(locale, 'recordingHint')
+        : prepareSeconds === null
+          ? participantText(locale, 'recordingHintTimed', { seconds: answerSeconds })
+          : participantText(locale, 'recordingHintPrepare', { prepare: prepareSeconds, seconds: answerSeconds })}</p>
+      {preparing && (
+        <p className="audio-countdown" aria-live="polite">
+          <span>{participantText(locale, 'preparing')}</span>
+          <strong>{prepareLeft}</strong>
+        </p>
+      )}
       <button
         className={recording ? 'recording-button active' : 'recording-button'}
-        disabled={busy}
+        disabled={busy || preparing}
         type="button"
-        onClick={recording ? stopRecording : startRecording}
+        onClick={recording ? stopRecording : prepareSeconds ? () => setPrepareLeft(prepareSeconds) : startRecording}
       >
         {recording ? <StopCircle size={28} /> : busy ? <ArrowCounterClockwise className="spin" size={28} /> : <Microphone size={28} />}
-        <span>{recording ? `${participantText(locale, 'stopRecording')} ${formatDuration(elapsed)}` : busy ? participantText(locale, 'uploading') : participantText(locale, 'startRecording')}</span>
+        <span>{recording
+          ? `${participantText(locale, 'stopRecording')} ${formatDuration(remainingMs ?? elapsed)}${remainingMs === null ? '' : ' ' + participantText(locale, 'recordingLeft')}`
+          : busy
+            ? participantText(locale, 'uploading')
+            : preparing
+              ? participantText(locale, 'preparing')
+              : participantText(locale, prepareSeconds ? 'prepareStart' : 'startRecording')}</span>
       </button>
       {error && <p className="error">{error}</p>}
     </div>

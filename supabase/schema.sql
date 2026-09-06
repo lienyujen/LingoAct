@@ -87,6 +87,11 @@ create table if not exists public.questions (
   allow_multiple boolean not null default false,
   correct_answer text null,
   correct_answers text[] not null default '{}'::text[],
+  -- Null on both means untimed. Read by the answers insert policy, so the
+  -- columns have to exist by the time that policy is created, not only in the
+  -- later alter block.
+  prepare_seconds integer null check (prepare_seconds is null or prepare_seconds between 5 and 300),
+  answer_seconds integer null check (answer_seconds is null or answer_seconds between 5 and 600),
   started_at timestamptz null default now(),
   stopped_at timestamptz null,
   translations jsonb not null default '{}'::jsonb,
@@ -470,6 +475,11 @@ with check (
       and questions.session_id = answers.session_id
       and questions.status = 'active'
       and questions.type <> 'custom_quiz'
+      and (
+        questions.answer_seconds is null
+        or questions.started_at is null
+        or now() <= questions.started_at + make_interval(secs => questions.answer_seconds + 3)
+      )
   )
   and exists (
     select 1 from public.participants
@@ -826,6 +836,21 @@ create unique index if not exists listening_clips_reuse_idx
 -- to leak — the text is on screen.
 alter table public.questions
   add column if not exists reading_font_url text null;
+
+-- Timed activities: a countdown to think, then a countdown to answer.
+--
+-- Two fields rather than one because the pause before speaking is the exercise
+-- in a spoken challenge — twenty seconds to plan, thirty to say it — while a
+-- vocabulary race has no preparation at all, only a clock.
+--
+-- Null means untimed, which is what every existing question is and should stay.
+alter table public.questions
+  add column if not exists prepare_seconds integer null
+  check (prepare_seconds is null or prepare_seconds between 5 and 300);
+
+alter table public.questions
+  add column if not exists answer_seconds integer null
+  check (answer_seconds is null or answer_seconds between 5 and 600);
 
 alter table public.questions
   add column if not exists listening_clip_id uuid null references public.listening_clips(id) on delete set null;

@@ -6,6 +6,7 @@ import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale, ParticipantMessageKey } from '../lib/participantI18n'
 import { listSeparator, localizedFields } from '../lib/localizedContent'
 import { useReadingFont } from '../lib/readingFont'
+import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
 import type { Answer, AudioResponse, Question } from '../types'
 
 type Props = {
@@ -30,11 +31,17 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
   // Above the early return below: a hook that runs only on some renders changes
   // the hook order between them, which React refuses outright.
   const readingFamily = useReadingFont(question?.reading_font_url)
+  const deadline = question ? answerDeadline(question) : null
+  const secondsLeft = useSecondsLeft(deadline)
 
   // file_upload has its own panel further up the page, carrying the same prompt
   // and the screenshot; rendering here as well would print the question twice.
   if (!question || ['send_screen', 'custom_quiz', 'file_upload', 'listening'].includes(question.type)) return null
   const isAudioQuestion = question.type === 'pronunciation' || question.type === 'oral_response'
+  // The clock having run out is a separate thing from the teacher having stopped
+  // the question: both close answering, and the student is told which happened.
+  const timeUp = secondsLeft === 0
+  const acceptingAnswers = question.status === 'active' && !timeUp
   const translation = localizedFields(question.translations, locale)
   // A question with no title of its own is described by its kind, and that
   // description belongs to whoever is reading rather than to English.
@@ -67,11 +74,17 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
         ? <h2 className="reading-text" style={{ fontFamily: readingFamily }}>{prompt}</h2>
         : <h2>{prompt}</h2>}
       {question.status !== 'active' && <p className="muted">{participantText(locale, 'questionEnded')}</p>}
+      {question.status === 'active' && secondsLeft !== null && !answer && (
+        <p className={timeUp ? 'answer-countdown spent' : 'answer-countdown'} aria-live="off">
+          <span>{participantText(locale, timeUp ? 'answerClosed' : 'answerTimeLeft')}</span>
+          {!timeUp && <strong>{secondsLeft}</strong>}
+        </p>
+      )}
       {isAudioQuestion && (
         <AudioRecorder busy={audioBusy} locale={locale} question={question} response={audioResponse} onSubmit={onSubmitAudio} />
       )}
       {answer && !isAudioQuestion && <p className="success">{participantText(locale, 'submittedAnswer')}{answer.answer_values?.map(displayAnswer).join(listSeparator(locale)) || (answer.answer_value ? displayAnswer(answer.answer_value) : answer.answer_text)}</p>}
-      {!answer && question.status === 'active' && question.type === 'short_answer' && (
+      {!answer && acceptingAnswers && question.type === 'short_answer' && (
         <form className="short-answer-form" onSubmit={submitShortAnswer}>
           <textarea
             maxLength={1000}
@@ -82,7 +95,7 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
           <button type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'submitAnswer')}</button>
         </form>
       )}
-      {!answer && !isAudioQuestion && question.status === 'active' && question.type !== 'short_answer' && question.allow_multiple && (
+      {!answer && !isAudioQuestion && acceptingAnswers && question.type !== 'short_answer' && question.allow_multiple && (
         <form
           className="multi-choice-form"
           onSubmit={(event) => {
@@ -112,7 +125,7 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
           <button disabled={!selectedOptions.length} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'submitAnswer')}</button>
         </form>
       )}
-      {!answer && !isAudioQuestion && question.status === 'active' && question.type !== 'short_answer' && !question.allow_multiple && (
+      {!answer && !isAudioQuestion && acceptingAnswers && question.type !== 'short_answer' && !question.allow_multiple && (
         <div className="choice-list">
           {question.options.map((option, index) => (
             <button key={option} type="button" onClick={() => onSubmit(option)}>

@@ -3,17 +3,38 @@ import { useEffect, useMemo, useState } from 'react'
 import type { QuestionType, QuizRequestedType } from '../types'
 import { CustomQuizFields } from './CustomQuizFields'
 import { quizSettingsFrom } from '../lib/customQuiz'
+import { TimingRow } from './TimingRow'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 
 export type { CustomQuizSettings }
+
+// One object rather than a growing list of positional arguments: with timing
+// added, the non-quiz call would have had to pass undefined for quizSettings
+// just to reach the fields after it.
+export type QuestionDraft = {
+  type: QuestionType
+  options: string[]
+  allowMultiple: boolean
+  promptText: string
+  quizSettings?: CustomQuizSettings
+  // Null on both means untimed, which stays the default.
+  prepareSeconds: number | null
+  answerSeconds: number | null
+}
 
 type Props = {
   error?: string
   open: boolean
   previewUrl: string | null
   onCancel: () => void
-  onCreate: (type: QuestionType, options: string[], allowMultiple: boolean, promptText: string, quizSettings?: CustomQuizSettings) => void
+  onCreate: (draft: QuestionDraft) => void
 }
+
+const TIMED_TYPES: QuestionType[] = ['poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response']
+// Only a spoken answer has anything to prepare. A vocabulary race is all clock.
+const SPOKEN_TYPES: QuestionType[] = ['pronunciation', 'oral_response']
+const ANSWER_PRESETS: Array<number | null> = [null, 30, 60, 90, 180]
+const PREPARE_PRESETS: Array<number | null> = [null, 10, 20, 30]
 
 const questionTypes: Array<{ type: QuestionType; label: string }> = [
   { type: 'send_screen', label: '派送畫面' },
@@ -34,6 +55,8 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
   const [quizCount, setQuizCount] = useState('auto')
   const [quizType, setQuizType] = useState<QuizRequestedType>('random')
   const [quizDirection, setQuizDirection] = useState('')
+  const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
+  const [answerSeconds, setAnswerSeconds] = useState<number | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -44,6 +67,8 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
     setQuizCount('auto')
     setQuizType('random')
     setQuizDirection('')
+    setPrepareSeconds(null)
+    setAnswerSeconds(null)
   }, [open])
 
   const editableOptions = type === 'multiple_choice' || type === 'poll'
@@ -51,6 +76,8 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
     if (['short_answer', 'send_screen', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload'].includes(type)) return []
     return options.map((option) => option.trim()).filter(Boolean)
   }, [options, type])
+
+  const timed = TIMED_TYPES.includes(type)
 
   if (!open) return null
 
@@ -63,10 +90,27 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
           if (type === 'custom_quiz') {
             const direction = quizDirection.trim()
             if (!direction) return
-            onCreate(type, [], false, direction, quizSettingsFrom(quizCount, quizType, direction))
+            onCreate({
+              type,
+              options: [],
+              allowMultiple: false,
+              promptText: direction,
+              quizSettings: quizSettingsFrom(quizCount, quizType, direction),
+              prepareSeconds: null,
+              answerSeconds: null,
+            })
             return
           }
-          onCreate(type, finalOptions, editableOptions && allowMultiple, type === 'send_screen' ? '' : promptText.trim())
+          onCreate({
+            type,
+            options: finalOptions,
+            allowMultiple: editableOptions && allowMultiple,
+            promptText: type === 'send_screen' ? '' : promptText.trim(),
+            // Timing a type that cannot be timed would store a limit nothing
+            // reads, so the fields are dropped rather than merely hidden.
+            prepareSeconds: timed && SPOKEN_TYPES.includes(type) ? prepareSeconds : null,
+            answerSeconds: timed ? answerSeconds : null,
+          })
         }}
       >
         <h2>截圖派題</h2>
@@ -151,6 +195,26 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
               onChange={(event) => setPromptText(event.target.value)}
             />
           </label>
+        )}
+        {timed && (
+          <div className="timing-editor">
+            {SPOKEN_TYPES.includes(type) && (
+              <TimingRow
+                label="準備時間"
+                offLabel="不準備"
+                presets={PREPARE_PRESETS}
+                value={prepareSeconds}
+                onChange={setPrepareSeconds}
+              />
+            )}
+            <TimingRow
+              label="作答時間"
+              offLabel="不限時"
+              presets={ANSWER_PRESETS}
+              value={answerSeconds}
+              onChange={setAnswerSeconds}
+            />
+          </div>
         )}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>

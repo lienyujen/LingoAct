@@ -218,9 +218,14 @@ What is **not** done:
   **聽打接力** (nothing built; needs per-sentence clips and pairing);
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
   still a whole passage.
-- `pnpm desktop:package` has not been run since `subset-font` was added. pnpm's
-  symlinks may defeat the electron-builder `files` globs; the likely fix is
-  `node-linker=hoisted` in `.npmrc`.
+- **No release build has been produced.** `pnpm desktop:folder` builds the app
+  into a gitignored `LingoAct/` folder that runs directly, and that has been
+  built and launched — so the packaging works, and the worry about pnpm's
+  symlinks defeating the `files` globs turned out to be unfounded: subset-font
+  and its whole tree reach the asar through `node_modules/.pnpm/**/*`, no
+  `node-linker=hoisted` needed. What has NOT been produced is the portable exe
+  and zip that `release.yml` ships, which differ in the way that matters: they
+  are built without a `.env`, so each teacher supplies their own project.
 
 ## Conventions worth knowing before editing
 

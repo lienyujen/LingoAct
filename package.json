@@ -11,6 +11,7 @@
     "dev": "vite",
     "desktop:dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env LINGOACT_DESKTOP_DEV=1 electron .\"",
     "desktop:start": "pnpm build && electron .",
+    "desktop:folder": "node scripts/build-desktop-folder.mjs",
     "desktop:package": "pnpm build && electron-builder --win portable --x64",
     "desktop:package:plus": "pnpm build:plus && cross-env APP_EDITION=plus electron-builder --win portable --x64",
     "build": "tsc -b && vite build",

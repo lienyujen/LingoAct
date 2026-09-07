@@ -14,7 +14,8 @@ release
 /release-build/
 /LingoAct.exe
 /LingoAct.zip
-# Locally extracted zip build kept around to run directly.
+# The unpacked build kept around to run directly: pnpm desktop:folder.
+# 300-odd MB of Electron, and it carries the .env of whoever built it.
 /LingoAct/
 .codex-tmp/
 supabase/.temp/

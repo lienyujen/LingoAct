@@ -3,6 +3,7 @@ import { ArrowsClockwise, CardsThree, Image as ImageIcon, Microphone, PaperPlane
 import { TimingRow } from './TimingRow'
 import { dispatchPictureOrdering, generatePicture } from '../lib/picture'
 import type { GeneratedPicture, PictureStoryboard } from '../lib/picture'
+import { usePresenterText } from '../lib/presenterI18n'
 import type { QuestionDraft } from './QuestionEditor'
 
 type Props = {
@@ -29,6 +30,7 @@ function promptFor(mode: Mode, storyboard: PictureStoryboard) {
 }
 
 export function PictureStudioModal({ open, sessionId, presenterToken, onClose, onDispatch }: Props) {
+  const t = usePresenterText()
   const [direction, setDirection] = useState('')
   const [picture, setPicture] = useState<GeneratedPicture | null>(null)
   const [mode, setMode] = useState<Mode>('spoken')
@@ -66,14 +68,14 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
   async function draw() {
     setError('')
     setSent(false)
-    setBusy('AI 正在畫四格圖…')
+    setBusy(t('drawing'))
     try {
       const drawn = await generatePicture({ sessionId, presenterToken, direction: direction.trim() })
       setPicture(drawn)
       setPromptTouched(false)
       setPromptText(promptFor(mode, drawn.storyboard))
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '生成失敗，請再試一次。')
+      setError(caught instanceof Error ? caught.message : t('generateFailed'))
     } finally {
       setBusy('')
     }
@@ -82,7 +84,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
   async function dispatch() {
     if (!picture) return
     setError('')
-    setBusy(mode === 'ordering' ? '正在切開四格並派送…' : '派送中…')
+    setBusy(mode === 'ordering' ? t('cuttingPanels') : t('sending'))
     try {
       if (mode === 'ordering') {
         await dispatchPictureOrdering({
@@ -105,7 +107,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
       })
       setSent(true)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '派送失敗。')
+      setError(caught instanceof Error ? caught.message : t('sendFailed'))
     } finally {
       setBusy('')
     }
@@ -118,10 +120,10 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
       <div className="picture-studio">
         <header className="ps-head">
           <span className="ps-mark"><ImageIcon size={19} /></span>
-          <h2>看圖說話</h2>
+          <h2>{t('pictureTalk')}</h2>
           <span className="ps-spacer" />
-          {sent && <span className="ps-sent">已派送</span>}
-          <button className="ps-close" type="button" aria-label="關閉" onClick={onClose}>
+          {sent && <span className="ps-sent">{t('sent')}</span>}
+          <button className="ps-close" type="button" aria-label={t('close')} onClick={onClose}>
             <X size={17} />
           </button>
         </header>
@@ -130,20 +132,20 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
           <div className="ps-direction">
             <input
               maxLength={200}
-              placeholder="主題（選填），例如：在夜市買東西、幫忙做家事"
+              placeholder={t('pictureTopicPlaceholder')}
               value={direction}
               onChange={(event) => setDirection(event.target.value)}
             />
             <button className="ps-draw" disabled={Boolean(busy)} type="button" onClick={() => void draw()}>
               {picture ? <ArrowsClockwise size={17} /> : <Sparkle size={17} />}
-              {busy || (picture ? '換一張' : '生成四格圖')}
+              {busy || (picture ? t('anotherPicture') : t('generatePicture'))}
             </button>
           </div>
-          <p className="ps-note">留空由 AI 依這堂課的語言和程度自己想一個情境。圖裡不會有任何文字，學生看圖說或寫。</p>
+          <p className="ps-note">{t('pictureHint')}</p>
 
           {storyboard && picture && (
             <div className="ps-result">
-              <img alt="四格圖預覽" className="ps-preview" src={picture.previewUrl} />
+              <img alt={t('picturePreviewAlt')} className="ps-preview" src={picture.previewUrl} />
               <div className="ps-plan">
                 <h3>{storyboard.title}</h3>
                 {storyboard.targetWords.length > 0 && (
@@ -155,7 +157,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                 <ol className="ps-panels">
                   {storyboard.panels.map((panel, index) => <li key={index}>{panel}</li>)}
                 </ol>
-                <p className="ps-plan-note">以上只有你看得到，學生端只會收到圖和題目。</p>
+                <p className="ps-plan-note">{t('planPrivate')}</p>
               </div>
             </div>
           )}
@@ -170,7 +172,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                   type="button"
                   onClick={() => setMode('spoken')}
                 >
-                  <Microphone size={16} />口說
+                  <Microphone size={16} />{t('modeSpoken')}
                 </button>
                 <button
                   aria-selected={mode === 'written'}
@@ -179,7 +181,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                   type="button"
                   onClick={() => setMode('written')}
                 >
-                  <PencilSimpleLine size={16} />打字
+                  <PencilSimpleLine size={16} />{t('modeWritten')}
                 </button>
                 <button
                   aria-selected={mode === 'ordering'}
@@ -188,16 +190,16 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                   type="button"
                   onClick={() => setMode('ordering')}
                 >
-                  <CardsThree size={16} />排順序
+                  <CardsThree size={16} />{t('modeOrdering')}
                 </button>
               </div>
 
               {mode === 'ordering' && (
-                <p className="ps-note">四格會被切開、打亂後送到學生端，學生拖成正確順序。完整的圖不會派出去。</p>
+                <p className="ps-note">{t('pictureOrderingHint')}</p>
               )}
 
               <label className="ps-prompt">
-                題目
+                {t('questionLabel')}
                 <textarea
                   maxLength={300}
                   rows={2}
@@ -211,16 +213,16 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
               <div className="ps-timing" hidden={mode === 'ordering'}>
                 {mode === 'spoken' && (
                   <TimingRow
-                    label="準備時間"
-                    offLabel="不準備"
+                    label={t('prepareTime')}
+                    offLabel={t('noPrepare')}
                     presets={PREPARE_PRESETS}
                     value={prepareSeconds}
                     onChange={setPrepareSeconds}
                   />
                 )}
                 <TimingRow
-                  label="作答時間"
-                  offLabel="不限時"
+                  label={t('answerTime')}
+                  offLabel={t('noTimeLimit')}
                   presets={ANSWER_PRESETS}
                   value={answerSeconds}
                   onChange={setAnswerSeconds}
@@ -233,9 +235,9 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
         </div>
 
         <footer className="ps-foot">
-          <button className="ps-secondary" type="button" onClick={onClose}>關閉</button>
+          <button className="ps-secondary" type="button" onClick={onClose}>{t('close')}</button>
           <button className="ps-primary" disabled={!picture || Boolean(busy)} type="button" onClick={() => void dispatch()}>
-            <PaperPlaneTilt size={17} />派送
+            <PaperPlaneTilt size={17} />{t('send')}
           </button>
         </footer>
       </div>

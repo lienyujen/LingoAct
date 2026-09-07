@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PaperPlaneTilt, PencilLine, X } from '@phosphor-icons/react'
 import { TimingRow } from './TimingRow'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   busy: boolean
@@ -15,6 +16,7 @@ type Props = {
 const ANSWER_PRESETS: Array<number | null> = [null, 60, 120, 180]
 
 export function SentenceWallModal({ busy, error, open, onCancel, onOpen }: Props) {
+  const t = usePresenterText()
   const [promptText, setPromptText] = useState('')
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(120)
 
@@ -37,35 +39,35 @@ export function SentenceWallModal({ busy, error, open, onCancel, onOpen }: Props
       >
         <div className="modal-heading">
           <div>
-            <h2><PencilLine size={19} />即時造句牆</h2>
-            <p className="muted">每人寫一句，全班的句子會即時出現在大螢幕上</p>
+            <h2><PencilLine size={19} />{t('sentenceWall')}</h2>
+            <p className="muted">{t('sentenceWallSub')}</p>
           </div>
-          <button className="ghost-button icon-button" aria-label="關閉" type="button" onClick={onCancel}>
+          <button className="ghost-button icon-button" aria-label={t('close')} type="button" onClick={onCancel}>
             <X size={18} />
           </button>
         </div>
         <label>
-          造句題目
+          {t('sentenceWallLabel')}
           <textarea
             maxLength={300}
-            placeholder="例如：用「雖然……但是……」造一個跟天氣有關的句子"
+            placeholder={t('sentenceWallPlaceholder')}
             rows={3}
             value={promptText}
             onChange={(event) => setPromptText(event.target.value)}
           />
         </label>
         <TimingRow
-          label="作答時間"
-          offLabel="不限時"
+          label={t('answerTime')}
+          offLabel={t('noTimeLimit')}
           presets={ANSWER_PRESETS}
           value={answerSeconds}
           onChange={setAnswerSeconds}
         />
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
-          <button className="ghost-button" type="button" onClick={onCancel}>取消</button>
+          <button className="ghost-button" type="button" onClick={onCancel}>{t('cancel')}</button>
           <button disabled={busy || !promptText.trim()} type="submit">
-            <PaperPlaneTilt size={17} />{busy ? '開啟中…' : '派題並開牆'}
+            <PaperPlaneTilt size={17} />{busy ? t('opening') : t('sendAndOpenWall')}
           </button>
         </div>
       </form>

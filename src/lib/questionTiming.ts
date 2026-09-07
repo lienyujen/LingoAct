@@ -48,9 +48,15 @@ function remaining(deadline: number | null) {
 }
 
 // 30秒 / 1分鐘 / 1分30秒 — the way a teacher would say it out loud.
-export function formatSeconds(seconds: number) {
-  if (seconds < 60) return `${seconds}秒`
+// Read by the teacher on the timing chips, so it follows the teaching language
+// like the rest of their interface. Everything outside Chinese uses the m/s
+// abbreviations, which are short enough for a chip in every language the app
+// speaks and are read the same way in all of them.
+export function formatSeconds(seconds: number, locale = 'zh-TW') {
+  const chinese = locale === 'zh-TW'
+  if (seconds < 60) return chinese ? `${seconds}秒` : `${seconds}s`
   const minutes = Math.floor(seconds / 60)
   const rest = seconds % 60
-  return rest === 0 ? `${minutes}分鐘` : `${minutes}分${rest}秒`
+  if (rest === 0) return chinese ? `${minutes}分鐘` : `${minutes}m`
+  return chinese ? `${minutes}分${rest}秒` : `${minutes}m ${rest}s`
 }

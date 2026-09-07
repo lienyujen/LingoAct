@@ -32,6 +32,38 @@ const messages = {
     danmaku: '彈幕', anonymous: '匿名', recording: '錄製', captions: '字幕',
     on: '開啟', off: '關閉', connecting: '連線中',
     captionToggleHint: '控制教師與學生端的即時字幕顯示', captionNeedsRecording: '請先開啟課程錄製',
+
+    // 共用
+    cancel: '取消', close: '關閉', send: '派送', sending: '派送中…', sendFailed: '派送失敗。',
+    sent: '已派送', actionFailed: '操作失敗。',
+    prepareTime: '準備時間', noPrepare: '不準備', answerTime: '作答時間', noTimeLimit: '不限時',
+
+    // 看圖說話
+    pictureTopicPlaceholder: '主題（選填），例如：在夜市買東西、幫忙做家事',
+    generatePicture: '生成四格圖', anotherPicture: '換一張', drawing: 'AI 正在畫四格圖…',
+    pictureHint: '留空由 AI 依這堂課的語言和程度自己想一個情境。圖裡不會有任何文字，學生看圖說或寫。',
+    picturePreviewAlt: '四格圖預覽',
+    modeSpoken: '口說', modeWritten: '打字', modeOrdering: '排順序',
+    pictureOrderingHint: '四格會被切開、打亂後送到學生端，學生拖成正確順序。完整的圖不會派出去。',
+    questionLabel: '題目', planPrivate: '以上只有你看得到，學生端只會收到圖和題目。',
+    cuttingPanels: '正在切開四格並派送…', generateFailed: '生成失敗，請再試一次。',
+
+    // 即時造句牆
+    sentenceWallSub: '每人寫一句，全班的句子會即時出現在大螢幕上',
+    sentenceWallLabel: '造句題目',
+    sentenceWallPlaceholder: '例如：用「雖然……但是……」造一個跟天氣有關的句子',
+    opening: '開啟中…', sendAndOpenWall: '派題並開牆',
+    sentenceWallShort: '造句牆', wallShowing: '大螢幕顯示中', wallShow: '投到大螢幕',
+    composeN: 'AI 集成這 {n} 句', composeAgain: '重新集成', composing: '集成中…',
+    sendViaText: '用文字派送給學生', composeNeedsTwo: '至少收到兩個句子後就可以集成。',
+    worthLearning: '值得學的句子', watchOutFor: '要注意的地方',
+
+    // 拍照描述
+    photoTaskSub: '學生拍下真實的東西，再用這堂課的語言寫或錄音說明',
+    photoTaskLabel: '任務說明',
+    photoTaskPlaceholder: '例如：在校園裡拍一樣你每天都會用到的東西，說明它是什麼、放在哪裡、你怎麼用它。',
+    photoTaskHint: '學生每張照片下方都會有一個說明欄，可以打字，也可以直接錄音。',
+    sendTask: '派送任務',
   },
   en: {
     onlineCount: '{n} online',
@@ -48,6 +80,34 @@ const messages = {
     danmaku: 'Live comments', anonymous: 'Anonymous', recording: 'Recording', captions: 'Captions',
     on: 'On', off: 'Off', connecting: 'Connecting',
     captionToggleHint: 'Shows or hides the live captions on both screens', captionNeedsRecording: 'Turn recording on first',
+
+    cancel: 'Cancel', close: 'Close', send: 'Send', sending: 'Sending…', sendFailed: 'Could not send.',
+    sent: 'Sent', actionFailed: 'That did not work.',
+    prepareTime: 'Thinking time', noPrepare: 'None', answerTime: 'Time to answer', noTimeLimit: 'No limit',
+
+    pictureTopicPlaceholder: 'Topic (optional) — buying something at a night market, helping at home',
+    generatePicture: 'Draw four panels', anotherPicture: 'Draw another', drawing: 'Drawing the four panels…',
+    pictureHint: 'Leave it empty and the AI picks a situation to suit this class and level. The picture carries no words, so students describe it in their own.',
+    picturePreviewAlt: 'Four-panel picture',
+    modeSpoken: 'Speak', modeWritten: 'Write', modeOrdering: 'Put in order',
+    pictureOrderingHint: 'The four panels are cut apart, shuffled and sent for students to drag back into order. The whole picture is never sent.',
+    questionLabel: 'Instruction', planPrivate: 'Only you see this. Students get the picture and the instruction.',
+    cuttingPanels: 'Cutting the panels and sending…', generateFailed: 'That did not work. Please try again.',
+
+    sentenceWallSub: 'Everyone writes one sentence, and the class’s sentences appear on the projector',
+    sentenceWallLabel: 'What to write',
+    sentenceWallPlaceholder: 'e.g. Write a sentence about the weather using "although … still …"',
+    opening: 'Opening…', sendAndOpenWall: 'Send it and open the wall',
+    sentenceWallShort: 'Sentence wall', wallShowing: 'On the projector', wallShow: 'Show on the projector',
+    composeN: 'Write up these {n} sentences', composeAgain: 'Write it up again', composing: 'Writing…',
+    sendViaText: 'Send it to the class as text', composeNeedsTwo: 'Two sentences are enough to write something up.',
+    worthLearning: 'Worth learning from', watchOutFor: 'Worth fixing',
+
+    photoTaskSub: 'Students photograph something real, then describe it in the language of this class',
+    photoTaskLabel: 'The task',
+    photoTaskPlaceholder: 'e.g. Photograph something on campus you use every day. Say what it is, where it is and how you use it.',
+    photoTaskHint: 'Every photo gets a description box under it. Students can type it or record it.',
+    sendTask: 'Send the task',
   },
 } as const
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeSlash, PaperPlaneTilt, Sparkle } from '@phosphor-icons/react'
+import { usePresenterText } from '../lib/presenterI18n'
 import type { SentenceWallComposition } from '../lib/sentenceWall'
 
 type Props = {
@@ -18,6 +19,7 @@ type Props = {
 export function SentenceWallPanel({
   sentenceCount, wallEnabled, isCurrentQuestion, composition, onToggleWall, onCompose, onDispatch,
 }: Props) {
+  const t = usePresenterText()
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
 
@@ -27,7 +29,7 @@ export function SentenceWallPanel({
     try {
       await work()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '操作失敗。')
+      setError(caught instanceof Error ? caught.message : t('actionFailed'))
     } finally {
       setBusy('')
     }
@@ -36,7 +38,7 @@ export function SentenceWallPanel({
   return (
     <section className="panel sentence-wall-panel">
       <div className="panel-heading">
-        <h2><Sparkle size={18} />造句牆</h2>
+        <h2><Sparkle size={18} />{t('sentenceWallShort')}</h2>
         {isCurrentQuestion && (
           <button
             aria-pressed={wallEnabled}
@@ -46,7 +48,7 @@ export function SentenceWallPanel({
             onClick={() => void run('wall', () => onToggleWall(!wallEnabled))}
           >
             {wallEnabled ? <Eye size={16} /> : <EyeSlash size={16} />}
-            {wallEnabled ? '大螢幕顯示中' : '投到大螢幕'}
+            {wallEnabled ? t('wallShowing') : t('wallShow')}
           </button>
         )}
       </div>
@@ -58,15 +60,15 @@ export function SentenceWallPanel({
           onClick={() => void run('compose', onCompose)}
         >
           <Sparkle size={16} />
-          {busy === 'compose' ? '集成中…' : composition ? '重新集成' : `AI 集成這 ${sentenceCount} 句`}
+          {busy === 'compose' ? t('composing') : composition ? t('composeAgain') : t('composeN', { n: sentenceCount })}
         </button>
         {composition && (
           <button className="ghost-button" type="button" onClick={() => onDispatch(composition)}>
-            <PaperPlaneTilt size={16} />用文字派送給學生
+            <PaperPlaneTilt size={16} />{t('sendViaText')}
           </button>
         )}
       </div>
-      {sentenceCount < 2 && <p className="muted">至少收到兩個句子後就可以集成。</p>}
+      {sentenceCount < 2 && <p className="muted">{t('composeNeedsTwo')}</p>}
       {error && <p className="error">{error}</p>}
 
       {composition && (
@@ -75,7 +77,7 @@ export function SentenceWallPanel({
           <p className="sentence-wall-passage">{composition.passage}</p>
           {composition.highlights.length > 0 && (
             <div className="sentence-wall-highlights">
-              <h4>值得學的句子</h4>
+              <h4>{t('worthLearning')}</h4>
               {composition.highlights.map((highlight) => (
                 <div key={highlight.sentence}>
                   <strong>「{highlight.sentence}」</strong>
@@ -86,7 +88,7 @@ export function SentenceWallPanel({
           )}
           {composition.watchOut.length > 0 && (
             <div className="sentence-wall-watch">
-              <h4>要注意的地方</h4>
+              <h4>{t('watchOutFor')}</h4>
               {composition.watchOut.map((item) => (
                 <div key={item.point}>
                   <strong>{item.point}</strong>

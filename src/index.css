@@ -683,10 +683,18 @@ h2 {
   justify-content: space-between;
 }
 
+/* min-width: 0 all the way down. A flex item defaults to a content-based
+   minimum, so without this the heading refused to shrink and grew past the
+   panel instead — the label then ran under the window buttons rather than
+   truncating before them. */
 .qr-panel .panel-heading h2 {
   align-items: center;
   display: flex;
+  /* Shrink, but never grow: the expanded panel centres this heading, and a
+     heading that fills the row has nothing left to centre. */
+  flex: 0 1 auto;
   gap: 7px;
+  min-width: 0;
 }
 
 .desktop-shell .qr-panel .panel-heading {
@@ -707,11 +715,43 @@ h2 {
   white-space: nowrap;
 }
 
+/* Never shrink, and never shrunk out of the panel by the title.
+
+   The collapsed presenter window is 194px wide. 「加入場次」 fits beside two
+   buttons; "Join the class" does not, and because the buttons were flex items
+   after a nowrap heading, the last of them — the close button — was laid out at
+   x=189 in a 194px window and simply never seen. Every other guidance language
+   is longer than the Chinese too, so this had to stop depending on the label. */
+.qr-panel .panel-heading {
+  position: relative;
+}
+
 .qr-window-actions {
   -webkit-app-region: no-drag;
   align-items: center;
   display: flex;
+  flex: none;
   gap: 2px;
+}
+
+.qr-heading-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The floating panel is 194px wide and holds a QR code, a URL, a title and two
+   window buttons. Something has to go, and the icon pill is the one thing there
+   that carries no information: it is a QR glyph sitting directly on top of a QR
+   code. Dropping it, and closing the heading gap, is what leaves the title
+   enough room to be a title in languages whose words are longer than 加入場次. */
+.qr-floating .qr-panel .panel-heading {
+  gap: 6px;
+}
+
+.qr-floating .qr-panel .panel-heading .heading-icon {
+  display: none;
 }
 
 .qr-window-actions button {

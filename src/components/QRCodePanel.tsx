@@ -15,10 +15,16 @@ export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps }
   return (
     <section className="panel qr-panel">
       <div className="panel-heading">
+        {/* The label is its own element so it can be the thing that truncates.
+            As a bare text node in a flex heading it had no box to clip, so it
+            pushed the window buttons out of a 194px panel instead — and in
+            English 「加入場次」 becomes "Join the class", which took the close
+            button off the edge of the window entirely. */}
         <h2>
           <span className="heading-icon">
             <QrCode size={16} />
-          </span>{t('joinClass')}
+          </span>
+          <span className="qr-heading-label">{t('joinClass')}</span>
         </h2>
         {(onMinimize || onClose) && (
           <div

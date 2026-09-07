@@ -19,6 +19,7 @@ import { CustomQuizResult } from '../components/CustomQuizResult'
 import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
+import { PictureStudioModal } from '../components/PictureStudioModal'
 import { FileTransferModal } from '../components/FileTransferModal'
 import { finalizeLottery } from '../lib/lottery'
 import { getPresenterToken } from '../lib/presenterAuth'
@@ -95,6 +96,7 @@ export function PresenterPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
   const [listeningOpen, setListeningOpen] = useState(false)
+  const [pictureOpen, setPictureOpen] = useState(false)
   const [textDispatchError, setTextDispatchError] = useState('')
   const [fileTransferOpen, setFileTransferOpen] = useState(false)
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([])
@@ -332,11 +334,11 @@ export function PresenterPage() {
   useEffect(() => {
     if (!window.lingoActDesktop || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
-      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen,
+      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, selectionMode, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, pictureOpen, selectionMode, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return
@@ -1624,6 +1626,7 @@ export function PresenterPage() {
             void refreshSharedFiles()
           }}
           onOpenListeningStudio={() => setListeningOpen(true)}
+          onOpenPictureStudio={() => setPictureOpen(true)}
           onOpenTextDispatch={() => {
             setTextDispatchError('')
             setTextDispatchOpen(true)
@@ -1753,6 +1756,13 @@ export function PresenterPage() {
         readingAnnotation={session?.reading_annotation || resolveTrack(session?.teaching_language).annotation}
         teachingLanguage={resolveTrack(session?.teaching_language).language}
         onClose={() => setListeningOpen(false)}
+      />
+      <PictureStudioModal
+        open={pictureOpen}
+        presenterToken={getPresenterToken(sessionId) || ''}
+        sessionId={sessionId}
+        onClose={() => setPictureOpen(false)}
+        onDispatch={uploadQuestionScreenshot}
       />
       <TextDispatchModal
         busy={busy}

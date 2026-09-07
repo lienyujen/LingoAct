@@ -1,6 +1,7 @@
 import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
 import { levelInstruction } from '../_shared/proficiency.ts'
+import { drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
@@ -563,6 +564,38 @@ Deno.serve(async (req) => {
         storagePath,
         uploadToken: data.token,
       })
+    }
+
+    // 看圖說話. Nothing is written down: the picture comes back to the teacher
+    // and is uploaded only if they choose to send it, so the ones they reject
+    // leave no row and no object behind. From the upload onwards it travels the
+    // screenshot path unchanged — which is why this activity needs no question
+    // type, no student view and no results view of its own.
+    if (action === 'generate_picture') {
+      const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 500) : ''
+      const { data: classRow } = await supabase.from('sessions')
+        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+
+      let storyboard
+      try {
+        storyboard = await planPictureStory({
+          trackId: classRow?.teaching_language ?? null,
+          framework: classRow?.level_framework ?? null,
+          levelCode: classRow?.level_code ?? null,
+          direction,
+        })
+      } catch (error) {
+        return jsonResponse({ message: errorDetail(error, '無法規劃四格圖，請再試一次。') }, 503)
+      }
+
+      let image
+      try {
+        image = await drawPicture(drawingPrompt(storyboard))
+      } catch (error) {
+        return jsonResponse({ message: errorDetail(error, '無法生成圖片，請再試一次。') }, 503)
+      }
+
+      return jsonResponse({ storyboard, image: image.data, mimeType: image.mimeType })
     }
 
     if (action === 'create_custom_quiz') {

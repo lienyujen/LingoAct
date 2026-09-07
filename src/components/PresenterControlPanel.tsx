@@ -1,4 +1,4 @@
-import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
+import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import type { Session } from '../types'
 
@@ -14,6 +14,7 @@ type Props = {
   onDrawLottery: () => void
   onStartBuzzer: () => void
   onOpenListeningStudio: () => void
+  onOpenPictureStudio: () => void
   onOpenTextDispatch: () => void
   onOpenFileTransfer: () => void
   onOpenRoster: () => void
@@ -37,6 +38,7 @@ export function PresenterControlPanel({
   onDrawLottery,
   onStartBuzzer,
   onOpenListeningStudio,
+  onOpenPictureStudio,
   onOpenTextDispatch,
   onOpenFileTransfer,
   onOpenRoster,
@@ -105,6 +107,10 @@ export function PresenterControlPanel({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v4" /></svg>
             </span>
             聽力播音室
+          </button>
+          <button className="control-action picture-control-action" type="button" onClick={onOpenPictureStudio} disabled={busy}>
+            <span className="control-action-icon"><Image size={18} /></span>
+            看圖說話
           </button>
           <button className="control-action share-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
             <span className="control-action-icon"><PaperPlaneTilt size={18} /></span>

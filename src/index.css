@@ -4803,6 +4803,147 @@ h2 {
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
 .ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* 看圖說話. Built on the listening studio's shell, because the two are the same
+   kind of thing to a teacher: a modal that makes one piece of material and then
+   sends it. The picture itself gets the space — everything beside it is there to
+   answer "is this the right picture?" in a couple of seconds. */
+.picture-studio {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 94vw);
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgb(23 22 26 / 24%);
+}
+
+.picture-studio .ps-spacer { flex-grow: 1; }
+
+.ps-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.ps-head h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+.ps-mark { display: flex; color: var(--primary); }
+.ps-sent {
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--success-soft); color: var(--success);
+  font-size: 11px; font-weight: 800;
+}
+.ps-close {
+  display: flex; padding: 5px; border: none; border-radius: 8px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.ps-close:hover { background: var(--bg); color: var(--text); }
+
+.ps-body {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px 18px; overflow-y: auto;
+}
+
+.ps-direction { display: flex; gap: 8px; }
+.ps-direction input {
+  flex-grow: 1; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-family: inherit; font-size: 13px;
+}
+.ps-direction input:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.ps-draw {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 10px 15px; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--primary); color: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.ps-draw:disabled { opacity: .55; cursor: not-allowed; }
+
+.ps-note {
+  margin: 0; padding: 8px 11px; border-radius: 9px;
+  background: var(--primary-soft); color: var(--muted);
+  font-size: 11.5px; line-height: 1.6;
+}
+
+/* Picture beside plan on a desktop; the picture first and the plan under it once
+   the panel is too narrow to read both. */
+.ps-result { display: flex; gap: 14px; align-items: flex-start; }
+.ps-preview {
+  width: 58%; flex-shrink: 0;
+  border-radius: 11px; border: 1px solid var(--border); background: var(--surface);
+}
+.ps-plan { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.ps-plan h3 { margin: 0; font-size: 14px; font-weight: 800; }
+.ps-words { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; }
+.ps-words span {
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary-dark);
+  font-size: 11.5px; font-weight: 700;
+}
+.ps-pattern {
+  margin: 0; font-size: 12px; line-height: 1.6;
+  color: var(--text); font-weight: 600;
+}
+.ps-panels {
+  display: flex; flex-direction: column; gap: 4px;
+  margin: 0; padding-left: 18px;
+  font-size: 11.5px; line-height: 1.55; color: var(--muted);
+}
+.ps-plan-note { margin: 0; font-size: 11px; color: var(--muted); }
+
+.ps-modes { display: flex; gap: 6px; }
+.ps-modes button {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font-family: inherit; font-size: 12.5px; font-weight: 700;
+}
+.ps-modes button.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.ps-prompt {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 11.5px; font-weight: 700; color: var(--muted);
+}
+.ps-prompt textarea {
+  padding: 10px 12px; border-radius: 10px; resize: vertical;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-family: inherit; font-size: 13px; line-height: 1.6;
+}
+.ps-prompt textarea:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.ps-timing { display: flex; flex-direction: column; gap: 8px; }
+
+.ps-error {
+  margin: 0; padding: 9px 11px; border-radius: 9px;
+  background: var(--danger-soft); color: var(--danger-dark); font-size: 12.5px;
+}
+
+.ps-foot {
+  display: flex; gap: 9px; padding: 13px 18px;
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.ps-foot button {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  flex-grow: 1; padding: 12px; border-radius: 11px; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.ps-secondary { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+.ps-primary { border: none; background: var(--primary); color: #fff; }
+.ps-foot button:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (width <= 620px) {
+  .ps-result { flex-direction: column; }
+  .ps-preview { width: 100%; }
+}
+
+.picture-control-action .control-action-icon {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
 /* Ordering items. Rows are generous because they are dragged with a finger on a
    tablet, not clicked with a mouse. */
 .quiz-ordering-hint { margin: 0 0 8px; font-size: 12px; color: var(--muted); }

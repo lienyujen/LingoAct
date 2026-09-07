@@ -112,6 +112,25 @@ why `release.yml` deliberately builds without a `.env`.
   against the database's clock, anchored on `started_at` — a countdown the
   client alone could be talked out of is not a deadline. Audio is deliberately
   outside that rule; see the migration for why.
+- **看圖說話**, a four-panel picture the class describes or narrates. Four
+  panels rather than one because one picture gets you nouns and four get you a
+  story — 先、再、然後、最後, a tense, a reason — which is why the panels have to
+  be one sequence rather than four related pictures. It is generated in two
+  calls: a text model plans the story against the class's track and level,
+  because that is the model that knows what TBCL 3 or 第五學習階段 means, and the
+  image model only draws what it is handed. The same button therefore produces
+  下雨、雨傘、一起 with 「因為…所以…」 for TBCL 2, and 天人交戰、將心比心 with a
+  300-字 記敘文 for 國中九年級. The picture comes back to the teacher as bytes
+  and is uploaded only when they send it, so the ones they reject leave no row
+  and no object behind; from the upload onwards it travels the screenshot path
+  unchanged, which is why the activity needs no question type, no student view
+  and no results view of its own — it dispatches as an ordinary 問答題 or
+  口語表達 carrying a picture. Two rules in the prompt were learned by drawing
+  rather than reasoned out: the story must not be built around anything that
+  carries writing, because the model letters whatever normally carries lettering
+  and the characters it invents are malformed; and each panel is one frozen
+  moment, because a panel describing three actions is drawn with the same person
+  in it three times.
 - **寫作教練**, which is the custom-quiz machinery with the marking switched
   off: `quizzes.graded` false, items generated as writing fields rather than
   questions, and the attempt reaching a `submitted` state that carries no
@@ -133,8 +152,8 @@ What is **not** done:
 - Of the twelve teaching activities, these are still open:
   **聽打接力** (nothing built; needs per-sentence clips and pairing);
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
-  still a whole passage; **看圖說話** lacks the AI four-panel image (v2);
-  **故事排序** orders text only, not images; **即時造句牆** collects the
+  still a whole passage; **故事排序** orders text only, not images;
+  **即時造句牆** collects the
   sentences but nothing aggregates them; **AI寫作教練** is the simplified form
   the teacher asked for, without the scaffolding questions the activity table
   describes; **拍照描述** uploads a photo with no paired caption field.

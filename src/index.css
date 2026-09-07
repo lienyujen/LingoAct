@@ -4703,6 +4703,15 @@ h2 {
 .ls-drop:focus-visible { outline: 2px solid var(--ls-accent); outline-offset: 2px; }
 .ls-drop p { margin: 0; font-size: 12.5px; color: var(--ls-muted); }
 .ls-drop input { font-size: 12px; }
+/* The primary way in on the desktop, so it leads and the paste hint follows. */
+.ls-capture {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  padding: 9px 16px; border-radius: 999px; border: 1px solid var(--ls-accent);
+  background: var(--ls-accent); color: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.ls-capture:hover { filter: brightness(1.08); }
+.ls-capture:focus-visible { outline: 2px solid var(--ls-accent); outline-offset: 3px; }
 
 .ls-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ls-chip {

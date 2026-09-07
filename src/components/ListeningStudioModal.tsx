@@ -18,9 +18,19 @@ type Props = {
   // 注音 or 拼音, decided with the rest of the class rather than per clip.
   readingAnnotation: string
   open: boolean
+  // Kept mounted but out of sight while the drag-select capture is running.
+  suspended?: boolean
   sessionId: string
   presenterToken: string
   teachingLanguage: string
+  // The desktop app's own screen capture, the same drag-select 截圖派題 uses.
+  // Absent in the browser, where there is no screen to grab.
+  onCaptureScreen?: () => void
+  // What that capture produced, handed over as a file. The studio reads it once
+  // and says so, because the same crop arriving twice would pay for the AI
+  // recognition twice.
+  capturedScreen?: File | null
+  onCapturedScreenRead?: () => void
   onClose: () => void
 }
 
@@ -57,6 +67,15 @@ function MicIcon() {
   )
 }
 
+// A crop frame, matching the drag-out-a-rectangle gesture the button starts.
+function CropIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14" />
+    </svg>
+  )
+}
+
 function HiddenIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
@@ -70,7 +89,18 @@ function PlayIcon({ size = 17 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
 }
 
-export function ListeningStudioModal({ open, sessionId, presenterToken, teachingLanguage, readingAnnotation, onClose }: Props) {
+export function ListeningStudioModal({
+  open,
+  suspended = false,
+  sessionId,
+  presenterToken,
+  teachingLanguage,
+  readingAnnotation,
+  onCaptureScreen,
+  capturedScreen,
+  onCapturedScreenRead,
+  onClose,
+}: Props) {
   const t = usePresenterText()
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
@@ -108,6 +138,18 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
     if (kind !== 'dialogue' || speakersTouched) return
     setSpeakers(speakersFromTranscript(transcript))
   }, [kind, transcript, speakersTouched])
+
+  // A crop has come back from the desktop capture. readImage is a hoisted
+  // function declaration, so it is in scope here even though it is written
+  // below the early return.
+  useEffect(() => {
+    if (!capturedScreen) return
+    onCapturedScreenRead?.()
+    void readImage(capturedScreen)
+    // readImage is redefined every render and would re-run this on each one;
+    // the captured file is what actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturedScreen])
 
   if (!open) return null
 
@@ -228,7 +270,11 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
   const canSynthesize = transcript.trim().length > 0 && !busy
 
   return (
-    <div className="modal-backdrop listening-studio-backdrop" role="presentation">
+    <div
+      className="modal-backdrop listening-studio-backdrop"
+      role="presentation"
+      style={suspended ? { display: 'none' } : undefined}
+    >
       <div className="listening-studio">
 
         <header className="ls-head">
@@ -251,7 +297,15 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
 
           {source === 'screenshot' && !transcript && (
             <div className="ls-drop" onPaste={onPaste} tabIndex={0}>
-              <p>{t('listeningDropHint')}</p>
+              {/* The teacher already has the page on screen — a textbook, a
+                  slide, a PDF. Making them save it as a file first was the
+                  long way round to the same image. */}
+              {onCaptureScreen && (
+                <button className="ls-capture" type="button" onClick={onCaptureScreen}>
+                  <CropIcon />{t('captureFromScreen')}
+                </button>
+              )}
+              <p>{onCaptureScreen ? t('listeningDropOrHint') : t('listeningDropHint')}</p>
               <input
                 accept="image/png,image/jpeg,image/webp"
                 type="file"

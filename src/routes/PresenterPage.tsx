@@ -140,6 +140,12 @@ export function PresenterPage() {
   const [capturePreset, setCapturePreset] = useState<QuizRequestedType | null>(null)
   const [capturePreviewUrl, setCapturePreviewUrl] = useState<string | null>(null)
   const [captureSource, setCaptureSource] = useState<LingoActCaptureSource | null>(null)
+  // Where the cropped image goes. 聽力播音室 reads the same drag-select capture
+  // as 截圖派題 — a teacher with a textbook page on screen should not have to
+  // save it as a file first — so the selection has to know which of the two
+  // asked for it before it opens anything.
+  const [captureTarget, setCaptureTarget] = useState<'question' | 'listening'>('question')
+  const [listeningCapture, setListeningCapture] = useState<File | null>(null)
   const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const [selectionMode, setSelectionMode] = useState(false)
   const activeSelectionPointerId = useRef<number | null>(null)
@@ -900,10 +906,11 @@ export function PresenterPage() {
     return new File([bytes], filename, { type: mime })
   }
 
-  async function captureWindowsScreen(preset: QuizRequestedType | null = null) {
+  async function captureWindowsScreen(preset: QuizRequestedType | null = null, target: 'question' | 'listening' = 'question') {
     if (!window.lingoActDesktop) return
 
     setCapturePreset(preset)
+    setCaptureTarget(target)
     setControlsOpen(false)
     setCapturePreviewUrl(null)
     setCaptureFile(null)
@@ -952,15 +959,19 @@ export function PresenterPage() {
 
     const dataUrl = canvas.toDataURL('image/png')
     const file = dataUrlToFile(dataUrl, `windows-selection-${Date.now()}.png`)
-    setCaptureFile(file)
-    setCapturePreviewUrl(dataUrl)
     setSelectionMode(false)
     setCaptureSource(null)
     setSelectionRect(null)
     selectionStartRef.current = null
     selectionRectRef.current = null
     activeSelectionPointerId.current = null
-    setEditorOpen(true)
+    if (captureTarget === 'listening') {
+      setListeningCapture(file)
+    } else {
+      setCaptureFile(file)
+      setCapturePreviewUrl(dataUrl)
+      setEditorOpen(true)
+    }
     await window.lingoActDesktop?.finishCaptureSelection(true)
   }
 
@@ -1884,7 +1895,7 @@ export function PresenterPage() {
           onPointerMove={updateSelection}
           onPointerUp={finishSelection}
         >
-          <p className="capture-selection-hint">{t('captureDragHint')}</p>
+          <p className="capture-selection-hint">{t(captureTarget === 'listening' ? 'captureDragHintRead' : 'captureDragHint')}</p>
           {selectionRect && (
             <div
               className="capture-selection-box"
@@ -1924,12 +1935,19 @@ export function PresenterPage() {
         />
       )}
       <ListeningStudioModal
+        capturedScreen={listeningCapture}
         open={listeningOpen}
+        // Hidden rather than closed while the teacher drags out the crop: the
+        // selection layer is this window painted with the screenshot, and
+        // closing the studio would throw away the transcript already in it.
+        suspended={selectionMode}
         presenterToken={getPresenterToken(sessionId) || ''}
         sessionId={sessionId}
         readingAnnotation={session?.reading_annotation || resolveTrack(session?.teaching_language).annotation}
         teachingLanguage={resolveTrack(session?.teaching_language).language}
-        onClose={() => setListeningOpen(false)}
+        onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'listening') : undefined}
+        onCapturedScreenRead={() => setListeningCapture(null)}
+        onClose={() => { setListeningCapture(null); setListeningOpen(false) }}
       />
       <PictureStudioModal
         open={pictureOpen}

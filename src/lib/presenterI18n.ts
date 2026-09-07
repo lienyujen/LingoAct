@@ -178,6 +178,8 @@ const messages = {
     annotateFailed: '標音失敗，改以無標音派送。', annotateFailedWith: '標音失敗，改以無標音派送：{message}',
     fromScreenshot: '從截圖', pasteText: '貼上文字', textCheaperHint: '不呼叫辨識，較省用量',
     listeningDropHint: '把教材截圖貼上（Ctrl+V），或選擇檔案',
+    captureFromScreen: '直接框選畫面',
+    listeningDropOrHint: '或把截圖貼上（Ctrl+V）、選擇檔案',
     scriptTraditional: '繁體・台灣腔', scriptSimplified: '簡體・普通話',
     transcriptHidden: '逐字稿・學生看不到', charCount: '{n} 字',
     transcriptPlaceholder: '貼上或修改要朗讀的文字。對話請每行以「說話者：」開頭。',
@@ -235,6 +237,7 @@ const messages = {
     // 講者頁
     loadingPresenter: '載入講者頁...',
     captureDragHint: '拖曳框選要派送的畫面區域',
+    captureDragHintRead: '拖曳框選要讓 AI 讀的畫面區域',
     noMicFound: '找不到可用的麥克風。', micNotAllowed: 'Windows 或程式未允許使用麥克風。',
     micBusy: '麥克風正被其他程式獨占，暫時無法使用。', micUnavailable: '先前選擇的麥克風目前不可用。',
     realtimeQuota: 'OpenAI 即時翻譯用量上限不足，請提高 API Project 的使用等級或限制。',
@@ -553,6 +556,8 @@ const messages = {
     annotateFailed: 'The readings failed; sending without them.', annotateFailedWith: 'The readings failed; sending without them: {message}',
     fromScreenshot: 'From a screenshot', pasteText: 'Paste text', textCheaperHint: 'No AI reading, so it costs less',
     listeningDropHint: 'Paste a screenshot (Ctrl+V), or choose a file',
+    captureFromScreen: 'Grab it off the screen',
+    listeningDropOrHint: 'Or paste a screenshot (Ctrl+V), or choose a file',
     scriptTraditional: 'Traditional · Taiwan', scriptSimplified: 'Simplified · Mainland',
     transcriptHidden: 'Script · the class cannot see this', charCount: '{n} characters',
     transcriptPlaceholder: 'Paste or edit the text to be read aloud. For a dialogue, start every line with "Speaker:".',
@@ -606,6 +611,7 @@ const messages = {
 
     loadingPresenter: 'Loading...',
     captureDragHint: 'Drag a box around the part of the screen to send',
+    captureDragHintRead: 'Drag a box around the part of the screen for the AI to read',
     noMicFound: 'No microphone found.', micNotAllowed: 'Windows or this app is not allowing the microphone.',
     micBusy: 'Another program has the microphone.', micUnavailable: 'The microphone you chose is not available.',
     realtimeQuota: 'The OpenAI live translation quota is too low. Raise the usage tier or limit on the API project.',

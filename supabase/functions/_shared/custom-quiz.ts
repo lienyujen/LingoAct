@@ -1,5 +1,6 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
+import { levelCeiling, stemLength, stemLengthComplaint } from './proficiency.ts'
 
 type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing' | 'flashcard'
 type ItemType = Exclude<RequestedType, 'random' | 'writing' | 'flashcard'>
@@ -172,6 +173,11 @@ export async function generateCustomQuiz(input: {
   // The class's own language, named for the model. Settled when the session was
   // created, so the teacher does not have to say it in every 出題方向.
   teachingLanguage?: string
+  // The class's ladder, for the stem-length check after generation. Passing the
+  // codes rather than the resolved ceiling keeps the level's own vocabulary at
+  // the call site, where the session row is.
+  levelFramework?: string | null
+  levelCode?: string | null
 }) {
   if (!input.sourceUrl && !input.sourceText) throw new Error('No quiz source was supplied.')
   const apiKey = Deno.env.get('GEMINI_API_KEY')
@@ -220,15 +226,19 @@ export async function generateCustomQuiz(input: {
       role: 'user',
       parts: [
         { text: JSON.stringify({ direction: input.direction, requested_count: input.requestedCount, requested_type: input.requestedType, requested_language: requestedLanguage }) },
-        ...(input.extraInstruction ? [{ text: input.extraInstruction }] : []),
         ...(sourcePart ? [sourcePart] : []),
         ...(input.sourceText ? [{ text: `教材原文如下：
 ${input.sourceText}` }] : []),
       ],
     }],
   }
+  // The class's language and level belong in the system instruction, not beside
+  // the material. As a user part they sat between the teacher's direction and
+  // the textbook page and read as context; the material won, and a TBCL level 1
+  // class got questions pitched at the page.
+  if (input.extraInstruction) requestPayload.systemInstruction.parts.push({ text: input.extraInstruction })
 
-  function requestBodyForModel() {
+  function requestBodyForModel(complaint = '') {
     // The current Generate Content API accepts JSON Schema through
     // responseFormat for both Gemini 3.x and Gemini 2.5. responseSchema is a
     // different, restricted schema dialect and rejects JSON Schema keywords.
@@ -236,24 +246,67 @@ ${input.sourceText}` }] : []),
       thinkingConfig: geminiThinkingConfig('realtime'),
       responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: quizGenerationSchema } },
     }
-    return JSON.stringify({ ...requestPayload, generationConfig })
+    const payload = complaint
+      ? {
+          ...requestPayload,
+          contents: [{
+            ...requestPayload.contents[0],
+            parts: [...requestPayload.contents[0].parts, { text: complaint }],
+          }],
+        }
+      : requestPayload
+    return JSON.stringify({ ...payload, generationConfig })
   }
 
-  const body = requestBodyForModel()
-  let result = await requestQuizGeneration(apiKey, model, body, 1, 12_000)
-  if (!result.response && fallbackModel && fallbackModel !== model && (result.failureStatus === null || retryableStatus(result.failureStatus))) {
-    console.warn(`Gemini quiz generation unavailable on ${model}; retrying with ${fallbackModel}.`)
-    result = await requestQuizGeneration(apiKey, fallbackModel, body, 1, 18_000)
-  }
-  if (!result.response) {
-    const status = result.failureStatus ? ` (${result.failureStatus})` : ''
-    throw new Error(`Gemini quiz generation failed${status}: ${result.failureMessage}`)
+  async function generate(complaint = '') {
+    const body = requestBodyForModel(complaint)
+    let result = await requestQuizGeneration(apiKey!, model, body, 1, 12_000)
+    if (!result.response && fallbackModel && fallbackModel !== model && (result.failureStatus === null || retryableStatus(result.failureStatus))) {
+      console.warn(`Gemini quiz generation unavailable on ${model}; retrying with ${fallbackModel}.`)
+      result = await requestQuizGeneration(apiKey!, fallbackModel, body, 1, 18_000)
+    }
+    if (!result.response) {
+      const status = result.failureStatus ? ` (${result.failureStatus})` : ''
+      throw new Error(`Gemini quiz generation failed${status}: ${result.failureMessage}`)
+    }
+    const text = extractGeminiText(await result.response.json())
+    if (!text) throw new Error('Gemini returned no quiz.')
+    return JSON.parse(text) as { title?: unknown; items?: unknown }
   }
 
-  const response = result.response
-  const outputText = extractGeminiText(await response.json())
-  if (!outputText) throw new Error('Gemini returned no quiz.')
-  const output = JSON.parse(outputText) as { title?: unknown; items?: unknown }
+  // The level ceiling is checked, not merely asked for. Told 「TBCL 第1級」 the
+  // model returned 「都市化帶來了什麼好處？」 with 「經濟成長與生活便利」 among
+  // the options: it knows the framework by name and drifts to the material's own
+  // difficulty anyway. A stem far over the limit is the visible end of that
+  // drift, so it earns one more attempt with the failure named.
+  const ceiling = levelCeiling(input.levelFramework ?? null, input.levelCode ?? null)
+  function overLength(candidate: { items?: unknown }) {
+    if (!ceiling || !Array.isArray(candidate.items)) return []
+    return candidate.items
+      .map((raw, index) => {
+        const promptText = (raw as Record<string, unknown>).prompt_text
+        if (typeof promptText !== 'string') return null
+        const length = stemLength(promptText, ceiling.unit)
+        return length > ceiling.maxStem ? { index, length } : null
+      })
+      .filter((entry): entry is { index: number; length: number } => entry !== null)
+  }
+
+  let output = await generate()
+  const offenders = overLength(output)
+  if (offenders.length) {
+    console.warn(`Quiz stems over the ${ceiling?.label} limit on the first attempt: ${offenders.map((o) => `#${o.index + 1}=${o.length}`).join(' ')}`)
+    try {
+      const retried = await generate(stemLengthComplaint(input.levelFramework ?? null, input.levelCode ?? null, offenders))
+      // Kept only if it is actually better. A second attempt that comes back
+      // worse is a worse quiz, not a fresher one.
+      if (overLength(retried).length < offenders.length) output = retried
+    } catch (error) {
+      // The first attempt is a usable quiz; losing it over a length limit would
+      // leave the class with nothing at all.
+      console.warn(`Level retry failed, keeping the first attempt: ${errorDetail(error, 'unknown error')}`)
+    }
+  }
   if (!Array.isArray(output.items)) throw new Error('AI returned an invalid quiz item list.')
   if (output.items.length < 1 || output.items.length > 10) throw new Error('AI returned an unsupported question count.')
   if (input.requestedCount && output.items.length !== input.requestedCount) throw new Error('AI did not follow the requested question count.')

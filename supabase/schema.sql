@@ -834,6 +834,34 @@ alter table public.sessions
 alter table public.questions
   add column if not exists wants_caption boolean not null default false;
 
+-- AI寫作教練, the scaffolded version. Every round a student asks for is kept:
+-- 寫作歷程 is what the teacher reads afterwards, and a first draft plus the
+-- question that moved it says more than the finished paragraph does. Keyed on
+-- the participant rather than an attempt, because coaching happens before
+-- submitting and an attempt opened early shows the class as finished.
+create table if not exists public.writing_coach_turns (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  item_id uuid not null references public.quiz_items(id) on delete cascade,
+  participant_id uuid not null references public.participants(id) on delete cascade,
+  round integer not null check (round between 1 and 5),
+  draft text not null check (char_length(draft) between 1 and 4000),
+  reply jsonb not null,
+  created_at timestamptz not null default now(),
+  unique (question_id, item_id, participant_id, round)
+);
+
+create index if not exists writing_coach_turns_question_idx
+  on public.writing_coach_turns (question_id, participant_id, created_at);
+
+alter table public.writing_coach_turns enable row level security;
+revoke all on public.writing_coach_turns from public, anon, authenticated;
+grant all on public.writing_coach_turns to service_role;
+
+alter table public.quizzes
+  add column if not exists coaching boolean not null default false;
+
 alter table public.file_responses
   add column if not exists caption text null
   check (caption is null or char_length(caption) between 1 and 2000);

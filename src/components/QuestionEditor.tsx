@@ -55,6 +55,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
   const [quizCount, setQuizCount] = useState('auto')
   const [quizType, setQuizType] = useState<QuizRequestedType>('random')
   const [quizDirection, setQuizDirection] = useState('')
+  const [quizCoaching, setQuizCoaching] = useState(false)
   const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(null)
 
@@ -67,6 +68,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
     setQuizCount('auto')
     setQuizType('random')
     setQuizDirection('')
+    setQuizCoaching(false)
     setPrepareSeconds(null)
     setAnswerSeconds(null)
   }, [open])
@@ -95,7 +97,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
               options: [],
               allowMultiple: false,
               promptText: direction,
-              quizSettings: quizSettingsFrom(quizCount, quizType, direction),
+              quizSettings: quizSettingsFrom(quizCount, quizType, direction, quizCoaching),
               prepareSeconds: null,
               answerSeconds: null,
             })
@@ -174,9 +176,11 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
         )}
         {type === 'custom_quiz' && (
           <CustomQuizFields
+            coaching={quizCoaching}
             count={quizCount}
             direction={quizDirection}
             quizType={quizType}
+            onCoachingChange={setQuizCoaching}
             onCountChange={setQuizCount}
             onDirectionChange={setQuizDirection}
             onTypeChange={setQuizType}

@@ -146,6 +146,18 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   // than left showing dashes and a stuck "評分中" count.
   const flashcard = results.quiz.requested_type === 'flashcard'
   const pictureOrdering = results.quiz.requested_type === 'picture_ordering'
+  const coaching = results.quiz.coaching === true
+  const coachTurns = results.coachTurns || []
+  // Sorted by round rather than by insert order: the history is only legible
+  // read forwards, first draft first.
+  function turnsFor(participantId: string, itemId: string) {
+    return coachTurns
+      .filter((turn) => turn.participant_id === participantId && turn.item_id === itemId)
+      .sort((a, b) => a.round - b.round)
+  }
+  function roundsFor(participantId: string) {
+    return coachTurns.filter((turn) => turn.participant_id === participantId).length
+  }
   // 寫作教練 and a deck are both ungraded, but for different reasons and with
   // different things worth showing, so they are not one branch.
   const writing = results.quiz.graded === false && !flashcard
@@ -298,7 +310,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               <span>{flashcard
                 ? `第一次就對 ${firstTryRight(attempt.id)}/${results.items.length}`
                 : writing
-                ? '已送出'
+                ? coaching ? `已送出 · 問了教練 ${roundsFor(attempt.participant_id)} 次` : '已送出'
                 : attempt.status === 'graded'
                   ? `${attempt.total_score}/${attempt.max_score}`
                   : attempt.status === 'failed' ? '評分失敗' : '評分中'}</span>
@@ -315,6 +327,22 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                     <div className="quiz-written-answer" key={answer.id}>
                       <span>{itemPosition.get(answer.item_id)}. {itemPrompt.get(answer.item_id)}</span>
                       <p>{answer.answer_text}</p>
+                      {/* 寫作歷程: what this field looked like before, and what
+                          the coach asked that moved it. The finished paragraph
+                          is above; this is how it got there. */}
+                      {coaching && turnsFor(attempt.participant_id, answer.item_id).length > 0 && (
+                        <details className="writing-history">
+                          <summary>寫作歷程（{turnsFor(attempt.participant_id, answer.item_id).length} 次）</summary>
+                          {turnsFor(attempt.participant_id, answer.item_id).map((turn) => (
+                            <div className="writing-history-turn" key={turn.id}>
+                              <strong>第 {turn.round} 稿</strong>
+                              <p className="writing-history-draft">{turn.draft}</p>
+                              <ul>{turn.reply.questions.map((q) => <li key={q}>{q}</li>)}</ul>
+                              {turn.reply.fix && <p className="writing-history-fix">{turn.reply.fix.point}</p>}
+                            </div>
+                          ))}
+                        </details>
+                      )}
                     </div>
                   ))}
               </div>

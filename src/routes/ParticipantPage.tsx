@@ -32,7 +32,7 @@ import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
 import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantLocale } from '../lib/participantI18n'
-import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent } from '../types'
+import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent, WritingCoachTurn } from '../types'
 
 async function participantFunctionMessage(error: unknown, fallback: string) {
   const context = (error as { context?: Response } | null)?.context
@@ -394,6 +394,21 @@ export function ParticipantPage() {
     }
   }
 
+  // One coaching round. The reply is merged in rather than reloaded: the
+  // student is mid-draft in a textarea, and a full refetch of the quiz would
+  // reset what they have typed under their hands.
+  async function askWritingCoach(itemId: string, draft: string) {
+    if (!participant || !participantToken || !question || question.type !== 'custom_quiz') return
+    const { data, error: askError } = await requireSupabase().functions.invoke('participant-action', {
+      body: { action: 'ask_writing_coach', sessionId, participantId: participant.id, participantToken, questionId: question.id, itemId, draft },
+    })
+    if (askError) throw new Error(await participantFunctionMessage(askError, '教練暫時無法回覆，請再試一次。'))
+    if (!data?.turn) throw new Error(data?.message || '教練暫時無法回覆，請再試一次。')
+    setQuizData((current) => (current
+      ? { ...current, coachTurns: [...(current.coachTurns || []), data.turn as WritingCoachTurn] }
+      : current))
+  }
+
   async function retryCustomQuiz() {
     if (!participant || !participantToken || !question || question.type !== 'custom_quiz') return
     setQuizBusy(true)
@@ -713,7 +728,7 @@ export function ParticipantPage() {
       {question?.type === 'custom_quiz' ? (quizData ? (
         quizData.quiz.requested_type === 'flashcard'
           ? <ParticipantFlashcards data={quizData} locale={locale} onTry={submitFlashcardTry} />
-          : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
+          : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
           <h2>{participantText(locale, 'customQuiz')}</h2>

@@ -76,6 +76,7 @@ export function FileTransferModal({
   const [quizFile, setQuizFile] = useState<SharedFile | null>(null)
   const [quizCount, setQuizCount] = useState('auto')
   const [quizType, setQuizType] = useState<QuizRequestedType>('random')
+  const [quizCoaching, setQuizCoaching] = useState(false)
   const [quizDirection, setQuizDirection] = useState('')
 
   const collecting = collectQuestion?.status === 'active'
@@ -337,15 +338,17 @@ export function FileTransferModal({
               if (!direction) return
               const file = quizFile
               setQuizFile(null)
-              void guard(() => onCreateFileQuiz(file.id, quizSettingsFrom(quizCount, quizType, direction)))
+              void guard(() => onCreateFileQuiz(file.id, quizSettingsFrom(quizCount, quizType, direction, quizCoaching)))
             }}
           >
             <h2 id="file-quiz-title">自訂測驗</h2>
             <p className="muted">以「{quizFile.name}」為教材出題，派送後學生端會立刻看到題目。</p>
             <CustomQuizFields
+              coaching={quizCoaching}
               count={quizCount}
               direction={quizDirection}
               quizType={quizType}
+              onCoachingChange={setQuizCoaching}
               onCountChange={setQuizCount}
               onDirectionChange={setQuizDirection}
               onTypeChange={setQuizType}

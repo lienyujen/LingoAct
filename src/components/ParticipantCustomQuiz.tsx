@@ -5,6 +5,7 @@ import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { QuizOrderingInput } from './QuizOrderingInput'
 import { QuizMatchingInput } from './QuizMatchingInput'
+import { WritingCoachPanel } from './WritingCoachPanel'
 import { localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { ParticipantQuizData } from '../types'
 
@@ -16,9 +17,14 @@ type Props = {
   locale: ParticipantLocale
   onRetry: () => Promise<void>
   onSubmit: (answers: QuizSubmission) => Promise<void>
+  onAskCoach: (itemId: string, draft: string) => Promise<void>
 }
 
-export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }: Props) {
+// Mirrors COACH_ROUNDS in the participant Edge Function, which is where the
+// limit is actually enforced; this only decides what the button says.
+const COACH_ROUNDS = 3
+
+export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, onAskCoach }: Props) {
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({})
   const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>({})
   // Seeded from the shuffled fragments the server sent, so an untouched item is
@@ -28,6 +34,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
   // untouched 配對 blocks submission rather than sending a row of first guesses.
   const [matchAnswers, setMatchAnswers] = useState<Record<string, string[]>>({})
   const writing = data.quiz.graded === false
+  const coaching = writing && data.quiz.coaching === true
   const usesAiGrading = !writing && data.items.some((item) => item.type !== 'multiple_choice')
 
   useEffect(() => {
@@ -106,7 +113,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
     <section className="panel participant-question participant-custom-quiz">
       <h2>{data.quiz.title}</h2>
       <p className="muted">{writing
-        ? participantText(locale, 'writingHint')
+        ? participantText(locale, coaching ? 'coachIntro' : 'writingHint')
         : usesAiGrading
           ? participantText(locale, 'quizHintAi')
           : participantText(locale, 'quizHintKey')}</p>
@@ -152,6 +159,15 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
                 <input value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={participantText(locale, 'quizFillPlaceholder')} />
               ) : (
                 <textarea maxLength={4000} value={textAnswers[item.id] || ''} onChange={(event) => setTextAnswers((current) => ({ ...current, [item.id]: event.target.value }))} placeholder={participantText(locale, 'quizShortPlaceholder')} />
+              )}
+              {coaching && (
+                <WritingCoachPanel
+                  draft={textAnswers[item.id] || ''}
+                  locale={locale}
+                  maxRounds={COACH_ROUNDS}
+                  turns={(data.coachTurns || []).filter((turn) => turn.item_id === item.id)}
+                  onAsk={() => onAskCoach(item.id, (textAnswers[item.id] || '').trim())}
+                />
               )}
             </fieldset>
           )

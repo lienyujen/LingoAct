@@ -2,8 +2,13 @@ import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { analyzeAudioResponse, removeRecording } from '../_shared/audio-analysis.ts'
 import { gradeCustomQuizAttempt } from '../_shared/custom-quiz.ts'
 import { getAdminClient, hashParticipantToken } from '../_shared/supabase.ts'
+import { askWritingCoach } from '../_shared/writing-coach.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
+
+// How many times one field may be taken back to the coach. Bounded because an
+// unbounded loop is both a bill and a way to never finish the writing.
+const COACH_ROUNDS = 3
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -141,7 +146,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true })
     }
 
-    if (['get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try'].includes(action)) {
+    if (['get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try', 'ask_writing_coach'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限失效，請重新掃描 QR Code 加入場次。' }, 403)
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
@@ -170,10 +175,86 @@ Deno.serve(async (req) => {
           if (error) throw error
           answers = data || []
         }
-        return jsonResponse({ quiz, items: items || [], attempt: attempt || null, answers })
+        // The student's own coaching rounds, so a reload does not lose the
+        // conversation they are in the middle of. Only their own: the table is
+        // granted to nobody, and this is read with the service role.
+        let coachTurns: unknown[] = []
+        if (quiz.coaching) {
+          const { data, error } = await supabase.from('writing_coach_turns')
+            .select('id, item_id, round, draft, reply, created_at')
+            .eq('question_id', questionId).eq('participant_id', participantId)
+            .order('created_at')
+          if (error) throw error
+          coachTurns = data || []
+        }
+        return jsonResponse({ quiz, items: items || [], attempt: attempt || null, answers, coachTurns })
       }
 
       if (!quiz) return jsonResponse({ message: '自訂測驗仍在出題中，請稍候。' }, 409)
+
+      // 寫作教練 with the scaffolding on. One round: the student shows what they
+      // have, the coach asks about it, and the student writes the next draft.
+      // The coach never writes it for them — see _shared/writing-coach.ts.
+      if (action === 'ask_writing_coach') {
+        if (!quiz.coaching) return jsonResponse({ message: '這份寫作沒有開啟教練。' }, 400)
+        const { data: liveSession } = await supabase.from('sessions')
+          .select('status, teaching_language, guidance_language, level_framework, level_code')
+          .eq('id', sessionId).maybeSingle()
+        if (liveSession?.status !== 'active' || question.status !== 'active') {
+          return jsonResponse({ message: '教師已停止作答。' }, 409)
+        }
+
+        const itemId = typeof input.itemId === 'string' ? input.itemId : ''
+        const draft = typeof input.draft === 'string' ? input.draft.trim().slice(0, 4000) : ''
+        if (!validUuid(itemId) || !draft) return jsonResponse({ message: '請先寫一點東西再問教練。' }, 400)
+
+        const { data: item } = await supabase.from('quiz_items')
+          .select('id, prompt_text').eq('id', itemId).eq('quiz_id', quiz.id).maybeSingle()
+        if (!item) return jsonResponse({ message: '找不到這個欄位。' }, 404)
+
+        const { data: earlier, error: earlierError } = await supabase.from('writing_coach_turns')
+          .select('round, draft, reply').eq('question_id', questionId)
+          .eq('item_id', itemId).eq('participant_id', participantId).order('round')
+        if (earlierError) throw earlierError
+        const round = (earlier?.length || 0) + 1
+        // A bounded loop, because an unbounded one is both a bill and a way to
+        // avoid ever finishing the writing.
+        if (round > COACH_ROUNDS) {
+          return jsonResponse({ message: `這個欄位已經問過 ${COACH_ROUNDS} 次了，把它寫完送出吧。`, rounds: earlier }, 429)
+        }
+
+        let reply
+        try {
+          reply = await askWritingCoach({
+            fieldPrompt: item.prompt_text,
+            direction: quiz.direction || '',
+            draft,
+            round,
+            previous: (earlier || []).map((turn) => ({
+              draft: turn.draft as string,
+              questions: ((turn.reply as { questions?: string[] })?.questions || []),
+            })),
+            trackId: liveSession.teaching_language ?? null,
+            framework: liveSession.level_framework ?? null,
+            levelCode: liveSession.level_code ?? null,
+            guidanceLanguage: liveSession.guidance_language ?? 'zh-TW',
+          })
+        } catch (error) {
+          return jsonResponse({ message: errorDetail(error, '教練暫時無法回覆，請再試一次。') }, 503)
+        }
+
+        const { data: saved, error: turnError } = await supabase.from('writing_coach_turns').insert({
+          session_id: sessionId,
+          question_id: questionId,
+          item_id: itemId,
+          participant_id: participantId,
+          round,
+          draft,
+          reply,
+        }).select('id, item_id, round, draft, reply, created_at').single()
+        if (turnError) throw turnError
+        return jsonResponse({ turn: saved, roundsLeft: COACH_ROUNDS - round })
+      }
 
       // One card at a time, marked here rather than in the browser.
       //

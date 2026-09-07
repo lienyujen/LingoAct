@@ -359,6 +359,8 @@ export type Quiz = {
   // False for 寫作教練. The results view reads this to know whether a missing
   // score means 'still marking' or 'nothing to mark'.
   graded: boolean
+  // 寫作教練 only: whether students may take a draft to the coach before sending.
+  coaching?: boolean
   total_points: number
   created_at: string
 }
@@ -415,11 +417,33 @@ export type QuizItemAnswer = {
   created_at: string
 }
 
+// One round with 寫作教練: the draft the student showed and what the coach asked
+// about it. Kept because 寫作歷程 is what the activity is for — a first draft and
+// the question that moved it says more than the finished paragraph does.
+export type CoachReply = {
+  noticed: string
+  questions: string[]
+  fix: { point: string; why: string } | null
+  ready: boolean
+}
+
+export type WritingCoachTurn = {
+  id: string
+  item_id: string
+  // Absent on the student's own copy: they only ever read their own rounds.
+  participant_id?: string
+  round: number
+  draft: string
+  reply: CoachReply
+  created_at: string
+}
+
 export type ParticipantQuizData = {
   quiz: Quiz
   items: QuizItem[]
   attempt: QuizAttempt | null
   answers: QuizItemAnswer[]
+  coachTurns?: WritingCoachTurn[]
 }
 
 // One attempt at one card. A 單字卡 deck is the only thing that produces
@@ -437,6 +461,8 @@ export type PresenterQuizResults = ParticipantQuizData & {
   attempts: QuizAttempt[]
   answers: QuizItemAnswer[]
   tries: QuizItemTry[]
+  // Every student's rounds, not just one's: 寫作歷程 is read across the class.
+  coachTurns: WritingCoachTurn[]
   keys: Array<{ item_id: string; accepted_answers: string[]; rubric: string }>
   screenshot: Screenshot | null
 }

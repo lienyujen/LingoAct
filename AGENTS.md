@@ -184,6 +184,24 @@ why `release.yml` deliberately builds without a `.env`.
   score. The teacher reads the writing on screen or in the workbook. Grading a
   class's free writing would be the most expensive call this app makes, and it
   is not what was asked for.
+- **鷹架提問 on top of it**, switched on per exercise with `quizzes.coaching`.
+  Between opening a field and sending it, a student can show the coach what they
+  have and be asked about it. The whole activity turns on one restraint: a model
+  asked to help with writing hands back the improved sentence, and a student who
+  pastes that sentence has learned nothing and produced work that is not theirs.
+  So the coach names what is missing, asks about it, and says what to change; it
+  may not write the change. The prompt in `_shared/writing-coach.ts` says that
+  several ways because saying it once does not hold, and the test greps the
+  replies for a sentence handed over. It also decides when to stop: `ready` ends
+  the loop, and three rounds per field end it anyway — an unbounded loop is both
+  a bill and a way never to finish the writing. The coach speaks the class's
+  導引語, not the language being taught: explaining a draft is explaining. Every
+  round is kept in `writing_coach_turns`, and that is the point rather than a
+  side effect — 寫作歷程 is what the teacher reads afterwards, and a first draft
+  plus the question that moved it says more than the finished paragraph does.
+  The rounds are keyed on the participant rather than an attempt, because
+  coaching happens before submitting and an attempt opened early would show the
+  class as finished while they are all still writing.
 
 Self-paced activities ride on that same machinery rather than needing anything
 new: `sessions.current_question_id` holds one question for the whole class, but
@@ -199,9 +217,7 @@ What is **not** done:
 - Of the twelve teaching activities, these are still open:
   **聽打接力** (nothing built; needs per-sentence clips and pairing);
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
-  still a whole passage; **AI寫作教練** is the simplified form
-  the teacher asked for, without the scaffolding questions the activity table
-  describes.
+  still a whole passage.
 - `pnpm desktop:package` has not been run since `subset-font` was added. pnpm's
   symlinks may defeat the electron-builder `files` globs; the likely fix is
   `node-linker=hoisted` in `.npmrc`.

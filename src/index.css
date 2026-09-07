@@ -4803,6 +4803,77 @@ h2 {
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
 .ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* AI寫作教練 with the scaffolding on, student side. Sits under the field it is
+   about, and reads as someone talking to them rather than as a mark. */
+.writing-coach { display: flex; flex-direction: column; gap: 9px; margin-top: 9px; }
+.coach-reply {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--primary-soft); background: var(--primary-soft);
+}
+.coach-reply.is-ready { border-color: var(--success-soft); background: var(--success-soft); }
+.coach-noticed {
+  display: flex; align-items: flex-start; gap: 7px; margin: 0;
+  font-size: 14px; line-height: 1.7; color: var(--text);
+}
+.coach-noticed svg { flex-shrink: 0; margin-top: 3px; color: var(--success); }
+.coach-questions { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.coach-questions li {
+  display: flex; align-items: flex-start; gap: 7px;
+  font-size: 15px; line-height: 1.75; font-weight: 600;
+}
+.coach-questions svg { flex-shrink: 0; margin-top: 4px; color: var(--primary); }
+.coach-fix { display: flex; align-items: flex-start; gap: 7px; margin: 0; font-size: 13.5px; line-height: 1.7; }
+.coach-fix svg { flex-shrink: 0; margin-top: 3px; color: var(--danger); }
+.coach-fix strong { display: block; }
+.coach-ready { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--success); }
+
+.coach-history { display: flex; flex-direction: column; gap: 5px; }
+.coach-history > div > button {
+  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 700;
+}
+.coach-history-body {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 6px; padding: 9px 11px;
+  border-radius: var(--radius-sm); background: var(--surface-subtle);
+}
+.coach-old-draft { margin: 0; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.coach-history-body ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+
+.coach-ask {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid var(--primary); background: var(--surface);
+  color: var(--primary); font-family: inherit; font-size: 14px; font-weight: 700;
+}
+.coach-ask:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+
+/* The teacher's 寫作歷程, collapsed under each finished field. */
+.writing-history { margin-top: 7px; font-size: 12.5px; }
+.writing-history summary { cursor: pointer; color: var(--muted); font-weight: 700; }
+.writing-history-turn {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 7px; padding: 8px 10px;
+  border-left: 2px solid var(--primary-soft); background: var(--surface-subtle);
+}
+.writing-history-turn strong { font-size: 11.5px; color: var(--muted); }
+.writing-history-draft { margin: 0; font-size: 13px; line-height: 1.75; }
+.writing-history-turn ul { margin: 0; padding-left: 17px; line-height: 1.6; color: var(--muted); }
+.writing-history-fix { margin: 0; font-size: 12px; color: var(--danger-dark); }
+
+/* The teacher's switch for it, in the quiz fields. */
+.coaching-toggle {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-subtle);
+  cursor: pointer;
+}
+.coaching-toggle input { margin-top: 2px; }
+.coaching-toggle span { display: flex; flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.65; color: var(--muted); }
+.coaching-toggle strong { font-size: 13px; color: var(--text); }
+
 /* 拍照描述, student side: one card per picture, the picture above the words
    about it, because that pairing is the whole activity. */
 .photo-caption-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }

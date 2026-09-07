@@ -1033,6 +1033,9 @@ Deno.serve(async (req) => {
             requested_count: requestedCount,
             requested_type: requestedType,
             graded: !['writing', 'flashcard'].includes(requestedType),
+            // Only 寫作教練 has anything to coach; asking for it on a quiz would
+            // put a "show the coach" button beside a multiple choice.
+            coaching: requestedType === 'writing' && input.coaching === true,
           })
           if (quizError) throw quizError
 
@@ -1153,6 +1156,14 @@ Deno.serve(async (req) => {
           : Promise.resolve({ data: [], error: null }),
       ])
       if (keyError || answerError || screenshotError) throw keyError || answerError || screenshotError
+      // 寫作歷程: every round the class took to the coach. This is what the
+      // teacher reads afterwards — a first draft and the question that moved it
+      // says more about a student's writing than the finished paragraph does.
+      const { data: coachTurns } = quiz.coaching
+        ? await supabase.from('writing_coach_turns')
+          .select('id, item_id, participant_id, round, draft, reply, created_at')
+          .eq('question_id', questionId).order('created_at')
+        : { data: [] }
       return jsonResponse({
         quiz,
         items: items || [],
@@ -1160,6 +1171,7 @@ Deno.serve(async (req) => {
         answers: answers || [],
         keys: keys || [],
         tries: tries || [],
+        coachTurns: coachTurns || [],
         screenshot: screenshot || null,
       })
     }

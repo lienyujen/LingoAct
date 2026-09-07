@@ -4,9 +4,12 @@ type Props = {
   count: string
   direction: string
   quizType: QuizRequestedType
+  // 寫作教練 only: whether students may take a draft to the coach before sending.
+  coaching: boolean
   onCountChange: (value: string) => void
   onDirectionChange: (value: string) => void
   onTypeChange: (value: QuizRequestedType) => void
+  onCoachingChange: (value: boolean) => void
 }
 
 // Shared by the screenshot editor and the shared-file dialog so the two offer
@@ -15,9 +18,11 @@ export function CustomQuizFields({
   count,
   direction,
   quizType,
+  coaching,
   onCountChange,
   onDirectionChange,
   onTypeChange,
+  onCoachingChange,
 }: Props) {
   const writing = quizType === 'writing'
   const flashcard = quizType === 'flashcard'
@@ -63,8 +68,23 @@ export function CustomQuizFields({
           onChange={(event) => onDirectionChange(event.target.value)}
         />
       </label>
+      {writing && (
+        <label className="coaching-toggle">
+          <input
+            checked={coaching}
+            type="checkbox"
+            onChange={(event) => onCoachingChange(event.target.checked)}
+          />
+          <span>
+            <strong>開啟 AI 鷹架提問</strong>
+            學生寫到一半可以請教練看看。教練只提問、指出要改的地方，不會幫學生寫，每個欄位最多三次。
+          </span>
+        </label>
+      )}
       <p className="muted custom-quiz-hint">{writing
-        ? 'AI 只負責開出要寫的欄位，學生填完送回後由你直接看，不會用 AI 批改。'
+        ? coaching
+          ? 'AI 開欄位、陪學生問，但不批改也不代寫。你會看到每個人的定稿，還有他們改了幾次、教練問了什麼。'
+          : 'AI 只負責開出要寫的欄位，學生填完送回後由你直接看，不會用 AI 批改。'
         : flashcard
           ? '學生一張一張自己練，答錯的卡片會再出現，直到整疊都答對。不打分數，你看到的是誰第一次就會、誰卡在哪張。'
           : '也可以直接在出題方向指定題數與題型；題數選「自動判斷」、題型選「隨機」即可。'}</p>

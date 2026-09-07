@@ -844,6 +844,7 @@ export function PresenterPage() {
           direction: quizSettings?.direction || promptText,
           requestedCount: quizSettings?.requestedCount ?? null,
           requestedType: quizSettings?.requestedType || 'random',
+          coaching: quizSettings?.coaching === true,
         } : {
           action: 'create_question',
           sessionId,
@@ -1385,6 +1386,7 @@ export function PresenterPage() {
         direction: settings.direction,
         requestedCount: settings.requestedCount,
         requestedType: settings.requestedType,
+        coaching: settings.coaching,
       }, 'AI 出題失敗。')
     } finally {
       setBusy(false)

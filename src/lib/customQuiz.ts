@@ -4,14 +4,22 @@ export type CustomQuizSettings = {
   requestedCount: number | null
   requestedType: QuizRequestedType
   direction: string
+  // 寫作教練 only: whether students can take a draft to the coach before sending.
+  coaching: boolean
 }
 
 // The count control carries 'auto' as a sentinel; the server wants null for it.
-export function quizSettingsFrom(count: string, quizType: QuizRequestedType, direction: string): CustomQuizSettings {
+export function quizSettingsFrom(
+  count: string,
+  quizType: QuizRequestedType,
+  direction: string,
+  coaching = false,
+): CustomQuizSettings {
   return {
     requestedCount: count === 'auto' ? null : Number(count),
     requestedType: quizType,
     direction: direction.trim(),
+    coaching: quizType === 'writing' && coaching,
   }
 }
 

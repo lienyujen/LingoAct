@@ -10,13 +10,19 @@ const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_ans
 // Ordering items arrive from the model in the right order and must not reach the
 // class that way: quiz_items.options is readable by students, while the answer
 // key table is not. Shuffling here is what keeps the puzzle a puzzle.
-function shuffledIndices(length: number) {
+//
+// avoidIdentity is for 排序 and 配對, where the model's own order IS the answer
+// and leaving it alone would put the answer on screen. A 選擇題 must NOT use it:
+// the model's order is not the answer there, it merely tends to start with it,
+// and forbidding the identity permutation would bias the answer away from the
+// first slot instead of spreading it evenly.
+function shuffledIndices(length: number, avoidIdentity = false) {
   const order = Array.from({ length }, (_, index) => index)
   for (let i = order.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[order[i], order[j]] = [order[j], order[i]]
   }
-  // A shuffle that happens to reproduce the original leaves the answer on screen.
+  if (!avoidIdentity) return order
   const unchanged = order.every((value, index) => value === index)
   if (unchanged && order.length > 1) [order[0], order[1]] = [order[1], order[0]]
   return order
@@ -376,22 +382,30 @@ ${input.sourceText}` }] : []),
     const translatedPrompt = typeof translation.prompt_text === 'string' ? translation.prompt_text.trim().slice(0, 2000) : ''
     const translatedOptions = cleanStrings(translation.options, 8)
     const translatedPairPrompts = cleanStrings(translation.pair_prompts, 6)
+    // Every type with options gets them in a different order from the one the
+    // model produced; what differs is why.
+    //
+    // 排序 and 配對: the order IS the answer, so the shuffled copy is what the
+    // class sees and the original travels to the key table.
+    //
+    // 選擇題: the key is the option's own text, so reordering only moves the
+    // answer on screen — and it has to be moved. The model puts the right
+    // answer first almost every time, which turned a 單字卡 deck into "tap the
+    // top one" and taught the class nothing about the words.
+    //
     // The permutation is applied to the translation as well, or an English
-    // reader would be dragging fragments that no longer line up with the Chinese.
-    // Both types hide the answer in the same way: the right-hand column is
-    // shuffled, and the unshuffled original travels to the key table.
-    const permutation = type === 'ordering' || type === 'matching' ? shuffledIndices(options.length) : null
-    const shownOptions = type === 'multiple_choice'
-      ? options
-      : permutation
-        ? permutation.map((from) => options[from])
-        : []
+    // reader would be reading options that no longer line up with the Chinese.
+    const withOptions = type === 'multiple_choice' || type === 'ordering' || type === 'matching'
+    const permutation = withOptions && options.length > 1
+      ? shuffledIndices(options.length, type !== 'multiple_choice')
+      : null
+    const shownOptions = withOptions
+      ? (permutation ? permutation.map((from) => options[from]) : options)
+      : []
     const alignedTranslation = translatedOptions.length === options.length ? translatedOptions : options
-    const shownTranslatedOptions = type === 'multiple_choice'
-      ? alignedTranslation
-      : permutation
-        ? permutation.map((from) => alignedTranslation[from])
-        : options
+    const shownTranslatedOptions = withOptions
+      ? (permutation ? permutation.map((from) => alignedTranslation[from]) : alignedTranslation)
+      : []
 
     return {
       id: crypto.randomUUID(),

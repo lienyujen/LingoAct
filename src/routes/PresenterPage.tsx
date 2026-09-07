@@ -1777,7 +1777,10 @@ export function PresenterPage() {
         </aside>
       )}
       {controlsOpen && (
-        <aside className="presenter-controls-overlay" onDoubleClick={(event) => event.stopPropagation()}>
+        <aside
+          className={question ? 'presenter-controls-overlay results-first' : 'presenter-controls-overlay'}
+          onDoubleClick={(event) => event.stopPropagation()}
+        >
         <PresenterControlPanel
           busy={busy}
           buzzerActive={isBuzzerPending(buzzerEvent)}
@@ -1816,6 +1819,7 @@ export function PresenterPage() {
           selectedQuestionId={selectedQuestionId}
           onSelect={selectQuestion}
         />
+        <div className="presenter-results">
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
             anonymousEnabled={session.anonymous_enabled}
@@ -1872,6 +1876,7 @@ export function PresenterPage() {
             tickets={exitTickets}
           />
         )}
+        </div>
       </aside>
       )}
       {!window.lingoActDesktop && session.captions_enabled && (

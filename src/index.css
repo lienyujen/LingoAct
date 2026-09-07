@@ -595,6 +595,21 @@ h2 {
   object-fit: contain;
 }
 
+/* While an activity is running, its answers come first.
+
+   The control panel is what you start something FROM; the results are what you
+   watch while it runs, and they were last in the column — under eight activity
+   buttons, the wrap-up section and the class settings. In a 420x760 presenter
+   window that put a 拍照描述 recording roughly 800px below the bottom edge, so
+   the audio player was there and simply never on screen. */
+.presenter-results {
+  display: grid;
+  gap: 14px;
+}
+.presenter-controls-overlay.results-first .presenter-results {
+  order: -1;
+}
+
 .presenter-controls-overlay {
   background: var(--bg);
   border-left: 1px solid var(--border);
@@ -3992,12 +4007,26 @@ h2 {
   gap: 10px;
 }
 
+/* flex: 1 alone lets this shrink below its content, and in the 420px presenter
+   window it shrank to about one character wide: 「匿名作答 1」 came out stacked
+   down the column with the filename underneath the download button. A flex
+   basis of zero with a floor is what keeps the name a name. */
 .file-response-row .file-list-meta {
-  flex: 1;
+  flex: 1 1 9rem;
+  min-width: 0;
 }
 
 .file-response-row .file-list-actions {
   margin-top: 0;
+}
+
+/* Below about 460px the thumbnail, the name and three buttons cannot share a
+   line. The buttons take their own row rather than squeezing the name out. */
+@media (width <= 460px) {
+  .file-response-row .file-list-actions {
+    flex-basis: 100%;
+    margin-top: 6px;
+  }
 }
 
 .file-response-thumb {
@@ -4607,6 +4636,70 @@ h2 {
 .upload-score {
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+/* 上傳作答 / 拍照描述, student side: what the AI said about their own upload.
+   It was written to the row and read only by the teacher, so pressing AI 批改
+   changed nothing the class could see. */
+.my-upload-marking {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.my-upload-marking > h3 {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  font-size: 0.9rem;
+  margin: 0;
+}
+.my-upload-row {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 13px;
+}
+.my-upload-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.my-upload-head strong {
+  overflow-wrap: anywhere;
+}
+.my-upload-status {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.my-upload-caption {
+  border-left: 2px solid var(--border-strong);
+  color: var(--muted);
+  margin: 0;
+  padding-left: 9px;
+  white-space: pre-wrap;
+}
+.my-upload-summary {
+  line-height: 1.65;
+  margin: 0;
+}
+.my-upload-row h4 {
+  font-size: 0.82rem;
+  margin: 4px 0 0;
+}
+.my-upload-row ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+.my-upload-row li {
+  line-height: 1.6;
 }
 
 .upload-answer-list {

@@ -4803,6 +4803,35 @@ h2 {
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
 .ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* AI 批改 for 寫作教練: feedback, never a mark. */
+.writing-review-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 10px; padding: 10px 12px;
+  border-radius: var(--radius-md); background: var(--surface-subtle);
+}
+.writing-review-bar button {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 15px; border: none; border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--primary); color: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.writing-review-bar button:disabled { opacity: .5; cursor: not-allowed; }
+.writing-review-bar span { font-size: 11.5px; }
+.writing-review-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
+.writing-review-row button { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.writing-review-overall {
+  flex-grow: 1; margin: 0; padding: 8px 11px;
+  border-radius: var(--radius-sm); background: var(--primary-soft);
+  font-size: 12.5px; line-height: 1.75;
+}
+.quiz-written-feedback {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin: 6px 0 0; padding: 7px 10px;
+  border-radius: var(--radius-sm); background: var(--surface-subtle);
+  font-size: 12.5px; line-height: 1.75; color: var(--muted);
+}
+.quiz-written-feedback svg { flex-shrink: 0; margin-top: 3px; color: var(--primary); }
+
 /* AI寫作教練 with the scaffolding on, student side. Sits under the field it is
    about, and reads as someone talking to them rather than as a mark. */
 .writing-coach { display: flex; flex-direction: column; gap: 9px; margin-top: 9px; }

@@ -64,13 +64,23 @@ export async function analyzeFileResponse(input: {
   // One student's submission, which may run to several photographed pages.
   files: Array<{ fileName: string; mimeType: string; fileBytes: Uint8Array }>
   questionImage?: { mimeType: string; bytes: Uint8Array } | null
+  // 拍照描述: the description that came with the photograph, written or spoken.
+  // Its presence changes what is being marked — the language, not the answer —
+  // because the photograph is of a real thing and has no right or wrong.
+  caption?: { text: string | null; audio: { mimeType: string; bytes: Uint8Array } | null } | null
+  // Only meaningful alongside a caption: what the class is learning and how far
+  // along it is, so the feedback lands at a level they can act on.
+  classInstruction?: string
 }) {
+  const describing = Boolean(input.caption?.text || input.caption?.audio)
   const marking = Boolean(input.questionImage) || Boolean(input.promptText)
   const parts: Array<Record<string, unknown>> = [
     { text: JSON.stringify({
       presenter_question: input.promptText,
       file_names: input.files.map((file) => file.fileName),
       page_count: input.files.length,
+      task: describing ? 'photo_description' : 'homework',
+      written_caption: input.caption?.text || null,
     }) },
   ]
   if (input.questionImage) {
@@ -86,11 +96,30 @@ export async function analyzeFileResponse(input: {
     if (input.files.length > 1) parts.push({ text: file.fileName })
     parts.push({ inlineData: { mimeType: file.mimeType, data: bytesToBase64(file.fileBytes) } })
   }
+  if (input.caption?.audio) {
+    parts.push({ text: '以下是這位學生對照片所錄的口說說明：' })
+    parts.push({ inlineData: { mimeType: input.caption.audio.mimeType, data: bytesToBase64(input.caption.audio.bytes) } })
+  }
+
+  // 拍照描述 is marked on the language, not on the answer. The photograph is of
+  // something real — a desk, a tree, a bus stop — so there is nothing to get
+  // right or wrong about it, and a verdict of "incorrect" on someone's desk is
+  // meaningless. What is worth saying is whether the description matches what
+  // is in the picture and whether the language reaches for this class's level.
+  const describingInstruction = [
+    '這是語言課的「拍照描述」：學生拍下真實的東西，再用學習中的語言說明它。照片本身沒有對錯，要評的是語言。',
+    '請先看照片，再讀（或聽）學生的說明，判斷：說明的內容跟照片相不相符、有沒有做到教師交代的事、用詞與句型是否清楚正確。',
+    'verdict 用來表示說明的完成度：correct 說明清楚完整且與照片相符；partial 有做到但漏了要求的項目或語言上有影響理解的錯誤；incorrect 說明與照片不符或幾乎沒有描述；unscored 檔案或錄音無法判讀。',
+    '若說明是錄音，transcript 不必輸出，但 summary 要說明你聽到的內容大意。發音口音本身不是錯誤。',
+    'improvements 請給具體、能立刻改的語言建議（某個詞用錯、少了哪個成分、可以再加什麼細節），不要只說「可以更詳細」。',
+    input.classInstruction || '',
+  ].filter(Boolean).join('\n')
 
   const response = await requestGemini(JSON.stringify({
     systemInstruction: {
       parts: [{
-        text: '你是 LingoAct 的作業批改助理。學員上傳了檔案回應教師的題目；若有多個檔案，那是同一份作答的不同頁或不同部分，請合併判讀後只給一份整體批改，不要逐頁分別評分。'
+        text: describing ? describingInstruction + '\n請以繁體中文給出具體、尊重且可行的個別回饋，再提供結構相同且忠實的英文版本；英文版是翻譯，不可另行推論。所有結論都要根據看得到、聽得到的內容，不可臆測。'
+          : '你是 LingoAct 的作業批改助理。學員上傳了檔案回應教師的題目；若有多個檔案，那是同一份作答的不同頁或不同部分，請合併判讀後只給一份整體批改，不要逐頁分別評分。'
           + '若有題目畫面，請先讀懂題目再批改學生的作答；沒有題目畫面時，依 presenter_question 與檔案內容判斷。'
           + 'verdict 為整體判定：correct 完全正確、partial 部分正確或方向對但有錯、incorrect 明顯錯誤、'
           + 'unscored 為開放式題目（作文、心得、專題）或資訊不足以判定對錯。'

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowsOut, Brain, Check, Clock, FloppyDisk, Play, Square, X } from '@phosphor-icons/react'
+import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Sparkle, Square, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 
 type Props = {
@@ -10,6 +10,8 @@ type Props = {
   onlineCount: number
   isCurrentQuestion: boolean
   onUpdateAnswer: (itemId: string, acceptedAnswers: string[]) => Promise<void>
+  // 寫作教練 only: read one student's writing and leave feedback on it.
+  onReviewWriting: (attemptId: string, force: boolean) => Promise<void>
   // The same pair the plain question panel carries, for the same reason: a
   // quiz is stopped and reopened where it is shown, not from 課堂收尾.
   onStopQuestion: () => Promise<void>
@@ -117,10 +119,12 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
   )
 }
 
-export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onStopQuestion, onResumeQuestion }: Props) {
+export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onStopQuestion, onResumeQuestion }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [busyItemId, setBusyItemId] = useState('')
+  const [reviewingId, setReviewingId] = useState('')
+  const [reviewProgress, setReviewProgress] = useState({ done: 0, total: 0 })
   const [error, setError] = useState('')
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
   // Off by default: this panel is on the screen the class is looking at.
@@ -148,6 +152,37 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   const pictureOrdering = results.quiz.requested_type === 'picture_ordering'
   const coaching = results.quiz.coaching === true
   const coachTurns = results.coachTurns || []
+  const unreviewed = results.attempts.filter((attempt) => !attempt.feedback?.zh_tw)
+
+  async function reviewOne(attemptId: string, force: boolean) {
+    setReviewingId(attemptId)
+    setError('')
+    try {
+      await onReviewWriting(attemptId, force)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '批改失敗。')
+    } finally {
+      setReviewingId('')
+    }
+  }
+
+  // One request per student rather than one for the class: thirty pieces of
+  // writing in a single call would outlive the function that sent it.
+  async function reviewAll() {
+    setReviewingId('all')
+    setError('')
+    const pending = [...unreviewed]
+    for (const [index, attempt] of pending.entries()) {
+      setReviewProgress({ done: index, total: pending.length })
+      try {
+        await onReviewWriting(attempt.id, false)
+      } catch {
+        // Recorded against that student; the rest of the class still gets read.
+      }
+    }
+    setReviewProgress({ done: 0, total: 0 })
+    setReviewingId('')
+  }
   // Sorted by round rather than by insert order: the history is only legible
   // read forwards, first draft first.
   function turnsFor(participantId: string, itemId: string) {
@@ -302,6 +337,19 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         </div>
       )}
       {!writing && grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />AI 正在背景評分，完成後會自動更新。</p>}
+      {/* 寫作教練 is unscored by design, so this gives feedback rather than a
+          mark — a first pass the teacher can skim, correct and ignore. Already
+          reviewed students are skipped, so a second press costs nothing. */}
+      {writing && results.attempts.length > 0 && (
+        <div className="writing-review-bar">
+          <button disabled={Boolean(reviewingId) || !unreviewed.length} type="button" onClick={() => void reviewAll()}>
+            {reviewingId === 'all'
+              ? <><CircleNotch className="spin" size={16} />批改中 {reviewProgress.done}/{reviewProgress.total}…</>
+              : <><Sparkle size={16} />{unreviewed.length ? `AI 批改剩下的 ${unreviewed.length} 人` : '每個人都批改過了'}</>}
+          </button>
+          <span className="muted">不打分數，只給回饋；已批改過的不會重跑。</span>
+        </div>
+      )}
       <div className="quiz-attempt-list">
         {results.attempts.map((attempt, index) => (
           <article key={attempt.id}>
@@ -327,6 +375,9 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                     <div className="quiz-written-answer" key={answer.id}>
                       <span>{itemPosition.get(answer.item_id)}. {itemPrompt.get(answer.item_id)}</span>
                       <p>{answer.answer_text}</p>
+                      {answer.feedback?.zh_tw && (
+                        <p className="quiz-written-feedback"><Sparkle size={14} />{answer.feedback.zh_tw}</p>
+                      )}
                       {/* 寫作歷程: what this field looked like before, and what
                           the coach asked that moved it. The finished paragraph
                           is above; this is how it got there. */}
@@ -345,6 +396,21 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                       )}
                     </div>
                   ))}
+              </div>
+            )}
+            {writing && (
+              <div className="writing-review-row">
+                {attempt.feedback?.zh_tw && <p className="writing-review-overall">{attempt.feedback.zh_tw}</p>}
+                <button
+                  className="ghost-button"
+                  disabled={reviewingId === attempt.id}
+                  type="button"
+                  onClick={() => void reviewOne(attempt.id, Boolean(attempt.feedback?.zh_tw))}
+                >
+                  {reviewingId === attempt.id
+                    ? <><CircleNotch className="spin" size={15} />批改中…</>
+                    : <><Sparkle size={15} />{attempt.feedback?.zh_tw ? '重批' : 'AI 批改'}</>}
+                </button>
               </div>
             )}
             {!writing && attempt.feedback?.zh_tw && <p>{attempt.feedback.zh_tw}</p>}

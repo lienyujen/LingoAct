@@ -20,6 +20,7 @@ import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { PictureStudioModal } from '../components/PictureStudioModal'
+import { PresenterLocaleContext, presenterLocaleFor } from '../lib/presenterI18n'
 import { PhotoTaskModal } from '../components/PhotoTaskModal'
 import { SentenceWallModal } from '../components/SentenceWallModal'
 import { SentenceWallPanel } from '../components/SentenceWallPanel'
@@ -1150,6 +1151,19 @@ export function PresenterPage() {
     }
   }
 
+  // 寫作教練 AI 批改, one student. The batch loop lives in the results panel so
+  // it can show progress; this is the single unit of work it repeats.
+  async function reviewWritingAttempt(attemptId: string, force: boolean) {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'analyze_writing_attempt', sessionId, presenterToken, attemptId, force },
+    })
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, '批改失敗。'))
+    if (!data?.answers) throw new Error(data?.message || '批改失敗。')
+    await loadAll()
+  }
+
   async function updateCustomQuizAnswer(itemId: string, acceptedAnswers: string[]) {
     if (!question || question.type !== 'custom_quiz') return
     const presenterToken = getPresenterToken(sessionId)
@@ -1675,6 +1689,7 @@ export function PresenterPage() {
   }
 
   return (
+    <PresenterLocaleContext.Provider value={presenterLocaleFor(session.teaching_language)}>
     <main className={`presenter-page${controlsOpen ? ' controls-open' : ''}${settingsOpen ? ' settings-open' : ''}${selectionMode ? ' selecting-capture' : ''}`}>
       {!selectionMode && (
         <aside className="qr-floating">
@@ -1740,6 +1755,7 @@ export function PresenterPage() {
             question={question}
             results={quizResults}
             onUpdateAnswer={updateCustomQuizAnswer}
+            onReviewWriting={reviewWritingAttempt}
             onStopQuestion={stopQuestion}
             onResumeQuestion={resumeQuestion}
           />
@@ -1930,5 +1946,6 @@ export function PresenterPage() {
         />
       )}
     </main>
+    </PresenterLocaleContext.Provider>
   )
 }

@@ -3,6 +3,7 @@ import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
 import { levelInstruction } from '../_shared/proficiency.ts'
 import { drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
 import { composeSentenceWall } from '../_shared/sentence-wall.ts'
+import { reviewWriting } from '../_shared/writing-review.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
@@ -497,7 +498,7 @@ Deno.serve(async (req) => {
         .update({ analysis_status: 'analyzing', error_message: null }).in('id', readableIds)
       try {
         const { data: question } = await supabase.from('questions')
-          .select('prompt_text, screenshot_id').eq('id', fileRow.question_id).maybeSingle()
+          .select('prompt_text, screenshot_id, wants_caption').eq('id', fileRow.question_id).maybeSingle()
         const files = []
         for (const row of readable) {
           const { data: blob, error: downloadError } = await supabase.storage
@@ -505,10 +506,37 @@ Deno.serve(async (req) => {
           if (downloadError) throw downloadError
           files.push({ fileName: row.name, mimeType: row.mime_type, fileBytes: new Uint8Array(await blob.arrayBuffer()) })
         }
+
+        // 拍照描述: the description is the thing being marked, so it has to
+        // travel with the photograph. Spoken ones are downloaded from the
+        // private bucket and handed over as audio — asking the model to judge a
+        // description it cannot hear would be judging the photograph alone.
+        let caption = null
+        let classInstruction = ''
+        if (question?.wants_caption) {
+          const spoken = submission.find((row) => row.caption_audio_path)
+          const written = submission.map((row) => row.caption).filter(Boolean).join('\n')
+          let audio = null
+          if (spoken?.caption_audio_path) {
+            const { data: clip } = await supabase.storage
+              .from('lingoact-recordings').download(spoken.caption_audio_path)
+            if (clip) audio = { mimeType: 'audio/wav', bytes: new Uint8Array(await clip.arrayBuffer()) }
+          }
+          caption = { text: written || null, audio }
+          const { data: classRow } = await supabase.from('sessions')
+            .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+          classInstruction = [
+            trackInstruction(classRow?.teaching_language),
+            levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
+          ].join('\n')
+        }
+
         const analysis = await analyzeFileResponse({
           promptText: question?.prompt_text || null,
           files,
           questionImage: await questionScreenshot(supabase, question?.screenshot_id || null),
+          caption,
+          classInstruction,
         })
         const { data: updatedRows, error: updateError } = await supabase.from('file_responses').update({
           analysis_status: 'success',
@@ -1082,6 +1110,72 @@ Deno.serve(async (req) => {
 
       EdgeRuntime.waitUntil(generateInBackground())
       return jsonResponse({ question: pendingQuestion, quizId, generating: true }, 202)
+    }
+
+    // AI 批改 for 寫作教練, one student at a time and only when asked. Feedback
+    // rather than a mark: the activity is unscored by design, and total_score
+    // stays null. Work already paid for is never redone — the same rule the
+    // upload marking follows — so a second press costs nothing unless the
+    // teacher explicitly asks for a re-read.
+    if (action === 'analyze_writing_attempt') {
+      const attemptId = input.attemptId
+      if (!validUuid(attemptId)) return jsonResponse({ message: '作答資料不正確。' }, 400)
+      const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts')
+        .select('id, quiz_id, session_id').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
+      if (attemptError) throw attemptError
+      if (!attempt) return jsonResponse({ message: '找不到這份作答。' }, 404)
+
+      const [{ data: quiz }, { data: answers }, { data: items }] = await Promise.all([
+        supabase.from('quizzes').select('direction, graded').eq('id', attempt.quiz_id).maybeSingle(),
+        supabase.from('quiz_item_answers').select('id, item_id, answer_text, feedback').eq('attempt_id', attemptId),
+        supabase.from('quiz_items').select('id, prompt_text, position').eq('quiz_id', attempt.quiz_id).order('position'),
+      ])
+      if (quiz?.graded !== false) return jsonResponse({ message: '這不是寫作教練，請用原本的評分。' }, 400)
+
+      const promptById = new Map((items || []).map((item) => [item.id, item.prompt_text as string]))
+      const written = (answers || []).filter((answer) => (answer.answer_text || '').trim())
+      if (!written.length) return jsonResponse({ message: '這位學員沒有寫任何內容。' }, 400)
+      if (!input.force && written.every((answer) => answer.feedback)) {
+        return jsonResponse({ alreadyReviewed: true, answers: written })
+      }
+
+      const { data: classRow } = await supabase.from('sessions')
+        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+
+      let review
+      try {
+        review = await reviewWriting({
+          direction: quiz?.direction || '',
+          fields: written.map((answer) => ({
+            itemId: answer.item_id as string,
+            prompt: promptById.get(answer.item_id as string) || '',
+            text: (answer.answer_text || '').slice(0, 4000),
+          })),
+          trackId: classRow?.teaching_language ?? null,
+          framework: classRow?.level_framework ?? null,
+          levelCode: classRow?.level_code ?? null,
+        })
+      } catch (error) {
+        return jsonResponse({ message: errorDetail(error, '批改失敗，請再試一次。') }, 503)
+      }
+
+      const feedbackByItem = new Map(review.fields.map((field) => [field.itemId, field]))
+      for (const answer of written) {
+        const field = feedbackByItem.get(answer.item_id as string)
+        if (!field) continue
+        const { error: writeError } = await supabase.from('quiz_item_answers')
+          // score stays untouched: 寫作教練 carries no mark, and writing one
+          // here would turn 「已送出」 into a grade on the teacher's panel.
+          .update({ feedback: { zh_tw: field.zhTw, en: field.en } }).eq('id', answer.id)
+        if (writeError) throw writeError
+      }
+      const { error: overallError } = await supabase.from('quiz_attempts')
+        .update({ feedback: { zh_tw: review.overall.zhTw, en: review.overall.en } }).eq('id', attemptId)
+      if (overallError) throw overallError
+
+      const { data: refreshed } = await supabase.from('quiz_item_answers')
+        .select('*').eq('attempt_id', attemptId)
+      return jsonResponse({ answers: refreshed || [], overall: review.overall })
     }
 
     if (action === 'get_session_custom_quiz_results') {

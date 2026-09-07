@@ -4967,6 +4967,59 @@ h2 {
   color: var(--primary-dark); font-size: 12px; font-weight: 700;
 }
 .quiz-ordering-text { flex-grow: 1; font-size: 14px; line-height: 1.6; }
+
+/* 圖片排序. The panel has to be big enough to read the drawing on a phone —
+   which is the whole task — so the row grows to fit it rather than the picture
+   shrinking to fit the row. */
+.quiz-ordering-list.has-pictures li { align-items: center; }
+.quiz-ordering-picture {
+  flex-grow: 1; min-width: 0;
+  /* contain rather than cover: a cropped panel is a panel with part of the
+     story cut out of it. The letterbox is the row's own background, so a wide
+     row simply centres the picture. */
+  max-height: 168px; object-fit: contain;
+  border-radius: 7px;
+  /* The rows are dragged with a finger; a long-press on an image otherwise
+     starts the browser's own image drag instead. */
+  user-select: none; -webkit-user-drag: none; pointer-events: none;
+}
+
+/* On a phone the handle, the number and two arrows leave the picture about a
+   third of the screen, and the picture is the thing being read. Give it the
+   full width and put the controls under it. */
+@media (width <= 520px) {
+  .quiz-ordering-list.has-pictures li { flex-wrap: wrap; }
+  .quiz-ordering-picture { order: -1; flex-basis: 100%; width: 100%; max-height: 42vh; }
+  .quiz-ordering-list.has-pictures .quiz-ordering-moves { margin-left: auto; }
+}
+
+/* The correct sequence, on the teacher's screen, behind 顯示正確答案. */
+.presenter-quiz-panels {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin: 0; padding: 0; list-style: none;
+}
+.presenter-quiz-panels li {
+  position: relative;
+  width: calc(25% - 6px); min-width: 96px;
+}
+.presenter-quiz-panels img {
+  width: 100%; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.presenter-quiz-panels span {
+  position: absolute; top: 5px; left: 5px;
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 800;
+}
+
+/* The order the student sent, in their own history. */
+.participant-history-panels { display: flex; gap: 6px; margin: 6px 0 0; }
+.participant-history-panels img {
+  width: calc(25% - 5px); border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+}
 .quiz-ordering-moves { display: flex; gap: 4px; }
 .quiz-ordering-moves button {
   display: flex; padding: 7px; border: 1px solid var(--border);

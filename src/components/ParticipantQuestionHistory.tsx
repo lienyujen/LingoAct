@@ -107,7 +107,16 @@ export function ParticipantQuestionHistory({
                           const prompt = localizedFields(item.translations, locale)?.prompt_text || item.prompt_text
                           const submitted = response?.answer_values?.join(', ') || response?.answer_text || '-'
                           const feedback = localizedFeedback(response?.feedback, locale)
-                          return <div key={item.id}><strong>{itemIndex + 1}. {prompt}</strong><p>{participantText(locale, 'yourAnswerLabel')}{submitted}</p>{feedback && <small>{feedback}</small>}</div>
+                          // 圖片排序: the values are panel ids, so the order the
+                          // student chose is only legible as the pictures again.
+                          const pictures = item.option_images?.length === item.options.length
+                            ? (response?.answer_values || []).map((value) => item.option_images[item.options.indexOf(value)])
+                            : []
+                          return <div key={item.id}><strong>{itemIndex + 1}. {prompt}</strong>
+                            {pictures.length
+                              ? <p className="participant-history-panels">{pictures.map((src, at) => <img alt="" key={`${src}-${at}`} src={src} />)}</p>
+                              : <p>{participantText(locale, 'yourAnswerLabel')}{submitted}</p>}
+                            {feedback && <small>{feedback}</small>}</div>
                         })}
                       </div>
                     ) : question.type === 'pronunciation' || question.type === 'oral_response' ? (

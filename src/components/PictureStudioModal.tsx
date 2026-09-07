@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowsClockwise, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
+import { ArrowsClockwise, CardsThree, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
 import { TimingRow } from './TimingRow'
-import { generatePicture } from '../lib/picture'
-import type { GeneratedPicture } from '../lib/picture'
+import { dispatchPictureOrdering, generatePicture } from '../lib/picture'
+import type { GeneratedPicture, PictureStoryboard } from '../lib/picture'
 import type { QuestionDraft } from './QuestionEditor'
 
 type Props = {
@@ -13,13 +13,20 @@ type Props = {
   onDispatch: (file: File, draft: QuestionDraft) => Promise<void>
 }
 
-// 打字 or 口說, which is the whole choice the activity offers. Both are ordinary
-// question types the class already answers, so a picture question needs nothing
-// new anywhere downstream — the picture rides in as the question's screenshot.
-type Mode = 'written' | 'spoken'
+// What to do with the picture. 口說 and 打字 send it whole as an ordinary
+// question that happens to carry an image; 排順序 cuts it into its four panels
+// and sends them shuffled as a 故事排序 quiz, so the intact picture — which is
+// the answer — never reaches the class at all.
+type Mode = 'written' | 'spoken' | 'ordering'
 
 const ANSWER_PRESETS: Array<number | null> = [null, 60, 120, 180]
 const PREPARE_PRESETS: Array<number | null> = [null, 10, 20, 30]
+
+function promptFor(mode: Mode, storyboard: PictureStoryboard) {
+  if (mode === 'spoken') return storyboard.spokenPrompt
+  if (mode === 'written') return storyboard.writtenPrompt
+  return storyboard.orderPrompt
+}
 
 export function PictureStudioModal({ open, sessionId, presenterToken, onClose, onDispatch }: Props) {
   const [direction, setDirection] = useState('')
@@ -51,7 +58,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
 
   useEffect(() => {
     if (!picture || promptTouched) return
-    setPromptText(mode === 'spoken' ? picture.storyboard.spokenPrompt : picture.storyboard.writtenPrompt)
+    setPromptText(promptFor(mode, picture.storyboard))
   }, [mode, picture, promptTouched])
 
   if (!open) return null
@@ -64,7 +71,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
       const drawn = await generatePicture({ sessionId, presenterToken, direction: direction.trim() })
       setPicture(drawn)
       setPromptTouched(false)
-      setPromptText(mode === 'spoken' ? drawn.storyboard.spokenPrompt : drawn.storyboard.writtenPrompt)
+      setPromptText(promptFor(mode, drawn.storyboard))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '生成失敗，請再試一次。')
     } finally {
@@ -75,8 +82,19 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
   async function dispatch() {
     if (!picture) return
     setError('')
-    setBusy('派送中…')
+    setBusy(mode === 'ordering' ? '正在切開四格並派送…' : '派送中…')
     try {
+      if (mode === 'ordering') {
+        await dispatchPictureOrdering({
+          sessionId,
+          presenterToken,
+          file: picture.file,
+          promptText: promptText.trim(),
+          title: picture.storyboard.title,
+        })
+        setSent(true)
+        return
+      }
       await onDispatch(picture.file, {
         type: mode === 'spoken' ? 'oral_response' : 'short_answer',
         options: [],
@@ -163,7 +181,20 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                 >
                   <PencilSimpleLine size={16} />打字
                 </button>
+                <button
+                  aria-selected={mode === 'ordering'}
+                  className={mode === 'ordering' ? 'is-on' : ''}
+                  role="tab"
+                  type="button"
+                  onClick={() => setMode('ordering')}
+                >
+                  <CardsThree size={16} />排順序
+                </button>
               </div>
+
+              {mode === 'ordering' && (
+                <p className="ps-note">四格會被切開、打亂後送到學生端，學生拖成正確順序。完整的圖不會派出去。</p>
+              )}
 
               <label className="ps-prompt">
                 題目
@@ -175,7 +206,9 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                 />
               </label>
 
-              <div className="ps-timing">
+              {/* An ordering quiz is answered through the attempt flow, which
+                  has no clock of its own to set here. */}
+              <div className="ps-timing" hidden={mode === 'ordering'}>
                 {mode === 'spoken' && (
                   <TimingRow
                     label="準備時間"

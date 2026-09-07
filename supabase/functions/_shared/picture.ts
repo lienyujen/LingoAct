@@ -21,6 +21,7 @@ export type PictureStoryboard = {
   pattern: string
   spokenPrompt: string
   writtenPrompt: string
+  orderPrompt: string
 }
 
 const storyboardSchema = {
@@ -34,8 +35,9 @@ const storyboardSchema = {
     pattern: { type: 'string' },
     spoken_prompt: { type: 'string' },
     written_prompt: { type: 'string' },
+    order_prompt: { type: 'string' },
   },
-  required: ['title', 'cast', 'panels', 'target_words', 'pattern', 'spoken_prompt', 'written_prompt'],
+  required: ['title', 'cast', 'panels', 'target_words', 'pattern', 'spoken_prompt', 'written_prompt', 'order_prompt'],
 }
 
 const STORYBOARD_RULES = [
@@ -50,6 +52,7 @@ const STORYBOARD_RULES = [
   'Do not build the story around anything that carries writing — a sign, a menu, a notice, a label, a screen, a ticket, a nameplate. The drawing model letters whatever normally carries lettering, and the characters it invents come out malformed, which is the last thing to put in front of a class learning to read them. Choose a moment that can be understood from what people are doing.',
   '`target_words` are the words the picture is meant to pull out of the learner, `pattern` the sentence pattern or connectives it should lead them into. Both must be within the class\'s level.',
   '`spoken_prompt` and `written_prompt` are the instruction the class is given, in the language being taught: one for saying it aloud, one for writing it down. They differ by more than the verb — speaking asks for a sequence out loud within a minute or two, writing asks for connected sentences or a short paragraph.',
+  '`order_prompt` is the instruction for a third use of the same picture: the four panels are cut apart and shuffled, and the class puts them back in order. Say what to work from — what happens first, what it leads to — without naming anything that appears in a particular panel.',
   'Never state the story in the prompts. Telling the class what happens is the answer.',
 ].join('\n')
 
@@ -57,7 +60,10 @@ const STORYBOARD_RULES = [
 // drawing: the first two rules keep the picture usable, and the last one keeps
 // it legal to put in front of a class.
 const DRAWING_STYLE = [
-  '畫風：乾淨的兒童繪本插畫，明亮的顏色，粗黑輪廓，背景簡單不雜亂。四格大小相同，用白色間隔分開，每格加細黑框。',
+  // The panels are cut apart down the middle for 圖片排序, so the grid has to be
+  // exactly halves — a strip that sits off-centre survives 看圖說話 and comes
+  // apart with a neighbour's frame in the corner of it.
+  '畫風：乾淨的兒童繪本插畫，明亮的顏色，粗黑輪廓，背景簡單不雜亂。四格大小完全相同，橫向與縱向的白色間隔都要正好通過畫面的正中央，每格加細黑框。',
   '一致性：四格是同一個故事。人物的長相、髮型、衣服顏色，以及重複出現的物品的形狀和顏色，四格完全一樣。',
   '嚴禁文字：畫面中不可以出現任何文字、字母或數字，包含校名牌、站名牌、博愛座標示、招牌、菜單、價目表、包裝、書本內頁、對話框與說明文字，一律留白或改用無字的圖示。如果某個地點只能靠招牌認出來，就改用它的形狀和擺設來畫。也不要畫任何真實存在的商標或連鎖店標誌。這張圖是要讓學生用自己的話講出來的，畫面上出現字就失去意義。',
 ].join('\n\n')
@@ -125,6 +131,7 @@ export async function planPictureStory(input: {
     pattern: cleanLine(output.pattern, 200),
     spokenPrompt: cleanLine(output.spoken_prompt, 300),
     writtenPrompt: cleanLine(output.written_prompt, 300),
+    orderPrompt: cleanLine(output.order_prompt, 300),
   }
 }
 

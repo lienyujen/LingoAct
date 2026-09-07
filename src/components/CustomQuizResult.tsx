@@ -58,6 +58,21 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
                   ))}
                 </div>
               )
+            ) : item.option_images?.length === item.options.length && item.options.length > 0 ? (
+              // 圖片排序. There is no reference answer to type here — the
+              // sequence is the answer, and it only means anything as pictures.
+              !showAnswers ? (
+                <p className="muted presenter-answer-hidden">正確順序已隱藏，勾選「顯示正確答案」即可檢視。</p>
+              ) : (
+                <ol className="presenter-quiz-panels">
+                  {acceptedAnswers.map((value, panelIndex) => (
+                    <li key={value}>
+                      <span>{panelIndex + 1}</span>
+                      <img alt="" src={item.option_images[item.options.indexOf(value)]} />
+                    </li>
+                  ))}
+                </ol>
+              )
             ) : item.type === 'multiple_choice' ? (
               <div className="presenter-quiz-options">
                 {item.options.map((option) => {
@@ -130,6 +145,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   // wait for. Everything below that reads as scoring is switched off rather
   // than left showing dashes and a stuck "評分中" count.
   const flashcard = results.quiz.requested_type === 'flashcard'
+  const pictureOrdering = results.quiz.requested_type === 'picture_ordering'
   // 寫作教練 and a deck are both ungraded, but for different reasons and with
   // different things worth showing, so they are not one branch.
   const writing = results.quiz.graded === false && !flashcard
@@ -223,7 +239,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">
-        <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : flashcard ? '單字卡練習' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
+        <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : flashcard ? '單字卡練習' : pictureOrdering ? '故事排序' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
           <span>{results.attempts.length}/{onlineCount} 人作答</span>
           {(stoppable || resumable) && (

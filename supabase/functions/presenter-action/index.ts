@@ -598,6 +598,136 @@ Deno.serve(async (req) => {
       return jsonResponse({ storyboard, image: image.data, mimeType: image.mimeType })
     }
 
+    // 故事排序, the picture version: the four panels arrive already cut apart and
+    // already shuffled, and the class drags them back into sequence.
+    //
+    // The shuffle happens before the upload rather than here, and that is the
+    // point of it. Panels are recorded as screenshots so that deleting the class
+    // still removes them, and screenshots are readable by students — timestamps
+    // included. Uploading them in reading order would leave the answer lying in
+    // created_at for anyone who thought to sort by it.
+    if (action === 'create_picture_ordering') {
+      const rawPanels = Array.isArray(input.panels) ? input.panels : []
+      if (rawPanels.length !== 4) return jsonResponse({ message: '圖片排序需要四格。' }, 400)
+      const panels = rawPanels.map((raw) => {
+        const panel = raw as { screenshotId?: unknown; storagePath?: unknown; order?: unknown }
+        return {
+          screenshotId: typeof panel.screenshotId === 'string' ? panel.screenshotId : '',
+          storagePath: typeof panel.storagePath === 'string' ? panel.storagePath : '',
+          order: typeof panel.order === 'number' ? panel.order : -1,
+        }
+      })
+      const orders = [...new Set(panels.map((panel) => panel.order))].sort()
+      if (panels.some((panel) => !validUuid(panel.screenshotId)) || orders.join() !== '1,2,3,4') {
+        return jsonResponse({ message: '圖片排序的四格資料不正確。' }, 400)
+      }
+      for (const panel of panels) {
+        if (panel.storagePath !== `sessions/${sessionId}/screenshots/${panel.screenshotId}.${panel.storagePath.split('.').at(-1)}` ||
+            !/\.(png|jpg|webp)$/.test(panel.storagePath)) {
+          return jsonResponse({ message: '截圖路徑不正確。' }, 400)
+        }
+      }
+
+      const { data: objectList, error: objectError } = await supabase.storage
+        .from('lingoact-screenshots')
+        .list(`sessions/${sessionId}/screenshots`, { limit: 1000 })
+      if (objectError) throw objectError
+      const uploaded = new Set((objectList || []).map((object) => object.name))
+      if (panels.some((panel) => !uploaded.has(panel.storagePath.split('/').at(-1) || ''))) {
+        return jsonResponse({ message: '找不到已上傳的四格圖片。' }, 400)
+      }
+
+      const promptText = typeof input.promptText === 'string' && input.promptText.trim()
+        ? input.promptText.trim().slice(0, 1000)
+        : '請把這四張圖排成正確的故事順序。'
+      const title = typeof input.title === 'string' && input.title.trim()
+        ? input.title.trim().slice(0, 200)
+        : '故事排序'
+
+      const stoppedAt = new Date().toISOString()
+      const { error: stopError } = await supabase.from('questions')
+        .update({ status: 'stopped', stopped_at: stoppedAt })
+        .eq('session_id', sessionId).eq('status', 'active')
+      if (stopError) throw stopError
+
+      const withUrls = panels.map((panel) => ({
+        ...panel,
+        publicUrl: supabase.storage.from('lingoact-screenshots').getPublicUrl(panel.storagePath).data.publicUrl,
+      }))
+      const { error: panelError } = await supabase.from('screenshots').insert(withUrls.map((panel) => ({
+        id: panel.screenshotId,
+        session_id: sessionId,
+        storage_path: panel.storagePath,
+        public_url: panel.publicUrl,
+        ai_status: 'skipped',
+      })))
+      if (panelError) throw panelError
+
+      let translations = {}
+      try {
+        translations = await translateQuestion(title, promptText, [])
+      } catch (translationError) {
+        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
+      }
+
+      // The question carries no screenshot: the intact picture is the answer,
+      // and it never enters the class.
+      const questionId = crypto.randomUUID()
+      const quizId = crypto.randomUUID()
+      const itemId = crypto.randomUUID()
+      const { data: question, error: questionError } = await supabase.from('questions').insert({
+        id: questionId,
+        session_id: sessionId,
+        screenshot_id: null,
+        type: 'custom_quiz',
+        status: 'active',
+        title,
+        prompt_text: promptText,
+        options: [],
+        translations,
+        allow_multiple: false,
+      }).select('*').single()
+      if (questionError) throw questionError
+
+      const { error: quizError } = await supabase.from('quizzes').insert({
+        id: quizId,
+        session_id: sessionId,
+        question_id: questionId,
+        title,
+        direction: promptText,
+        requested_count: 1,
+        requested_type: 'picture_ordering',
+        graded: true,
+      })
+      if (quizError) throw quizError
+
+      const { error: itemError } = await supabase.from('quiz_items').insert({
+        id: itemId,
+        quiz_id: quizId,
+        position: 1,
+        type: 'ordering',
+        prompt_text: promptText,
+        options: withUrls.map((panel) => panel.screenshotId),
+        option_images: withUrls.map((panel) => panel.publicUrl),
+        pair_prompts: [],
+        points: 100,
+        translations: { en: { prompt_text: promptText, options: [], pair_prompts: [] } },
+      })
+      if (itemError) throw itemError
+
+      const { error: keyError } = await supabase.from('quiz_item_keys').insert({
+        item_id: itemId,
+        accepted_answers: [...withUrls].sort((a, b) => a.order - b.order).map((panel) => panel.screenshotId),
+        rubric: '',
+      })
+      if (keyError) throw keyError
+
+      const { error: sessionError } = await supabase.from('sessions')
+        .update({ current_question_id: questionId }).eq('id', sessionId).eq('status', 'active')
+      if (sessionError) throw sessionError
+      return jsonResponse({ question, quizId })
+    }
+
     if (action === 'create_custom_quiz') {
       const screenshotId = input.screenshotId
       const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
@@ -938,8 +1068,8 @@ Deno.serve(async (req) => {
           const values: Record<string, unknown> = { total_score: totalScore }
           if (isChoiceOnlyQuiz) {
             values.feedback = {
-              zh_tw: `本次選擇題得分 ${totalScore}/100。`,
-              en: `Multiple-choice score: ${totalScore}/100.`,
+              zh_tw: `本次自動評分 ${totalScore}/100。`,
+              en: `Auto-marked score: ${totalScore}/100.`,
             }
           }
           const { error } = await supabase.from('quiz_attempts').update(values).eq('id', attemptId)

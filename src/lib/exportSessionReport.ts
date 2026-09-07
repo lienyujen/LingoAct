@@ -290,13 +290,21 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
         const scored = itemAnswers.filter((answer) => typeof answer.score === 'number')
         const correct = scored.filter((answer) => Number(answer.score) >= Number(item.points))
         const key = quizKeyByItem.get(item.id)
+        // 圖片排序: the options are panel ids, so the sheet lists the panels
+        // themselves, in story order — which makes the answer simply 1、2、3、4,
+        // and a student's 2、1、3、4 in the answers sheet directly comparable.
+        const panels = item.option_images?.length === item.options.length
+          ? (key?.accepted_answers || []).map((value, at) => `${at + 1}. ${item.option_images[item.options.indexOf(value)]}`)
+          : null
         questions.addRow({
           number: `${index + 1}-${item.position}`,
           type: `自訂測驗／${quizItemTypeLabels[item.type]}`,
           title: item.prompt_text,
           status: question.status,
-          options: item.options.join('\n'),
-          correctAnswer: key?.accepted_answers.join('、') || key?.rubric || '',
+          options: (panels || item.options).join('\n'),
+          correctAnswer: panels
+            ? panels.map((_, at) => at + 1).join('、')
+            : key?.accepted_answers.join('、') || key?.rubric || '',
           answerCount: itemAnswers.length,
           responseRate: data.participants.length ? quizAttempts.length / data.participants.length : 0,
           correctRate: scored.length ? correct.length / scored.length : '',
@@ -365,11 +373,19 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
     // not a pending one. Reporting it as 評分中 would leave the teacher waiting
     // for a column that is never going to fill in.
     const writing = quizById.get(item.quiz_id)?.graded === false
+    // 圖片排序 answers are panel ids, which say nothing in a spreadsheet. The
+    // key holds them in the right order, so each one can be reported as the
+    // panel number it actually is: 2、1、3、4 shows at a glance what was swapped.
+    const panelNumber = item.option_images?.length === item.options.length
+      ? new Map((quizKeyByItem.get(item.id)?.accepted_answers || []).map((value, at) => [value, at + 1]))
+      : null
     answers.addRow({
       questionNumber: `${questionNumber.get(attempt.question_id) || ''}-${item.position}`,
       questionType: writing ? '寫作教練' : `自訂測驗／${quizItemTypeLabels[item.type]}`,
       participantName: attempt.participant_name,
-      answerValue: answer.answer_values?.join('、') || '',
+      answerValue: panelNumber
+        ? (answer.answer_values || []).map((value) => panelNumber.get(value) ?? '?').join('、')
+        : answer.answer_values?.join('、') || '',
       answerText: answer.answer_text || '',
       correctness: writing ? '不評分' : score === null ? '評分中' : score >= itemPoints ? '正確／滿分' : score > 0 ? '部分得分' : '錯誤／零分',
       score: writing || score === null ? '' : `${score}/${itemPoints}`,

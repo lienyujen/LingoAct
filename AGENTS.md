@@ -125,12 +125,26 @@ why `release.yml` deliberately builds without a `.env`.
   and no object behind; from the upload onwards it travels the screenshot path
   unchanged, which is why the activity needs no question type, no student view
   and no results view of its own — it dispatches as an ordinary 問答題 or
-  口語表達 carrying a picture. Two rules in the prompt were learned by drawing
-  rather than reasoned out: the story must not be built around anything that
+  口語表達 carrying a picture, or comes apart into its four panels for 故事排序
+  below. Two rules in the prompt were learned by drawing rather than reasoned
+  out: the story must not be built around anything that
   carries writing, because the model letters whatever normally carries lettering
   and the characters it invents are malformed; and each panel is one frozen
   moment, because a panel describing three actions is drawn with the same person
   in it three times.
+- **故事排序 on pictures**, which is the same four-panel picture cut apart. The
+  panels are sliced in the browser down the middle of the picture — the drawing
+  prompt puts the gutter exactly on the centre lines for this reason — and sent
+  as an ordering item whose options are opaque panel ids, with `option_images`
+  carrying the pictures beside them; the sequence lives in `quiz_item_keys`,
+  which students cannot read, so the drag, the key and the marking are the ones
+  that already ordered sentences. Two things are deliberate and easy to undo by
+  accident. The panels are uploaded in shuffled order, because they are recorded
+  as `screenshots` so that deleting the class removes them, and that table is
+  readable by students — `created_at` included, so uploading them in reading
+  order would leave the answer in the timestamps. And the question carries no
+  `screenshot_id`: the intact picture is the answer, so it never enters the
+  class at all. Marking needs no AI — comparing two sequences is exact.
 - **寫作教練**, which is the custom-quiz machinery with the marking switched
   off: `quizzes.graded` false, items generated as writing fields rather than
   questions, and the attempt reaching a `submitted` state that carries no
@@ -152,8 +166,7 @@ What is **not** done:
 - Of the twelve teaching activities, these are still open:
   **聽打接力** (nothing built; needs per-sentence clips and pairing);
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
-  still a whole passage; **故事排序** orders text only, not images;
-  **即時造句牆** collects the
+  still a whole passage; **即時造句牆** collects the
   sentences but nothing aggregates them; **AI寫作教練** is the simplified form
   the teacher asked for, without the scaffolding questions the activity table
   describes; **拍照描述** uploads a photo with no paired caption field.

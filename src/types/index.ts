@@ -124,7 +124,7 @@ export type QuizItemType = 'multiple_choice' | 'fill_blank' | 'short_answer' | '
 // 'writing' and 'flashcard' are modes rather than item types: 寫作教練 lays out
 // short_answer fields with the marking off, and a deck is multiple_choice cards
 // answered one at a time. Neither makes a new shape for anything downstream.
-export type QuizRequestedType = 'random' | QuizItemType | 'writing' | 'flashcard'
+export type QuizRequestedType = 'random' | QuizItemType | 'writing' | 'flashcard' | 'picture_ordering'
 export type ExitTicketCategory = 'lesson_summary' | 'learning_assessment' | 'course_satisfaction' | 'student_question'
 export type ExitTicketResponseType = 'text' | 'rating'
 
@@ -366,6 +366,9 @@ export type QuizItem = {
   options: string[]
   // 配對 only: the left-hand column, in the order it is shown. Empty otherwise.
   pair_prompts: string[]
+  // 圖片排序 only: the picture to show for each option, in the same order. Empty
+  // means the options are text, which is every other item.
+  option_images: string[]
   points: number
   translations: Translated<{
     prompt_text?: string

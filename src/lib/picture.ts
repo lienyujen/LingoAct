@@ -11,6 +11,7 @@ export type PictureStoryboard = {
   pattern: string
   spokenPrompt: string
   writtenPrompt: string
+  orderPrompt: string
 }
 
 export type GeneratedPicture = {
@@ -48,4 +49,103 @@ export async function generatePicture(input: {
     previewUrl: `data:${mimeType};base64,${data.image}`,
     file: fileFromBase64(data.image as string, mimeType),
   }
+}
+
+// Cut along the middle of the picture, which is where the drawing prompt puts
+// the gutter. The inner edges are trimmed by a hair: a panel's own frame stops
+// short of the centre line, so the sliver being lost is white, and what it
+// buys is that no panel arrives with the corner of its neighbour in it.
+const GUTTER_TRIM = 0.012
+
+async function panelBlob(bitmap: ImageBitmap, column: number, row: number) {
+  const width = Math.floor(bitmap.width / 2)
+  const height = Math.floor(bitmap.height / 2)
+  const trimX = Math.round(width * GUTTER_TRIM)
+  const trimY = Math.round(height * GUTTER_TRIM)
+  const sourceX = column === 0 ? 0 : width + trimX
+  const sourceY = row === 0 ? 0 : height + trimY
+  const sourceWidth = width - trimX
+  const sourceHeight = height - trimY
+
+  const canvas = document.createElement('canvas')
+  canvas.width = sourceWidth
+  canvas.height = sourceHeight
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('無法處理圖片。')
+  context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+  if (!blob) throw new Error('無法處理圖片。')
+  return blob
+}
+
+// In reading order: 左上, 右上, 左下, 右下.
+export async function splitIntoPanels(file: File) {
+  const bitmap = await createImageBitmap(file)
+  try {
+    const panels: File[] = []
+    for (const [column, row] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+      const blob = await panelBlob(bitmap, column, row)
+      panels.push(new File([blob], 'panel.jpg', { type: 'image/jpeg' }))
+    }
+    return panels
+  } finally {
+    bitmap.close()
+  }
+}
+
+// Uploaded in a shuffled order, and that is not cosmetic: panels are recorded
+// as screenshots so deleting the class removes them, and students can read that
+// table — created_at included. Sending them up in reading order would leave the
+// answer in the timestamps.
+export async function dispatchPictureOrdering(input: {
+  sessionId: string
+  presenterToken: string
+  file: File
+  promptText: string
+  title: string
+}) {
+  const supabase = requireSupabase()
+  const panels = (await splitIntoPanels(input.file)).map((file, index) => ({ file, order: index + 1 }))
+  for (let index = panels.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1))
+    ;[panels[index], panels[swap]] = [panels[swap], panels[index]]
+  }
+
+  const uploaded: Array<{ screenshotId: string; storagePath: string; order: number }> = []
+  for (const panel of panels) {
+    const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
+      body: {
+        action: 'prepare_screenshot_upload',
+        sessionId: input.sessionId,
+        presenterToken: input.presenterToken,
+        fileName: panel.file.name,
+      },
+    })
+    if (prepareError) throw prepareError
+    if (!prepared?.screenshotId || !prepared?.storagePath || !prepared?.uploadToken) {
+      throw new Error(prepared?.message || '無法準備圖片上傳。')
+    }
+    const { error: uploadError } = await supabase.storage
+      .from('lingoact-screenshots')
+      .uploadToSignedUrl(prepared.storagePath, prepared.uploadToken, panel.file, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      })
+    if (uploadError) throw uploadError
+    uploaded.push({ screenshotId: prepared.screenshotId, storagePath: prepared.storagePath, order: panel.order })
+  }
+
+  const { data, error } = await supabase.functions.invoke('presenter-action', {
+    body: {
+      action: 'create_picture_ordering',
+      sessionId: input.sessionId,
+      presenterToken: input.presenterToken,
+      panels: uploaded,
+      promptText: input.promptText,
+      title: input.title,
+    },
+  })
+  if (error) throw error
+  if (!data?.question) throw new Error(data?.message || '派送失敗。')
+  return data.question as { id: string }
 }

@@ -6,6 +6,9 @@ import type { ParticipantLocale } from '../lib/participantI18n'
 type Props = {
   values: string[]
   labels: string[]
+  // 圖片排序: one picture per row, aligned to values. Empty means the rows are
+  // text, which is what ordering sentences and paragraphs has always been.
+  images?: string[]
   locale: ParticipantLocale
   onChange: (values: string[]) => void
 }
@@ -17,7 +20,8 @@ type Props = {
 // fragments simply immovable. The arrows are not a fallback for old browsers but
 // the path for anyone using a keyboard, and they are quicker than dragging when
 // only one piece is out of place.
-export function QuizOrderingInput({ values, labels, locale, onChange }: Props) {
+export function QuizOrderingInput({ values, labels, images, locale, onChange }: Props) {
+  const pictures = images?.length === values.length
   const [dragging, setDragging] = useState<number | null>(null)
   const rowsRef = useRef<(HTMLLIElement | null)[]>([])
 
@@ -58,8 +62,8 @@ export function QuizOrderingInput({ values, labels, locale, onChange }: Props) {
 
   return (
     <div className="quiz-ordering">
-      <p className="quiz-ordering-hint">{participantText(locale, 'orderingHint')}</p>
-      <ol className="quiz-ordering-list">
+      <p className="quiz-ordering-hint">{participantText(locale, pictures ? 'orderingPictureHint' : 'orderingHint')}</p>
+      <ol className={pictures ? 'quiz-ordering-list has-pictures' : 'quiz-ordering-list'}>
         {values.map((value, index) => (
           <li
             className={dragging === index ? 'is-dragging' : ''}
@@ -80,7 +84,9 @@ export function QuizOrderingInput({ values, labels, locale, onChange }: Props) {
               </svg>
             </button>
             <span className="quiz-ordering-index">{index + 1}</span>
-            <span className="quiz-ordering-text">{labels[index] ?? value}</span>
+            {pictures
+              ? <img alt="" className="quiz-ordering-picture" draggable={false} src={images[index]} />
+              : <span className="quiz-ordering-text">{labels[index] ?? value}</span>}
             <span className="quiz-ordering-moves">
               <button
                 aria-label={participantText(locale, 'orderingUp')}

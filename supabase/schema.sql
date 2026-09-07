@@ -235,6 +235,9 @@ create table if not exists public.quiz_items (
   -- 配對 needs two lists: options holds the right-hand choices, shuffled, and
   -- this holds the left-hand things being matched. Empty for every other type.
   pair_prompts jsonb not null default '[]'::jsonb,
+  -- 圖片排序: the picture to show for each option, in the same order. Empty
+  -- means the options are text, which is every item that came before.
+  option_images jsonb not null default '[]'::jsonb,
   points integer not null check (points between 1 and 100),
   translations jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
@@ -974,6 +977,9 @@ alter table public.quiz_items
 alter table public.quiz_items
   add column if not exists pair_prompts jsonb not null default '[]'::jsonb;
 
+alter table public.quiz_items
+  add column if not exists option_images jsonb not null default '[]'::jsonb;
+
 notify pgrst, 'reload schema';
 
 alter table public.quizzes drop constraint if exists quizzes_requested_type_check;
@@ -981,7 +987,7 @@ alter table public.quizzes
   add constraint quizzes_requested_type_check
   check (requested_type in (
     'random', 'multiple_choice', 'fill_blank', 'short_answer',
-    'ordering', 'matching', 'writing', 'flashcard'
+    'ordering', 'matching', 'writing', 'flashcard', 'picture_ordering'
   ));
 
 alter table public.quizzes

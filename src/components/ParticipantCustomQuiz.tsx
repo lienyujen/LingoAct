@@ -128,6 +128,9 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit }:
                 </div>
               ) : item.type === 'ordering' ? (
                 <QuizOrderingInput
+                  images={item.option_images?.length === item.options.length
+                    ? (orderAnswers[item.id] || item.options).map((value) => item.option_images[item.options.indexOf(value)])
+                    : undefined}
                   labels={(orderAnswers[item.id] || item.options).map((value) => options[item.options.indexOf(value)] ?? value)}
                   locale={locale}
                   values={orderAnswers[item.id] || item.options}

@@ -433,8 +433,13 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         const submitted = answer.answer_values || []
         const correct = expected.length === submitted.length && expected.every((value: string, at: number) => value === submitted[at])
         score = correct ? item.points : 0
-        feedbackZhTw = correct ? '順序正確。' : `順序不對，正確順序：${expected.join(' → ')}`
-        feedbackEn = correct ? 'Correct order.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
+        // 圖片排序 has nothing readable to name the panels by — the values are
+        // opaque ids precisely so that a student reading them learns nothing —
+        // so the wrong-order feedback says only that, and the teacher shows the
+        // sequence as pictures.
+        const pictures = Array.isArray(item.option_images) && item.option_images.length > 0
+        feedbackZhTw = correct ? '順序正確。' : pictures ? '順序不對。' : `順序不對，正確順序：${expected.join(' → ')}`
+        feedbackEn = correct ? 'Correct order.' : pictures ? 'Wrong order.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
       } else if (item.type === 'multiple_choice') {
         const expected = [...new Set(key.accepted_answers || [])].sort()
         const submitted = [...new Set(answer.answer_values || [])].sort()
@@ -467,10 +472,10 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     totalScore = Math.round(totalScore * 100) / 100
     const overallFeedbackZhTw = aiGradingInput.length
       ? String(output.overall_feedback_zh_tw || '')
-      : `本次選擇題得分 ${totalScore}/100。`
+      : `本次自動評分 ${totalScore}/100。`
     const overallFeedbackEn = aiGradingInput.length
       ? String(output.overall_feedback_en || '')
-      : `Multiple-choice score: ${totalScore}/100.`
+      : `Auto-marked score: ${totalScore}/100.`
     const { error: updateError } = await supabase.from('quiz_attempts').update({
       status: 'graded',
       total_score: totalScore,

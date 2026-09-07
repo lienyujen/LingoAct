@@ -1,6 +1,7 @@
 import { Link, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   busy: boolean
@@ -14,6 +15,7 @@ type Props = {
 }
 
 export function TextDispatchModal({ busy, error, initialBody = '', open, onCancel, onSend }: Props) {
+  const t = usePresenterText()
   const [body, setBody] = useState('')
   const [url, setUrl] = useState('')
 
@@ -37,24 +39,24 @@ export function TextDispatchModal({ busy, error, initialBody = '', open, onCance
       <form className="modal text-dispatch-modal" onSubmit={submit}>
         <div className="modal-heading">
           <div>
-            <h2>文字派送</h2>
-            <p className="muted">內容會即時出現在學員裝置上</p>
+            <h2>{t('textDispatch')}</h2>
+            <p className="muted">{t('textDispatchSub')}</p>
           </div>
-          <button className="ghost-button icon-button" aria-label="關閉文字派送" title="關閉" type="button" onClick={onCancel}>
+          <button className="ghost-button icon-button" aria-label={t('closeTextDispatch')} title={t('close')} type="button" onClick={onCancel}>
             <X size={18} />
           </button>
         </div>
         <label>
-          文字
+          {t('textLabel')}
           <textarea
             maxLength={5000}
-            placeholder="輸入可讓學員複製的文字"
+            placeholder={t('textPlaceholder')}
             value={body}
             onChange={(event) => setBody(event.target.value)}
           />
         </label>
         <label>
-          <span className="field-label-with-icon"><Link size={16} />網址</span>
+          <span className="field-label-with-icon"><Link size={16} />{t('urlLabel')}</span>
           <input
             inputMode="url"
             maxLength={2048}
@@ -66,9 +68,9 @@ export function TextDispatchModal({ busy, error, initialBody = '', open, onCance
         </label>
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
-          <button className="ghost-button" type="button" onClick={onCancel}>取消</button>
+          <button className="ghost-button" type="button" onClick={onCancel}>{t('cancel')}</button>
           <button disabled={busy || (!body.trim() && !url.trim())} type="submit">
-            <PaperPlaneTilt size={17} />{busy ? '派送中...' : '立即派送'}
+            <PaperPlaneTilt size={17} />{busy ? t('sending') : t('sendNow')}
           </button>
         </div>
       </form>

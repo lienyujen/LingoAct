@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { QuestionType, QuizRequestedType } from '../types'
 import { CustomQuizFields } from './CustomQuizFields'
 import { quizSettingsFrom } from '../lib/customQuiz'
+import { usePresenterText } from '../lib/presenterI18n'
+import type { PresenterMessageKey } from '../lib/presenterI18n'
 import { TimingRow } from './TimingRow'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 
@@ -36,18 +38,19 @@ const SPOKEN_TYPES: QuestionType[] = ['pronunciation', 'oral_response']
 const ANSWER_PRESETS: Array<number | null> = [null, 30, 60, 90, 180]
 const PREPARE_PRESETS: Array<number | null> = [null, 10, 20, 30]
 
-const questionTypes: Array<{ type: QuestionType; label: string }> = [
-  { type: 'send_screen', label: '派送畫面' },
-  { type: 'custom_quiz', label: '自訂測驗' },
-  { type: 'poll', label: '投票題' },
-  { type: 'multiple_choice', label: '選擇題' },
-  { type: 'file_upload', label: '上傳作答' },
-  { type: 'short_answer', label: '問答題' },
-  { type: 'oral_response', label: '口語表達' },
-  { type: 'pronunciation', label: '朗讀發音' },
+const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> = [
+  { type: 'send_screen', label: 'typeSendScreen' },
+  { type: 'custom_quiz', label: 'typeCustomQuiz' },
+  { type: 'poll', label: 'typePoll' },
+  { type: 'multiple_choice', label: 'typeMultipleChoice' },
+  { type: 'file_upload', label: 'typeFileUpload' },
+  { type: 'short_answer', label: 'typeShortAnswer' },
+  { type: 'oral_response', label: 'typeOralResponse' },
+  { type: 'pronunciation', label: 'typePronunciation' },
 ]
 
 export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: Props) {
+  const t = usePresenterText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
   const [allowMultiple, setAllowMultiple] = useState(false)
@@ -115,8 +118,8 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
           })
         }}
       >
-        <h2>截圖派題</h2>
-        {previewUrl && <img alt="截圖預覽" className="capture-preview" src={previewUrl} />}
+        <h2>{t('captureTitle')}</h2>
+        {previewUrl && <img alt={t('capturePreviewAlt')} className="capture-preview" src={previewUrl} />}
         {error && <p className="error">{error}</p>}
         <div className="type-grid">
           {questionTypes.map((item) => (
@@ -126,7 +129,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
               type="button"
               onClick={() => setType(item.type)}
             >
-              {item.label}
+              {t(item.label)}
             </button>
           ))}
         </div>
@@ -138,10 +141,10 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
                 type="checkbox"
                 onChange={(event) => setAllowMultiple(event.target.checked)}
               />
-              <span>允許多選</span>
+              <span>{t('allowMultiple')}</span>
             </label>
             <div className="panel-heading">
-              <h2>選項</h2>
+              <h2>{t('options')}</h2>
               <button className="ghost-button icon-button" type="button" onClick={() => setOptions((current) => [...current, String.fromCharCode(65 + current.length)])}>
                 <Plus size={16} />
               </button>
@@ -149,7 +152,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
             {options.map((option, index) => (
               <div className="option-edit-row" key={index}>
                 <input
-                  aria-label={`選項 ${index + 1}`}
+                  aria-label={t('optionN', { n: index + 1 })}
                   value={option}
                   onChange={(event) => {
                     const next = [...options]
@@ -171,7 +174,7 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
         )}
         {type === 'file_upload' && (
           <p className="muted question-type-hint">
-            學生端會看到這張截圖和上傳按鈕，手機、平板可以直接拍照上傳。停止作答後可逐份批改。
+            {t('uploadTypeHint')}
           </p>
         )}
         {type === 'custom_quiz' && (
@@ -188,14 +191,14 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
         )}
         {type !== 'send_screen' && type !== 'custom_quiz' && (
           <label className="question-prompt-field">
-            {type === 'pronunciation' ? '指定朗讀內容（選填）' : type === 'file_upload' ? '作答說明（選填）' : '題目（選填）'}
+            {type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : t('promptLabel')}
             <input
               value={promptText}
               placeholder={type === 'pronunciation'
-                ? '未輸入則以 AI 判讀截圖中的朗讀內容'
+                ? t('readAloudPlaceholder')
                 : type === 'file_upload'
-                  ? '例如：請把計算過程寫在紙上拍照上傳'
-                  : '未輸入則以AI判讀題目'}
+                  ? t('uploadPromptPlaceholder')
+                  : t('promptPlaceholder')}
               onChange={(event) => setPromptText(event.target.value)}
             />
           </label>
@@ -204,16 +207,16 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
           <div className="timing-editor">
             {SPOKEN_TYPES.includes(type) && (
               <TimingRow
-                label="準備時間"
-                offLabel="不準備"
+                label={t('prepareTime')}
+                offLabel={t('noPrepare')}
                 presets={PREPARE_PRESETS}
                 value={prepareSeconds}
                 onChange={setPrepareSeconds}
               />
             )}
             <TimingRow
-              label="作答時間"
-              offLabel="不限時"
+              label={t('answerTime')}
+              offLabel={t('noTimeLimit')}
               presets={ANSWER_PRESETS}
               value={answerSeconds}
               onChange={setAnswerSeconds}
@@ -222,11 +225,11 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
         )}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>
-            <X size={17} />取消
+            <X size={17} />{t('cancel')}
           </button>
           <button disabled={type === 'custom_quiz' && !quizDirection.trim()} type="submit">
             {type === 'custom_quiz' ? <Sparkle size={17} /> : <PaperPlaneTilt size={17} />}
-            {type === 'custom_quiz' ? 'AI 出題並派送' : '派送'}
+            {type === 'custom_quiz' ? t('generateAndSend') : t('send')}
           </button>
         </div>
       </form>

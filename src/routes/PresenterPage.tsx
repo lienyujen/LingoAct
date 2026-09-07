@@ -1199,7 +1199,7 @@ export function PresenterPage() {
     if (mode !== 'zhuyin' && mode !== 'pinyin') return
     if (!resolveTrack(session.teaching_language).language.startsWith('zh')) return
     // Already done, or being done: a deck is annotated once.
-    if (items.some((item) => item.option_readings?.length)) return
+    if (items.some((item) => item.option_readings?.length || item.prompt_reading)) return
     if (annotatingDeck.current === question.id) return
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) return

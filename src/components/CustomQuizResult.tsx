@@ -373,7 +373,11 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               return (
                 <div className={misses ? 'flashcard-card-row is-missed' : 'flashcard-card-row'} key={item.id}>
                   <span>{item.prompt_text}</span>
-                  {item.option_readings?.length > 0 && <em className="card-reading">{item.option_readings.join('・')}</em>}
+                  {/* Whichever side the word is on. A 看詞選解釋 deck has the
+                      reading on the prompt and nothing on the glosses. */}
+                  {item.prompt_reading
+                    ? <em className="card-reading">{item.prompt_reading}</em>
+                    : item.option_readings?.length > 0 && <em className="card-reading">{item.option_readings.join('・')}</em>}
                   <strong>{misses ? t('missedNTimes', { n: misses }) : t('noMisses')}</strong>
                   <button
                     aria-label={t('removeCard')}

@@ -386,6 +386,11 @@ export type QuizItem = {
   // 拼音 syllables to print under it. Which one, the question says — a deck
   // carrying card_font_url is 注音.
   option_readings: string[]
+  // 單字卡 only: whether the WORD being learned is the prompt rather than the
+  // options. It decides which side carries the 標音 and which side is the gloss
+  // the student reads in their own language.
+  prompt_is_word?: boolean
+  prompt_reading?: string | null
   points: number
   translations: Translated<{
     prompt_text?: string

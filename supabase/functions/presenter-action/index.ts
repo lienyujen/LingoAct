@@ -7,7 +7,7 @@ import { reviewWriting } from '../_shared/writing-review.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
-import { guidanceLanguages } from '../_shared/languages.ts'
+import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
 import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
 
 type ParticipantRecord = { id: string; name: string }
@@ -952,7 +952,7 @@ Deno.serve(async (req) => {
       // they created the class; making them restate it in 出題方向 each time is
       // how a Japanese class ends up with Chinese questions.
       const { data: classRow } = await supabase.from('sessions')
-        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+        .select('teaching_language, guidance_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
       const classInstruction = [
         trackInstruction(classRow?.teaching_language),
         levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
@@ -1071,6 +1071,7 @@ Deno.serve(async (req) => {
             sourceText: sourceText || undefined,
             extraInstruction: [classInstruction, extraInstruction].filter(Boolean).join('\n'),
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+            guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
             levelFramework: classRow?.level_framework ?? null,
             levelCode: classRow?.level_code ?? null,
             direction,
@@ -1113,6 +1114,9 @@ Deno.serve(async (req) => {
             options: item.options,
             pair_prompts: item.pair_prompts,
             points: item.points,
+            // 單字卡: which side is the word, so the 標音 lands on it and not on
+            // the gloss beside it.
+            prompt_is_word: item.prompt_is_word,
             translations: item.translations,
           })))
           if (itemError) throw itemError
@@ -1251,15 +1255,20 @@ Deno.serve(async (req) => {
         fontUrl = supabase.storage.from('lingoact-listening').getPublicUrl(fontPath).data.publicUrl
       }
 
+      // The reading goes on whichever side the word is. A card asked the other
+      // way round — 看詞選解釋 — has the word in the prompt and three glosses in
+      // the options, and annotating the glosses put 注音 on 「不同之處」 under a
+      // question about 「差異」.
       for (const raw of rows) {
-        const row = raw as { itemId?: unknown; readings?: unknown }
+        const row = raw as { itemId?: unknown; readings?: unknown; promptReading?: unknown }
         const itemId = typeof row.itemId === 'string' ? row.itemId : ''
         if (!known.has(itemId)) continue
         const readings = Array.isArray(row.readings)
           ? row.readings.map((reading) => typeof reading === 'string' ? reading : '')
           : []
+        const promptReading = typeof row.promptReading === 'string' ? row.promptReading : ''
         const { error: itemError } = await supabase.from('quiz_items')
-          .update({ option_readings: readings }).eq('id', itemId)
+          .update({ option_readings: readings, prompt_reading: promptReading || null }).eq('id', itemId)
         if (itemError) throw itemError
       }
 
@@ -1315,7 +1324,7 @@ Deno.serve(async (req) => {
         if (!sourceUrl) return jsonResponse({ message: '找不到原始教材，無法再出卡。' }, 400)
 
         const { data: classRow } = await supabase.from('sessions')
-          .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+          .select('teaching_language, guidance_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
         // What each card TEACHES, not every word printed on it. A card's other
         // options are distractors drawn from the same lesson by design, so
         // treating them as covered makes a thirteen-word lesson look exhausted
@@ -1335,6 +1344,7 @@ Deno.serve(async (req) => {
               covered.length ? `These are already on cards in this deck; choose different ones: ${covered.join('、')}` : '',
             ].filter(Boolean).join('\n'),
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+            guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
             levelFramework: classRow?.level_framework ?? null,
             levelCode: classRow?.level_code ?? null,
             direction: quiz.direction,
@@ -1363,6 +1373,9 @@ Deno.serve(async (req) => {
             options: item.options,
             pair_prompts: item.pair_prompts,
             points: item.points,
+            // 單字卡: which side is the word, so the 標音 lands on it and not on
+            // the gloss beside it.
+            prompt_is_word: item.prompt_is_word,
             translations: item.translations,
           }))
           const { error: insertError } = await supabase.from('quiz_items').insert(added)

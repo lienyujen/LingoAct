@@ -106,8 +106,18 @@ export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Prop
 
   if (!current) return null
 
+  // Two halves with different jobs. The WORD is what is being learned, so it
+  // stays in the language being taught and carries the 標音; the GLOSS exists to
+  // be understood, so it is read in whatever language the student is on —
+  // generated in the 導引語 and translated where a translation exists.
   const translation = localizedFields(current.translations, locale)
-  const options = translation?.options?.length === current.options.length ? translation.options : current.options
+  const promptIsWord = current.prompt_is_word === true
+  const promptReading = current.prompt_reading || ''
+  // Never localise the word: a translated 詞彙 is no longer the thing on the card.
+  const promptText = promptIsWord ? current.prompt_text : (translation?.prompt_text || current.prompt_text)
+  const options = promptIsWord && translation?.options?.length === current.options.length
+    ? translation.options
+    : current.options
 
   return (
     <section className="panel participant-question participant-flashcards">
@@ -116,14 +126,19 @@ export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Prop
         <div className="flashcard-bar"><span style={{ width: `${(cleared.length / data.items.length) * 100}%` }} /></div>
       </div>
 
-      <p className="flashcard-prompt">{translation?.prompt_text || current.prompt_text}</p>
+      {/* 注音 replaces the word, because the reading is inside its glyphs; 拼音
+          sits under it, which is where a vocabulary card puts it. */}
+      <p className={promptIsWord ? 'flashcard-prompt is-word' : 'flashcard-prompt'}>
+        {readingFamily && promptReading
+          ? <span style={{ fontFamily: readingFamily }}>{promptReading}</span>
+          : <span className="flashcard-word">{promptText}{promptReading && <small>{promptReading}</small>}</span>}
+      </p>
 
       <div className="flashcard-options">
         {current.options.map((option, index) => {
           const chosen = verdict?.chosen === option
           const isAnswer = verdict && !verdict.correct && verdict.correctAnswer === option
-          // 注音 replaces the word, because the reading is inside its glyphs;
-          // 拼音 sits under it, which is where a vocabulary card puts it.
+          // Empty on a card whose word is the prompt: these are the glosses.
           const reading = current.option_readings?.[index] || ''
           return (
             <button

@@ -45,6 +45,10 @@ const quizGenerationSchema = {
           // 配對 only: the left-hand column. Every other type leaves it empty.
           pair_prompts: { type: 'array', items: { type: 'string' } },
           accepted_answers: { type: 'array', items: { type: 'string' } },
+          // 單字卡 only, ignored on every other type: the word this card
+          // teaches, exactly as it is written on the card. Which side it is on
+          // is worked out by matching rather than declared — see below.
+          target_word: { type: 'string' },
           rubric: { type: 'string' },
           translation_en: {
             type: 'object',
@@ -57,7 +61,7 @@ const quizGenerationSchema = {
             required: ['prompt_text', 'options', 'pair_prompts'],
           },
         },
-        required: ['type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'rubric', 'translation_en'],
+        required: ['type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'target_word', 'rubric', 'translation_en'],
       },
     },
   },
@@ -106,6 +110,20 @@ function extractGeminiText(response: Record<string, unknown>) {
 function cleanStrings(value: unknown, limit = 10) {
   if (!Array.isArray(value)) return []
   return [...new Set(value.map((item) => typeof item === 'string' ? item.trim() : '').filter(Boolean))].slice(0, limit)
+}
+
+// 單字卡: whether this card's prompt is the word itself rather than its gloss.
+//
+// Compared after stripping the quotation marks a model reaches for around a
+// vocabulary item, so 「差異」 and 差異 are the same card. A prompt that merely
+// CONTAINS the word — 「差異」的意思是什麼？ — is deliberately not a match: the
+// reading belongs on the word, and annotating the question around it would put
+// 注音 on 的意思是什麼 as well.
+function promptIsTargetWord(promptText: string, targetWord: unknown) {
+  if (typeof targetWord !== 'string') return false
+  const bare = (value: string) => value.replace(/[「」『』（）()\s]/g, '')
+  const word = bare(targetWord)
+  return word.length > 0 && bare(promptText) === word
 }
 
 function normalizedAnswer(value: string) {
@@ -173,6 +191,10 @@ export async function generateCustomQuiz(input: {
   // The class's own language, named for the model. Settled when the session was
   // created, so the teacher does not have to say it in every 出題方向.
   teachingLanguage?: string
+  // What the class is EXPLAINED in, named for the model. A 單字卡 gloss is for
+  // understanding rather than for practising, so it goes in this and not in the
+  // language being taught.
+  guidanceLanguage?: string
   // The class's ladder, for the stem-length check after generation. Passing the
   // codes rather than the resolved ceiling keeps the level's own vocabulary at
   // the call site, where the session row is.
@@ -197,13 +219,6 @@ export async function generateCustomQuiz(input: {
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
   const flashcard = input.requestedType === 'flashcard'
   const writing = input.requestedType === 'writing'
-  const typeInstruction = flashcard
-    ? '這是單字卡練習，不是測驗。每一張卡片都必須是 multiple_choice，題幹只放要辨認的提示（一個詞、一個定義、一段情境描述或一個問句），選項放 3 到 4 個候選答案，accepted_answers 只放唯一正確的那一個。卡片之間互相獨立，不要互相參照；重點是能不能立刻反應出來，所以題幹要短，不要考長篇理解。'
-    : writing
-    ? '這是寫作練習，不是測驗。每一題都必須是 short_answer，題幹是一個要學生動筆寫的欄位：寫清楚這一欄要寫什麼、大約多長、可以用到哪些詞語或句型。不要出有標準答案的題目，accepted_answers 與 rubric 一律留空。'
-    : input.requestedType === 'random'
-      ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
-      : `每一題都必須是 ${input.requestedType}。`
   // The class's language decides this, and the teacher's direction can still
   // override it — a 華語文 teacher does sometimes want an English gloss. Reading
   // it out of the direction text was the wrong way round: it made the default
@@ -212,6 +227,24 @@ export async function generateCustomQuiz(input: {
   const requestedLanguage = /(?:英文|英語|english)/i.test(input.direction)
     ? 'English'
     : input.teachingLanguage || 'auto'
+  // A vocabulary card is bilingual by nature and was being written in one
+  // language: a TBCL 1 learner cannot read a Chinese definition of 差異, so the
+  // three options came out harder than the word they were glossing.
+  const guidanceName = input.guidanceLanguage || requestedLanguage
+  const typeInstruction = flashcard
+    ? [
+        '這是單字卡練習，不是測驗。每一張卡片都必須是 multiple_choice，題幹只放要辨認的提示，選項放 3 到 4 個候選答案，accepted_answers 只放唯一正確的那一個。卡片之間互相獨立，不要互相參照；重點是能不能立刻反應出來，所以題幹要短，不要考長篇理解。',
+        `一張卡片一定分成「詞彙」與「解釋」兩邊。詞彙是要學的那個詞，用 ${requestedLanguage} 寫；解釋是它的意思，用 ${guidanceName} 寫，讓學生看得懂。解釋要說出這個詞是什麼意思，不要只換一個同義詞。`,
+        '方向由教師的出卡方向決定：看詞選解釋就把詞彙放題幹、三到四個解釋放選項；看解釋選詞就把解釋放題幹、三到四個詞彙放選項。',
+        'target_word 一律填這張卡要學的那個詞（只填詞，不要填解釋、不要加標點或引號）。系統用它來判斷詞彙在哪一邊，並只在那一邊加標音。',
+        '看詞選解釋時，題幹就只放那個詞本身，不要包成問句。「差異」比「「差異」的意思是什麼？」好：卡片本來就是在問意思，多出來的字只會被一起標上注音。',
+        '不論方向，同一張卡的選項必須是同一類的東西——三個都是解釋，或三個都是詞彙——否則正確答案一眼就看得出來。',
+      ].join('\n')
+    : writing
+    ? '這是寫作練習，不是測驗。每一題都必須是 short_answer，題幹是一個要學生動筆寫的欄位：寫清楚這一欄要寫什麼、大約多長、可以用到哪些詞語或句型。不要出有標準答案的題目，accepted_answers 與 rubric 一律留空。'
+    : input.requestedType === 'random'
+      ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
+      : `每一題都必須是 ${input.requestedType}。`
   const languageInstruction = requestedLanguage === 'auto'
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
     : `本課程的教學語言是 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則都必須使用 ${requestedLanguage}，除非教師在出題方向中另外指定。`
@@ -364,6 +397,9 @@ ${input.sourceText}` }] : []),
       id: crypto.randomUUID(),
       position: index + 1,
       type,
+      // Only a 單字卡 has a word side; anything else leaves it false and the
+      // annotation never looks at it.
+      prompt_is_word: flashcard && promptIsTargetWord(promptText, item.target_word),
       prompt_text: promptText,
       options: shownOptions,
       pair_prompts: pairPrompts,

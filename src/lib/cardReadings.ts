@@ -12,10 +12,15 @@ import type { QuizItem } from '../types'
 // characters and leaves everything else alone, and 拼音 returns an empty slot
 // for anything that is not a Han character.
 //
-// The two modes end up in the same column as a string per option, which is what
-// keeps the card renderer simple: 注音 is the word with its readings built into
-// the glyphs, 拼音 is the syllables to print under the word. Which one it is,
-// the question says — a deck with a font is 注音.
+// The two modes end up in the same shape — a string per annotated text — which
+// is what keeps the card renderer simple: 注音 is the word with its readings
+// built into the glyphs, 拼音 is the syllables to print under the word. Which
+// one it is, the question says — a deck with a font is 注音.
+//
+// Only the WORD is annotated, never the gloss. Which side that is the card
+// says: a 看解釋選詞 deck has the words in the options, a 看詞選解釋 deck has
+// one word in the prompt and three glosses beside it, and annotating those
+// glosses put 注音 on 「不同之處」 under a question about 「差異」.
 const SEPARATOR = '\n'
 
 export async function annotateCardDeck(input: {
@@ -25,13 +30,19 @@ export async function annotateCardDeck(input: {
   items: QuizItem[]
   mode: 'zhuyin' | 'pinyin'
 }, t: PresenterT = presenterLookup('zh-TW')) {
-  // One entry per option of every card, flattened, so the whole deck is one
-  // request and the font subset is cut from every character at once.
+  // Every word in the deck, flattened, so the whole deck is one request and the
+  // font subset is cut from every character at once. A card contributes its
+  // prompt or its options, never both.
   const words: string[] = []
   const shape: number[] = []
   for (const item of input.items) {
-    shape.push(item.options.length)
-    words.push(...item.options)
+    if (item.prompt_is_word) {
+      shape.push(1)
+      words.push(item.prompt_text)
+    } else {
+      shape.push(item.options.length)
+      words.push(...item.options)
+    }
   }
   if (!words.length) return null
 
@@ -61,10 +72,13 @@ export async function annotateCardDeck(input: {
   // A split that does not line up would put one word's reading on another.
   if (perWord.length !== words.length) throw new Error(t('readingCountMismatch'))
 
-  const items: Array<{ itemId: string; readings: string[] }> = []
+  const items: Array<{ itemId: string; readings: string[]; promptReading: string }> = []
   let at = 0
   for (const [index, item] of input.items.entries()) {
-    items.push({ itemId: item.id, readings: perWord.slice(at, at + shape[index]) })
+    const slice = perWord.slice(at, at + shape[index])
+    items.push(item.prompt_is_word
+      ? { itemId: item.id, readings: [], promptReading: slice[0] || '' }
+      : { itemId: item.id, readings: slice, promptReading: '' })
     at += shape[index]
   }
 

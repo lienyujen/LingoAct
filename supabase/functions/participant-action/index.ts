@@ -429,6 +429,15 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 寫作教練: the fields were the working-out and this is the piece. It
+      // is required wherever the exercise asked for it, because an exercise
+      // whose point is the article cannot be finished without one.
+      const composing = quiz.graded === false && items.length > 1
+      const composition = typeof input.composition === 'string' ? input.composition.trim().slice(0, 12000) : ''
+      if (composing && !composition) {
+        return jsonResponse({ message: '請先把各段整合成一篇文章再送出。' }, 400)
+      }
+
       const attemptId = crypto.randomUUID()
       const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts').insert({
         id: attemptId,
@@ -437,6 +446,7 @@ Deno.serve(async (req) => {
         quiz_id: quiz.id,
         participant_id: participantId,
         participant_name: participant.name,
+        composition: composition || null,
         status: 'grading',
       }).select('*').single()
       if (attemptError) {

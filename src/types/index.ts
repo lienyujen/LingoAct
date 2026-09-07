@@ -410,6 +410,16 @@ export type QuizAttempt = {
   total_score: number | null
   max_score: number
   feedback: { zh_tw?: string; en?: string } | null
+  // 寫作教練 only: the fields joined into one article by the student, which is
+  // the piece of writing the exercise exists to produce.
+  composition?: string | null
+  // The same article with the AI's corrections applied, and why. The page diffs
+  // it against `composition` rather than trusting a diff from the model, so
+  // everything shown as the student's own is exactly what they wrote.
+  revision?: {
+    zh_tw?: string
+    notes?: Array<{ before: string; after: string; why: string }>
+  } | null
   error_message: string | null
   submitted_at: string
   graded_at: string | null

@@ -376,13 +376,13 @@ export function ParticipantPage() {
     }
   }
 
-  async function submitCustomQuiz(answers: QuizSubmission) {
+  async function submitCustomQuiz(answers: QuizSubmission, composition: string) {
     if (!participant || !participantToken || !question || question.type !== 'custom_quiz') return
     setQuizBusy(true)
     setError('')
     try {
       const { data, error: submitError } = await requireSupabase().functions.invoke('participant-action', {
-        body: { action: 'submit_custom_quiz', sessionId, participantId: participant.id, participantToken, questionId: question.id, answers },
+        body: { action: 'submit_custom_quiz', sessionId, participantId: participant.id, participantToken, questionId: question.id, answers, composition },
       })
       if (submitError) throw submitError
       if (!data?.attempt) throw new Error(data?.message || '自訂測驗送出失敗。')

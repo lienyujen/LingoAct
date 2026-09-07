@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sparkle, Square, Trash, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
+import { RevisedWriting } from './RevisedWriting'
 
 type Props = {
   anonymousEnabled: boolean
@@ -419,6 +420,27 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
             {/* The writing itself is the result here — a score would be the one
                 thing the teacher did not ask for, and the words are the thing
                 they did. */}
+            {/* The article first, because it is the piece of work. The fields
+                below it are how they got there, which is worth reading second
+                and worth reading at all only for that reason. */}
+            {writing && attempt.composition && (
+              <div className="quiz-written-answer is-composition">
+                <span>{t('composedArticle')}</span>
+                {attempt.revision?.zh_tw ? (
+                  <RevisedWriting
+                    labels={{
+                      added: t('revisionAdded'),
+                      removed: t('revisionRemoved'),
+                      unchanged: t('revisionUnchanged'),
+                      notesHeading: t('revisionNotes'),
+                    }}
+                    notes={attempt.revision.notes}
+                    original={attempt.composition}
+                    revised={attempt.revision.zh_tw}
+                  />
+                ) : <p>{attempt.composition}</p>}
+              </div>
+            )}
             {writing && (
               <div className="quiz-written-answers">
                 {(answersByAttempt.get(attempt.id) || [])

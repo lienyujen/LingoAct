@@ -6,6 +6,7 @@ import { participantText } from '../lib/participantI18n'
 import { QuizOrderingInput } from './QuizOrderingInput'
 import { QuizMatchingInput } from './QuizMatchingInput'
 import { WritingCoachPanel } from './WritingCoachPanel'
+import { RevisedWriting } from './RevisedWriting'
 import { localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { ParticipantQuizData } from '../types'
 
@@ -16,7 +17,7 @@ type Props = {
   busy: boolean
   locale: ParticipantLocale
   onRetry: () => Promise<void>
-  onSubmit: (answers: QuizSubmission) => Promise<void>
+  onSubmit: (answers: QuizSubmission, composition: string) => Promise<void>
   onAskCoach: (itemId: string, draft: string) => Promise<void>
 }
 
@@ -33,14 +34,23 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
   // One chosen option per left-hand item, positionally. Starts empty so an
   // untouched 配對 blocks submission rather than sending a row of first guesses.
   const [matchAnswers, setMatchAnswers] = useState<Record<string, string[]>>({})
+  // 寫作教練: the article the fields add up to. Held apart from the answers
+  // because it is not the answer to any one of them.
+  const [composition, setComposition] = useState('')
   const writing = data.quiz.graded === false
   const coaching = writing && data.quiz.coaching === true
   const usesAiGrading = !writing && data.items.some((item) => item.type !== 'multiple_choice')
+  const composing = writing && data.items.length > 1
+  // In field order, which is the order the article should run in.
+  const paragraphs = data.items
+    .map((item) => (textAnswers[item.id] || '').trim())
+    .filter(Boolean)
 
   useEffect(() => {
     setTextAnswers({})
     setChoiceAnswers({})
     setMatchAnswers({})
+    setComposition('')
   }, [data.quiz.id])
 
   const complete = useMemo(() => data.items.every((item) => {
@@ -52,7 +62,8 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
       return item.pair_prompts.length > 0 && item.pair_prompts.every((_, index) => Boolean(chosen[index]))
     }
     return Boolean(textAnswers[item.id]?.trim())
-  }), [choiceAnswers, data.items, matchAnswers, orderAnswers, textAnswers])
+  }) && (!composing || Boolean(composition.trim())),
+  [choiceAnswers, composing, composition, data.items, matchAnswers, orderAnswers, textAnswers])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -64,7 +75,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
       // Positional: the nth value is the choice for the nth left-hand item.
       if (item.type === 'matching') return { itemId: item.id, answerValues: matchAnswers[item.id] || [] }
       return { itemId: item.id, answerText: textAnswers[item.id].trim() }
-    }))
+    }), composing ? composition.trim() : '')
   }
 
   if (data.attempt) {
@@ -84,6 +95,34 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
           {graded && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
         </div>
         {data.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(data.attempt.feedback, locale)}</p>}
+        {/* The corrected article laid over their own, once the teacher has run
+            the AI over it. This is the point of getting it back at all: seeing
+            what was added and what it replaced is how the next draft is
+            better. Their own untouched sentences stay plain, so the first thing
+            they see is how much was already right. */}
+        {submitted && data.attempt.composition && (
+          <article className="quiz-graded-item writing-composition-result">
+            <div><strong>{participantText(locale, 'composeHeading')}</strong></div>
+            {data.attempt.revision?.zh_tw ? (
+              <RevisedWriting
+                labels={{
+                  added: participantText(locale, 'revisionAdded'),
+                  removed: participantText(locale, 'revisionRemoved'),
+                  unchanged: participantText(locale, 'revisionUnchanged'),
+                  notesHeading: participantText(locale, 'revisionNotes'),
+                }}
+                notes={data.attempt.revision.notes}
+                original={data.attempt.composition}
+                revised={data.attempt.revision.zh_tw}
+              />
+            ) : (
+              <>
+                <p className="quiz-written-back">{data.attempt.composition}</p>
+                <p className="muted">{participantText(locale, 'revisionPending')}</p>
+              </>
+            )}
+          </article>
+        )}
         {submitted && data.items.map((item, index) => {
           const response = data.answers.find((answer) => answer.item_id === item.id)
           const translation = localizedFields(item.translations, locale)
@@ -91,6 +130,11 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
             <article className="quiz-graded-item" key={item.id}>
               <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong></div>
               <p className="quiz-written-back">{response?.answer_text}</p>
+              {/* Written back to them, not only to the teacher's panel: notes
+                  the student never reads are notes nobody acts on. */}
+              {response?.feedback && (
+                <p className="quiz-field-feedback">{localizedFeedback(response.feedback, locale)}</p>
+              )}
             </article>
           )
         })}
@@ -172,6 +216,31 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
             </fieldset>
           )
         })}
+        {/* The fields were the way in; this is the writing. Pasting the
+            paragraphs is offered rather than done automatically — filling the
+            box for them once they have started editing would throw away the
+            joining work, which is the part being taught. */}
+        {composing && (
+          <fieldset className="custom-quiz-item writing-composition">
+            <legend><span>✓</span>{participantText(locale, 'composeHeading')}</legend>
+            <p className="muted">{participantText(locale, 'composeHint')}</p>
+            <textarea
+              maxLength={12000}
+              placeholder={participantText(locale, 'composePlaceholder')}
+              rows={10}
+              value={composition}
+              onChange={(event) => setComposition(event.target.value)}
+            />
+            <button
+              className="compose-fill"
+              disabled={!paragraphs.length}
+              type="button"
+              onClick={() => setComposition(paragraphs.join('\n\n'))}
+            >
+              {participantText(locale, composition.trim() ? 'composeRefill' : 'composeFill')}
+            </button>
+          </fieldset>
+        )}
         <button disabled={!complete || busy} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, busy ? 'submitting' : 'submitAnswers')}</button>
       </form>
     </section>

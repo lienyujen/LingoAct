@@ -20,6 +20,10 @@ import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { PictureStudioModal } from '../components/PictureStudioModal'
+import { SentenceWallModal } from '../components/SentenceWallModal'
+import { SentenceWallPanel } from '../components/SentenceWallPanel'
+import { composeSentenceWall, dispatchTextFor, openSentenceWall } from '../lib/sentenceWall'
+import type { SentenceWallComposition } from '../lib/sentenceWall'
 import { FileTransferModal } from '../components/FileTransferModal'
 import { finalizeLottery } from '../lib/lottery'
 import { getPresenterToken } from '../lib/presenterAuth'
@@ -97,6 +101,11 @@ export function PresenterPage() {
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
   const [listeningOpen, setListeningOpen] = useState(false)
   const [pictureOpen, setPictureOpen] = useState(false)
+  const [sentenceWallOpen, setSentenceWallOpen] = useState(false)
+  const [sentenceWallError, setSentenceWallError] = useState('')
+  const [wallComposition, setWallComposition] = useState<SentenceWallComposition | null>(null)
+  // Pre-filled when 造句牆 hands its write-up to 文字派送; empty for a plain send.
+  const [textDispatchDraft, setTextDispatchDraft] = useState('')
   const [textDispatchError, setTextDispatchError] = useState('')
   const [fileTransferOpen, setFileTransferOpen] = useState(false)
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([])
@@ -226,7 +235,7 @@ export function PresenterPage() {
       : nextSession?.current_question_id || nextQuestions.at(-1)?.id || null
 
     if (targetQuestionId) {
-      const [{ data: questionData }, { data: answerData }, { data: summaryData }] = await Promise.all([
+      const [{ data: questionData }, { data: answerData }, { data: summaryData }, { data: wallData }] = await Promise.all([
         supabase.from('questions').select('*').eq('id', targetQuestionId).single(),
         supabase.from('answers').select('*').eq('question_id', targetQuestionId).order('submitted_at'),
         supabase
@@ -238,11 +247,23 @@ export function PresenterPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        // Stored rather than held in the page, so switching questions and
+        // coming back does not throw away a write-up that cost an AI call.
+        supabase
+          .from('ai_summaries')
+          .select('*')
+          .eq('question_id', targetQuestionId)
+          .eq('type', 'sentence_wall')
+          .eq('status', 'success')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ])
       if (targetQuestionId !== selectedQuestionId) setSelectedQuestionId(targetQuestionId)
       setQuestion(questionData as Question | null)
       setAnswers((answerData || []) as Answer[])
       setAnalysis(((summaryData as AiSummary | null)?.output_json as QuestionAnalysis | undefined) || null)
+      setWallComposition(((wallData as AiSummary | null)?.output_json as SentenceWallComposition | undefined) || null)
       const loadedQuestion = questionData as Question | null
       if (loadedQuestion?.type === 'custom_quiz') {
         const presenterToken = getPresenterToken(sessionId)
@@ -272,6 +293,7 @@ export function PresenterPage() {
       setAudioResponses([])
       setQuizResults(null)
       setAnalysis(null)
+      setWallComposition(null)
     }
   }, [selectedQuestionId, sessionId])
 
@@ -334,11 +356,11 @@ export function PresenterPage() {
   useEffect(() => {
     if (!window.lingoActDesktop || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
-      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen,
+      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, pictureOpen, selectionMode, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, pictureOpen, selectionMode, sentenceWallOpen, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return
@@ -433,6 +455,7 @@ export function PresenterPage() {
           presenterToken,
           danmakuEnabled: values.danmaku_enabled,
           anonymousEnabled: values.anonymous_enabled,
+          sentenceWallEnabled: values.sentence_wall_enabled,
           recordingEnabled: values.recording_enabled,
           captionsEnabled: values.captions_enabled,
           captionStatus: values.caption_status,
@@ -1488,6 +1511,41 @@ export function PresenterPage() {
       markingRef.current = false
     }
   }
+  async function openWall(promptText: string, answerSeconds: number | null) {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) {
+      setSentenceWallError('找不到講者權限，請重新加入場次。')
+      return
+    }
+    setBusy(true)
+    setSentenceWallError('')
+    try {
+      const { question: created, session: updated } = await openSentenceWall({
+        sessionId, presenterToken, promptText, answerSeconds,
+      })
+      if (updated) setSession(updated)
+      setSelectedQuestionId(created.id)
+      setWallComposition(null)
+      setSentenceWallOpen(false)
+    } catch (error) {
+      setSentenceWallError(error instanceof Error ? error.message : '造句牆開啟失敗。')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function composeWall() {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken || !question) throw new Error('找不到講者權限，請重新加入場次。')
+    setWallComposition(await composeSentenceWall({ sessionId, presenterToken, questionId: question.id }))
+  }
+
+  function dispatchWallComposition(composition: SentenceWallComposition) {
+    setTextDispatchDraft(dispatchTextFor(composition))
+    setTextDispatchError('')
+    setTextDispatchOpen(true)
+  }
+
   async function sendSharedContent(body: string, url: string) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
@@ -1627,6 +1685,7 @@ export function PresenterPage() {
           }}
           onOpenListeningStudio={() => setListeningOpen(true)}
           onOpenPictureStudio={() => setPictureOpen(true)}
+          onOpenSentenceWall={() => setSentenceWallOpen(true)}
           onOpenTextDispatch={() => {
             setTextDispatchError('')
             setTextDispatchOpen(true)
@@ -1677,6 +1736,17 @@ export function PresenterPage() {
           })}
           onDrawUnanswered={drawUnanswered}
           onSetCorrectAnswer={setCorrectAnswer}
+          sentenceWall={question?.type === 'short_answer' ? (
+            <SentenceWallPanel
+              composition={wallComposition}
+              isCurrentQuestion={question.id === session.current_question_id}
+              sentenceCount={answers.filter((answer) => (answer.answer_text || '').trim()).length}
+              wallEnabled={session.sentence_wall_enabled}
+              onCompose={composeWall}
+              onDispatch={dispatchWallComposition}
+              onToggleWall={(enabled) => updateSession({ sentence_wall_enabled: enabled })}
+            />
+          ) : undefined}
         />}
         {session.exit_ticket_prompt && session.exit_ticket_category && (
           <ExitTicketResult
@@ -1764,11 +1834,19 @@ export function PresenterPage() {
         onClose={() => setPictureOpen(false)}
         onDispatch={uploadQuestionScreenshot}
       />
+      <SentenceWallModal
+        busy={busy}
+        error={sentenceWallError}
+        open={sentenceWallOpen}
+        onCancel={() => setSentenceWallOpen(false)}
+        onOpen={openWall}
+      />
       <TextDispatchModal
         busy={busy}
         error={textDispatchError}
+        initialBody={textDispatchDraft}
         open={textDispatchOpen}
-        onCancel={() => setTextDispatchOpen(false)}
+        onCancel={() => { setTextDispatchOpen(false); setTextDispatchDraft('') }}
         onSend={sendSharedContent}
       />
       <PresenterSettingsModal

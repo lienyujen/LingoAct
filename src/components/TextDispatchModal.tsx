@@ -6,20 +6,24 @@ type Props = {
   busy: boolean
   error: string
   open: boolean
+  // 造句牆 hands its write-up over here rather than sending it itself: it is the
+  // class's own writing, and what of it goes out is the teacher's call.
+  initialBody?: string
   onCancel: () => void
   onSend: (body: string, url: string) => void
 }
 
-export function TextDispatchModal({ busy, error, open, onCancel, onSend }: Props) {
+export function TextDispatchModal({ busy, error, initialBody = '', open, onCancel, onSend }: Props) {
   const [body, setBody] = useState('')
   const [url, setUrl] = useState('')
 
   useEffect(() => {
-    if (!open) {
+    if (open) setBody(initialBody)
+    else {
       setBody('')
       setUrl('')
     }
-  }, [open])
+  }, [initialBody, open])
 
   if (!open) return null
 

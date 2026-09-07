@@ -4803,6 +4803,106 @@ h2 {
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
 .ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* 即時造句牆 on the projector. Its own dark ground rather than the app palette:
+   this is the one surface the class reads from across a room, competing with a
+   lit classroom, so it is sized and contrasted for the back row. */
+.sentence-wall {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 34px 40px 40px;
+  background: rgb(11 16 32 / 94%);
+  color: #f5f3f7;
+  overflow: hidden;
+}
+
+.sentence-wall-head { display: flex; align-items: baseline; gap: 18px; }
+.sentence-wall-head h1 {
+  margin: 0; flex-grow: 1;
+  font-size: clamp(22px, 2.6vw, 40px); font-weight: 800; line-height: 1.35;
+  text-wrap: balance;
+}
+.sentence-wall-count {
+  flex-shrink: 0;
+  padding: 4px 18px; border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  font-size: clamp(18px, 2vw, 30px); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sentence-wall-waiting {
+  margin: auto; font-size: clamp(20px, 2.4vw, 34px); color: rgb(245 243 247 / 55%);
+}
+
+/* Columns rather than a grid: sentences vary in length, and a masonry flow
+   wastes none of the wall on the gaps a row grid would leave. */
+.sentence-wall-grid {
+  flex-grow: 1;
+  column-gap: 16px;
+  overflow: hidden;
+}
+.sentence-wall-grid.is-roomy { columns: 2; font-size: clamp(20px, 2.2vw, 34px); }
+.sentence-wall-grid.is-full { columns: 3; font-size: clamp(17px, 1.7vw, 27px); }
+.sentence-wall-grid.is-tight { columns: 4; font-size: clamp(15px, 1.3vw, 21px); }
+.sentence-wall-grid.is-packed { columns: 5; font-size: clamp(13px, 1.05vw, 17px); }
+
+.sentence-card {
+  break-inside: avoid;
+  margin: 0 0 14px;
+  padding: 0.55em 0.7em;
+  border-radius: 12px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 7%);
+}
+.sentence-card p { margin: 0; font-size: 1em; line-height: 1.6; }
+.sentence-card span {
+  display: block; margin-top: 0.35em;
+  font-size: 0.62em; font-weight: 700; letter-spacing: .04em;
+  color: rgb(245 243 247 / 52%);
+}
+
+/* A sentence should be seen landing — that is what makes the wall feel live —
+   without the whole board reflowing in the reader's face. */
+.sentence-card.is-arriving { animation: sentence-arrive .55s ease-out; }
+@keyframes sentence-arrive {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sentence-card.is-arriving { animation: none; }
+}
+
+/* The teacher's half: the switch, the write-up, and the hand-off to 文字派送. */
+.sentence-wall-panel .wall-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 13px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font-family: inherit; font-size: 12.5px; font-weight: 700;
+}
+.sentence-wall-panel .wall-toggle.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.sentence-wall-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sentence-wall-composition {
+  display: flex; flex-direction: column; gap: 12px;
+  margin-top: 12px; padding: 14px 16px;
+  border-radius: var(--radius-md); background: var(--surface-subtle);
+}
+.sentence-wall-composition h3 { margin: 0; font-size: 15px; font-weight: 800; }
+.sentence-wall-composition h4 {
+  margin: 0 0 6px; font-size: 11.5px; font-weight: 800;
+  letter-spacing: .05em; color: var(--muted);
+}
+.sentence-wall-passage { margin: 0; font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
+.sentence-wall-highlights div, .sentence-wall-watch div {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 0; border-top: 1px solid var(--border);
+}
+.sentence-wall-highlights strong, .sentence-wall-watch strong { font-size: 13.5px; line-height: 1.6; }
+.sentence-wall-highlights span, .sentence-wall-watch span { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+.sentence-wall-modal textarea { min-height: 84px; resize: vertical; }
+
 /* 看圖說話. Built on the listening studio's shell, because the two are the same
    kind of thing to a teacher: a modal that makes one piece of material and then
    sends it. The picture itself gets the space — everything beside it is there to

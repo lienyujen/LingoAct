@@ -11,6 +11,9 @@ export type Session = {
   status: 'active' | 'ended'
   danmaku_enabled: boolean
   anonymous_enabled: boolean
+  // 即時造句牆: whether the class-facing overlay is currently showing the
+  // sentences for the current question.
+  sentence_wall_enabled: boolean
   current_question_id: string | null
   short_join_url: string | null
   // The language being taught, the language it is explained in, and how far

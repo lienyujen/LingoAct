@@ -145,6 +145,24 @@ why `release.yml` deliberately builds without a `.env`.
   order would leave the answer in the timestamps. And the question carries no
   `screenshot_id`: the intact picture is the answer, so it never enters the
   class at all. Marking needs no AI — comparing two sequences is exact.
+- **即時造句牆**, which is one button doing what four existing pieces already
+  could: it dispatches a 問答題 and switches the class-facing overlay on in the
+  same call, because asking for the sentence and putting the sentences on the
+  projector are one action to a teacher. The wall is a display switch on the
+  session, beside 彈幕 and 字幕, rather than a question type — so any 問答題 can
+  go on the projector — and it hides itself whenever the class is not on a
+  written question, or a switch left on would black out the screen over the next
+  activity. Then **AI 集成撰寫**: the class's sentences written up into one
+  connected text, and this is the part with a rule that is easy to get wrong.
+  Every sentence stays word for word as the student wrote it, mistakes included,
+  and everything the model adds goes BETWEEN their sentences — an opening, the
+  transitions, a close. A passage in which the errors have quietly disappeared
+  teaches nothing and misrepresents what the class wrote; the corrections belong
+  in 要注意的地方, where they can be seen, written as wrong → right pairs that
+  are nobody's sentence verbatim. The write-up is stored as an `ai_summaries`
+  row so it survives a reload, and it goes back to the class through 文字派送
+  pre-filled rather than sent automatically: it is their writing, and what of it
+  goes out is the teacher's call.
 - **寫作教練**, which is the custom-quiz machinery with the marking switched
   off: `quizzes.graded` false, items generated as writing fields rather than
   questions, and the attempt reaching a `submitted` state that carries no
@@ -166,8 +184,7 @@ What is **not** done:
 - Of the twelve teaching activities, these are still open:
   **聽打接力** (nothing built; needs per-sentence clips and pairing);
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
-  still a whole passage; **即時造句牆** collects the
-  sentences but nothing aggregates them; **AI寫作教練** is the simplified form
+  still a whole passage; **AI寫作教練** is the simplified form
   the teacher asked for, without the scaffolding questions the activity table
   describes; **拍照描述** uploads a photo with no paired caption field.
 - `pnpm desktop:package` has not been run since `subset-font` was added. pnpm's

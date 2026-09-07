@@ -1,4 +1,4 @@
-import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
+import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import type { Session } from '../types'
 
@@ -15,6 +15,7 @@ type Props = {
   onStartBuzzer: () => void
   onOpenListeningStudio: () => void
   onOpenPictureStudio: () => void
+  onOpenSentenceWall: () => void
   onOpenTextDispatch: () => void
   onOpenFileTransfer: () => void
   onOpenRoster: () => void
@@ -39,6 +40,7 @@ export function PresenterControlPanel({
   onStartBuzzer,
   onOpenListeningStudio,
   onOpenPictureStudio,
+  onOpenSentenceWall,
   onOpenTextDispatch,
   onOpenFileTransfer,
   onOpenRoster,
@@ -111,6 +113,10 @@ export function PresenterControlPanel({
           <button className="control-action picture-control-action" type="button" onClick={onOpenPictureStudio} disabled={busy}>
             <span className="control-action-icon"><Image size={18} /></span>
             看圖說話
+          </button>
+          <button className="control-action picture-control-action" type="button" onClick={onOpenSentenceWall} disabled={busy}>
+            <span className="control-action-icon"><PencilLine size={18} /></span>
+            即時造句牆
           </button>
           <button className="control-action share-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
             <span className="control-action-icon"><PaperPlaneTilt size={18} /></span>

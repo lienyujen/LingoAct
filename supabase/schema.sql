@@ -7,6 +7,9 @@ create table if not exists public.sessions (
   status text not null default 'active' check (status in ('active', 'ended')),
   danmaku_enabled boolean not null default true,
   anonymous_enabled boolean not null default true,
+  -- 即時造句牆: whether the class-facing overlay is showing the sentences for the
+  -- current question. A display switch, like 彈幕 and 字幕 beside it.
+  sentence_wall_enabled boolean not null default false,
   current_question_id uuid null,
   short_join_url text null,
   exit_ticket_prompt text null,
@@ -175,7 +178,7 @@ create table if not exists public.ai_summaries (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.sessions(id) on delete cascade,
   question_id uuid null references public.questions(id) on delete cascade,
-  type text not null check (type in ('screen_preview', 'short_answer_summary', 'question_analysis', 'exit_ticket_summary')),
+  type text not null check (type in ('screen_preview', 'short_answer_summary', 'question_analysis', 'exit_ticket_summary', 'sentence_wall')),
   input_json jsonb not null default '{}'::jsonb,
   output_json jsonb not null default '{}'::jsonb,
   status text not null check (status in ('success', 'failed')),
@@ -814,6 +817,17 @@ alter table public.sessions
 
 alter table public.sessions
   add column if not exists level_code text null check (level_code is null or char_length(level_code) between 1 and 20);
+
+alter table public.sessions
+  add column if not exists sentence_wall_enabled boolean not null default false;
+
+alter table public.ai_summaries drop constraint if exists ai_summaries_type_check;
+alter table public.ai_summaries
+  add constraint ai_summaries_type_check
+  check (type in (
+    'screen_preview', 'short_answer_summary', 'question_analysis',
+    'exit_ticket_summary', 'sentence_wall'
+  ));
 
 create table if not exists public.listening_clips (
   id uuid primary key default gen_random_uuid(),

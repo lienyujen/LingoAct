@@ -5,11 +5,12 @@ import { DanmakuLayer } from '../components/DanmakuLayer'
 import { BuzzerOverlay } from '../components/BuzzerOverlay'
 import { LotteryOverlay } from '../components/LotteryOverlay'
 import { LiveCaptionOverlay } from '../components/LiveCaptionOverlay'
+import { SentenceWallOverlay } from '../components/SentenceWallOverlay'
 import { isBuzzerAccepting, isBuzzerPending } from '../lib/buzzer'
 import { finalizeLottery } from '../lib/lottery'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
-import type { BuzzerSessionEvent, CaptionSegment, LotterySessionEvent, Message, Session, SessionEvent } from '../types'
+import type { Answer, BuzzerSessionEvent, CaptionSegment, LotterySessionEvent, Message, Question, Session, SessionEvent } from '../types'
 
 export function DesktopOverlayPage() {
   const { sessionId = '' } = useParams()
@@ -18,6 +19,10 @@ export function DesktopOverlayPage() {
   const [lotteryEvent, setLotteryEvent] = useState<LotterySessionEvent | null>(null)
   const [buzzerEvent, setBuzzerEvent] = useState<BuzzerSessionEvent | null>(null)
   const [liveCaptions, setLiveCaptions] = useState<Record<string, string>>({})
+  // 即時造句牆: only fetched while the wall is up, so an overlay showing nothing
+  // but captions is not polling for answers nobody is looking at.
+  const [wallQuestion, setWallQuestion] = useState<Question | null>(null)
+  const [wallAnswers, setWallAnswers] = useState<Answer[]>([])
   const messageCutoffRef = useRef(new Date().toISOString())
   const loadingRef = useRef(false)
   const captionHideTimersRef = useRef<Map<string, number>>(new Map())
@@ -95,6 +100,45 @@ export function DesktopOverlayPage() {
       loadingRef.current = false
     }
   }, [mergeMessages, sessionId])
+
+  const wallQuestionId = session?.sentence_wall_enabled ? session.current_question_id : null
+
+  const loadWall = useCallback(async () => {
+    if (!isSupabaseConfigured || !wallQuestionId) return
+    const supabase = requireSupabase()
+    const [{ data: questionData }, { data: answerData }] = await Promise.all([
+      supabase.from('questions').select('*').eq('id', wallQuestionId).maybeSingle(),
+      supabase.from('answers').select('*').eq('question_id', wallQuestionId).order('submitted_at'),
+    ])
+    setWallQuestion(questionData as Question | null)
+    setWallAnswers((answerData || []) as Answer[])
+  }, [wallQuestionId])
+
+  useEffect(() => {
+    if (!wallQuestionId) {
+      setWallQuestion(null)
+      setWallAnswers([])
+      return
+    }
+    void loadWall()
+    if (!isSupabaseConfigured) return
+    const supabase = requireSupabase()
+    const channel = supabase
+      .channel(`sentence-wall:${wallQuestionId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers', filter: `question_id=eq.${wallQuestionId}` }, (payload) => {
+        // Appended rather than refetched: a sentence landing while thirty
+        // students type should cost one row, not thirty.
+        setWallAnswers((current) => (
+          current.some((answer) => answer.id === (payload.new as Answer).id)
+            ? current
+            : [...current, payload.new as Answer]
+        ))
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loadWall, wallQuestionId])
 
   useEffect(() => {
     loadOverlay()
@@ -225,6 +269,13 @@ export function DesktopOverlayPage() {
           position={session.caption_position}
           status={session.caption_status}
           text={liveCaptions[resolvedCaptionLanguage(session.caption_display_language, session.caption_source_language)] || ''}
+        />
+      )}
+      {session.sentence_wall_enabled && (
+        <SentenceWallOverlay
+          anonymousEnabled={session.anonymous_enabled}
+          answers={wallAnswers}
+          question={wallQuestion}
         />
       )}
       <LotteryOverlay event={lotteryEvent} onSelect={selectLotteryCandidate} />

@@ -2,6 +2,7 @@ import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/a
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
 import { levelInstruction } from '../_shared/proficiency.ts'
 import { drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
+import { composeSentenceWall } from '../_shared/sentence-wall.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
@@ -271,6 +272,7 @@ Deno.serve(async (req) => {
         if (!guidanceLanguages.has(input.guidanceLanguage)) return jsonResponse({ message: '不支援這個導引語。' }, 400)
         values.guidance_language = input.guidanceLanguage
       }
+      if (typeof input.sentenceWallEnabled === 'boolean') values.sentence_wall_enabled = input.sentenceWallEnabled
       if (typeof input.danmakuEnabled === 'boolean') values.danmaku_enabled = input.danmakuEnabled
       if (typeof input.anonymousEnabled === 'boolean') values.anonymous_enabled = input.anonymousEnabled
       if (typeof input.recordingEnabled === 'boolean') {
@@ -596,6 +598,104 @@ Deno.serve(async (req) => {
       }
 
       return jsonResponse({ storyboard, image: image.data, mimeType: image.mimeType })
+    }
+
+    // 即時造句牆. A 問答題 dispatched with the wall switched on in the same call,
+    // because the two halves are one action to a teacher: ask for the sentence
+    // and put the sentences on the projector.
+    if (action === 'open_sentence_wall') {
+      const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (!promptText) return jsonResponse({ message: '請先寫出要學生造句的題目。' }, 400)
+      const answerSeconds = timingSeconds(input.answerSeconds, 600)
+      if (answerSeconds === undefined) return jsonResponse({ message: '時間設定不正確。' }, 400)
+
+      let translations = {}
+      try {
+        translations = await translateQuestion('造句', promptText, [])
+      } catch (translationError) {
+        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
+      }
+
+      const stoppedAt = new Date().toISOString()
+      const { error: stopError } = await supabase.from('questions')
+        .update({ status: 'stopped', stopped_at: stoppedAt })
+        .eq('session_id', sessionId).eq('status', 'active')
+      if (stopError) throw stopError
+
+      // No screenshot: the prompt is a 句型, and the wall is where the class
+      // looks. Everything else about it is an ordinary 問答題.
+      const { data: question, error: questionError } = await supabase.from('questions').insert({
+        session_id: sessionId,
+        screenshot_id: null,
+        type: 'short_answer',
+        status: 'active',
+        title: '造句',
+        prompt_text: promptText,
+        options: [],
+        translations,
+        allow_multiple: false,
+        answer_seconds: answerSeconds,
+      }).select('*').single()
+      if (questionError) throw questionError
+
+      const { data: session, error: sessionError } = await supabase.from('sessions')
+        .update({ current_question_id: question.id, sentence_wall_enabled: true })
+        .eq('id', sessionId).eq('status', 'active').select('*').maybeSingle()
+      if (sessionError) throw sessionError
+      return jsonResponse({ question, session })
+    }
+
+    // The write-up. Stored rather than returned only, so closing the panel or
+    // reloading does not lose it, and so the session report can find it.
+    if (action === 'compose_sentence_wall') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+      const [{ data: question }, { data: classRow }] = await Promise.all([
+        supabase.from('questions').select('prompt_text').eq('id', questionId).eq('session_id', sessionId).maybeSingle(),
+        supabase.from('sessions').select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle(),
+      ])
+      if (!question) return jsonResponse({ message: '找不到這一題。' }, 404)
+
+      const { data: answers, error: answerError } = await supabase.from('answers')
+        .select('answer_text').eq('question_id', questionId).order('submitted_at').limit(200)
+      if (answerError) throw answerError
+      const sentences = (answers || [])
+        .map((answer) => typeof answer.answer_text === 'string' ? answer.answer_text.trim() : '')
+        .filter(Boolean)
+      if (sentences.length < 2) return jsonResponse({ message: '至少要有兩個句子才能集成。' }, 400)
+
+      let composition
+      try {
+        composition = await composeSentenceWall({
+          prompt: question.prompt_text || '',
+          sentences,
+          trackId: classRow?.teaching_language ?? null,
+          framework: classRow?.level_framework ?? null,
+          levelCode: classRow?.level_code ?? null,
+        })
+      } catch (error) {
+        const detail = errorDetail(error, '無法集成這面造句牆。')
+        await supabase.from('ai_summaries').insert({
+          session_id: sessionId,
+          question_id: questionId,
+          type: 'sentence_wall',
+          input_json: { sentence_count: sentences.length },
+          output_json: { error: detail.slice(0, 500) },
+          status: 'failed',
+        })
+        return jsonResponse({ message: detail }, 503)
+      }
+
+      const { error: summaryError } = await supabase.from('ai_summaries').insert({
+        session_id: sessionId,
+        question_id: questionId,
+        type: 'sentence_wall',
+        input_json: { sentence_count: sentences.length },
+        output_json: composition,
+        status: 'success',
+      })
+      if (summaryError) throw summaryError
+      return jsonResponse({ composition })
     }
 
     // 故事排序, the picture version: the four panels arrive already cut apart and

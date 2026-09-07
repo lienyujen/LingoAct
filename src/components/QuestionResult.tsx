@@ -1,5 +1,6 @@
 import { CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Play, Sparkle, Square, Waveform } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
 import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
@@ -17,6 +18,9 @@ type Props = {
   analysis: QuestionAnalysis | null
   analysisBusy: boolean
   analysisError: string
+  // 造句牆 belongs to a 問答題 but carries its own state and its own calls, so it
+  // arrives assembled rather than as six more props to thread through here.
+  sentenceWall?: ReactNode
   busy: boolean
   isCurrentQuestion: boolean
   onlineCount: number
@@ -407,6 +411,7 @@ export function QuestionResult(props: Props) {
             ))}
           </div>
         </section>
+        {props.sentenceWall}
         <AiAnalysisPanel {...props} />
       </>
     )

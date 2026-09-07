@@ -27,7 +27,7 @@ import {
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
 import { trackParticipantPresence } from '../lib/participantPresence'
-import { contentLocaleKey, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
+import { contentLocaleKey, localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
 import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
 import { localizedFields } from '../lib/localizedContent'
@@ -85,9 +85,13 @@ export function ParticipantPage() {
   const location = useLocation()
   useSessionPresence(sessionId, session?.status === 'active' ? participant : null)
 
+  // The class's 導引語 is what the page opens in, and it has to win when the
+  // teacher changes it. See localeForDispatchedGuidance for why reading it out
+  // of storage alone did not.
   useEffect(() => {
-    if (session?.guidance_language) setLocale(participantLocaleFromStorage(session.guidance_language))
-  }, [session?.guidance_language])
+    if (!session?.guidance_language) return
+    setLocale(localeForDispatchedGuidance(sessionId, session.guidance_language))
+  }, [session?.guidance_language, sessionId])
 
   // Presence in the channel is live-only; this is what the report reads later.
   useEffect(() => {

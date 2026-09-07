@@ -227,3 +227,24 @@ export function participantLocaleFromStorage(sessionDefault?: string | null): Pa
   if (isParticipantLocale(sessionDefault)) return sessionDefault
   return 'zh-TW'
 }
+
+// The 導引語 the teacher set, applied so that it actually wins.
+//
+// Reading it through participantLocaleFromStorage alone did not: the stored
+// value is preferred there, so a device that had ever been in a Chinese class
+// stayed in Chinese whatever the teacher dispatched — the "it uses last time's
+// setting" everyone was seeing.
+//
+// A student's own pick still stands, remembered against the 導引語 it was made
+// under. It survives reloads and is dropped the moment the teacher moves the
+// class to a different language, because that is a new instruction rather than
+// the same one arriving again.
+export function localeForDispatchedGuidance(sessionId: string, dispatched: string | null | undefined) {
+  if (!isParticipantLocale(dispatched)) return participantLocaleFromStorage()
+  const appliedKey = `lingoact_guidance_applied_${sessionId}`
+  if (localStorage.getItem(appliedKey) !== dispatched) {
+    localStorage.setItem(appliedKey, dispatched)
+    localStorage.removeItem('lingoact_participant_locale')
+  }
+  return participantLocaleFromStorage(dispatched)
+}

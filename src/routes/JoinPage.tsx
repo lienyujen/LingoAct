@@ -7,7 +7,7 @@ import { StudentSocialLinks } from '../components/StudentSocialLinks'
 import { ParticipantLanguageSwitcher } from '../components/ParticipantLanguageSwitcher'
 import { getDeviceId } from '../lib/device'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
-import { participantLocaleFromStorage, participantText } from '../lib/participantI18n'
+import { localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import type { Participant, Session } from '../types'
 
@@ -21,12 +21,13 @@ export function JoinPage() {
   const [sessionLookupError, setSessionLookupError] = useState('')
   const [returning, setReturning] = useState(false)
   const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
-  // The teacher's 導引語 is the starting point, not a lock: a student who has
-  // chosen for themselves keeps their choice, which is why the stored value wins
-  // inside participantLocaleFromStorage.
+  // The teacher's 導引語 is the starting point and it wins on a change; a
+  // student's own pick stands until then. Same rule as the class page, so
+  // arriving through either door lands on the same language.
   useEffect(() => {
-    if (session?.guidance_language) setLocale(participantLocaleFromStorage(session.guidance_language))
-  }, [session?.guidance_language])
+    if (!session?.id || !session.guidance_language) return
+    setLocale(localeForDispatchedGuidance(session.id, session.guidance_language))
+  }, [session?.id, session?.guidance_language])
   const navigate = useNavigate()
   const location = useLocation()
 

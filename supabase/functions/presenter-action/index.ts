@@ -1470,12 +1470,27 @@ Deno.serve(async (req) => {
       }
 
       const teacherPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      // The annotated form when there is one, so a beginner reading aloud gets the
-      // zhuyin or pinyin the teacher chose rather than bare characters.
-      const readingText = clip.annotation === 'zhuyin' || clip.annotation === 'pinyin'
-        ? (clip.annotation_text || clip.transcript)
-        : clip.transcript
+      // 注音 is set into the glyphs, so the annotated text IS the text to show.
+      // 拼音 is not: annotate-reading returns a syllable per character, and
+      // printing that list is how students ended up reading ["wǒ","měi",...].
+      // It travels in reading_ruby instead and the prompt stays the sentence.
+      const zhuyin = clip.annotation === 'zhuyin'
+      const readingText = zhuyin ? (clip.annotation_text || clip.transcript) : clip.transcript
       const promptText = readAloud ? readingText.slice(0, 1000) : teacherPrompt
+      let readingRuby: string[] | null = null
+      if (readAloud && clip.annotation === 'pinyin' && clip.annotation_text) {
+        try {
+          const syllables = JSON.parse(clip.annotation_text)
+          // Aligned per character, so a list of the wrong length would put every
+          // reading over the wrong word — better none than that.
+          if (Array.isArray(syllables) && syllables.length === [...promptText].length) {
+            readingRuby = syllables.map((syllable) => typeof syllable === 'string' ? syllable : '')
+          }
+        } catch {
+          // Stored by an older build in a shape this cannot read; the sentence
+          // still goes out, just without the pinyin above it.
+        }
+      }
       const title = readAloud ? '朗讀發音' : '聽力'
       let translations = {}
       try {
@@ -1507,7 +1522,8 @@ Deno.serve(async (req) => {
           // Only a read-aloud item carries the font. The subset is cut from the
           // clip's characters, so handing it to a listening item would reveal
           // which characters the passage uses.
-          reading_font_url: readAloud && clip.annotation !== 'none' ? clip.font_url : null,
+          reading_font_url: readAloud && zhuyin ? clip.font_url : null,
+          reading_ruby: readingRuby,
           prepare_seconds: prepareSeconds,
           answer_seconds: answerSeconds,
           translations,

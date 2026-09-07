@@ -197,6 +197,9 @@ export type Question = {
   // subset is cut from the clip's own characters, so a listening item never
   // carries it.
   reading_font_url?: string | null
+  // 拼音 only: one syllable per character of prompt_text, rendered as ruby.
+  // 注音 leaves this null — its reading is inside the font above.
+  reading_ruby?: string[] | null
   // Null on both means untimed, which is every question that came before.
   // Thinking time and answering time are separate: planning is the exercise in
   // a spoken challenge, and absent entirely from a vocabulary race.

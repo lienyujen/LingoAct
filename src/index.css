@@ -4803,6 +4803,19 @@ h2 {
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
 .ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* 拼音 above the line. The row needs room the plain line does not, and the
+   syllables want to read as a guide rather than compete with the characters. */
+.reading-ruby { line-height: 2.4; }
+.reading-ruby rt {
+  font-size: .42em;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--muted);
+  /* Chromium centres ruby over the base by default but drifts on wide glyphs;
+     pinned so a syllable sits over its own character on every line. */
+  ruby-align: center;
+}
+
 /* AI 批改 for 寫作教練: feedback, never a mark. */
 .writing-review-bar {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;

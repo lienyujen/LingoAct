@@ -834,6 +834,13 @@ alter table public.sessions
 alter table public.questions
   add column if not exists wants_caption boolean not null default false;
 
+-- 拼音 sits above the line, so it cannot be set into the glyphs the way 注音 is.
+-- The syllables travel here, one per character of prompt_text, and the student
+-- page renders them as <ruby>. Null on everything else, including 注音 items,
+-- which carry their reading in reading_font_url instead.
+alter table public.questions
+  add column if not exists reading_ruby jsonb null;
+
 -- AI寫作教練, the scaffolded version. Every round a student asks for is kept:
 -- 寫作歷程 is what the teacher reads afterwards, and a first draft plus the
 -- question that moved it says more than the finished paragraph does. Keyed on

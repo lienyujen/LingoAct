@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PaperPlaneTilt } from '@phosphor-icons/react'
 import { AudioRecorder } from './AudioRecorder'
+import { RubyText } from './RubyText'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale, ParticipantMessageKey } from '../lib/participantI18n'
 import { listSeparator, localizedFields } from '../lib/localizedContent'
@@ -71,9 +72,13 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
 
   return (
     <section className="panel participant-question">
+      {/* Three ways a read-aloud line can be shown, and only one applies at a
+          time: 注音 inside the font, 拼音 above the characters, or plain. */}
       {readingFamily
         ? <h2 className="reading-text" style={{ fontFamily: readingFamily }}>{prompt}</h2>
-        : <h2>{prompt}</h2>}
+        : question.reading_ruby?.length
+          ? <h2 className="reading-text reading-ruby"><RubyText ruby={question.reading_ruby} text={prompt} /></h2>
+          : <h2>{prompt}</h2>}
       {question.status !== 'active' && <p className="muted">{participantText(locale, 'questionEnded')}</p>}
       {question.status === 'active' && secondsLeft !== null && !answer && (
         <p className={timeUp ? 'answer-countdown spent' : 'answer-countdown'} aria-live="off">

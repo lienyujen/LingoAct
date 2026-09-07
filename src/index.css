@@ -1570,6 +1570,22 @@ h2 {
   grid-column: auto;
 }
 
+/* 看圖說話 and 寫作教練 used to be their own 課堂活動 buttons. Both start from a
+   screenshot like everything else here, so they sit under the type grid: one
+   leaves for the picture studio, the other picks a 自訂測驗 型式. */
+.type-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.type-shortcuts button {
+  align-items: center;
+  display: inline-flex;
+  flex: 1 1 0;
+  gap: 7px;
+  justify-content: center;
+}
+
 .selected-type {
   background: var(--primary);
   border-color: var(--primary);
@@ -5134,6 +5150,19 @@ h2 {
   font-family: inherit; font-size: 13px; font-weight: 700;
 }
 .ps-draw:disabled { opacity: .55; cursor: not-allowed; }
+/* The second way into a 看圖說話 picture: what is already on the screen. Quieter
+   than 生成四格圖 because drawing one is still the default. */
+.ps-capture {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 10px 15px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text); font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.ps-capture:disabled { opacity: .55; cursor: not-allowed; }
+.ps-note.is-caution { color: var(--danger); }
+/* A captured picture has no storyboard, so the preview takes the room the
+   panel list would have used. */
+.ps-result.is-captured .ps-preview { max-width: 100%; }
 
 .ps-note {
   margin: 0; padding: 8px 11px; border-radius: 9px;
@@ -5438,6 +5467,101 @@ h2 {
   border-left: 2px solid var(--border-strong);
   background: var(--surface-subtle);
   white-space: pre-wrap;
+  line-height: 1.65;
+}
+
+/* 整合成一篇文章: the piece of writing the fields add up to, so it reads as the
+   work and the fields read as the working-out. */
+.writing-composition textarea {
+  line-height: 1.8;
+  min-height: 180px;
+}
+.compose-fill {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 13px;
+}
+.compose-fill:disabled { cursor: not-allowed; opacity: .5; }
+.quiz-written-answer.is-composition {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+/* The AI's corrections laid over the learner's own sentences. Colour carries
+   the difference, so each kind also carries a mark of its own — an underline
+   and a strike — for anyone who cannot separate the two hues. */
+.revised-writing { display: flex; flex-direction: column; gap: 10px; }
+.revised-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.revised-key span::before {
+  content: '';
+  display: inline-block;
+  height: 9px;
+  width: 9px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: baseline;
+}
+.revised-key-added { color: var(--success); }
+.revised-key-added::before { background: var(--success); }
+.revised-key-removed { color: var(--danger); }
+.revised-key-removed::before { background: var(--danger); }
+.revised-key.is-clean { color: var(--success); font-weight: 600; }
+.revised-body {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--border-strong);
+  background: var(--surface-subtle);
+  line-height: 2;
+  white-space: pre-wrap;
+}
+.revised-writing ins {
+  background: var(--success-soft);
+  border-radius: 3px;
+  color: var(--success);
+  font-weight: 700;
+  padding: 1px 2px;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.revised-writing del {
+  color: var(--danger);
+  opacity: .75;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.revised-notes h4 { margin: 0 0 6px; font-size: 12.5px; }
+.revised-notes ul { display: flex; flex-direction: column; gap: 7px; list-style: none; margin: 0; padding: 0; }
+.revised-notes li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: baseline;
+  border-left: 2px solid var(--border);
+  padding-left: 9px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.revised-notes li span { color: var(--muted); }
+.quiz-field-feedback {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
   line-height: 1.65;
 }
 

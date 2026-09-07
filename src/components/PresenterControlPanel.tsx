@@ -1,4 +1,4 @@
-import { CardsThree, NotePencil, Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
+import { CardsThree, Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { Session } from '../types'
@@ -13,11 +13,9 @@ type Props = {
   onToggleAnonymous: () => void
   onCaptureScreen?: () => void
   onCaptureFlashcards?: () => void
-  onCaptureWriting?: () => void
   onDrawLottery: () => void
   onStartBuzzer: () => void
   onOpenListeningStudio: () => void
-  onOpenPictureStudio: () => void
   onOpenSentenceWall: () => void
   onOpenPhotoTask: () => void
   onOpenTextDispatch: () => void
@@ -41,11 +39,9 @@ export function PresenterControlPanel({
   onToggleAnonymous,
   onCaptureScreen,
   onCaptureFlashcards,
-  onCaptureWriting,
   onDrawLottery,
   onStartBuzzer,
   onOpenListeningStudio,
-  onOpenPictureStudio,
   onOpenSentenceWall,
   onOpenPhotoTask,
   onOpenTextDispatch,
@@ -118,10 +114,6 @@ export function PresenterControlPanel({
             </span>
             {t('listeningStudio')}
           </button>
-          <button className="control-action picture-control-action" type="button" onClick={onOpenPictureStudio} disabled={busy}>
-            <span className="control-action-icon"><Image size={18} /></span>
-            {t('pictureTalk')}
-          </button>
           <button className="control-action picture-control-action" type="button" onClick={onOpenSentenceWall} disabled={busy}>
             <span className="control-action-icon"><PencilLine size={18} /></span>
             {t('sentenceWall')}
@@ -130,12 +122,6 @@ export function PresenterControlPanel({
             <button className="control-action picture-control-action" type="button" onClick={onCaptureFlashcards} disabled={busy}>
               <span className="control-action-icon"><CardsThree size={18} /></span>
               {t('flashcards')}
-            </button>
-          )}
-          {onCaptureWriting && (
-            <button className="control-action picture-control-action" type="button" onClick={onCaptureWriting} disabled={busy}>
-              <span className="control-action-icon"><NotePencil size={18} /></span>
-              {t('writingCoach')}
             </button>
           )}
           <button className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}>

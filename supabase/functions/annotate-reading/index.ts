@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
         ].join('\n'),
         { text, character_count: characters.length },
         pinyinSchema,
+        null,
         'realtime',
       )
       if (result.status !== 'success') throw new Error('AI 標音沒有回應。')
@@ -125,6 +126,7 @@ Deno.serve(async (req) => {
           })),
         },
         zhuyinSchema,
+        null,
         'realtime',
       )
       if (result.status !== 'success') throw new Error('AI 讀音判定沒有回應。')

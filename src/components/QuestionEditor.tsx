@@ -1,4 +1,4 @@
-import { PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
+import { Image, NotePencil, PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
 import type { QuestionType, QuizRequestedType } from '../types'
 import { CustomQuizFields } from './CustomQuizFields'
@@ -25,9 +25,13 @@ export type QuestionDraft = {
 }
 
 type Props = {
-  // 單字卡 and 寫作教練 have their own 課堂活動 buttons, which capture the
-  // screen and then open this editor already on the right setting.
+  // 單字卡 has its own 課堂活動 button, which captures the screen and then opens
+  // this editor already on the right setting.
   preset?: QuizRequestedType | null
+  // 看圖說話 leaves the editor for the picture studio, taking the crop with it:
+  // choosing what to do with a picture is a page of its own, not a row of
+  // fields under a type button.
+  onPictureTalk?: () => void
   error?: string
   open: boolean
   previewUrl: string | null
@@ -52,7 +56,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
   { type: 'pronunciation', label: 'typePronunciation' },
 ]
 
-export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCreate }: Props) {
+export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCreate, onPictureTalk }: Props) {
   const t = usePresenterText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
@@ -135,6 +139,20 @@ export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCr
               {t(item.label)}
             </button>
           ))}
+        </div>
+        <div className="type-shortcuts">
+          {onPictureTalk && (
+            <button className="ghost-button" type="button" onClick={onPictureTalk}>
+              <Image size={16} />{t('pictureTalk')}
+            </button>
+          )}
+          <button
+            className={type === 'custom_quiz' && quizType === 'writing' ? 'selected-type' : 'ghost-button'}
+            type="button"
+            onClick={() => { setType('custom_quiz'); setQuizType('writing') }}
+          >
+            <NotePencil size={16} />{t('writingCoach')}
+          </button>
         </div>
         {editableOptions && (
           <div className="option-editor">

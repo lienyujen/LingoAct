@@ -85,6 +85,79 @@ function cleanLine(value: unknown, limit: number) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, limit) : ''
 }
 
+// The other way a 看圖說話 picture arrives: the teacher already has one on
+// screen — a textbook illustration, a photograph in a slide — and grabs it.
+//
+// Nothing is planned here and nothing is drawn: the picture exists, so all this
+// does is read it and write the instruction the class is given. Which makes it
+// a different job from planPictureStory, not a mode of it — there is no cast to
+// keep consistent and no story to invent, and the risk runs the other way, into
+// a prompt that gives the picture away.
+const DESCRIBE_RULES = [
+  'You are looking at a picture a teacher has just grabbed off their screen to use for a 看圖說話 activity. The class will see this same picture and then describe or narrate it, aloud or in writing.',
+  'Your job is the instruction they are given, not the answer. Do not say what is in the picture: naming the people, the actions or the objects hands the class the words the activity exists to pull out of them.',
+  '`spoken_prompt` and `written_prompt` are that instruction in the language being taught — one for saying it aloud, one for writing it down, and they differ by more than the verb: speaking asks for a minute or two of connected speech, writing asks for sentences or a short paragraph.',
+  'Point them at what the picture can actually support. A single scene with people doing something supports who, where, what they are doing and why; a diagram or a chart supports comparing and explaining; a photograph of one object supports describing it and saying what it is for. Look before you write the instruction.',
+  '`target_words` are the words this particular picture should pull out of them and `pattern` the sentence pattern it leads into — both within the class\'s level, and both drawn from what is visible rather than from what you would have chosen to draw.',
+  '`title` is for the teacher\'s own list, in Traditional Chinese, and may say what the picture is.',
+  'If the picture carries printed words the class could simply read aloud, say so in `caution` and steer the instruction towards what is happening in it instead. Otherwise leave `caution` empty.',
+].join('\n')
+
+const describeSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    title: { type: 'string' },
+    target_words: { type: 'array', maxItems: 8, items: { type: 'string' } },
+    pattern: { type: 'string' },
+    spoken_prompt: { type: 'string' },
+    written_prompt: { type: 'string' },
+    caution: { type: 'string' },
+  },
+  required: ['title', 'target_words', 'pattern', 'spoken_prompt', 'written_prompt', 'caution'],
+}
+
+export async function describePictureSource(input: {
+  image: { mimeType: string; base64: string }
+  trackId: string | null
+  framework: string | null
+  levelCode: string | null
+  direction: string
+}): Promise<PictureStoryboard & { caution: string }> {
+  const systemPrompt = [
+    DESCRIBE_RULES,
+    trackInstruction(input.trackId),
+    levelInstruction(input.framework, input.levelCode),
+  ].join('\n\n')
+
+  const result = await callAiJson(
+    systemPrompt,
+    { teacher_direction: input.direction || null },
+    describeSchema,
+    input.image,
+  )
+  if (result.status !== 'success') {
+    throw new Error(errorDetail((result.output as { message?: string })?.message, '無法讀取這張圖片。'))
+  }
+  const output = result.output as Record<string, unknown>
+  const words = Array.isArray(output.target_words)
+    ? output.target_words.map((word) => cleanLine(word, 40)).filter(Boolean).slice(0, 8)
+    : []
+  return {
+    title: cleanLine(output.title, 80) || '看圖說話',
+    // A captured picture has no cast to keep consistent and no panels: nothing
+    // is being drawn, so both stay empty and 排順序 is not offered for it.
+    cast: '',
+    panels: [],
+    targetWords: words,
+    pattern: cleanLine(output.pattern, 200),
+    spokenPrompt: cleanLine(output.spoken_prompt, 300),
+    writtenPrompt: cleanLine(output.written_prompt, 300),
+    orderPrompt: '',
+    caution: cleanLine(output.caution, 200),
+  }
+}
+
 export async function planPictureStory(input: {
   trackId: string | null
   framework: string | null

@@ -450,6 +450,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。以台灣繁體中文提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
         { items: aiGradingInput },
         gradingSchema,
+        null,
         'realtime',
       )
       if (result.status !== 'success') throw new Error(String((result.output as { message?: string }).message || 'AI grading failed.'))

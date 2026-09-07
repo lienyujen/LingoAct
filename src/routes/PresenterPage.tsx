@@ -144,8 +144,9 @@ export function PresenterPage() {
   // as 截圖派題 — a teacher with a textbook page on screen should not have to
   // save it as a file first — so the selection has to know which of the two
   // asked for it before it opens anything.
-  const [captureTarget, setCaptureTarget] = useState<'question' | 'listening'>('question')
+  const [captureTarget, setCaptureTarget] = useState<'question' | 'listening' | 'picture'>('question')
   const [listeningCapture, setListeningCapture] = useState<File | null>(null)
+  const [pictureCapture, setPictureCapture] = useState<File | null>(null)
   const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const [selectionMode, setSelectionMode] = useState(false)
   const activeSelectionPointerId = useRef<number | null>(null)
@@ -906,7 +907,7 @@ export function PresenterPage() {
     return new File([bytes], filename, { type: mime })
   }
 
-  async function captureWindowsScreen(preset: QuizRequestedType | null = null, target: 'question' | 'listening' = 'question') {
+  async function captureWindowsScreen(preset: QuizRequestedType | null = null, target: 'question' | 'listening' | 'picture' = 'question') {
     if (!window.lingoActDesktop) return
 
     setCapturePreset(preset)
@@ -967,6 +968,8 @@ export function PresenterPage() {
     activeSelectionPointerId.current = null
     if (captureTarget === 'listening') {
       setListeningCapture(file)
+    } else if (captureTarget === 'picture') {
+      setPictureCapture(file)
     } else {
       setCaptureFile(file)
       setCapturePreviewUrl(dataUrl)
@@ -1787,7 +1790,6 @@ export function PresenterPage() {
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
           onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen() : undefined}
           onCaptureFlashcards={window.lingoActDesktop ? () => void captureWindowsScreen('flashcard') : undefined}
-          onCaptureWriting={window.lingoActDesktop ? () => void captureWindowsScreen('writing') : undefined}
           onGenerateExitTicket={generateExitTicket}
           onEndClass={() => setEndClassConfirmOpen(true)}
           onOpenFileTransfer={() => {
@@ -1795,7 +1797,6 @@ export function PresenterPage() {
             void refreshSharedFiles()
           }}
           onOpenListeningStudio={() => setListeningOpen(true)}
-          onOpenPictureStudio={() => setPictureOpen(true)}
           onOpenSentenceWall={() => setSentenceWallOpen(true)}
           onOpenPhotoTask={() => setPhotoTaskOpen(true)}
           onOpenTextDispatch={() => {
@@ -1916,6 +1917,7 @@ export function PresenterPage() {
         previewUrl={capturePreviewUrl}
         onCancel={cancelQuestionEditor}
         onCreate={createScreenshotQuestion}
+        onPictureTalk={() => { setEditorOpen(false); setPictureCapture(captureFile); setPictureOpen(true) }}
       />
       {fileTransferOpen && (
         <FileTransferModal
@@ -1950,10 +1952,14 @@ export function PresenterPage() {
         onClose={() => { setListeningCapture(null); setListeningOpen(false) }}
       />
       <PictureStudioModal
+        capturedScreen={pictureCapture}
         open={pictureOpen}
+        suspended={selectionMode}
         presenterToken={getPresenterToken(sessionId) || ''}
         sessionId={sessionId}
-        onClose={() => setPictureOpen(false)}
+        onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'picture') : undefined}
+        onCapturedScreenRead={() => setPictureCapture(null)}
+        onClose={() => { setPictureCapture(null); setPictureOpen(false) }}
         onDispatch={uploadQuestionScreenshot}
       />
       <SentenceWallModal

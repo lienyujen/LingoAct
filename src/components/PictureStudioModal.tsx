@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ArrowsClockwise, CardsThree, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
+import { ArrowsClockwise, CardsThree, Crop, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
 import { TimingRow } from './TimingRow'
-import { dispatchPictureOrdering, generatePicture } from '../lib/picture'
+import { dispatchPictureOrdering, describePicture, generatePicture } from '../lib/picture'
 import type { GeneratedPicture, PictureStoryboard } from '../lib/picture'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { QuestionDraft } from './QuestionEditor'
@@ -10,6 +10,15 @@ type Props = {
   open: boolean
   sessionId: string
   presenterToken: string
+  // A picture the teacher grabbed off their own screen — a textbook page, a
+  // photograph in a slide. Read by the AI rather than drawn by it, so it comes
+  // with prompts but no storyboard.
+  // Kept mounted but out of sight while the drag-select capture is running.
+  suspended?: boolean
+  capturedScreen?: File | null
+  onCapturedScreenRead?: () => void
+  // The desktop app's drag-select capture, absent in the browser.
+  onCaptureScreen?: () => void
   onClose: () => void
   onDispatch: (file: File, draft: QuestionDraft) => Promise<void>
 }
@@ -29,7 +38,17 @@ function promptFor(mode: Mode, storyboard: PictureStoryboard) {
   return storyboard.orderPrompt
 }
 
-export function PictureStudioModal({ open, sessionId, presenterToken, onClose, onDispatch }: Props) {
+export function PictureStudioModal({
+  open,
+  sessionId,
+  presenterToken,
+  suspended = false,
+  capturedScreen,
+  onCapturedScreenRead,
+  onCaptureScreen,
+  onClose,
+  onDispatch,
+}: Props) {
   const t = usePresenterText()
   const [direction, setDirection] = useState('')
   const [picture, setPicture] = useState<GeneratedPicture | null>(null)
@@ -43,6 +62,10 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
+  // A captured picture is one image, so there are no four panels to cut apart:
+  // 排順序 needs the 2x2 grid the drawing prompt produces.
+  const [drawn, setDrawn] = useState(true)
+  const [caution, setCaution] = useState('')
 
   useEffect(() => {
     if (open) return
@@ -56,6 +79,8 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
     setBusy('')
     setError('')
     setSent(false)
+    setDrawn(true)
+    setCaution('')
   }, [open])
 
   useEffect(() => {
@@ -63,17 +88,52 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
     setPromptText(promptFor(mode, picture.storyboard))
   }, [mode, picture, promptTouched])
 
+  // readCapture is a hoisted function declaration, so it is in scope here even
+  // though it is written below the early return.
+  useEffect(() => {
+    if (!capturedScreen) return
+    onCapturedScreenRead?.()
+    void readCapture(capturedScreen)
+    // readCapture is redefined every render; the captured file is what changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturedScreen])
+
   if (!open) return null
+
+  async function readCapture(file: File) {
+    setError('')
+    setSent(false)
+    setCaution('')
+    setBusy(t('readingPicture'))
+    try {
+      const read = await describePicture({ sessionId, presenterToken, direction: direction.trim(), file }, t)
+      setPicture(read)
+      setDrawn(false)
+      setCaution(read.caution)
+      // 排順序 is not available for a captured picture, so a teacher who was on
+      // it lands somewhere that works rather than on a tab that has gone.
+      const next = mode === 'ordering' ? 'spoken' : mode
+      setMode(next)
+      setPromptTouched(false)
+      setPromptText(promptFor(next, read.storyboard))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t('pictureReadFailed'))
+    } finally {
+      setBusy('')
+    }
+  }
 
   async function draw() {
     setError('')
     setSent(false)
+    setCaution('')
     setBusy(t('drawing'))
     try {
-      const drawn = await generatePicture({ sessionId, presenterToken, direction: direction.trim() }, t)
-      setPicture(drawn)
+      const made = await generatePicture({ sessionId, presenterToken, direction: direction.trim() }, t)
+      setPicture(made)
+      setDrawn(true)
       setPromptTouched(false)
-      setPromptText(promptFor(mode, drawn.storyboard))
+      setPromptText(promptFor(mode, made.storyboard))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t('generateFailed'))
     } finally {
@@ -116,7 +176,11 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
   const storyboard = picture?.storyboard
 
   return (
-    <div className="modal-backdrop picture-studio-backdrop" role="presentation">
+    <div
+      className="modal-backdrop picture-studio-backdrop"
+      role="presentation"
+      style={suspended ? { display: 'none' } : undefined}
+    >
       <div className="picture-studio">
         <header className="ps-head">
           <span className="ps-mark"><ImageIcon size={19} /></span>
@@ -137,14 +201,22 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
               onChange={(event) => setDirection(event.target.value)}
             />
             <button className="ps-draw" disabled={Boolean(busy)} type="button" onClick={() => void draw()}>
-              {picture ? <ArrowsClockwise size={17} /> : <Sparkle size={17} />}
-              {busy || (picture ? t('anotherPicture') : t('generatePicture'))}
+              {picture && drawn ? <ArrowsClockwise size={17} /> : <Sparkle size={17} />}
+              {busy || (picture && drawn ? t('anotherPicture') : t('generatePicture'))}
             </button>
+            {/* Two ways to get a picture, side by side: let the AI draw one, or
+                grab what is already on the screen. */}
+            {onCaptureScreen && (
+              <button className="ps-capture" disabled={Boolean(busy)} type="button" onClick={onCaptureScreen}>
+                <Crop size={17} />{t('captureFromScreen')}
+              </button>
+            )}
           </div>
-          <p className="ps-note">{t('pictureHint')}</p>
+          <p className="ps-note">{onCaptureScreen ? t('pictureHintBoth') : t('pictureHint')}</p>
+          {caution && <p className="ps-note is-caution">{caution}</p>}
 
           {storyboard && picture && (
-            <div className="ps-result">
+            <div className={drawn ? 'ps-result' : 'ps-result is-captured'}>
               <img alt={t('picturePreviewAlt')} className="ps-preview" src={picture.previewUrl} />
               <div className="ps-plan">
                 <h3>{storyboard.title}</h3>
@@ -154,9 +226,11 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                   </p>
                 )}
                 {storyboard.pattern && <p className="ps-pattern">{storyboard.pattern}</p>}
-                <ol className="ps-panels">
-                  {storyboard.panels.map((panel, index) => <li key={index}>{panel}</li>)}
-                </ol>
+                {storyboard.panels.length > 0 && (
+                  <ol className="ps-panels">
+                    {storyboard.panels.map((panel, index) => <li key={index}>{panel}</li>)}
+                  </ol>
+                )}
                 <p className="ps-plan-note">{t('planPrivate')}</p>
               </div>
             </div>
@@ -183,15 +257,17 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
                 >
                   <PencilSimpleLine size={16} />{t('modeWritten')}
                 </button>
-                <button
-                  aria-selected={mode === 'ordering'}
-                  className={mode === 'ordering' ? 'is-on' : ''}
-                  role="tab"
-                  type="button"
-                  onClick={() => setMode('ordering')}
-                >
-                  <CardsThree size={16} />{t('modeOrdering')}
-                </button>
+                {drawn && (
+                  <button
+                    aria-selected={mode === 'ordering'}
+                    className={mode === 'ordering' ? 'is-on' : ''}
+                    role="tab"
+                    type="button"
+                    onClick={() => setMode('ordering')}
+                  >
+                    <CardsThree size={16} />{t('modeOrdering')}
+                  </button>
+                )}
               </div>
 
               {mode === 'ordering' && (

@@ -53,6 +53,43 @@ export async function generatePicture(input: {
   }
 }
 
+// The picture the teacher already had on screen. Nothing is generated: the AI
+// only reads it and writes the instruction, so what comes back is a storyboard
+// with no cast and no panels — there is no story to invent and nothing to draw.
+export async function describePicture(input: {
+  sessionId: string
+  presenterToken: string
+  direction: string
+  file: File
+}, t: PresenterT = presenterLookup('zh-TW')): Promise<GeneratedPicture & { caution: string }> {
+  const bytes = new Uint8Array(await input.file.arrayBuffer())
+  let binary = ''
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+  }
+  const base64 = btoa(binary)
+  const mimeType = input.file.type || 'image/png'
+
+  const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+    body: {
+      action: 'describe_picture',
+      sessionId: input.sessionId,
+      presenterToken: input.presenterToken,
+      direction: input.direction,
+      imageBase64: base64,
+      mimeType,
+    },
+  })
+  if (error) throw error
+  if (!data?.storyboard) throw new Error(data?.message || t('pictureReadFailed'))
+  return {
+    storyboard: data.storyboard as PictureStoryboard,
+    previewUrl: `data:${mimeType};base64,${base64}`,
+    file: input.file,
+    caution: typeof data.storyboard.caution === 'string' ? data.storyboard.caution : '',
+  }
+}
+
 // Cut along the middle of the picture, which is where the drawing prompt puts
 // the gutter. The inner edges are trimmed by a hair: a panel's own frame stops
 // short of the centre line, so the sliver being lost is white, and what it

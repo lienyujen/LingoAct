@@ -1,7 +1,7 @@
 import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
 import { levelInstruction } from '../_shared/proficiency.ts'
-import { drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
+import { describePictureSource, drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
 import { composeSentenceWall } from '../_shared/sentence-wall.ts'
 import { reviewWriting } from '../_shared/writing-review.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
@@ -48,6 +48,7 @@ async function translateQuestion(title: string, promptText: string, options: str
     'Translate this instructor-authored classroom question into concise, natural English. Preserve names, numbers, formulas, meaning, option order, and the number of options exactly. Do not answer, explain, summarize, or add content. Return only the requested JSON.',
     { title, prompt_text: promptText, options },
     questionTranslationSchema,
+    null,
     'realtime',
   )
   if (result.status !== 'success') return {}
@@ -637,6 +638,37 @@ Deno.serve(async (req) => {
       return jsonResponse({ storyboard, image: image.data, mimeType: image.mimeType })
     }
 
+    // The other source for 看圖說話: a picture the teacher already had on
+    // screen. Nothing is drawn — the image exists — so this only reads it and
+    // writes the instruction the class is given. The bytes come inline rather
+    // than through storage: the crop is in the browser already, and recording
+    // a screenshot row for a picture that may not be sent is litter.
+    if (action === 'describe_picture') {
+      const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 500) : ''
+      const base64 = typeof input.imageBase64 === 'string' ? input.imageBase64 : ''
+      const mimeType = typeof input.mimeType === 'string' ? input.mimeType : 'image/png'
+      if (!base64) return jsonResponse({ message: '沒有收到圖片。' }, 400)
+      // Roughly 8 MB of image once decoded, which is far more than a crop of a
+      // screen and well inside what the model accepts.
+      if (base64.length > 11_000_000) return jsonResponse({ message: '圖片太大，請框選小一點的範圍。' }, 413)
+
+      const { data: classRow } = await supabase.from('sessions')
+        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+
+      try {
+        const storyboard = await describePictureSource({
+          image: { mimeType, base64 },
+          trackId: classRow?.teaching_language ?? null,
+          framework: classRow?.level_framework ?? null,
+          levelCode: classRow?.level_code ?? null,
+          direction,
+        })
+        return jsonResponse({ storyboard })
+      } catch (error) {
+        return jsonResponse({ message: errorDetail(error, '無法讀取這張圖片，請再試一次。') }, 503)
+      }
+    }
+
     // 拍照描述. An upload question with no screenshot behind it: the material is
     // whatever the student walks up to, which is the point of the activity.
     if (action === 'open_photo_task') {
@@ -1126,7 +1158,7 @@ Deno.serve(async (req) => {
       const attemptId = input.attemptId
       if (!validUuid(attemptId)) return jsonResponse({ message: '作答資料不正確。' }, 400)
       const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts')
-        .select('id, quiz_id, session_id').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
+        .select('id, quiz_id, session_id, composition').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
       if (attemptError) throw attemptError
       if (!attempt) return jsonResponse({ message: '找不到這份作答。' }, 404)
 
@@ -1140,7 +1172,11 @@ Deno.serve(async (req) => {
       const promptById = new Map((items || []).map((item) => [item.id, item.prompt_text as string]))
       const written = (answers || []).filter((answer) => (answer.answer_text || '').trim())
       if (!written.length) return jsonResponse({ message: '這位學員沒有寫任何內容。' }, 400)
-      if (!input.force && written.every((answer) => answer.feedback)) {
+      const needsRevision = Boolean((attempt.composition || '').trim())
+      const { data: reviewedAttempt } = await supabase.from('quiz_attempts')
+        .select('revision').eq('id', attemptId).maybeSingle()
+      const revisionDone = !needsRevision || Boolean(reviewedAttempt?.revision)
+      if (!input.force && revisionDone && written.every((answer) => answer.feedback)) {
         return jsonResponse({ alreadyReviewed: true, answers: written })
       }
 
@@ -1156,6 +1192,7 @@ Deno.serve(async (req) => {
             prompt: promptById.get(answer.item_id as string) || '',
             text: (answer.answer_text || '').slice(0, 4000),
           })),
+          composition: (attempt.composition || '').slice(0, 12000),
           trackId: classRow?.teaching_language ?? null,
           framework: classRow?.level_framework ?? null,
           levelCode: classRow?.level_code ?? null,
@@ -1175,12 +1212,17 @@ Deno.serve(async (req) => {
         if (writeError) throw writeError
       }
       const { error: overallError } = await supabase.from('quiz_attempts')
-        .update({ feedback: { zh_tw: review.overall.zhTw, en: review.overall.en } }).eq('id', attemptId)
+        .update({
+          feedback: { zh_tw: review.overall.zhTw, en: review.overall.en },
+          // The corrected article, which the student's own page diffs against
+          // what they wrote and shows marked up.
+          revision: review.revision ? { zh_tw: review.revision.zhTw, notes: review.revision.notes } : null,
+        }).eq('id', attemptId)
       if (overallError) throw overallError
 
       const { data: refreshed } = await supabase.from('quiz_item_answers')
         .select('*').eq('attempt_id', attemptId)
-      return jsonResponse({ answers: refreshed || [], overall: review.overall })
+      return jsonResponse({ answers: refreshed || [], overall: review.overall, revision: review.revision })
     }
 
     // 單字卡 標音. The readings arrive already chosen and the font already cut:

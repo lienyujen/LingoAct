@@ -107,6 +107,11 @@ export async function callAiJson(
   systemPrompt: string,
   userPayload: unknown,
   schema?: Record<string, unknown>,
+  // A picture the model is meant to look at, already base64. Given as the
+  // fourth argument, ahead of the profile, because a call that needs an image
+  // needs it every time and a call that overrides the profile is the rarer
+  // thing.
+  image?: { mimeType: string; base64: string } | null,
   profile: AiProfile = 'realtime',
   thinkingLevel?: ThinkingLevel,
 ) {
@@ -119,11 +124,18 @@ export async function callAiJson(
     }
   }
 
+  const imagePart = image?.base64
+    ? { inlineData: { mimeType: image.mimeType || 'image/png', data: image.base64 } }
+    : null
+
   let response: Response
   try {
     response = await requestGemini(JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: JSON.stringify(userPayload) }] }],
+      contents: [{
+        role: 'user',
+        parts: [{ text: JSON.stringify(userPayload) }, ...(imagePart ? [imagePart] : [])],
+      }],
       generationConfig: {
         thinkingConfig: geminiThinkingConfig(profile, thinkingLevel),
         responseFormat: { text: { mimeType: 'APPLICATION_JSON', ...(schema ? { schema } : {}) } },

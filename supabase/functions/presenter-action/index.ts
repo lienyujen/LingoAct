@@ -450,7 +450,16 @@ Deno.serve(async (req) => {
       if (questionId) fileQuery = fileQuery.eq('question_id', questionId)
       const { data, error } = await fileQuery.order('submitted_at')
       if (error) throw error
-      return jsonResponse({ responses: (data || []).map(withFileUrl) })
+      // A spoken 說明 sits in the private bucket, so it reaches the teacher as a
+      // signed URL and its path never leaves the server.
+      const responses = await Promise.all((data || []).map(async (row) => {
+        const withUrl = withFileUrl(row) as Record<string, unknown>
+        const { caption_audio_path: audioPath, ...rest } = withUrl
+        if (typeof audioPath !== 'string' || !audioPath) return rest
+        const { data: signed } = await supabase.storage.from('lingoact-recordings').createSignedUrl(audioPath, 3600)
+        return { ...rest, caption_audio_url: signed?.signedUrl || null }
+      }))
+      return jsonResponse({ responses })
     }
 
     // Analysis is per file and only ever runs when the presenter asks for it.
@@ -598,6 +607,45 @@ Deno.serve(async (req) => {
       }
 
       return jsonResponse({ storyboard, image: image.data, mimeType: image.mimeType })
+    }
+
+    // 拍照描述. An upload question with no screenshot behind it: the material is
+    // whatever the student walks up to, which is the point of the activity.
+    if (action === 'open_photo_task') {
+      const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (!promptText) return jsonResponse({ message: '請先寫出要學生拍什麼、說明什麼。' }, 400)
+
+      let translations = {}
+      try {
+        translations = await translateQuestion('拍照描述', promptText, [])
+      } catch (translationError) {
+        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
+      }
+
+      const stoppedAt = new Date().toISOString()
+      const { error: stopError } = await supabase.from('questions')
+        .update({ status: 'stopped', stopped_at: stoppedAt })
+        .eq('session_id', sessionId).eq('status', 'active')
+      if (stopError) throw stopError
+
+      const { data: question, error: questionError } = await supabase.from('questions').insert({
+        session_id: sessionId,
+        screenshot_id: null,
+        type: 'file_upload',
+        status: 'active',
+        title: '拍照描述',
+        prompt_text: promptText,
+        options: [],
+        translations,
+        allow_multiple: false,
+        wants_caption: true,
+      }).select('*').single()
+      if (questionError) throw questionError
+
+      const { error: sessionError } = await supabase.from('sessions')
+        .update({ current_question_id: question.id }).eq('id', sessionId).eq('status', 'active')
+      if (sessionError) throw sessionError
+      return jsonResponse({ question })
     }
 
     // 即時造句牆. A 問答題 dispatched with the wall switched on in the same call,

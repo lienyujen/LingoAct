@@ -399,6 +399,75 @@ Deno.serve(async (req) => {
     }
 
 
+    // 拍照描述: the description that goes with one photo, written or spoken.
+    // Keyed on the file response rather than the question, because a student who
+    // sends two photos describes each of them.
+    if (['prepare_caption_recording', 'submit_caption'].includes(action)) {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: '學員權限驗證失敗，請重新掃描 QR Code 加入。' }, 403)
+      const responseId = typeof input.responseId === 'string' ? input.responseId : ''
+      if (!validUuid(responseId)) return jsonResponse({ message: '照片資料不正確。' }, 400)
+
+      const { data: fileResponse, error: fileError } = await supabase.from('file_responses')
+        .select('id, question_id, participant_id, caption_audio_path')
+        .eq('id', responseId).eq('session_id', sessionId).maybeSingle()
+      if (fileError) throw fileError
+      // Only the student who sent the photo may describe it.
+      if (!fileResponse || fileResponse.participant_id !== participantId) {
+        return jsonResponse({ message: '找不到這張照片。' }, 404)
+      }
+      const { data: question } = await supabase.from('questions')
+        .select('status').eq('id', fileResponse.question_id).maybeSingle()
+      if (question?.status !== 'active') return jsonResponse({ message: '教師已停止收件。' }, 409)
+
+      if (action === 'prepare_caption_recording') {
+        const fileSize = Number(input.fileSize)
+        if (!Number.isInteger(fileSize) || fileSize < 1 || fileSize > 10 * 1024 * 1024) {
+          return jsonResponse({ message: '錄音檔不可超過 10 MB。' }, 400)
+        }
+        const clipId = crypto.randomUUID()
+        // Under the recordings prefix on purpose: deleting the class sweeps
+        // everything below it, so a caption clip is cleaned up with the rest.
+        const storagePath = `sessions/${sessionId}/recordings/captions/${responseId}/${clipId}.wav`
+        const { data, error } = await supabase.storage.from('lingoact-recordings').createSignedUploadUrl(storagePath)
+        if (error) throw error
+        return jsonResponse({ clipId, storagePath, uploadToken: data.token })
+      }
+
+      const caption = typeof input.caption === 'string' ? input.caption.trim().slice(0, 2000) : ''
+      const audioPath = typeof input.storagePath === 'string' ? input.storagePath : ''
+      const durationMs = input.durationMs === undefined || input.durationMs === null ? null : Math.round(Number(input.durationMs))
+      const values: Record<string, unknown> = {}
+
+      if (audioPath) {
+        const expectedPrefix = `sessions/${sessionId}/recordings/captions/${responseId}/`
+        if (!audioPath.startsWith(expectedPrefix) || !audioPath.endsWith('.wav')) {
+          return jsonResponse({ message: '錄音路徑不正確。' }, 400)
+        }
+        if (durationMs === null || !Number.isInteger(durationMs) || durationMs < 250 || durationMs > 180_000) {
+          return jsonResponse({ message: '錄音長度不正確。' }, 400)
+        }
+        const { data: clip, error: downloadError } = await supabase.storage.from('lingoact-recordings').download(audioPath)
+        if (downloadError || !clip) return jsonResponse({ message: '找不到已上傳的錄音。' }, 400)
+        // A re-recorded description replaces the take before it rather than
+        // leaving the first one behind in the bucket.
+        if (fileResponse.caption_audio_path && fileResponse.caption_audio_path !== audioPath) {
+          await supabase.storage.from('lingoact-recordings').remove([fileResponse.caption_audio_path])
+        }
+        values.caption_audio_path = audioPath
+        values.caption_audio_duration_ms = durationMs
+      } else if (caption) {
+        values.caption = caption
+      } else {
+        return jsonResponse({ message: '請寫下或錄下你的說明。' }, 400)
+      }
+
+      const { data: updated, error: updateError } = await supabase.from('file_responses')
+        .update(values).eq('id', responseId).select('id, caption, caption_audio_duration_ms').single()
+      if (updateError) throw updateError
+      return jsonResponse({ response: updated })
+    }
+
     if (['prepare_file_upload', 'submit_file_response'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限驗證失敗，請重新掃描 QR Code 加入。' }, 403)

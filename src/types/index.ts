@@ -202,6 +202,9 @@ export type Question = {
   // a spoken challenge, and absent entirely from a vocabulary race.
   prepare_seconds?: number | null
   answer_seconds?: number | null
+  // 拍照描述: whether an upload wants a description paired with it. False on a
+  // plain 上傳作答, where a caption box would be clutter.
+  wants_caption?: boolean
   type: QuestionType
   status: 'draft' | 'active' | 'stopped' | 'closed'
   title: string
@@ -528,6 +531,12 @@ export interface FileResponse {
   storage_path: string
   analysis_status: FileAnalysisStatus
   analysis_json: FileAnalysis | null
+  // 拍照描述: the description paired with this picture. One of the two, or
+  // neither — the student chooses whether to write it or say it.
+  caption: string | null
+  caption_audio_duration_ms: number | null
+  // Signed by the server; the clip's own path never leaves it.
+  caption_audio_url?: string | null
   error_message: string | null
   submitted_at: string
   analyzed_at: string | null

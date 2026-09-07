@@ -95,6 +95,9 @@ create table if not exists public.questions (
   -- later alter block.
   prepare_seconds integer null check (prepare_seconds is null or prepare_seconds between 5 and 300),
   answer_seconds integer null check (answer_seconds is null or answer_seconds between 5 and 600),
+  -- 拍照描述: whether an upload wants a description paired with it. A page of
+  -- working wants no caption box under it.
+  wants_caption boolean not null default false,
   started_at timestamptz null default now(),
   stopped_at timestamptz null,
   translations jsonb not null default '{}'::jsonb,
@@ -168,6 +171,13 @@ create table if not exists public.file_responses (
   analysis_status text not null default 'pending'
     check (analysis_status in ('pending', 'analyzing', 'success', 'failed', 'unsupported')),
   analysis_json jsonb null,
+  -- 拍照描述: the description paired with this picture, written or spoken. The
+  -- clip lives in the private recordings bucket rather than beside the photo in
+  -- the public one — a voice is not a photo of a tree.
+  caption text null check (caption is null or char_length(caption) between 1 and 2000),
+  caption_audio_path text null,
+  caption_audio_duration_ms integer null
+    check (caption_audio_duration_ms is null or caption_audio_duration_ms between 250 and 180000),
   error_message text null,
   submitted_at timestamptz not null default now(),
   analyzed_at timestamptz null
@@ -820,6 +830,18 @@ alter table public.sessions
 
 alter table public.sessions
   add column if not exists sentence_wall_enabled boolean not null default false;
+
+alter table public.questions
+  add column if not exists wants_caption boolean not null default false;
+
+alter table public.file_responses
+  add column if not exists caption text null
+  check (caption is null or char_length(caption) between 1 and 2000);
+alter table public.file_responses
+  add column if not exists caption_audio_path text null;
+alter table public.file_responses
+  add column if not exists caption_audio_duration_ms integer null
+  check (caption_audio_duration_ms is null or caption_audio_duration_ms between 250 and 180000);
 
 alter table public.ai_summaries drop constraint if exists ai_summaries_type_check;
 alter table public.ai_summaries

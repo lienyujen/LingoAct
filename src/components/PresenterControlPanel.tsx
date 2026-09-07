@@ -1,4 +1,4 @@
-import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
+import { Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import type { Session } from '../types'
 
@@ -16,6 +16,7 @@ type Props = {
   onOpenListeningStudio: () => void
   onOpenPictureStudio: () => void
   onOpenSentenceWall: () => void
+  onOpenPhotoTask: () => void
   onOpenTextDispatch: () => void
   onOpenFileTransfer: () => void
   onOpenRoster: () => void
@@ -41,6 +42,7 @@ export function PresenterControlPanel({
   onOpenListeningStudio,
   onOpenPictureStudio,
   onOpenSentenceWall,
+  onOpenPhotoTask,
   onOpenTextDispatch,
   onOpenFileTransfer,
   onOpenRoster,
@@ -117,6 +119,10 @@ export function PresenterControlPanel({
           <button className="control-action picture-control-action" type="button" onClick={onOpenSentenceWall} disabled={busy}>
             <span className="control-action-icon"><PencilLine size={18} /></span>
             即時造句牆
+          </button>
+          <button className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}>
+            <span className="control-action-icon"><Camera size={18} /></span>
+            拍照描述
           </button>
           <button className="control-action share-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
             <span className="control-action-icon"><PaperPlaneTilt size={18} /></span>

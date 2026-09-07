@@ -4,6 +4,7 @@ import { requireSupabase } from '../lib/supabase'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { downloadHref, publicFileUrl } from '../lib/fileLinks'
+import { PhotoCaptionCard } from './PhotoCaptionCard'
 import type { SharedFile } from '../types'
 
 type Props = {
@@ -87,9 +88,13 @@ type UploadProps = {
   // A question dispatched from a screenshot lives on the image, so it belongs
   // inside this panel rather than further down the page under everything else.
   imageUrl?: string | null
+  // 拍照描述: the teacher asked for a description with each picture.
+  wantsCaption?: boolean
   active: boolean
   locale: ParticipantLocale
 }
+
+type Uploaded = { id: string; name: string; previewUrl: string | null }
 
 export function ParticipantFileUpload({
   sessionId,
@@ -98,10 +103,17 @@ export function ParticipantFileUpload({
   participantToken,
   promptText,
   imageUrl,
+  wantsCaption,
   active,
   locale,
 }: UploadProps) {
-  const [uploaded, setUploaded] = useState<string[]>([])
+  const [uploaded, setUploaded] = useState<Uploaded[]>([])
+
+  // The previews are object URLs over the files the student just picked; the
+  // browser holds the blob until they are handed back.
+  useEffect(() => () => {
+    for (const item of uploaded) if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+  }, [uploaded])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -144,7 +156,7 @@ export function ParticipantFileUpload({
           })
         if (uploadError) throw uploadError
 
-        const { error: submitError } = await supabase.functions.invoke('participant-action', {
+        const { data: submitted, error: submitError } = await supabase.functions.invoke('participant-action', {
           body: {
             action: 'submit_file_response',
             sessionId,
@@ -158,7 +170,11 @@ export function ParticipantFileUpload({
           },
         })
         if (submitError) throw submitError
-        setUploaded((current) => [...current, file.name])
+        setUploaded((current) => [...current, {
+          id: submitted?.response?.id || prepared.fileId,
+          name: file.name,
+          previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+        }])
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : participantText(locale, 'uploadFailed'))
@@ -211,11 +227,28 @@ export function ParticipantFileUpload({
         </>
       ) : <p className="muted">{participantText(locale, 'uploadClosed')}</p>}
       {error && <p className="error">{error}</p>}
-      {uploaded.length > 0 && (
+      {uploaded.length > 0 && (wantsCaption ? (
+        // 拍照描述: one card per picture, so a student who sends two describes
+        // each of them rather than writing one description for the pair.
+        <div className="photo-caption-list">
+          {uploaded.map((item) => (
+            <PhotoCaptionCard
+              fileName={item.name}
+              key={item.id}
+              locale={locale}
+              participantId={participantId}
+              participantToken={participantToken}
+              previewUrl={item.previewUrl}
+              responseId={item.id}
+              sessionId={sessionId}
+            />
+          ))}
+        </div>
+      ) : (
         <ul className="participant-uploaded-list">
-          {uploaded.map((name, index) => <li key={`${index}-${name}`}><Sparkle size={13} />{name}</li>)}
+          {uploaded.map((item) => <li key={item.id}><Sparkle size={13} />{item.name}</li>)}
         </ul>
-      )}
+      ))}
     </section>
   )
 }

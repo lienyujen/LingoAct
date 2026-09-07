@@ -20,6 +20,7 @@ import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { PictureStudioModal } from '../components/PictureStudioModal'
+import { PhotoTaskModal } from '../components/PhotoTaskModal'
 import { SentenceWallModal } from '../components/SentenceWallModal'
 import { SentenceWallPanel } from '../components/SentenceWallPanel'
 import { composeSentenceWall, dispatchTextFor, openSentenceWall } from '../lib/sentenceWall'
@@ -103,6 +104,8 @@ export function PresenterPage() {
   const [pictureOpen, setPictureOpen] = useState(false)
   const [sentenceWallOpen, setSentenceWallOpen] = useState(false)
   const [sentenceWallError, setSentenceWallError] = useState('')
+  const [photoTaskOpen, setPhotoTaskOpen] = useState(false)
+  const [photoTaskError, setPhotoTaskError] = useState('')
   const [wallComposition, setWallComposition] = useState<SentenceWallComposition | null>(null)
   // Pre-filled when 造句牆 hands its write-up to 文字派送; empty for a plain send.
   const [textDispatchDraft, setTextDispatchDraft] = useState('')
@@ -356,11 +359,11 @@ export function PresenterPage() {
   useEffect(() => {
     if (!window.lingoActDesktop || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
-      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen,
+      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen || photoTaskOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, pictureOpen, selectionMode, sentenceWallOpen, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, selectionMode, sentenceWallOpen, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return
@@ -1534,6 +1537,29 @@ export function PresenterPage() {
     }
   }
 
+  async function openPhotoTask(promptText: string) {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) {
+      setPhotoTaskError('找不到講者權限，請重新加入場次。')
+      return
+    }
+    setBusy(true)
+    setPhotoTaskError('')
+    try {
+      const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+        body: { action: 'open_photo_task', sessionId, presenterToken, promptText },
+      })
+      if (error) throw new Error(await edgeFunctionErrorMessage(error, '拍照任務派送失敗。'))
+      if (!data?.question) throw new Error(data?.message || '拍照任務派送失敗。')
+      setSelectedQuestionId(data.question.id)
+      setPhotoTaskOpen(false)
+    } catch (error) {
+      setPhotoTaskError(error instanceof Error ? error.message : '拍照任務派送失敗。')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function composeWall() {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken || !question) throw new Error('找不到講者權限，請重新加入場次。')
@@ -1686,6 +1712,7 @@ export function PresenterPage() {
           onOpenListeningStudio={() => setListeningOpen(true)}
           onOpenPictureStudio={() => setPictureOpen(true)}
           onOpenSentenceWall={() => setSentenceWallOpen(true)}
+          onOpenPhotoTask={() => setPhotoTaskOpen(true)}
           onOpenTextDispatch={() => {
             setTextDispatchError('')
             setTextDispatchOpen(true)
@@ -1840,6 +1867,13 @@ export function PresenterPage() {
         open={sentenceWallOpen}
         onCancel={() => setSentenceWallOpen(false)}
         onOpen={openWall}
+      />
+      <PhotoTaskModal
+        busy={busy}
+        error={photoTaskError}
+        open={photoTaskOpen}
+        onCancel={() => setPhotoTaskOpen(false)}
+        onOpen={openPhotoTask}
       />
       <TextDispatchModal
         busy={busy}

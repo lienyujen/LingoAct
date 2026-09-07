@@ -163,6 +163,21 @@ why `release.yml` deliberately builds without a `.env`.
   row so it survives a reload, and it goes back to the class through 文字派送
   pre-filled rather than sent automatically: it is their writing, and what of it
   goes out is the teacher's call.
+- **拍照描述**: photograph something real, then describe it in the language
+  being learned — written or spoken, the student's choice. The photograph half
+  was already there in 上傳作答; what makes it a language activity is that the
+  description is PAIRED with the picture it describes, on the `file_responses`
+  row, so a student who sends two photos describes each of them and the teacher
+  reads each description under its own picture. Written captions sit beside the
+  photo in the public files bucket; a spoken one goes to the private recordings
+  bucket and reaches the teacher as a signed URL, because a voice is not a photo
+  of a tree and that distinction is already the rule here. The clip is stored
+  under the session's `recordings` prefix so deleting the class sweeps it with
+  everything else. `questions.wants_caption` says whether an upload wants a
+  description at all — a page of working does not — and it also switches the
+  marking off: that button grades a page of working, and pointed at a photo of a
+  water bottle it returns a verdict on the bottle. The description is what there
+  is to read, and the teacher reads it.
 - **寫作教練**, which is the custom-quiz machinery with the marking switched
   off: `quizzes.graded` false, items generated as writing fields rather than
   questions, and the attempt reaching a `submitted` state that carries no
@@ -186,7 +201,7 @@ What is **not** done:
   **聽力分段任務** has replay and a slow toggle but no segmenting, so a clip is
   still a whole passage; **AI寫作教練** is the simplified form
   the teacher asked for, without the scaffolding questions the activity table
-  describes; **拍照描述** uploads a photo with no paired caption field.
+  describes.
 - `pnpm desktop:package` has not been run since `subset-font` was added. pnpm's
   symlinks may defeat the electron-builder `files` globs; the likely fix is
   `node-linker=hoisted` in `.npmrc`.

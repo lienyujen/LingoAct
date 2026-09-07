@@ -681,6 +681,7 @@ export function ParticipantPage() {
           promptText={question.prompt_text}
           questionId={question.id}
           sessionId={sessionId}
+          wantsCaption={question.wants_caption}
         />
       )}
       {session?.exit_ticket_prompt && session.exit_ticket_category && (

@@ -125,6 +125,10 @@ function AiAnalysisPanel({
   question, answers, analysis, analysisBusy, analysisError, fileResponses, gradeProgress, onAnalyze, onSetCorrectAnswer,
 }: AnalysisProps) {
   if (!question || ['send_screen', 'pronunciation', 'oral_response'].includes(question.type)) return null
+  // Same reason the per-student 批改 button is gone from 拍照描述: this panel
+  // marks the uploaded files, and the files here are photographs of real
+  // things. The description is what there is to read, and the teacher reads it.
+  if (question.wants_caption) return null
 
   const isUpload = question.type === 'file_upload'
   // Counted in students, because that is what a press costs: one call covers
@@ -270,6 +274,11 @@ function UploadResults({
   }, [fileResponses])
 
   const marked = submissions.filter((files) => files[0].analysis_status === 'success').length
+  // 拍照描述 inherits this panel from 上傳作答, but not its marking: that button
+  // grades a page of working, and pointed at a photo of a water bottle it
+  // returns a verdict on the bottle. What the teacher reads here is the
+  // description, which needs no AI to be worth reading.
+  const captionTask = question.wants_caption === true
 
   if (!submissions.length) {
     return (
@@ -281,7 +290,7 @@ function UploadResults({
 
   return (
     <>
-      <p className="muted">已上傳 {submissions.length} 人 · 已批改 {marked} 人</p>
+      <p className="muted">已上傳 {submissions.length} 人{captionTask ? '' : ` · 已批改 ${marked} 人`}</p>
       <ul className="file-list upload-answer-list">
         {submissions.map((files, index) => {
           const lead = files[0]
@@ -326,13 +335,13 @@ function UploadResults({
                       <DownloadSimple size={15} />下載{files.length > 1 ? ` ${fileIndex + 1}` : ''}
                     </a>
                   ))}
-                  {lead.analysis_status !== 'unsupported' && (
+                  {!captionTask && lead.analysis_status !== 'unsupported' && (
                     <button disabled={busy} type="button" onClick={() => onAnalyzeFile(lead.id)}>
                       {busy ? <CircleNotch className="spin" size={15} /> : <Sparkle size={15} />}
                       {lead.analysis_status === 'success' ? '重批' : 'AI 批改'}
                     </button>
                   )}
-                  {lead.analysis_status === 'success' && (
+                  {!captionTask && lead.analysis_status === 'success' && (
                     <button
                       className="ghost-button"
                       type="button"
@@ -343,6 +352,16 @@ function UploadResults({
                   )}
                 </div>
               </div>
+              {/* 拍照描述: the description belongs beside its own picture, and
+                  it is what the teacher actually reads here — the photograph is
+                  only what the student had to talk about. */}
+              {files.filter((file) => file.caption || file.caption_audio_url).map((file) => (
+                <div className="photo-caption-review" key={`caption-${file.id}`}>
+                  {files.length > 1 && <span className="muted">{file.name}</span>}
+                  {file.caption && <p>{file.caption}</p>}
+                  {file.caption_audio_url && <audio controls preload="metadata" src={file.caption_audio_url} />}
+                </div>
+              ))}
               {failure && <p className="muted file-analysis-error">{failure.error_message}</p>}
               {expanded === lead.participant_id && result && (
                 <div className="file-analysis-detail">

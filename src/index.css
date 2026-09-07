@@ -4803,6 +4803,57 @@ h2 {
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
 .ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* 拍照描述, student side: one card per picture, the picture above the words
+   about it, because that pairing is the whole activity. */
+.photo-caption-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.photo-caption-card {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 10px; border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--surface);
+}
+.photo-caption-shot img {
+  width: 100%; max-height: 34svh; object-fit: contain;
+  border-radius: var(--radius-sm); background: var(--surface-subtle);
+}
+.photo-caption-name { font-size: 13px; font-weight: 700; color: var(--muted); }
+.photo-caption-body { display: flex; flex-direction: column; gap: 9px; }
+.photo-caption-modes { display: flex; gap: 6px; }
+.photo-caption-modes button {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font-family: inherit; font-size: 13px; font-weight: 700;
+}
+.photo-caption-modes button.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.photo-caption-card textarea {
+  padding: 11px 12px; border-radius: var(--radius-sm); resize: vertical;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-family: inherit; font-size: 15px; line-height: 1.7;
+}
+.photo-caption-card > .photo-caption-body > button,
+.photo-caption-card .photo-caption-record {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 48px; border: none; border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--primary); color: #fff;
+  font-family: inherit; font-size: 15px; font-weight: 700;
+}
+.photo-caption-card .photo-caption-record.is-recording { background: var(--danger); }
+.photo-caption-card button:disabled { opacity: .5; cursor: not-allowed; }
+.photo-caption-sent { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14px; }
+
+/* Teacher side: the description under the picture it belongs to. */
+.photo-caption-review {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 8px 0 0; padding: 9px 11px;
+  border-radius: var(--radius-sm); background: var(--surface-subtle);
+}
+.photo-caption-review p { margin: 0; font-size: 13.5px; line-height: 1.8; }
+.photo-caption-review span { font-size: 11px; font-weight: 700; }
+.photo-caption-review audio { width: 100%; height: 34px; }
+
+.photo-task-modal textarea { min-height: 96px; resize: vertical; }
+.photo-task-hint { margin: 0; font-size: 12px; }
+
 /* 即時造句牆 on the projector. Its own dark ground rather than the app palette:
    this is the one surface the class reads from across a room, competing with a
    lit classroom, so it is sized and contrasted for the back row. */

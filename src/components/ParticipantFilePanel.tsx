@@ -5,7 +5,7 @@ import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { downloadHref, publicFileUrl } from '../lib/fileLinks'
 import { PhotoCaptionCard } from './PhotoCaptionCard'
-import type { SharedFile } from '../types'
+import type { FileAnalysis, SharedFile } from '../types'
 
 type Props = {
   sessionId: string
@@ -95,6 +95,120 @@ type UploadProps = {
 }
 
 type Uploaded = { id: string; name: string; previewUrl: string | null }
+
+// What the student is told back about their own upload. Their rows only, read
+// through the Edge Function: file_responses is granted to nobody.
+type MyResponse = {
+  id: string
+  name: string
+  caption: string | null
+  analysis_status: 'pending' | 'analyzing' | 'success' | 'failed' | 'unsupported'
+  analysis_json: FileAnalysis | null
+  error_message: string | null
+}
+
+// 'success' is absent on purpose: a marked row shows the marking, not a
+// status line about it.
+const statusKeys: Partial<Record<MyResponse['analysis_status'], 'markPending' | 'markRunning' | 'markFailed' | 'markUnsupported'>> = {
+  pending: 'markPending',
+  analyzing: 'markRunning',
+  failed: 'markFailed',
+  unsupported: 'markUnsupported',
+}
+
+const verdictKeys = {
+  correct: 'fileVerdictCorrect',
+  partial: 'fileVerdictPartial',
+  incorrect: 'fileVerdictIncorrect',
+  unscored: 'fileVerdictUnscored',
+} as const
+
+// The marking is written in both languages; which one a student reads follows
+// the language they are on, the same as every other AI text on this page.
+function inLocale(analysis: FileAnalysis, locale: ParticipantLocale) {
+  const chinese = locale === 'zh-TW'
+  return {
+    summary: (chinese ? analysis.summary_zh_tw : analysis.summary_en) || analysis.summary_zh_tw || '',
+    strengths: (chinese ? analysis.strengths_zh_tw : analysis.strengths_en)?.length
+      ? (chinese ? analysis.strengths_zh_tw : analysis.strengths_en)
+      : analysis.strengths_zh_tw || [],
+    improvements: (chinese ? analysis.improvements_zh_tw : analysis.improvements_en)?.length
+      ? (chinese ? analysis.improvements_zh_tw : analysis.improvements_en)
+      : analysis.improvements_zh_tw || [],
+  }
+}
+
+// The marking never reached the student: it was written to file_responses, read
+// by the teacher's panel, and that was the end of it — so pressing AI 批改
+// changed nothing the class could see. Polled rather than pushed because it
+// arrives when the teacher decides to press the button, which may be minutes
+// after the upload or not at all.
+function MyUploadMarking({ sessionId, questionId, participantId, participantToken, locale }: {
+  sessionId: string
+  questionId: string
+  participantId: string
+  participantToken: string
+  locale: ParticipantLocale
+}) {
+  const [responses, setResponses] = useState<MyResponse[]>([])
+
+  useEffect(() => {
+    if (!sessionId || !questionId || !participantId || !participantToken) return
+    let active = true
+    async function load() {
+      const { data } = await requireSupabase().functions.invoke('participant-action', {
+        body: { action: 'get_my_file_responses', sessionId, questionId, participantId, participantToken },
+      })
+      if (active) setResponses((data?.responses || []) as MyResponse[])
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 8000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [sessionId, questionId, participantId, participantToken])
+
+  if (!responses.length) return null
+
+  return (
+    <div className="my-upload-marking">
+      <h3><Sparkle size={15} />{participantText(locale, 'myUploads')}</h3>
+      {responses.map((response) => {
+        const analysis = response.analysis_status === 'success' ? response.analysis_json : null
+        const text = analysis ? inLocale(analysis, locale) : null
+        const verdict = analysis?.verdict
+        return (
+          <article className="my-upload-row" key={response.id}>
+            <div className="my-upload-head">
+              <strong>{response.name}</strong>
+              {verdict && <span className={`file-verdict is-${verdict}`}>{participantText(locale, verdictKeys[verdict])}</span>}
+              {typeof analysis?.score === 'number' && (
+                <span className="upload-score">{analysis.score} {participantText(locale, 'points')}</span>
+              )}
+              {!analysis && (
+                <span className="my-upload-status">
+                  {participantText(locale, statusKeys[response.analysis_status] || 'markPending')}
+                </span>
+              )}
+            </div>
+            {response.caption && <p className="my-upload-caption">{response.caption}</p>}
+            {text?.summary && <p className="my-upload-summary">{text.summary}</p>}
+            {text && text.strengths.length > 0 && (
+              <>
+                <h4>{participantText(locale, 'fileDidWell')}</h4>
+                <ul>{text.strengths.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              </>
+            )}
+            {text && text.improvements.length > 0 && (
+              <>
+                <h4>{participantText(locale, 'fileCouldImprove')}</h4>
+                <ul>{text.improvements.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              </>
+            )}
+          </article>
+        )
+      })}
+    </div>
+  )
+}
 
 export function ParticipantFileUpload({
   sessionId,
@@ -227,6 +341,13 @@ export function ParticipantFileUpload({
         </>
       ) : <p className="muted">{participantText(locale, 'uploadClosed')}</p>}
       {error && <p className="error">{error}</p>}
+      <MyUploadMarking
+        locale={locale}
+        participantId={participantId}
+        participantToken={participantToken}
+        questionId={questionId}
+        sessionId={sessionId}
+      />
       {uploaded.length > 0 && (wantsCaption ? (
         // 拍照描述: one card per picture, so a student who sends two describes
         // each of them rather than writing one description for the pair.

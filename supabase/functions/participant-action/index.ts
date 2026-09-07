@@ -621,6 +621,35 @@ Deno.serve(async (req) => {
       }
       return jsonResponse({ response: saved })
     }
+
+    // What the teacher's AI made of this student's own upload.
+    //
+    // 上傳作答 and 拍照描述 were marked and the marking stopped at the teacher's
+    // panel: the student had no route to it at all, so pressing AI 批改 changed
+    // nothing they could see. Their own rows only — the question and the
+    // participant are both pinned, and the service role is what reads them.
+    //
+    // Shown as soon as it exists rather than waiting for the question to close:
+    // there is no answer key to leak, the feedback is on their own photograph
+    // and their own description, and a teacher who marks mid-activity means the
+    // class to read it and go again.
+    if (action === 'get_my_file_responses') {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: '學員權限失效，請重新掃描 QR Code 加入場次。' }, 403)
+      const questionId = typeof input.questionId === 'string' ? input.questionId : ''
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料不正確。' }, 400)
+      const { data: question, error: questionError } = await supabase.from('questions')
+        .select('id, type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (questionError) throw questionError
+      if (question?.type !== 'file_upload') return jsonResponse({ message: '找不到上傳題目。' }, 404)
+
+      const { data: rows, error } = await supabase.from('file_responses')
+        .select('id, question_id, name, mime_type, file_size, caption, analysis_status, analysis_json, error_message, submitted_at, analyzed_at')
+        .eq('question_id', questionId).eq('participant_id', participantId)
+        .order('submitted_at')
+      if (error) throw error
+      return jsonResponse({ responses: rows || [] })
+    }
     if (['prepare_recording_upload', 'submit_recording', 'get_recording_result', 'discard_recording'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限驗證失敗，請重新掃描 QR Code 加入。' }, 403)
@@ -674,6 +703,12 @@ Deno.serve(async (req) => {
         return jsonResponse({ response: { ...safeResponse, signed_url: signed.signedUrl } })
       }
 
+      // What the teacher's AI made of this student's own upload.
+      //
+      // 上傳作答 and 拍照描述 were marked and the marking stopped at the teacher's
+      // panel: the student had no route to it at all, so pressing AI 批改 改
+      // nothing they could see. Their own rows only — the question and the
+      // participant are both pinned, and the service role is what reads them.
       if (question.status !== 'active') return jsonResponse({ message: '本題已停止作答。' }, 409)
 
       const { data: activeSession, error: activeSessionError } = await supabase

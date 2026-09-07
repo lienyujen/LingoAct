@@ -29,6 +29,10 @@ const quizGenerationSchema = {
     items: {
       type: 'array',
       minItems: 1,
+      // Ten, and not because ten is enough: Gemini rejects a responseFormat
+      // schema whose maxItems is higher — 10 is accepted, 20 and 30 both come
+      // back 400 INVALID_ARGUMENT. A deck larger than this is built by asking
+      // again and appending, which is what 再出 N 張 does.
       maxItems: 10,
       items: {
         type: 'object',

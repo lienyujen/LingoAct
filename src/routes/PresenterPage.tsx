@@ -12,6 +12,7 @@ import { LotteryOverlay } from '../components/LotteryOverlay'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { resolveTrack } from '../lib/teachingTracks'
 import type { QuestionDraft } from '../components/QuestionEditor'
+import type { QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
 import { QuestionResult } from '../components/QuestionResult'
@@ -22,6 +23,7 @@ import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { PictureStudioModal } from '../components/PictureStudioModal'
 import { PresenterLocaleContext, presenterLocaleFor } from '../lib/presenterI18n'
 import { PhotoTaskModal } from '../components/PhotoTaskModal'
+import { annotateCardDeck, editQuizItems } from '../lib/cardReadings'
 import { SentenceWallModal } from '../components/SentenceWallModal'
 import { SentenceWallPanel } from '../components/SentenceWallPanel'
 import { composeSentenceWall, dispatchTextFor, openSentenceWall } from '../lib/sentenceWall'
@@ -128,6 +130,9 @@ export function PresenterPage() {
   const [lotteryEvent, setLotteryEvent] = useState<LotterySessionEvent | null>(null)
   const [buzzerEvent, setBuzzerEvent] = useState<BuzzerSessionEvent | null>(null)
   const [captureFile, setCaptureFile] = useState<File | null>(null)
+  // Which 課堂活動 button started the capture, so the editor opens on it
+  // instead of on a generic multiple choice.
+  const [capturePreset, setCapturePreset] = useState<QuizRequestedType | null>(null)
   const [capturePreviewUrl, setCapturePreviewUrl] = useState<string | null>(null)
   const [captureSource, setCaptureSource] = useState<LingoActCaptureSource | null>(null)
   const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -881,9 +886,10 @@ export function PresenterPage() {
     return new File([bytes], filename, { type: mime })
   }
 
-  async function captureWindowsScreen() {
+  async function captureWindowsScreen(preset: QuizRequestedType | null = null) {
     if (!window.lingoActDesktop) return
 
+    setCapturePreset(preset)
     setControlsOpen(false)
     setCapturePreviewUrl(null)
     setCaptureFile(null)
@@ -1153,6 +1159,41 @@ export function PresenterPage() {
 
   // 寫作教練 AI 批改, one student. The batch loop lives in the results panel so
   // it can show progress; this is the single unit of work it repeats.
+  // 單字卡 標音, once per deck and only for the Chinese tracks. Runs when the
+  // results first arrive rather than at dispatch, because the cards do not
+  // exist until the AI has finished making them.
+  const annotatingDeck = useRef('')
+  useEffect(() => {
+    const quiz = quizResults?.quiz
+    const items = quizResults?.items || []
+    if (!session || !question || quiz?.requested_type !== 'flashcard' || !items.length) return
+    const mode = session.reading_annotation
+    if (mode !== 'zhuyin' && mode !== 'pinyin') return
+    if (!resolveTrack(session.teaching_language).language.startsWith('zh')) return
+    // Already done, or being done: a deck is annotated once.
+    if (items.some((item) => item.option_readings?.length)) return
+    if (annotatingDeck.current === question.id) return
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) return
+    annotatingDeck.current = question.id
+    void annotateCardDeck({ sessionId, presenterToken, questionId: question.id, items, mode })
+      .then(() => loadAll())
+      .catch((caught) => {
+        // The deck still works; the cards just have no 注音 above them.
+        setAnalysisError(caught instanceof Error ? `標音失敗，卡片仍可使用：${caught.message}` : '標音失敗，卡片仍可使用。')
+      })
+  }, [loadAll, question, quizResults, session, sessionId])
+
+  async function editDeck(input: { removeItemId?: string; addCount?: number }) {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken || !question) throw new Error('找不到講者權限，請重新加入場次。')
+    await editQuizItems({ sessionId, presenterToken, questionId: question.id, ...input })
+    // A deck that changed needs its 標音 redone: a new card brings characters
+    // the font subset was not cut for.
+    annotatingDeck.current = ''
+    await loadAll()
+  }
+
   async function reviewWritingAttempt(attemptId: string, force: boolean) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
@@ -1719,7 +1760,9 @@ export function PresenterPage() {
           onStartBuzzer={startBuzzer}
           onToggleAnonymous={() => updateSession({ anonymous_enabled: !session.anonymous_enabled })}
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
-          onCaptureScreen={window.lingoActDesktop ? captureWindowsScreen : undefined}
+          onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen() : undefined}
+          onCaptureFlashcards={window.lingoActDesktop ? () => void captureWindowsScreen('flashcard') : undefined}
+          onCaptureWriting={window.lingoActDesktop ? () => void captureWindowsScreen('writing') : undefined}
           onGenerateExitTicket={generateExitTicket}
           onEndClass={() => setEndClassConfirmOpen(true)}
           onOpenFileTransfer={() => {
@@ -1755,6 +1798,7 @@ export function PresenterPage() {
             question={question}
             results={quizResults}
             onUpdateAnswer={updateCustomQuizAnswer}
+            onEditDeck={editDeck}
             onReviewWriting={reviewWritingAttempt}
             onStopQuestion={stopQuestion}
             onResumeQuestion={resumeQuestion}
@@ -1841,6 +1885,7 @@ export function PresenterPage() {
         </div>
       )}
       <QuestionEditor
+        preset={capturePreset}
         error={analysisError}
         open={editorOpen}
         previewUrl={capturePreviewUrl}

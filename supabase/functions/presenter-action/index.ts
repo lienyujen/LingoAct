@@ -943,7 +943,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '測驗題型設定不正確。' }, 400)
       }
       if (input.requestedCount !== null && input.requestedCount !== '' && input.requestedCount !== undefined && requestedCount === null) {
-        return jsonResponse({ message: '題數必須介於 1 到 10 題。' }, 400)
+        return jsonResponse({ message: '題數必須介於 1 到 10 之間。' }, 400)
       }
       let sourceUrl = ''
       let sourceText = ''
@@ -1064,6 +1064,9 @@ Deno.serve(async (req) => {
             // Only 寫作教練 has anything to coach; asking for it on a quiz would
             // put a "show the coach" button beside a multiple choice.
             coaching: requestedType === 'writing' && input.coaching === true,
+            // Kept so the deck can be added to later; a screenshot-sourced one
+            // finds its way back through questions.screenshot_id instead.
+            source_file_id: fromSharedFile ? sharedFileId : null,
           })
           if (quizError) throw quizError
 
@@ -1176,6 +1179,168 @@ Deno.serve(async (req) => {
       const { data: refreshed } = await supabase.from('quiz_item_answers')
         .select('*').eq('attempt_id', attemptId)
       return jsonResponse({ answers: refreshed || [], overall: review.overall })
+    }
+
+    // 單字卡 標音. The readings arrive already chosen and the font already cut:
+    // the source face is 17 MB and sits on the teacher's machine, so subsetting
+    // happens there and this only files the result.
+    if (action === 'set_quiz_annotation') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '測驗資料格式不正確。' }, 400)
+      const { data: quiz } = await supabase.from('quizzes').select('id')
+        .eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (!quiz) return jsonResponse({ message: '找不到這份測驗。' }, 404)
+
+      const rows = Array.isArray(input.items) ? input.items : []
+      const { data: items } = await supabase.from('quiz_items').select('id').eq('quiz_id', quiz.id)
+      const known = new Set((items || []).map((item) => item.id))
+
+      const fontBase64 = typeof input.fontBase64 === 'string' ? input.fontBase64 : ''
+      let fontUrl: string | null = null
+      if (fontBase64) {
+        const bytes = Uint8Array.from(atob(fontBase64), (character) => character.charCodeAt(0))
+        if (bytes.length > 2 * 1024 * 1024) return jsonResponse({ message: '字型子集過大。' }, 413)
+        const fontPath = `${sessionId}/cards-${questionId}.woff2`
+        const { error: uploadError } = await supabase.storage
+          .from('lingoact-listening').upload(fontPath, bytes, { contentType: 'font/woff2', upsert: true })
+        if (uploadError) throw uploadError
+        fontUrl = supabase.storage.from('lingoact-listening').getPublicUrl(fontPath).data.publicUrl
+      }
+
+      for (const raw of rows) {
+        const row = raw as { itemId?: unknown; readings?: unknown }
+        const itemId = typeof row.itemId === 'string' ? row.itemId : ''
+        if (!known.has(itemId)) continue
+        const readings = Array.isArray(row.readings)
+          ? row.readings.map((reading) => typeof reading === 'string' ? reading : '')
+          : []
+        const { error: itemError } = await supabase.from('quiz_items')
+          .update({ option_readings: readings }).eq('id', itemId)
+        if (itemError) throw itemError
+      }
+
+      const { error: questionError } = await supabase.from('questions')
+        .update({ card_font_url: fontUrl }).eq('id', questionId).eq('session_id', sessionId)
+      if (questionError) throw questionError
+      return jsonResponse({ cardFontUrl: fontUrl })
+    }
+
+    // 增減詞彙量: the deck the AI produced is a first draft, and the teacher is
+    // the one who knows which words this class actually needs.
+    if (action === 'edit_quiz_items') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '測驗資料格式不正確。' }, 400)
+      const { data: quiz } = await supabase.from('quizzes').select('*')
+        .eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (!quiz) return jsonResponse({ message: '找不到這份測驗。' }, 404)
+
+      const removeId = typeof input.removeItemId === 'string' ? input.removeItemId : ''
+      const addCount = Number(input.addCount)
+
+      if (removeId) {
+        if (!validUuid(removeId)) return jsonResponse({ message: '卡片資料不正確。' }, 400)
+        const { data: remaining } = await supabase.from('quiz_items')
+          .select('id').eq('quiz_id', quiz.id)
+        if ((remaining || []).length <= 1) return jsonResponse({ message: '至少要留一張。' }, 400)
+        const { error: deleteError } = await supabase.from('quiz_items')
+          .delete().eq('id', removeId).eq('quiz_id', quiz.id)
+        if (deleteError) throw deleteError
+      }
+
+      // One call per press, and a call cannot exceed ten items — see the
+      // schema comment in custom-quiz.ts. The deck itself may reach thirty.
+      if (Number.isInteger(addCount) && addCount > 0 && addCount <= 10) {
+        const { data: existing } = await supabase.from('quiz_items')
+          .select('id, position, prompt_text, options').eq('quiz_id', quiz.id).order('position')
+        const taken = (existing || []).length
+        if (taken + addCount > 30) return jsonResponse({ message: '一疊最多 30 張。' }, 400)
+
+        const { data: question } = await supabase.from('questions')
+          .select('screenshot_id').eq('id', questionId).maybeSingle()
+        // Back to whatever the deck was built from, screenshot or shared file.
+        let sourceUrl = ''
+        if (question?.screenshot_id) {
+          const { data: screenshot } = await supabase.from('screenshots')
+            .select('public_url').eq('id', question.screenshot_id).maybeSingle()
+          sourceUrl = screenshot?.public_url || ''
+        } else if (quiz.source_file_id) {
+          const { data: file } = await supabase.from('shared_files')
+            .select('storage_path').eq('id', quiz.source_file_id).maybeSingle()
+          if (file) sourceUrl = supabase.storage.from('lingoact-files').getPublicUrl(file.storage_path).data.publicUrl
+        }
+        if (!sourceUrl) return jsonResponse({ message: '找不到原始教材，無法再出卡。' }, 400)
+
+        const { data: classRow } = await supabase.from('sessions')
+          .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+        // What each card TEACHES, not every word printed on it. A card's other
+        // options are distractors drawn from the same lesson by design, so
+        // treating them as covered makes a thirteen-word lesson look exhausted
+        // after five cards and every 再出 refuse.
+        const { data: existingKeys } = await supabase.from('quiz_item_keys')
+          .select('accepted_answers').in('item_id', (existing || []).map((item) => item.id))
+        const covered = (existingKeys || [])
+          .map((key) => (key.accepted_answers as string[])?.[0])
+          .filter(Boolean)
+          .slice(0, 100)
+        try {
+          const generated = await generateCustomQuiz({
+            sourceUrl,
+            extraInstruction: [
+              trackInstruction(classRow?.teaching_language),
+              levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
+              covered.length ? `These are already on cards in this deck; choose different ones: ${covered.join('、')}` : '',
+            ].filter(Boolean).join('\n'),
+            teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+            direction: quiz.direction,
+            requestedCount: addCount,
+            requestedType: quiz.requested_type as 'flashcard',
+          })
+          // Asked for more than the material holds, the model repeats itself
+          // rather than returning fewer — and the same word twice in one deck
+          // is worse than a shorter deck. Whatever is already here is dropped.
+          const seen = new Set(covered)
+          const fresh = generated.items.filter((item) => {
+            const answer = (item.accepted_answers || [])[0] || item.prompt_text
+            if (seen.has(answer)) return false
+            seen.add(answer)
+            return true
+          })
+          if (!fresh.length) {
+            return jsonResponse({ message: '這份教材裡的詞已經都出過了，沒有新的可以再出。' }, 409)
+          }
+          const added = fresh.map((item, index) => ({
+            id: item.id,
+            quiz_id: quiz.id,
+            position: taken + index + 1,
+            type: item.type,
+            prompt_text: item.prompt_text,
+            options: item.options,
+            pair_prompts: item.pair_prompts,
+            points: item.points,
+            translations: item.translations,
+          }))
+          const { error: insertError } = await supabase.from('quiz_items').insert(added)
+          if (insertError) throw insertError
+          const { error: keyError } = await supabase.from('quiz_item_keys').insert(fresh.map((item) => ({
+            item_id: item.id,
+            accepted_answers: item.accepted_answers,
+            rubric: item.rubric,
+          })))
+          if (keyError) throw keyError
+        } catch (error) {
+          return jsonResponse({ message: errorDetail(error, '再出卡失敗，請再試一次。') }, 503)
+        }
+      }
+
+      // Positions are renumbered so a deck with a hole in it does not carry that
+      // hole into the next edit, where it would collide.
+      const { data: finalItems } = await supabase.from('quiz_items')
+        .select('id, position').eq('quiz_id', quiz.id).order('position')
+      for (const [index, item] of (finalItems || []).entries()) {
+        if (item.position === index + 1) continue
+        await supabase.from('quiz_items').update({ position: index + 1 }).eq('id', item.id)
+      }
+      return jsonResponse({ count: (finalItems || []).length })
     }
 
     if (action === 'get_session_custom_quiz_results') {

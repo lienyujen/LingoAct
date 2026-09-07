@@ -727,7 +727,7 @@ export function ParticipantPage() {
       )}
       {question?.type === 'custom_quiz' ? (quizData ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          ? <ParticipantFlashcards cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">

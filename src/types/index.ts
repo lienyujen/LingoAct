@@ -200,6 +200,8 @@ export type Question = {
   // 拼音 only: one syllable per character of prompt_text, rendered as ruby.
   // 注音 leaves this null — its reading is inside the font above.
   reading_ruby?: string[] | null
+  // 單字卡 注音: the deck's font subset, cut from the characters its cards use.
+  card_font_url?: string | null
   // Null on both means untimed, which is every question that came before.
   // Thinking time and answering time are separate: planning is the exercise in
   // a spoken challenge, and absent entirely from a vocabulary race.
@@ -380,6 +382,10 @@ export type QuizItem = {
   // 圖片排序 only: the picture to show for each option, in the same order. Empty
   // means the options are text, which is every other item.
   option_images: string[]
+  // 單字卡 標音, one per option: the word with 注音 built into the glyphs, or the
+  // 拼音 syllables to print under it. Which one, the question says — a deck
+  // carrying card_font_url is 注音.
+  option_readings: string[]
   points: number
   translations: Translated<{
     prompt_text?: string

@@ -229,7 +229,7 @@ create table if not exists public.quizzes (
   question_id uuid not null unique references public.questions(id) on delete cascade,
   title text not null,
   direction text not null,
-  requested_count integer null check (requested_count between 1 and 10),
+  requested_count integer null check (requested_count between 1 and 30),
   requested_type text not null check (requested_type in ('random', 'multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'writing')),
   -- False for 寫作教練, where the AI lays out what to write and then gets out
   -- of the way: no model is asked to mark a class's worth of free writing.
@@ -241,7 +241,7 @@ create table if not exists public.quizzes (
 create table if not exists public.quiz_items (
   id uuid primary key default gen_random_uuid(),
   quiz_id uuid not null references public.quizzes(id) on delete cascade,
-  position integer not null check (position between 1 and 10),
+  position integer not null check (position between 1 and 30),
   type text not null check (type in ('multiple_choice', 'fill_blank', 'short_answer', 'ordering')),
   prompt_text text not null check (char_length(prompt_text) between 1 and 2000),
   options jsonb not null default '[]'::jsonb,
@@ -869,6 +869,12 @@ grant all on public.writing_coach_turns to service_role;
 alter table public.quizzes
   add column if not exists coaching boolean not null default false;
 
+-- Which file a quiz was built from, so a deck made through 檔案傳送 can be added
+-- to later. A screenshot-sourced one is found through questions.screenshot_id;
+-- a file-sourced one had no way back to its own material at all.
+alter table public.quizzes
+  add column if not exists source_file_id uuid null references public.shared_files(id) on delete set null;
+
 alter table public.file_responses
   add column if not exists caption text null
   check (caption is null or char_length(caption) between 1 and 2000);
@@ -1050,6 +1056,26 @@ alter table public.quiz_items
 
 alter table public.quiz_items
   add column if not exists option_images jsonb not null default '[]'::jsonb;
+
+-- 單字卡 標音, beside the option rather than inside it: options is what the
+-- answer is compared against, so annotating it in place would leave a card whose
+-- correct answer no longer matches its own key.
+alter table public.quiz_items
+  add column if not exists option_readings jsonb not null default '[]'::jsonb;
+
+-- One font subset for the whole deck, cut from the characters its cards use.
+alter table public.questions
+  add column if not exists card_font_url text null;
+
+-- Ten is a long quiz but a short 生詞表, and a deck can now be added to after
+-- the teacher has seen what the AI made of it.
+alter table public.quiz_items drop constraint if exists quiz_items_position_check;
+alter table public.quiz_items
+  add constraint quiz_items_position_check check (position between 1 and 30);
+alter table public.quizzes drop constraint if exists quizzes_requested_count_check;
+alter table public.quizzes
+  add constraint quizzes_requested_count_check
+  check (requested_count is null or requested_count between 1 and 30);
 
 notify pgrst, 'reload schema';
 

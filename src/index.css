@@ -5681,3 +5681,32 @@ h2 {
 .flashcard-card-row strong { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .flashcard-card-row.is-missed { background: var(--danger-soft); }
 .flashcard-card-row.is-missed strong { color: var(--danger); }
+
+/* 單字卡 標音. 注音 is inside the glyphs and needs no layout; 拼音 goes under
+   the word, which is where a vocabulary card has always put it. */
+.flashcard-word { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.flashcard-word small {
+  font-size: .55em;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--muted);
+}
+
+/* 增減詞彙量: the deck the AI made is a first draft. */
+.deck-size-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 10px; padding: 9px 12px;
+  border-radius: var(--radius-md); background: var(--surface-subtle);
+  font-size: 12.5px; font-weight: 700; color: var(--muted);
+}
+.deck-size-actions { display: flex; gap: 7px; margin-left: auto; }
+.deck-size-actions button {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 700;
+}
+.deck-size-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.flashcard-card-row .card-reading {
+  font-size: 11.5px; font-style: normal; color: var(--muted); letter-spacing: .02em;
+}

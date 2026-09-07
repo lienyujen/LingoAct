@@ -1,4 +1,4 @@
-import { Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
+import { CardsThree, NotePencil, Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Image, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Shapes, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { isPlusEdition } from '../lib/edition'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { Session } from '../types'
@@ -12,6 +12,8 @@ type Props = {
   onToggleDanmaku: () => void
   onToggleAnonymous: () => void
   onCaptureScreen?: () => void
+  onCaptureFlashcards?: () => void
+  onCaptureWriting?: () => void
   onDrawLottery: () => void
   onStartBuzzer: () => void
   onOpenListeningStudio: () => void
@@ -38,6 +40,8 @@ export function PresenterControlPanel({
   onToggleDanmaku,
   onToggleAnonymous,
   onCaptureScreen,
+  onCaptureFlashcards,
+  onCaptureWriting,
   onDrawLottery,
   onStartBuzzer,
   onOpenListeningStudio,
@@ -122,6 +126,18 @@ export function PresenterControlPanel({
             <span className="control-action-icon"><PencilLine size={18} /></span>
             {t('sentenceWall')}
           </button>
+          {onCaptureFlashcards && (
+            <button className="control-action picture-control-action" type="button" onClick={onCaptureFlashcards} disabled={busy}>
+              <span className="control-action-icon"><CardsThree size={18} /></span>
+              {t('flashcards')}
+            </button>
+          )}
+          {onCaptureWriting && (
+            <button className="control-action picture-control-action" type="button" onClick={onCaptureWriting} disabled={busy}>
+              <span className="control-action-icon"><NotePencil size={18} /></span>
+              {t('writingCoach')}
+            </button>
+          )}
           <button className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}>
             <span className="control-action-icon"><Camera size={18} /></span>
             {t('photoTask')}

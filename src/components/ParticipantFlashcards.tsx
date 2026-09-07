@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, CheckCircle, Confetti, XCircle } from '@phosphor-icons/react'
 import { participantText } from '../lib/participantI18n'
+import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantQuizData, QuizItem } from '../types'
 
 type Props = {
+  // 注音 arrives as a font the word is rendered in; 拼音 as a line under it.
+  cardFontUrl?: string | null
   data: ParticipantQuizData
   locale: ParticipantLocale
   onTry: (itemId: string, answerValue: string) => Promise<{ correct: boolean; correctAnswer: string | null }>
@@ -23,7 +26,8 @@ type Verdict = { correct: boolean; correctAnswer: string | null; chosen: string 
 // still on screen would be copying, not recall.
 const REQUEUE_GAP = 2
 
-export function ParticipantFlashcards({ data, locale, onTry }: Props) {
+export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Props) {
+  const readingFamily = useReadingFont(cardFontUrl)
   const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id))
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [busy, setBusy] = useState(false)
@@ -118,6 +122,9 @@ export function ParticipantFlashcards({ data, locale, onTry }: Props) {
         {current.options.map((option, index) => {
           const chosen = verdict?.chosen === option
           const isAnswer = verdict && !verdict.correct && verdict.correctAnswer === option
+          // 注音 replaces the word, because the reading is inside its glyphs;
+          // 拼音 sits under it, which is where a vocabulary card puts it.
+          const reading = current.option_readings?.[index] || ''
           return (
             <button
               className={`flashcard-option${chosen ? (verdict.correct ? ' is-right' : ' is-wrong') : ''}${isAnswer ? ' is-answer' : ''}`}
@@ -126,7 +133,9 @@ export function ParticipantFlashcards({ data, locale, onTry }: Props) {
               type="button"
               onClick={() => void answer(option)}
             >
-              {options[index]}
+              {readingFamily && reading
+                ? <span style={{ fontFamily: readingFamily }}>{reading}</span>
+                : <span className="flashcard-word">{options[index]}{reading && <small>{reading}</small>}</span>}
               {chosen && (verdict.correct ? <CheckCircle size={20} weight="fill" /> : <XCircle size={20} weight="fill" />)}
               {isAnswer && <CheckCircle size={20} weight="fill" />}
             </button>

@@ -25,6 +25,9 @@ export type QuestionDraft = {
 }
 
 type Props = {
+  // 單字卡 and 寫作教練 have their own 課堂活動 buttons, which capture the
+  // screen and then open this editor already on the right setting.
+  preset?: QuizRequestedType | null
   error?: string
   open: boolean
   previewUrl: string | null
@@ -49,7 +52,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
   { type: 'pronunciation', label: 'typePronunciation' },
 ]
 
-export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: Props) {
+export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCreate }: Props) {
   const t = usePresenterText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
@@ -64,17 +67,17 @@ export function QuestionEditor({ error, open, previewUrl, onCancel, onCreate }: 
 
   useEffect(() => {
     if (!open) return
-    setType('multiple_choice')
+    setType(preset ? 'custom_quiz' : 'multiple_choice')
     setOptions(['A', 'B', 'C', 'D'])
     setAllowMultiple(false)
     setPromptText('')
     setQuizCount('auto')
-    setQuizType('random')
+    setQuizType(preset || 'random')
     setQuizDirection('')
     setQuizCoaching(false)
     setPrepareSeconds(null)
     setAnswerSeconds(null)
-  }, [open])
+  }, [open, preset])
 
   const editableOptions = type === 'multiple_choice' || type === 'poll'
   const finalOptions = useMemo(() => {

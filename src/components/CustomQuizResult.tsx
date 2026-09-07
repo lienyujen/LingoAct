@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Sparkle, Square, X } from '@phosphor-icons/react'
+import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sparkle, Square, Trash, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   onUpdateAnswer: (itemId: string, acceptedAnswers: string[]) => Promise<void>
   // 寫作教練 only: read one student's writing and leave feedback on it.
   onReviewWriting: (attemptId: string, force: boolean) => Promise<void>
+  // 單字卡 only: drop a card, or ask for more from the same screenshot.
+  onEditDeck: (input: { removeItemId?: string; addCount?: number }) => Promise<void>
   // The same pair the plain question panel carries, for the same reason: a
   // quiz is stopped and reopened where it is shown, not from 課堂收尾.
   onStopQuestion: () => Promise<void>
@@ -119,12 +121,26 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
   )
 }
 
-export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onStopQuestion, onResumeQuestion }: Props) {
+export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onEditDeck, onStopQuestion, onResumeQuestion }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [busyItemId, setBusyItemId] = useState('')
   const [reviewingId, setReviewingId] = useState('')
   const [reviewProgress, setReviewProgress] = useState({ done: 0, total: 0 })
+  const [deckBusy, setDeckBusy] = useState('')
+  const [deckError, setDeckError] = useState('')
+
+  async function runDeck(label: string, input: { removeItemId?: string; addCount?: number }) {
+    setDeckBusy(label)
+    setDeckError('')
+    try {
+      await onEditDeck(input)
+    } catch (caught) {
+      setDeckError(caught instanceof Error ? caught.message : '修改卡片失敗。')
+    } finally {
+      setDeckBusy('')
+    }
+  }
   const [error, setError] = useState('')
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
   // Off by default: this panel is on the screen the class is looking at.
@@ -321,6 +337,29 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
       )}
       {error && <p className="error">{error}</p>}
       {!flashcard && <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>}
+      {/* The deck the AI produced is a first draft; the teacher is the one who
+          knows which words this class actually needs. Removing is immediate,
+          adding goes back to the same screenshot and avoids what is already
+          there. Both re-cut the 標音, because a new card brings new characters. */}
+      {flashcard && (
+        <div className="deck-size-bar">
+          <span>這疊有 {results.items.length} 張</span>
+          <div className="deck-size-actions">
+            {[3, 5].map((count) => (
+              <button
+                disabled={Boolean(deckBusy) || results.items.length + count > 30}
+                key={count}
+                type="button"
+                onClick={() => void runDeck(`add${count}`, { addCount: count })}
+              >
+                {deckBusy === `add${count}` ? <CircleNotch className="spin" size={15} /> : <Plus size={15} />}
+                再出 {count} 張
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {deckError && <p className="error">{deckError}</p>}
       {flashcard && (
         <div className="flashcard-card-list">
           {[...results.items]
@@ -330,7 +369,18 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               return (
                 <div className={misses ? 'flashcard-card-row is-missed' : 'flashcard-card-row'} key={item.id}>
                   <span>{item.prompt_text}</span>
+                  {item.option_readings?.length > 0 && <em className="card-reading">{item.option_readings.join('・')}</em>}
                   <strong>{misses ? `答錯 ${misses} 次` : '沒人答錯'}</strong>
+                  <button
+                    aria-label="移除這張"
+                    className="ghost-button icon-button"
+                    disabled={Boolean(deckBusy) || results.items.length <= 1}
+                    title="移除這張"
+                    type="button"
+                    onClick={() => void runDeck(item.id, { removeItemId: item.id })}
+                  >
+                    {deckBusy === item.id ? <CircleNotch className="spin" size={14} /> : <Trash size={14} />}
+                  </button>
                 </div>
               )
             })}

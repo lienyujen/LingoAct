@@ -7,13 +7,15 @@ import { useSessionPresence } from '../lib/useSessionPresence'
 import { buzzerWinsFrom, participationRows } from '../lib/participation'
 import type { ParticipationRow } from '../lib/participation'
 import type { Answer, FileResponse, Message, Participant, Question, SessionCustomQuizResults, SessionEvent } from '../types'
+import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
+import type { PresenterMessageKey } from '../lib/presenterI18n'
 
 type SortMode = 'engagement' | 'name' | 'joined'
 
-const sortLabels: Record<SortMode, string> = {
-  engagement: '參與積極度',
-  name: '姓名',
-  joined: '加入順序',
+const sortLabels: Record<SortMode, PresenterMessageKey> = {
+  engagement: 'sortEngagement',
+  name: 'sortName',
+  joined: 'sortJoined',
 }
 
 function minutes(ms: number) {
@@ -24,6 +26,10 @@ function minutes(ms: number) {
 // rather than a panel that covers the controls it sits on.
 export function RosterPage() {
   const { sessionId = '' } = useParams()
+  // Its own window, so it resolves the class's teaching language itself.
+  const [teachingLanguage, setTeachingLanguage] = useState<string | null>(null)
+  const locale = presenterLocaleFor(teachingLanguage)
+  const t = presenterLookup(locale)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Answer[]>([])
@@ -70,6 +76,16 @@ export function RosterPage() {
   }, [sessionId])
 
   useEffect(() => {
+    if (!isSupabaseConfigured || !sessionId) return
+    let cancelled = false
+    void requireSupabase().from('sessions').select('teaching_language').eq('id', sessionId).maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setTeachingLanguage((data?.teaching_language as string | null) ?? '')
+      })
+    return () => { cancelled = true }
+  }, [sessionId])
+
+  useEffect(() => {
     void load()
     if (!isSupabaseConfigured || !sessionId) return
     const supabase = requireSupabase()
@@ -101,7 +117,7 @@ export function RosterPage() {
       quizAttempts: quiz?.attempts || [],
       buzzerWins: buzzerWinsFrom(events),
       uploadMarks,
-    })
+    }, t)
     const online = (row: ParticipationRow) => onlineParticipantIds.includes(row.participant.id)
     const scored = computed.some((row) => row.score > 0)
     return [...computed].sort((a, b) => {
@@ -114,13 +130,13 @@ export function RosterPage() {
       if (!scored) return a.participant.name.localeCompare(b.participant.name, 'zh-Hant')
       return b.score - a.score
     })
-  }, [answers, events, messages, onlineParticipantIds, participants, questions, quiz, sort, uploadMarks])
+  }, [answers, events, messages, onlineParticipantIds, participants, questions, quiz, sort, t, uploadMarks])
 
   const onlineCount = rows.filter((row) => onlineParticipantIds.includes(row.participant.id)).length
 
   async function callOn(participantId: string, name: string) {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) { setError('這個場次沒有講者操作權限。'); return }
+    if (!presenterToken) { setError(t('rosterNoRights')); return }
     setCalling(participantId)
     setError('')
     try {
@@ -129,7 +145,7 @@ export function RosterPage() {
       })
       if (callError) throw callError
     } catch {
-      setError(`點名「${name}」失敗，請再試一次。`)
+      setError(t('callOnFailed', { name }))
     } finally {
       setCalling('')
     }
@@ -140,13 +156,14 @@ export function RosterPage() {
   }
 
   return (
+    <PresenterLocaleContext.Provider value={locale}>
     <main className="roster-window">
       <header className="roster-heading">
-        <h1><Users size={17} />線上名單</h1>
+        <h1><Users size={17} />{t('rosterTitle')}</h1>
         <button
-          aria-label="關閉線上名單"
+          aria-label={t('closeRoster')}
           className="icon-button ghost-button"
-          title="關閉"
+          title={t('close')}
           type="button"
           onClick={() => window.lingoActDesktop?.close()}
         >
@@ -155,14 +172,14 @@ export function RosterPage() {
       </header>
 
       <div className="roster-toolbar">
-        <span className="roster-count">線上 {onlineCount}／共 {rows.length} 人</span>
-        <button className="roster-sort" type="button" title="切換排序" onClick={cycleSort}>
-          <SortDescending size={14} />{sortLabels[sort]}
+        <span className="roster-count">{t('rosterCount', { online: onlineCount, total: rows.length })}</span>
+        <button className="roster-sort" type="button" title={t('toggleSort')} onClick={cycleSort}>
+          <SortDescending size={14} />{t(sortLabels[sort])}
         </button>
       </div>
 
       {activeQuestion && (
-        <p className="roster-hint">派題中：未作答者以橘色標示</p>
+        <p className="roster-hint">{t('rosterPendingHint')}</p>
       )}
       {error && <p className="error roster-error">{error}</p>}
 
@@ -189,26 +206,26 @@ export function RosterPage() {
                   )}
                 </span>
                 <span className="roster-tags">
-                  {pending && <span className="roster-tag is-pending">未作答</span>}
-                  {distracted && <span className="roster-tag is-distracted">離開 {minutes(row.unfocusedMs)} 分</span>}
+                  {pending && <span className="roster-tag is-pending">{t('tagPending')}</span>}
+                  {distracted && <span className="roster-tag is-distracted">{t('tagAway', { n: minutes(row.unfocusedMs) })}</span>}
                 </span>
                 <span
                   className="roster-score"
                   title={[
-                    `作答 ${row.answerCount}`,
-                    `答對 ${row.correctCount}`,
-                    `彈幕 ${row.messageCount}`,
-                    `搶答 ${row.quickCount}`,
-                    row.uploadScore !== null ? `上傳作答 ${row.uploadScore} 分` : '',
+                    t('statAnswers', { n: row.answerCount }),
+                    t('statCorrect', { n: row.correctCount }),
+                    t('statMessages', { n: row.messageCount }),
+                    t('statBuzzes', { n: row.quickCount }),
+                    row.uploadScore !== null ? t('statUploadScore', { n: row.uploadScore }) : '',
                   ].filter(Boolean).join('．')}
                 >
                   {row.score}
                 </span>
                 <button
-                  aria-label={`點名 ${row.participant.name}`}
+                  aria-label={t('callOn', { name: row.participant.name })}
                   className="roster-call"
                   disabled={!online || calling === row.participant.id}
-                  title="點名這位學員"
+                  title={t('callOnHint')}
                   type="button"
                   onClick={() => void callOn(row.participant.id, row.participant.name)}
                 >
@@ -218,7 +235,8 @@ export function RosterPage() {
             )
           })}
         </ol>
-      ) : <p className="muted roster-empty">還沒有學員加入。</p>}
+      ) : <p className="muted roster-empty">{t('noStudentsJoined')}</p>}
     </main>
+    </PresenterLocaleContext.Provider>
   )
 }

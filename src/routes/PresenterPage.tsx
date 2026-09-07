@@ -21,7 +21,8 @@ import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { PictureStudioModal } from '../components/PictureStudioModal'
-import { PresenterLocaleContext, presenterLocaleFor } from '../lib/presenterI18n'
+import { PresenterLocaleContext, presenterLocaleFor, presenterLookup, savePresenterLocale } from '../lib/presenterI18n'
+import type { PresenterT } from '../lib/presenterI18n'
 import { PhotoTaskModal } from '../components/PhotoTaskModal'
 import { annotateCardDeck, editQuizItems } from '../lib/cardReadings'
 import { SentenceWallModal } from '../components/SentenceWallModal'
@@ -46,13 +47,13 @@ import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, 
 import { useParams } from 'react-router-dom'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-function microphoneErrorMessage(error: unknown) {
-  if (!(error instanceof DOMException)) return error instanceof Error ? error.message : '無法讀取麥克風。'
-  if (error.name === 'NotAllowedError') return 'Windows 或程式未允許使用麥克風。'
-  if (error.name === 'NotFoundError') return '找不到可用的麥克風。'
-  if (error.name === 'NotReadableError') return '麥克風正被其他程式獨占，暫時無法使用。'
-  if (error.name === 'OverconstrainedError') return '先前選擇的麥克風目前不可用。'
-  return error.message || '無法讀取麥克風。'
+function microphoneErrorMessage(error: unknown, t: PresenterT) {
+  if (!(error instanceof DOMException)) return error instanceof Error ? error.message : t('micReadFailed')
+  if (error.name === 'NotAllowedError') return t('micNotAllowed')
+  if (error.name === 'NotFoundError') return t('noMicFound')
+  if (error.name === 'NotReadableError') return t('micBusy')
+  if (error.name === 'OverconstrainedError') return t('micUnavailable')
+  return error.message || t('micReadFailed')
 }
 
 function realtimeRetryDelay(message: string) {
@@ -63,9 +64,9 @@ function realtimeRetryDelay(message: string) {
   return Math.min(65_000, Math.max(500, match[2].toLowerCase() === 's' ? value * 1000 : value) + 350)
 }
 
-function readableRealtimeError(message: string) {
-  if (/tokens per min|TPM/i.test(message)) return 'OpenAI 即時翻譯用量上限不足，請提高 API Project 的使用等級或限制。'
-  if (/rate limit reached/i.test(message)) return 'OpenAI 即時翻譯連線頻率暫時達到上限，請稍候再試。'
+function readableRealtimeError(message: string, t: PresenterT) {
+  if (/tokens per min|TPM/i.test(message)) return t('realtimeQuota')
+  if (/rate limit reached/i.test(message)) return t('realtimeRateLimited')
   return message
 }
 
@@ -85,6 +86,10 @@ async function edgeFunctionErrorMessage(error: unknown, fallback: string) {
 export function PresenterPage() {
   const { sessionId = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
+  // The provider below is inside this component's own tree, so the context is
+  // not readable from here — the locale comes from the session row directly.
+  const locale = presenterLocaleFor(session?.teaching_language)
+  const t = presenterLookup(locale)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [answerCounts, setAnswerCounts] = useState<Record<string, number>>({})
@@ -310,6 +315,13 @@ export function PresenterPage() {
     loadAll()
   }, [loadAll])
 
+  // 自訂測驗檢視 opens as its own desktop window with its own React root, and it
+  // never loads the session row. Leaving the locale where that window can find
+  // it is cheaper than teaching it to authenticate and fetch the class again.
+  useEffect(() => {
+    if (session) savePresenterLocale(sessionId, locale)
+  }, [locale, session, sessionId])
+
   useEffect(() => {
     if (!session || recordingStateRecoveredRef.current) return
     recordingStateRecoveredRef.current = true
@@ -329,9 +341,9 @@ export function PresenterPage() {
       if (error) throw error
       return loadAll()
     }).catch((error: unknown) => {
-      setCaptionError(error instanceof Error ? error.message : '無法清除上次中斷的課程錄製狀態。')
+      setCaptionError(error instanceof Error ? error.message : t('recordingResetFailed'))
     })
-  }, [loadAll, session])
+  }, [loadAll, session, t])
 
   useEffect(() => {
     if (session?.id && window.lingoActDesktop) {
@@ -421,9 +433,9 @@ export function PresenterPage() {
         localStorage.removeItem('lingoact:caption-microphone')
       }
     } catch (error) {
-      setSettingsError(microphoneErrorMessage(error))
+      setSettingsError(microphoneErrorMessage(error, t))
     }
-  }, [selectedMicrophoneId])
+  }, [selectedMicrophoneId, t])
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -441,18 +453,18 @@ export function PresenterPage() {
   useEffect(() => {
     if (!lotteryEvent || lotteryEvent.payload.finalized !== false) return
     const timer = window.setTimeout(() => {
-      void finalizeLottery(sessionId, lotteryEvent.id, lotteryEvent.payload.winner_id)
+      void finalizeLottery(sessionId, lotteryEvent.id, lotteryEvent.payload.winner_id, t)
         .then(setLotteryEvent)
-        .catch((error) => setAnalysisError(error instanceof Error ? error.message : '抽籤停止失敗。'))
+        .catch((error) => setAnalysisError(error instanceof Error ? error.message : t('lotteryStopFailed')))
     }, lotteryEvent.payload.duration_ms)
     return () => window.clearTimeout(timer)
-  }, [lotteryEvent, sessionId])
+  }, [lotteryEvent, sessionId, t])
 
   async function updateSession(values: Partial<Session>) {
     if (!session) return
     const presenterToken = getPresenterToken(session.id)
     if (!presenterToken) {
-      setAnalysisError('找不到講者權限，請重新加入場次。')
+      setAnalysisError(t('noRightsRejoin'))
       return
     }
     setBusy(true)
@@ -471,10 +483,10 @@ export function PresenterPage() {
         },
       })
       if (error) throw error
-      if (!data?.session) throw new Error(data?.message || '場次設定更新失敗。')
+      if (!data?.session) throw new Error(data?.message || t('sessionUpdateFailed'))
       setSession(data.session as Session)
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : '場次設定更新失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('sessionUpdateFailed'))
     } finally {
       setBusy(false)
     }
@@ -513,7 +525,7 @@ export function PresenterPage() {
     if (!targetSession || captionConnectionsRef.current.length) return
     const presenterToken = getPresenterToken(targetSession.id)
     if (!presenterToken) {
-      setAnalysisError('找不到講者權限，請重新加入場次。')
+      setAnalysisError(t('noRightsRejoin'))
       return
     }
     const interpretationAudioContext = targetSession.interpretation_audio_enabled
@@ -587,9 +599,9 @@ export function PresenterPage() {
             logDiagnostic('caption_persist_failed', {
               sessionId,
               language,
-              message: await edgeFunctionErrorMessage(error, '字幕儲存失敗。'),
+              message: await edgeFunctionErrorMessage(error, t('captionSaveFailed')),
             })
-            setCaptionError('字幕仍會顯示，但有一段逐字稿儲存失敗；請檢查網路後再結束課程。')
+            setCaptionError(t('captionSavePartial'))
           }
         }
       }
@@ -614,7 +626,7 @@ export function PresenterPage() {
         if (reconnectScheduled || captionRunIdRef.current !== runId) return
         reconnectScheduled = true
         logDiagnostic('caption_transport_disconnected', { sessionId, message })
-        setCaptionError('即時字幕連線中斷，正在自動重新連線…')
+        setCaptionError(t('captionReconnecting'))
         const timer = window.setTimeout(() => {
           captionRetryTimersRef.current = captionRetryTimersRef.current.filter((item) => item !== timer)
           if (captionRunIdRef.current !== runId) return
@@ -622,7 +634,7 @@ export function PresenterPage() {
             await stopCourseRecording(false, false)
             await startCourseRecording(targetSession, microphoneId)
           })().catch((error: unknown) => {
-            const reconnectMessage = error instanceof Error ? error.message : '即時字幕自動重連失敗。'
+            const reconnectMessage = error instanceof Error ? error.message : t('captionReconnectFailed')
             logDiagnostic('caption_reconnect_failed', { sessionId, message: reconnectMessage })
             setCaptionError(reconnectMessage)
           })
@@ -652,6 +664,7 @@ export function PresenterPage() {
           onCaption,
           onError,
           onDisconnected,
+          t,
         })
       captionConnectionsRef.current = [transcriptionConnection]
       const connectTranslation = async (language: string, retryCount = 0): Promise<void> => {
@@ -670,10 +683,10 @@ export function PresenterPage() {
               ? (translatedStream) => {
                   const audioContext = interpretationAudioContext || prepareInterpretationAudioContext()
                   void createInterpretationAudioBroadcaster(sessionId, language, translatedStream, audioContext, (message) => {
-                    setCaptionError(`${language.toUpperCase()} 即時口譯語音：${message}`)
-                  })
+                    setCaptionError(t('interpretationAudioError', { lang: language.toUpperCase(), message }))
+                  }, t)
                     .then((broadcaster) => interpretationBroadcastersRef.current.push(broadcaster))
-                    .catch((error: unknown) => setCaptionError(error instanceof Error ? error.message : '即時口譯語音啟動失敗。'))
+                    .catch((error: unknown) => setCaptionError(error instanceof Error ? error.message : t('interpretationStartFailed')))
                 }
               : undefined,
             onCaption,
@@ -682,7 +695,7 @@ export function PresenterPage() {
               const retryDelay = realtimeRetryDelay(message)
               if (!retryScheduled && retryDelay !== null && retryCount < 2 && captionRunIdRef.current === runId) {
                 retryScheduled = true
-                setCaptionError(`${language.toUpperCase()} 即時口譯連線忙碌，正在自動重連…`)
+                setCaptionError(t('interpretationBusy', { lang: language.toUpperCase() }))
                 const timer = window.setTimeout(() => {
                   captionRetryTimersRef.current = captionRetryTimersRef.current.filter((item) => item !== timer)
                   translationConnection?.close()
@@ -694,8 +707,9 @@ export function PresenterPage() {
                 captionRetryTimersRef.current.push(timer)
                 return
               }
-              setCaptionError(`${language.toUpperCase()} 即時口譯：${readableRealtimeError(message)}`)
+              setCaptionError(t('interpretationError', { lang: language.toUpperCase(), message: readableRealtimeError(message, t) }))
             },
+            t,
           })
           if (captionRunIdRef.current !== runId) {
             translationConnection.close()
@@ -703,10 +717,10 @@ export function PresenterPage() {
           }
           captionConnectionsRef.current.push(translationConnection)
         } catch (error) {
-          const message = error instanceof Error ? error.message : '即時口譯連線失敗。'
+          const message = error instanceof Error ? error.message : t('interpretationConnectFailed')
           const retryDelay = realtimeRetryDelay(message)
           if (retryDelay !== null && retryCount < 2 && captionRunIdRef.current === runId) {
-            setCaptionError(`${language.toUpperCase()} 即時口譯連線忙碌，正在自動重連…`)
+            setCaptionError(t('interpretationBusy', { lang: language.toUpperCase() }))
             const timer = window.setTimeout(() => {
               captionRetryTimersRef.current = captionRetryTimersRef.current.filter((item) => item !== timer)
               void connectTranslation(language, retryCount + 1)
@@ -714,7 +728,7 @@ export function PresenterPage() {
             captionRetryTimersRef.current.push(timer)
             return
           }
-          setCaptionError(`${language.toUpperCase()} 即時口譯：${readableRealtimeError(message)}`)
+          setCaptionError(t('interpretationError', { lang: language.toUpperCase(), message: readableRealtimeError(message, t) }))
         }
       }
       for (const language of targets) await connectTranslation(language)
@@ -728,8 +742,8 @@ export function PresenterPage() {
       await requireSupabase().functions.invoke('presenter-action', {
         body: { action: 'update_session', sessionId, presenterToken, recordingEnabled: false, captionsEnabled: false, captionStatus: 'error' },
       })
-      const message = microphoneErrorMessage(error)
-      setCaptionError(message || '課程錄製啟動失敗。')
+      const message = microphoneErrorMessage(error, t)
+      setCaptionError(message || t('recordingStartFailed'))
       await loadAll()
     } finally {
       setBusy(false)
@@ -750,7 +764,7 @@ export function PresenterPage() {
     if (!session) return
     const presenterToken = getPresenterToken(session.id)
     if (!presenterToken) {
-      setSettingsError('找不到講師權限，請重新加入場次。')
+      setSettingsError(t('noTeacherRightsRejoin'))
       return
     }
     if (settings.interpretationAudioEnabled) prepareInterpretationAudioContext()
@@ -781,7 +795,7 @@ export function PresenterPage() {
         },
       })
       if (error) throw error
-      if (!data?.session) throw new Error(data?.message || '字幕設定儲存失敗。')
+      if (!data?.session) throw new Error(data?.message || t('captionSettingsSaveFailed'))
       const nextSession = data.session as Session
       setSession(nextSession)
       setSelectedMicrophoneId(microphoneId)
@@ -798,7 +812,7 @@ export function PresenterPage() {
         }
       } else await loadAll()
     } catch (error) {
-      setSettingsError(error instanceof Error ? error.message : '字幕設定儲存失敗。')
+      setSettingsError(error instanceof Error ? error.message : t('captionSettingsSaveFailed'))
     } finally {
       setSettingsBusy(false)
     }
@@ -815,7 +829,7 @@ export function PresenterPage() {
   async function uploadQuestionScreenshot(file: File, draft: QuestionDraft) {
     const { type, options, allowMultiple, promptText, quizSettings } = draft
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
     setBusy(true)
     try {
       const supabase = requireSupabase()
@@ -827,9 +841,9 @@ export function PresenterPage() {
           fileName: file.name,
         },
       })
-      if (prepareError) throw new Error(await edgeFunctionErrorMessage(prepareError, '無法準備截圖上傳。'))
+      if (prepareError) throw new Error(await edgeFunctionErrorMessage(prepareError, t('shotUploadPrepareFailed')))
       if (!prepared?.screenshotId || !prepared?.storagePath || !prepared?.uploadToken) {
-        throw new Error(prepared?.message || '無法準備截圖上傳。')
+        throw new Error(prepared?.message || t('shotUploadPrepareFailed'))
       }
 
       const { error: uploadError } = await supabase.storage
@@ -865,8 +879,8 @@ export function PresenterPage() {
           answerSeconds: draft.answerSeconds,
         },
       })
-      if (error) throw new Error(await edgeFunctionErrorMessage(error, '截圖派題失敗。'))
-      if (!data?.question) throw new Error(data?.message || '建立題目失敗。')
+      if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
+      if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
       setSelectedQuestionId(data.question.id)
     } finally {
       setBusy(false)
@@ -1024,7 +1038,7 @@ export function PresenterPage() {
       setCaptureFile(null)
       setCapturePreviewUrl(null)
     } catch (error) {
-      setAnalysisError(`截圖派題失敗：${error instanceof Error ? error.message : '請稍後再試。'}`)
+      setAnalysisError(t('captureSendFailedWith', { message: error instanceof Error ? error.message : t('tryAgainLater') }))
       setEditorOpen(true)
     }
   }
@@ -1038,7 +1052,7 @@ export function PresenterPage() {
   async function stopQuestion() {
     if (!session?.current_question_id) return
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: {
         action: 'stop_question',
@@ -1048,13 +1062,13 @@ export function PresenterPage() {
       },
     })
     if (error) throw error
-    if (!data?.question) throw new Error(data?.message || '停止作答失敗。')
+    if (!data?.question) throw new Error(data?.message || t('stopFailed'))
   }
 
   async function resumeQuestion() {
     if (!session?.current_question_id) return
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: {
         action: 'resume_question',
@@ -1064,13 +1078,13 @@ export function PresenterPage() {
       },
     })
     if (error) throw error
-    if (!data?.question) throw new Error(data?.message || '恢復作答失敗。')
+    if (!data?.question) throw new Error(data?.message || t('resumeFailed'))
   }
 
   async function setCorrectAnswer(answer: string) {
     if (!question || question.status === 'active') return
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
     const currentCorrectAnswers = question.correct_answers || []
     const correctAnswers = question.allow_multiple
       ? currentCorrectAnswers.includes(answer)
@@ -1088,7 +1102,7 @@ export function PresenterPage() {
       },
     })
     if (error) throw error
-    if (!Array.isArray(data?.correctAnswers)) throw new Error(data?.message || '答案設定失敗。')
+    if (!Array.isArray(data?.correctAnswers)) throw new Error(data?.message || t('answerSetFailed'))
     setQuestion({
       ...question,
       correct_answer: question.allow_multiple ? null : data.correctAnswers[0] || null,
@@ -1100,7 +1114,7 @@ export function PresenterPage() {
     if (!question) return
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setAnalysisError('這個舊場次沒有講者 AI 權限，請建立新場次後再試。')
+      setAnalysisError(t('oldSessionNoAi'))
       return
     }
 
@@ -1147,10 +1161,10 @@ export function PresenterPage() {
         if (responseMessage) throw new Error(responseMessage)
         throw error
       }
-      if (!data?.analysis) throw new Error(data?.message || 'AI 沒有回傳分析結果。')
+      if (!data?.analysis) throw new Error(data?.message || t('noAnalysisReturned'))
       setAnalysis(data.analysis as QuestionAnalysis)
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : 'AI 分析失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('analysisFailed'))
     } finally {
       setAnalysisBusy(false)
       setGradeProgress(null)
@@ -1176,18 +1190,18 @@ export function PresenterPage() {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) return
     annotatingDeck.current = question.id
-    void annotateCardDeck({ sessionId, presenterToken, questionId: question.id, items, mode })
+    void annotateCardDeck({ sessionId, presenterToken, questionId: question.id, items, mode }, t)
       .then(() => loadAll())
       .catch((caught) => {
         // The deck still works; the cards just have no 注音 above them.
-        setAnalysisError(caught instanceof Error ? `標音失敗，卡片仍可使用：${caught.message}` : '標音失敗，卡片仍可使用。')
+        setAnalysisError(caught instanceof Error ? t('cardAnnotateFailedWith', { message: caught.message }) : t('cardAnnotateFailed'))
       })
-  }, [loadAll, question, quizResults, session, sessionId])
+  }, [loadAll, question, quizResults, session, sessionId, t])
 
   async function editDeck(input: { removeItemId?: string; addCount?: number }) {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken || !question) throw new Error('找不到講者權限，請重新加入場次。')
-    await editQuizItems({ sessionId, presenterToken, questionId: question.id, ...input })
+    if (!presenterToken || !question) throw new Error(t('noRightsRejoin'))
+    await editQuizItems({ sessionId, presenterToken, questionId: question.id, ...input }, t)
     // A deck that changed needs its 標音 redone: a new card brings characters
     // the font subset was not cut for.
     annotatingDeck.current = ''
@@ -1196,19 +1210,19 @@ export function PresenterPage() {
 
   async function reviewWritingAttempt(attemptId: string, force: boolean) {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者權限，請重新加入場次。')
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'analyze_writing_attempt', sessionId, presenterToken, attemptId, force },
     })
-    if (error) throw new Error(await edgeFunctionErrorMessage(error, '批改失敗。'))
-    if (!data?.answers) throw new Error(data?.message || '批改失敗。')
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, t('markFailed')))
+    if (!data?.answers) throw new Error(data?.message || t('markFailed'))
     await loadAll()
   }
 
   async function updateCustomQuizAnswer(itemId: string, acceptedAnswers: string[]) {
     if (!question || question.type !== 'custom_quiz') return
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('這個舊場次沒有講者修改答案的權限。')
+    if (!presenterToken) throw new Error(t('oldSessionNoAnswerEdit'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: {
         action: 'update_custom_quiz_key',
@@ -1219,8 +1233,8 @@ export function PresenterPage() {
         acceptedAnswers,
       },
     })
-    if (error) throw new Error(await edgeFunctionErrorMessage(error, '正確答案更新失敗。'))
-    if (!data?.success) throw new Error(data?.message || '正確答案更新失敗。')
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, t('answerUpdateFailed')))
+    if (!data?.success) throw new Error(data?.message || t('answerUpdateFailed'))
     await loadAll()
   }
 
@@ -1228,7 +1242,7 @@ export function PresenterPage() {
     if (session?.exit_ticket_prompt) return
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setAnalysisError('這個舊場次沒有講者 AI 權限，請建立新場次後再試。')
+      setAnalysisError(t('oldSessionNoAi'))
       return
     }
 
@@ -1239,10 +1253,10 @@ export function PresenterPage() {
         body: { sessionId, presenterToken },
       })
       if (error) throw error
-      if (!data?.prompt) throw new Error(data?.message || 'AI 沒有產生 Exit Ticket。')
+      if (!data?.prompt) throw new Error(data?.message || t('noExitTicket'))
       await loadAll()
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : 'Exit Ticket 產生失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('exitTicketFailed'))
     } finally {
       setBusy(false)
     }
@@ -1258,17 +1272,17 @@ export function PresenterPage() {
   }
 
   async function drawLottery() {
-    await runLottery(onlineParticipants.map((participant) => participant.id), '目前沒有線上學生。')
+    await runLottery(onlineParticipants.map((participant) => participant.id), t('noStudentsOnlineMsg'))
   }
 
   async function startBuzzer() {
     if (!onlineParticipants.length) {
-      setAnalysisError('目前沒有線上學生。')
+      setAnalysisError(t('noStudentsOnlineMsg'))
       return
     }
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setAnalysisError('這個舊場次沒有講者操作權限，請建立新場次後再試。')
+      setAnalysisError(t('oldSessionNoControl'))
       return
     }
 
@@ -1284,13 +1298,13 @@ export function PresenterPage() {
         },
       })
       if (error) throw error
-      if (!data?.event) throw new Error(data?.message || '搶答沒有成功開始。')
+      if (!data?.event) throw new Error(data?.message || t('buzzerNotStarted'))
       const nextEvent = data.event as BuzzerSessionEvent
       setLotteryEvent(null)
       setBuzzerEvent(nextEvent)
       await window.lingoActDesktop?.showLottery(nextEvent)
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : '搶答啟動失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('buzzerStartFailed'))
     } finally {
       setBusy(false)
     }
@@ -1298,13 +1312,13 @@ export function PresenterPage() {
 
   async function activateBuzzer(eventId: string) {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者操作權限。')
+    if (!presenterToken) throw new Error(t('noControlRights'))
 
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'activate_buzzer', sessionId, presenterToken, eventId },
     })
     if (error) throw error
-    if (!data?.event) throw new Error(data?.message || '搶答沒有成功開始。')
+    if (!data?.event) throw new Error(data?.message || t('buzzerNotStarted'))
     const nextEvent = data.event as BuzzerSessionEvent
     setBuzzerEvent(nextEvent)
     await window.lingoActDesktop?.showLottery(nextEvent)
@@ -1312,7 +1326,7 @@ export function PresenterPage() {
 
   async function drawUnanswered(questionId: string) {
     if (!onlineParticipants.length) {
-      setAnalysisError('目前沒有線上學生。')
+      setAnalysisError(t('noStudentsOnlineMsg'))
       return
     }
 
@@ -1332,12 +1346,12 @@ export function PresenterPage() {
         .map((participant) => participant.id)
 
       if (!unansweredIds.length) {
-        setAnalysisError('目前線上學生皆已作答此題。')
+        setAnalysisError(t('everyoneAnswered'))
         return
       }
       await invokeLottery(unansweredIds)
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : '未作答學生抽選失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('drawUnansweredFailed'))
     } finally {
       setBusy(false)
     }
@@ -1354,7 +1368,7 @@ export function PresenterPage() {
     try {
       await invokeLottery(candidateIds)
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : '抽籤失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('lotteryFailed'))
     } finally {
       setBusy(false)
     }
@@ -1363,14 +1377,14 @@ export function PresenterPage() {
   async function invokeLottery(candidateIds: string[]) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      throw new Error('這個舊場次沒有講者操作權限，請建立新場次後再試。')
+      throw new Error(t('oldSessionNoControl'))
     }
 
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'draw_lottery', sessionId, presenterToken, candidateIds },
     })
     if (error) throw error
-    if (!data?.event) throw new Error(data?.message || '抽籤沒有回傳結果。')
+    if (!data?.event) throw new Error(data?.message || t('lotteryNoResult'))
     const nextEvent = data.event as LotterySessionEvent
     setLotteryEvent(nextEvent)
     await window.lingoActDesktop?.showLottery(nextEvent)
@@ -1379,9 +1393,9 @@ export function PresenterPage() {
   async function selectLotteryCandidate(winnerId: string) {
     if (!lotteryEvent) return
     try {
-      setLotteryEvent(await finalizeLottery(sessionId, lotteryEvent.id, winnerId))
+      setLotteryEvent(await finalizeLottery(sessionId, lotteryEvent.id, winnerId, t))
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : '抽籤停止失敗。')
+      setAnalysisError(error instanceof Error ? error.message : t('lotteryStopFailed'))
       throw error
     }
   }
@@ -1408,7 +1422,7 @@ export function PresenterPage() {
 
   function requirePresenterToken() {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('這個舊場次沒有講者操作權限，請建立新場次後再試。')
+    if (!presenterToken) throw new Error(t('oldSessionNoControl'))
     return presenterToken
   }
 
@@ -1442,7 +1456,7 @@ export function PresenterPage() {
         requestedCount: settings.requestedCount,
         requestedType: settings.requestedType,
         coaching: settings.coaching,
-      }, 'AI 出題失敗。')
+      }, t('quizCreateFailed'))
     } finally {
       setBusy(false)
     }
@@ -1460,7 +1474,7 @@ export function PresenterPage() {
           presenterToken,
           fileName: file.name,
           fileSize: file.size,
-        }, '無法準備檔案上傳。')
+        }, t('fileUploadPrepareFailed'))
         const { error: uploadError } = await supabase.storage
           .from('lingoact-files')
           .uploadToSignedUrl(prepared.storagePath as string, prepared.uploadToken as string, file, {
@@ -1476,7 +1490,7 @@ export function PresenterPage() {
           fileName: file.name,
           mimeType: file.type,
           fileSize: file.size,
-        }, '檔案上傳失敗。')
+        }, t('uploadFailed'))
       }
       await refreshSharedFiles()
     } finally {
@@ -1488,7 +1502,7 @@ export function PresenterPage() {
     const presenterToken = requirePresenterToken()
     setBusy(true)
     try {
-      await callPresenter({ action: 'delete_shared_file', sessionId, presenterToken, fileId }, '移除檔案失敗。')
+      await callPresenter({ action: 'delete_shared_file', sessionId, presenterToken, fileId }, t('fileRemoveFailed'))
       await refreshSharedFiles()
     } finally {
       setBusy(false)
@@ -1524,7 +1538,7 @@ export function PresenterPage() {
     try {
       const data = await callPresenter({
         action: 'create_file_request', sessionId, presenterToken, promptText,
-      }, '無法派送檔案上傳。')
+      }, t('collectStartFailed'))
       setCollectQuestion(data.question as Question)
       setFileResponses([])
       await loadAll()
@@ -1540,7 +1554,7 @@ export function PresenterPage() {
     try {
       await callPresenter({
         action: 'stop_question', sessionId, presenterToken, questionId: collectQuestion.id,
-      }, '無法停止收件。')
+      }, t('collectStopFailed'))
       setCollectQuestion({ ...collectQuestion, status: 'stopped' })
       await refreshFileResponses()
       await loadAll()
@@ -1558,7 +1572,7 @@ export function PresenterPage() {
     try {
       const data = await callPresenter({
         action: 'analyze_file_response', sessionId, presenterToken, responseId,
-      }, 'AI 批改失敗。')
+      }, t('aiMarkFailed'))
       const updated = (data.responses as FileResponse[] | undefined)
         || (data.response ? [data.response as FileResponse] : [])
       if (updated.length) {
@@ -1574,7 +1588,7 @@ export function PresenterPage() {
   async function openWall(promptText: string, answerSeconds: number | null) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setSentenceWallError('找不到講者權限，請重新加入場次。')
+      setSentenceWallError(t('noRightsRejoin'))
       return
     }
     setBusy(true)
@@ -1582,13 +1596,13 @@ export function PresenterPage() {
     try {
       const { question: created, session: updated } = await openSentenceWall({
         sessionId, presenterToken, promptText, answerSeconds,
-      })
+      }, t)
       if (updated) setSession(updated)
       setSelectedQuestionId(created.id)
       setWallComposition(null)
       setSentenceWallOpen(false)
     } catch (error) {
-      setSentenceWallError(error instanceof Error ? error.message : '造句牆開啟失敗。')
+      setSentenceWallError(error instanceof Error ? error.message : t('wallOpenFailed'))
     } finally {
       setBusy(false)
     }
@@ -1597,7 +1611,7 @@ export function PresenterPage() {
   async function openPhotoTask(promptText: string) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setPhotoTaskError('找不到講者權限，請重新加入場次。')
+      setPhotoTaskError(t('noRightsRejoin'))
       return
     }
     setBusy(true)
@@ -1606,12 +1620,12 @@ export function PresenterPage() {
       const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
         body: { action: 'open_photo_task', sessionId, presenterToken, promptText },
       })
-      if (error) throw new Error(await edgeFunctionErrorMessage(error, '拍照任務派送失敗。'))
-      if (!data?.question) throw new Error(data?.message || '拍照任務派送失敗。')
+      if (error) throw new Error(await edgeFunctionErrorMessage(error, t('photoTaskFailed')))
+      if (!data?.question) throw new Error(data?.message || t('photoTaskFailed'))
       setSelectedQuestionId(data.question.id)
       setPhotoTaskOpen(false)
     } catch (error) {
-      setPhotoTaskError(error instanceof Error ? error.message : '拍照任務派送失敗。')
+      setPhotoTaskError(error instanceof Error ? error.message : t('photoTaskFailed'))
     } finally {
       setBusy(false)
     }
@@ -1619,12 +1633,12 @@ export function PresenterPage() {
 
   async function composeWall() {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken || !question) throw new Error('找不到講者權限，請重新加入場次。')
-    setWallComposition(await composeSentenceWall({ sessionId, presenterToken, questionId: question.id }))
+    if (!presenterToken || !question) throw new Error(t('noRightsRejoin'))
+    setWallComposition(await composeSentenceWall({ sessionId, presenterToken, questionId: question.id }, t))
   }
 
   function dispatchWallComposition(composition: SentenceWallComposition) {
-    setTextDispatchDraft(dispatchTextFor(composition))
+    setTextDispatchDraft(dispatchTextFor(composition, t))
     setTextDispatchError('')
     setTextDispatchOpen(true)
   }
@@ -1632,7 +1646,7 @@ export function PresenterPage() {
   async function sendSharedContent(body: string, url: string) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setTextDispatchError('這個舊場次沒有講者操作權限，請建立新場次後再試。')
+      setTextDispatchError(t('oldSessionNoControl'))
       return
     }
 
@@ -1643,11 +1657,11 @@ export function PresenterPage() {
         body: { action: 'share_content', sessionId, presenterToken, body, url },
         timeout: 15_000,
       })
-      if (error) throw new Error(await edgeFunctionErrorMessage(error, '文字派送失敗。'))
-      if (!data?.content) throw new Error(data?.message || '文字派送失敗。')
+      if (error) throw new Error(await edgeFunctionErrorMessage(error, t('textDispatchFailed')))
+      if (!data?.content) throw new Error(data?.message || t('textDispatchFailed'))
       setTextDispatchOpen(false)
     } catch (error) {
-      const message = error instanceof Error ? error.message : '文字派送失敗。'
+      const message = error instanceof Error ? error.message : t('textDispatchFailed')
       logDiagnostic('shared_content_failed', { sessionId, message })
       setTextDispatchError(message)
     } finally {
@@ -1658,7 +1672,7 @@ export function PresenterPage() {
   async function endClass() {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setAnalysisError('這個舊場次沒有講者 AI 權限，請建立新場次後再試。')
+      setAnalysisError(t('oldSessionNoAi'))
       return
     }
 
@@ -1671,7 +1685,7 @@ export function PresenterPage() {
         window.location.hash = `/session-report/${sessionId}?generate=1`
       }
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : '無法開啟課堂報告。')
+      setAnalysisError(error instanceof Error ? error.message : t('reportOpenFailed'))
       setBusy(false)
     }
   }
@@ -1685,7 +1699,7 @@ export function PresenterPage() {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
       setCloseConfirmOpen(false)
-      setAnalysisError('找不到這個場次的講者權限，無法安全結束課程。')
+      setAnalysisError(t('noRightsCannotEnd'))
       return
     }
 
@@ -1693,11 +1707,11 @@ export function PresenterPage() {
     setAnalysisError('')
     try {
       if (captionConnectionsRef.current.length) await stopCourseRecording()
-      await endManagedSession(sessionId, presenterToken)
+      await endManagedSession(sessionId, presenterToken, t)
       await window.lingoActDesktop?.close()
     } catch (error) {
       setCloseConfirmOpen(false)
-      setAnalysisError(error instanceof Error ? error.message : '無法結束課程，程式尚未關閉。')
+      setAnalysisError(error instanceof Error ? error.message : t('endClassFailed'))
       setClosingSession(false)
     }
   }
@@ -1710,7 +1724,7 @@ export function PresenterPage() {
       await window.lingoActDesktop?.close()
     } catch (error) {
       setCloseConfirmOpen(false)
-      setAnalysisError(error instanceof Error ? error.message : '暫時中止失敗，程式尚未關閉。')
+      setAnalysisError(error instanceof Error ? error.message : t('suspendFailed'))
       setClosingSession(false)
     }
   }
@@ -1724,7 +1738,7 @@ export function PresenterPage() {
     return (
       <main className="center-page">
         <SetupNotice />
-        <p className="muted">載入講者頁...</p>
+        <p className="muted">{t('loadingPresenter')}</p>
       </main>
     )
   }
@@ -1821,7 +1835,7 @@ export function PresenterPage() {
           onStopQuestion={stopQuestion}
           onResumeQuestion={resumeQuestion}
           onAnalyzeFile={(responseId) => void analyzeFileResponse(responseId).catch((error) => {
-            setAnalysisError(error instanceof Error ? error.message : 'AI 批改失敗。')
+            setAnalysisError(error instanceof Error ? error.message : t('aiMarkFailed'))
           })}
           onDrawUnanswered={drawUnanswered}
           onSetCorrectAnswer={setCorrectAnswer}
@@ -1870,7 +1884,7 @@ export function PresenterPage() {
           onPointerMove={updateSelection}
           onPointerUp={finishSelection}
         >
-          <p className="capture-selection-hint">拖曳框選要派送的畫面區域</p>
+          <p className="capture-selection-hint">{t('captureDragHint')}</p>
           {selectionRect && (
             <div
               className="capture-selection-box"
@@ -1961,10 +1975,10 @@ export function PresenterPage() {
       />
       <ConfirmDialog
         busy={busy}
-        confirmLabel="下課並產生報告"
-        description={`「${session.title}」會停止互動，學員將看到課程已結束；課堂資料、派送內容與分析都會保留。`}
+        confirmLabel={t('endClassConfirm')}
+        description={t('endClassBody', { title: session.title })}
         open={endClassConfirmOpen}
-        title="確定要下課並產生報告？"
+        title={t('endClassTitle')}
         onCancel={() => {
           if (!busy) setEndClassConfirmOpen(false)
         }}
@@ -1972,11 +1986,11 @@ export function PresenterPage() {
       />
       <ConfirmDialog
         busy={closingSession}
-        confirmLabel="結束課程並離開"
-        description={`暫時中止只會關閉講師程式，場次與資料保持原狀，可從「管理場次」重新加入。選擇結束課程後，學員會看到課程已結束，資料保留但不產生 AI 課程總結。`}
+        confirmLabel={t('leaveConfirm')}
+        description={t('leaveBody')}
         open={closeConfirmOpen}
-        secondaryLabel="暫時中止"
-        title={`要如何離開「${session.title}」？`}
+        secondaryLabel={t('leaveSecondary')}
+        title={t('leaveTitle', { title: session.title })}
         onCancel={() => {
           if (!closingSession) setCloseConfirmOpen(false)
         }}

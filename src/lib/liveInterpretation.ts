@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { requireSupabase } from './supabase'
+import type { PresenterT } from './presenterI18n'
 
 const CHUNK_DURATION_MS = 250
 const AUDIO_PACKET_HEADER_BYTES = 8
@@ -30,16 +31,16 @@ function encodePcm16(samples: Float32Array, sampleRate: number) {
   return buffer
 }
 
-function waitForSubscription(channel: RealtimeChannel) {
+function waitForSubscription(channel: RealtimeChannel, t: PresenterT) {
   return new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error('即時口譯廣播連線逾時。')), 8000)
+    const timeout = window.setTimeout(() => reject(new Error(t('interpretationBroadcastTimeout'))), 8000)
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         window.clearTimeout(timeout)
         resolve()
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         window.clearTimeout(timeout)
-        reject(new Error('無法連接即時口譯廣播。'))
+        reject(new Error(t('interpretationBroadcastFailed')))
       }
     })
   })
@@ -51,13 +52,14 @@ export async function createInterpretationAudioBroadcaster(
   stream: MediaStream,
   audioContext: AudioContext,
   onError: (message: string) => void,
+  t: PresenterT,
 ): Promise<InterpretationAudioBroadcaster> {
   const supabase = requireSupabase()
   const channel = supabase.channel(`interpretation-audio:${sessionId}:${language}`, {
     config: { broadcast: { ack: true } },
   })
   try {
-    await waitForSubscription(channel)
+    await waitForSubscription(channel, t)
   } catch (error) {
     void supabase.removeChannel(channel)
     throw error
@@ -79,8 +81,8 @@ export async function createInterpretationAudioBroadcaster(
         event: 'audio',
         payload: encodePcm16(samples, sampleRate),
       })
-      if (result !== 'ok') throw new Error('即時口譯音訊送出失敗。')
-    }).catch((error: unknown) => onError(error instanceof Error ? error.message : '即時口譯音訊送出失敗。'))
+      if (result !== 'ok') throw new Error(t('interpretationSendFailed'))
+    }).catch((error: unknown) => onError(error instanceof Error ? error.message : t('interpretationSendFailed')))
   }
 
   const appendSamples = (channels: Float32Array[], sampleRate: number) => {
@@ -101,7 +103,7 @@ export async function createInterpretationAudioBroadcaster(
   const startWebAudioFallback = async () => {
     if (closed || source) return
     if (audioContext.state !== 'running') await audioContext.resume()
-    if (audioContext.state !== 'running') throw new Error('教師端的音訊處理尚未啟動，請關閉後重新開啟課程錄製。')
+    if (audioContext.state !== 'running') throw new Error(t('audioContextNotRunning'))
     source = audioContext.createMediaStreamSource(stream)
     processor = audioContext.createScriptProcessor(4096, 1, 1)
     silentOutput = audioContext.createGain()
@@ -123,7 +125,7 @@ export async function createInterpretationAudioBroadcaster(
   const track = stream.getAudioTracks()[0]
   if (!track) {
     void supabase.removeChannel(channel)
-    throw new Error('OpenAI 沒有提供即時口譯音軌。')
+    throw new Error(t('noInterpretationTrack'))
   }
   const TrackProcessor = (globalThis as typeof globalThis & {
     MediaStreamTrackProcessor?: MediaStreamTrackProcessorConstructor
@@ -152,7 +154,7 @@ export async function createInterpretationAudioBroadcaster(
           frameReader = null
           await startWebAudioFallback()
         } catch {
-          onError(error instanceof Error ? error.message : '即時口譯音訊讀取失敗。')
+          onError(error instanceof Error ? error.message : t('interpretationReadFailed'))
         }
       }
     })()

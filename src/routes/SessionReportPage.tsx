@@ -5,28 +5,30 @@ import { useSessionReportBack } from '../lib/sessionReportNavigation'
 import { requireSupabase } from '../lib/supabase'
 import type { AiSummary, Answer, AudioResponse, CaptionSegment, ExitTicket, Message, Participant, Question, Screenshot, Session, SessionAnalysis, SessionCustomQuizResults, SessionMetrics, SessionEvent, SessionReportData, SharedContent, FileResponse } from '../types'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { PresenterLocaleContext, presenterLocaleFor, presenterLookup, usePresenterText } from '../lib/presenterI18n'
+import type { PresenterMessageKey, PresenterT } from '../lib/presenterI18n'
 
 const PAGE_SIZE = 1000
 
 type ReportThinkingLevel = 'LOW' | 'MEDIUM' | 'HIGH'
 
-const reportModes: { level: ReportThinkingLevel; label: string; hint: string }[] = [
-  { level: 'LOW', label: '快速', hint: 'gemini-3.7-flash · thinking low：最不容易逾時，建議先用這個' },
-  { level: 'MEDIUM', label: '標準', hint: 'gemini-3.7-flash · thinking medium：分析較深入，較慢' },
-  { level: 'HIGH', label: '深入', hint: 'gemini-3.7-flash · thinking high：最深入，最可能逾時' },
+const reportModes: { level: ReportThinkingLevel; label: PresenterMessageKey; hint: PresenterMessageKey }[] = [
+  { level: 'LOW', label: 'reportModeFast', hint: 'reportModeFastHint' },
+  { level: 'MEDIUM', label: 'reportModeStandard', hint: 'reportModeStandardHint' },
+  { level: 'HIGH', label: 'reportModeDeep', hint: 'reportModeDeepHint' },
 ]
 
-const questionTypeLabels: Record<Question['type'], string> = {
-  send_screen: '派送畫面',
-  poll: '投票題',
-  multiple_choice: '選擇題',
-  true_false: '是非題',
-  short_answer: '問答題',
-  pronunciation: '朗讀發音',
-  oral_response: '口語表達',
-  custom_quiz: '自訂測驗',
-  file_upload: '上傳作答',
-  listening: '聽力',
+const questionTypeLabels: Record<Question['type'], PresenterMessageKey> = {
+  send_screen: 'typeSendScreen',
+  poll: 'typePoll',
+  multiple_choice: 'typeMultipleChoice',
+  true_false: 'typeTrueFalse',
+  short_answer: 'typeShortAnswer',
+  pronunciation: 'typePronunciation',
+  oral_response: 'typeOralResponse',
+  custom_quiz: 'typeCustomQuiz',
+  file_upload: 'typeFileUpload',
+  listening: 'typeListening',
 }
 
 async function fetchAllRows<T>(table: string, sessionId: string, orderColumn: string) {
@@ -45,8 +47,8 @@ async function fetchAllRows<T>(table: string, sessionId: string, orderColumn: st
   }
 }
 
-async function edgeFunctionMessage(error: unknown) {
-  if (!(error instanceof Error)) return '整節課 AI 分析失敗。'
+async function edgeFunctionMessage(error: unknown, t: PresenterT) {
+  if (!(error instanceof Error)) return t('sessionAnalysisFailed')
   const context = (error as Error & { context?: Response }).context
   if (context) {
     try {
@@ -59,28 +61,29 @@ async function edgeFunctionMessage(error: unknown) {
   return error.message
 }
 
-function formatPercent(value: number | null) {
-  return value === null ? '未判定' : `${value.toFixed(1)}%`
+function formatPercent(value: number | null, t: PresenterT) {
+  return value === null ? t('notDetermined') : `${value.toFixed(1)}%`
 }
 
 function BulletList({ items }: { items: string[] }) {
-  if (!items.length) return <p className="muted">目前沒有足夠資料。</p>
+  const t = usePresenterText()
+  if (!items.length) return <p className="muted">{t('notEnoughData')}</p>
   return <ul className="report-list">{items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
 }
 
-const fileAnalysisLabels: Record<string, string> = {
-  pending: '尚未批改',
-  analyzing: '批改中',
-  success: '已批改',
-  failed: '批改失敗',
-  unsupported: 'AI 無法讀取此格式',
+const fileAnalysisLabels: Record<string, PresenterMessageKey> = {
+  pending: 'statusPending',
+  analyzing: 'statusGrading',
+  success: 'statusSuccess',
+  failed: 'statusFailed',
+  unsupported: 'statusUnsupported',
 }
 
-const uploadVerdictLabels: Record<string, string> = {
-  correct: '正確',
-  partial: '部分正確',
-  incorrect: '不正確',
-  unscored: '未評分',
+const uploadVerdictLabels: Record<string, PresenterMessageKey> = {
+  correct: 'verdictCorrect',
+  partial: 'verdictPartial',
+  incorrect: 'verdictIncorrect',
+  unscored: 'verdictUnscored',
 }
 
 export function SessionReportPage() {
@@ -91,6 +94,16 @@ export function SessionReportPage() {
   const [analysis, setAnalysis] = useState<SessionAnalysis | null>(null)
   const [metrics, setMetrics] = useState<SessionMetrics | null>(null)
   const [reportData, setReportData] = useState<SessionReportData | null>(null)
+  // Its own window: the locale comes from the class that was taught, not from a
+  // provider. The AI wrote this report in Chinese and translated it into
+  // English, so a non-Chinese class reads the English one where it exists.
+  //
+  // Read on its own rather than off reportData, because the first thing this
+  // page may have to say is that there is no report — and that sentence needs
+  // the language before the report it is refusing to load.
+  const [teachingLanguage, setTeachingLanguage] = useState<string | null>(null)
+  const locale = presenterLocaleFor(teachingLanguage)
+  const t = presenterLookup(locale)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
@@ -116,7 +129,7 @@ export function SessionReportPage() {
     ])
 
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到這個場次的講者權限，無法讀取錄音評測。')
+    if (!presenterToken) throw new Error(t('noRightsForRecordings'))
     const [recordingResult, customQuizResult, fileResult] = await Promise.all([
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_session_recording_results', sessionId, presenterToken },
@@ -130,8 +143,8 @@ export function SessionReportPage() {
         body: { action: 'get_file_responses', sessionId, presenterToken },
       }),
     ])
-    if (recordingResult.error) throw new Error(await edgeFunctionMessage(recordingResult.error))
-    if (customQuizResult.error) throw new Error(await edgeFunctionMessage(customQuizResult.error))
+    if (recordingResult.error) throw new Error(await edgeFunctionMessage(recordingResult.error, t))
+    if (customQuizResult.error) throw new Error(await edgeFunctionMessage(customQuizResult.error, t))
 
     setReportData({
       session: session as Session,
@@ -149,31 +162,31 @@ export function SessionReportPage() {
       exitTickets,
       buzzerEvents: sessionEvents.filter((event) => event.event_type === 'buzzer'),
     })
-  }, [sessionId])
+  }, [sessionId, t])
 
   const generateReport = useCallback(async (level?: ReportThinkingLevel) => {
     setLoading(true)
     setError('')
     try {
       const presenterToken = getPresenterToken(sessionId)
-      if (!presenterToken) throw new Error('找不到這個場次的講者權限，無法產生課堂報告。')
+      if (!presenterToken) throw new Error(t('noRightsForReport'))
 
       const supabase = requireSupabase()
       const { data, error: functionError } = await supabase.functions.invoke('analyze-session', {
         body: { sessionId, presenterToken, ...(level ? { thinkingLevel: level } : {}) },
       })
-      if (functionError) throw new Error(await edgeFunctionMessage(functionError))
-      if (!data?.analysis || !data?.metrics) throw new Error(data?.message || 'AI 沒有回傳完整課堂分析。')
+      if (functionError) throw new Error(await edgeFunctionMessage(functionError, t))
+      if (!data?.analysis || !data?.metrics) throw new Error(data?.message || t('noFullAnalysis'))
 
       setAnalysis(data.analysis as SessionAnalysis)
       setMetrics(data.metrics as SessionMetrics)
       await loadReportData()
     } catch (caught) {
-      setError(await edgeFunctionMessage(caught))
+      setError(await edgeFunctionMessage(caught, t))
     } finally {
       setLoading(false)
     }
-  }, [loadReportData, sessionId])
+  }, [loadReportData, sessionId, t])
 
   const loadSavedReport = useCallback(async () => {
     setLoading(true)
@@ -193,20 +206,34 @@ export function SessionReportPage() {
       const savedSummary = data as AiSummary | null
       const savedMetrics = savedSummary?.input_json?.metrics as SessionMetrics | undefined
       if (!savedSummary || !savedMetrics) {
-        throw new Error('此場次是直接結束，未使用「下課並產生報告」，因此沒有 AI 課程總結。')
+        throw new Error(t('endedWithoutReport'))
       }
 
       setAnalysis(savedSummary.output_json as SessionAnalysis)
       setMetrics(savedMetrics)
       await loadReportData()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '無法讀取課堂報告。')
+      setError(caught instanceof Error ? caught.message : t('reportReadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [loadReportData, sessionId])
+  }, [loadReportData, sessionId, t])
+
+  // One column, before anything else: every message this page can produce is in
+  // the language of the class it belongs to.
+  useEffect(() => {
+    let cancelled = false
+    void requireSupabase().from('sessions').select('teaching_language').eq('id', sessionId).maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setTeachingLanguage((data?.teaching_language as string | null) ?? '')
+      })
+    return () => { cancelled = true }
+  }, [sessionId])
 
   useEffect(() => {
+    // Held until the locale has arrived, so a failure is reported in the right
+    // language rather than in whatever the fallback happened to be.
+    if (teachingLanguage === null) return
     const loadKey = `${sessionId}:${generateRequested ? 'generate' : 'saved'}`
     if (automaticLoadKeyRef.current === loadKey) return
     automaticLoadKeyRef.current = loadKey
@@ -215,14 +242,14 @@ export function SessionReportPage() {
     } else {
       void loadSavedReport()
     }
-  }, [generateReport, generateRequested, loadSavedReport, sessionId])
+  }, [generateReport, generateRequested, loadSavedReport, sessionId, teachingLanguage])
 
   const questionMeta = useMemo(
     () => new Map((reportData?.questions || []).map((question, index) => [question.id, {
       number: index + 1,
-      type: questionTypeLabels[question.type],
+      type: t(questionTypeLabels[question.type]),
     }])),
-    [reportData?.questions],
+    [reportData?.questions, t],
   )
 
   // One row per student per question, the way the mark itself was made.
@@ -248,7 +275,7 @@ export function SessionReportPage() {
       const { exportSessionReport } = await import('../lib/exportSessionReport')
       await exportSessionReport(reportData, analysis, metrics)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Excel 匯出失敗。')
+      setError(caught instanceof Error ? caught.message : t('excelExportFailed'))
     } finally {
       setExporting(false)
     }
@@ -258,12 +285,12 @@ export function SessionReportPage() {
     return (
       <main className="session-report-page report-loading">
         <CircleNotch className="spin" size={34} />
-        <h1>{generateRequested ? 'AI 正在分析整節課' : '正在讀取課堂報告'}</h1>
+        <h1>{generateRequested ? t('analysingWholeClass') : t('readingReport')}</h1>
         <p className="muted">
-          {generateRequested ? '彙整字幕逐字稿、文字派送、題目、作答、彈幕與參與資料...' : '載入已產生的課堂分析與互動資料...'}
+          {generateRequested ? t('analysingWholeClassHint') : t('readingReportHint')}
         </p>
         <button className="ghost-button" type="button" onClick={() => void returnToSessionManager()}>
-          <ArrowLeft size={17} />返回場次管理
+          <ArrowLeft size={17} />{t('backToSessions')}
         </button>
       </main>
     )
@@ -272,10 +299,10 @@ export function SessionReportPage() {
   if (error && (!analysis || !metrics || !reportData)) {
     return (
       <main className="session-report-page report-loading">
-        <h1>報告尚未產生</h1>
+        <h1>{t('reportNotMade')}</h1>
         <p className="error">{error}</p>
         <fieldset className="report-mode-picker">
-          <legend>分析模式</legend>
+          <legend>{t('analysisMode')}</legend>
           {reportModes.map((mode) => (
             <label key={mode.level}>
               <input
@@ -285,17 +312,17 @@ export function SessionReportPage() {
                 value={mode.level}
                 onChange={() => setThinkingLevel(mode.level)}
               />
-              <span className="report-mode-label">{mode.label}</span>
-              <span className="report-mode-hint">{mode.hint}</span>
+              <span className="report-mode-label">{t(mode.label)}</span>
+              <span className="report-mode-hint">{t(mode.hint)}</span>
             </label>
           ))}
         </fieldset>
         <div className="report-actions">
           <button type="button" onClick={() => void generateReport(thinkingLevel)}>
-            <ArrowsClockwise size={17} />產生課堂報告
+            <ArrowsClockwise size={17} />{t('makeReport')}
           </button>
           <button className="ghost-button" type="button" onClick={() => void returnToSessionManager()}>
-            <ArrowLeft size={17} />返回場次管理
+            <ArrowLeft size={17} />{t('backToSessions')}
           </button>
         </div>
       </main>
@@ -304,68 +331,76 @@ export function SessionReportPage() {
 
   if (!analysis || !metrics || !reportData) return null
 
+  // The analysis itself is AI prose, not interface text, so it cannot come from
+  // the message table. The report is written in Chinese and translated into
+  // English in the same call; anything else falls back to what was written.
+  const report = locale === 'zh-TW' ? analysis : { ...analysis, ...(analysis.translations?.en || {}) }
+  // 、 reads as a list in Chinese and as a typo in English.
+  const listJoin = locale === 'zh-TW' ? '、' : ', '
+
   return (
+    <PresenterLocaleContext.Provider value={locale}>
     <main className="session-report-page">
       <header className="report-header">
         <div>
           <p className="eyebrow">LingoAct Session Report</p>
-          <h1><BookOpen size={28} />課堂互動報告</h1>
-          <p className="muted">{reportData.session.title}．{new Date(reportData.session.created_at).toLocaleString('zh-TW')}</p>
+          <h1><BookOpen size={28} />{t('reportTitle')}</h1>
+          <p className="muted">{reportData.session.title}．{new Date(reportData.session.created_at).toLocaleString(locale)}</p>
         </div>
         <div className="report-actions">
           <button className="ghost-button" type="button" onClick={() => void returnToSessionManager()}>
-            <ArrowLeft size={17} />返回場次管理
+            <ArrowLeft size={17} />{t('backToSessions')}
           </button>
           <button type="button" onClick={exportExcel} disabled={exporting}>
             {exporting ? <CircleNotch className="spin" size={17} /> : <DownloadSimple size={17} />}
-            {exporting ? '匯出中...' : '匯出 Excel'}
+            {exporting ? t('exporting') : t('exportExcel')}
           </button>
         </div>
       </header>
 
       {error && <p className="report-inline-error error">{error}</p>}
 
-      <section className="report-metrics" aria-label="課堂互動統計">
-        <article><Users size={20} /><span>參與者</span><strong>{metrics.participant_count}</strong></article>
-        <article><ChatText size={20} /><span>彈幕次數</span><strong>{metrics.message_count}</strong></article>
-        <article><ListChecks size={20} /><span>題目／作答</span><strong>{metrics.question_count}／{metrics.answer_count}</strong></article>
-        <article><ChartLineUp size={20} /><span>平均作答率</span><strong>{formatPercent(metrics.average_response_rate)}</strong></article>
-        <article><Clock size={20} /><span>課堂長度</span><strong>{metrics.duration_minutes} 分</strong></article>
+      <section className="report-metrics" aria-label={t('reportMetricsLabel')}>
+        <article><Users size={20} /><span>{t('metricParticipants')}</span><strong>{metrics.participant_count}</strong></article>
+        <article><ChatText size={20} /><span>{t('metricMessages')}</span><strong>{metrics.message_count}</strong></article>
+        <article><ListChecks size={20} /><span>{t('metricQuestions')}</span><strong>{metrics.question_count}／{metrics.answer_count}</strong></article>
+        <article><ChartLineUp size={20} /><span>{t('metricResponseRate')}</span><strong>{formatPercent(metrics.average_response_rate, t)}</strong></article>
+        <article><Clock size={20} /><span>{t('metricDuration')}</span><strong>{t('minutes', { n: metrics.duration_minutes })}</strong></article>
       </section>
 
       <section className="report-section report-summary-band">
         <div className="report-section-heading">
-          <h2>AI 課堂總結</h2>
+          <h2>{t('aiClassSummary')}</h2>
           <span className={`engagement-badge ${analysis.engagement_analysis.level}`}>
-            互動程度：{analysis.engagement_analysis.level === 'high' ? '高' : analysis.engagement_analysis.level === 'medium' ? '中' : '低'}
+            {t('engagementLevel', { level: t(analysis.engagement_analysis.level === 'high' ? 'levelHigh' : analysis.engagement_analysis.level === 'medium' ? 'levelMedium' : 'levelLow') })}
           </span>
         </div>
-        <p className="report-lead">{analysis.executive_summary}</p>
-        <p>{analysis.engagement_analysis.summary}</p>
+        <p className="report-lead">{report.executive_summary}</p>
+        <p>{report.engagement_analysis.summary}</p>
       </section>
 
-      {analysis.lesson_key_points?.length ? (
+      {report.lesson_key_points?.length ? (
         <section className="report-section report-summary-band">
           <div className="report-section-heading">
             <BookOpen size={20} />
-            <h2>課堂重點整理</h2>
+            <h2>{t('lessonKeyPoints')}</h2>
           </div>
           <ul>
-            {analysis.lesson_key_points.map((point) => <li key={point}>{point}</li>)}
+            {report.lesson_key_points.map((point) => <li key={point}>{point}</li>)}
           </ul>
         </section>
       ) : null}
 
       <section className="report-section">
-        <h2>課堂文字與連結派送</h2>
+        <h2>{t('sharedTextAndLinks')}</h2>
         {reportData.sharedContents.length ? (
           <div className="report-table-wrap">
             <table className="report-table">
-              <thead><tr><th>派送時間</th><th>文字內容</th><th>連結</th></tr></thead>
+              <thead><tr><th>{t('colSentAt')}</th><th>{t('colText')}</th><th>{t('colLink')}</th></tr></thead>
               <tbody>
                 {reportData.sharedContents.map((content) => (
                   <tr key={content.id}>
-                    <td>{new Date(content.created_at).toLocaleString('zh-TW')}</td>
+                    <td>{new Date(content.created_at).toLocaleString(locale)}</td>
                     <td>{content.body || '—'}</td>
                     <td>
                       {content.url
@@ -377,42 +412,43 @@ export function SessionReportPage() {
               </tbody>
             </table>
           </div>
-        ) : <p className="muted">本場次沒有派送文字或連結。</p>}
+        ) : <p className="muted">{t('noSharedContents')}</p>}
       </section>
 
       <section className="report-section">
-        <h2>錄音評測</h2>
+        <h2>{t('recordingResults')}</h2>
         {reportData.audioResponses.length ? (
           <div className="report-table-wrap">
             <table className="report-table">
-              <thead><tr><th>題次／題型</th><th>姓名</th><th>語言／分數</th><th>AI 分析</th><th>優點</th><th>改善建議</th></tr></thead>
+              <thead><tr><th>{t('colQuestion')}</th><th>{t('colName')}</th><th>{t('colLanguageScore')}</th><th>{t('colAiAnalysis')}</th><th>{t('colStrengths')}</th><th>{t('colImprovements')}</th></tr></thead>
               <tbody>
                 {reportData.audioResponses.map((response) => {
-                  const item = response.analysis_json
+                  const stored = response.analysis_json
+                  const item = locale === 'zh-TW' || !stored ? stored : { ...stored, ...(stored.translations?.en || {}) }
                   const meta = questionMeta.get(response.question_id)
                   return (
                     <tr key={response.id}>
                       <td>{meta ? `${meta.number}．${meta.type}` : '—'}</td>
                       <td>{response.participant_name}</td>
-                      <td>{response.detected_language || '—'}<br />{typeof response.score === 'number' ? `${response.score} 分` : '分析未完成'}</td>
+                      <td>{response.detected_language || '—'}<br />{typeof response.score === 'number' ? t('points', { n: response.score }) : t('analysisIncomplete')}</td>
                       <td>{item?.summary || response.error_message || '—'}</td>
-                      <td>{item?.strengths.join('、') || '—'}</td>
-                      <td>{item?.improvements.join('、') || '—'}</td>
+                      <td>{item?.strengths.join(listJoin) || '—'}</td>
+                      <td>{item?.improvements.join(listJoin) || '—'}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-        ) : <p className="muted">本場次沒有錄音評測。</p>}
+        ) : <p className="muted">{t('noRecordingResults')}</p>}
       </section>
 
       <section className="report-section">
-        <h2>上傳作答批改</h2>
+        <h2>{t('uploadMarking')}</h2>
         {uploadSubmissions.length ? (
           <div className="report-table-wrap">
             <table className="report-table">
-              <thead><tr><th>題次／題型</th><th>姓名</th><th>檔案</th><th>判定／分數</th><th>AI 批改</th><th>做得好</th><th>可改進</th></tr></thead>
+              <thead><tr><th>{t('colQuestion')}</th><th>{t('colName')}</th><th>{t('colFiles')}</th><th>{t('colVerdictScore')}</th><th>{t('colAiMarking')}</th><th>{t('didWell')}</th><th>{t('couldImprove')}</th></tr></thead>
               <tbody>
                 {uploadSubmissions.map(([key, files]) => {
                   const lead = files[0]
@@ -422,49 +458,51 @@ export function SessionReportPage() {
                     <tr key={key}>
                       <td>{meta ? `${meta.number}．${meta.type}` : '—'}</td>
                       <td>{lead.participant_name}</td>
-                      <td>{files.map((file) => file.name).join('、')}</td>
+                      <td>{files.map((file) => file.name).join(listJoin)}</td>
                       <td>
-                        {item?.verdict ? uploadVerdictLabels[item.verdict] || item.verdict : fileAnalysisLabels[lead.analysis_status] || '—'}
-                        <br />{typeof item?.score === 'number' ? `${item.score} 分` : '—'}
+                        {item?.verdict
+                          ? uploadVerdictLabels[item.verdict] ? t(uploadVerdictLabels[item.verdict]) : item.verdict
+                          : fileAnalysisLabels[lead.analysis_status] ? t(fileAnalysisLabels[lead.analysis_status]) : '—'}
+                        <br />{typeof item?.score === 'number' ? t('points', { n: item.score }) : '—'}
                       </td>
-                      <td>{item?.summary_zh_tw || lead.error_message || '—'}</td>
-                      <td>{item?.strengths_zh_tw.join('、') || '—'}</td>
-                      <td>{item?.improvements_zh_tw.join('、') || '—'}</td>
+                      <td>{(locale === 'zh-TW' ? item?.summary_zh_tw : item?.summary_en || item?.summary_zh_tw) || lead.error_message || '—'}</td>
+                      <td>{(locale === 'zh-TW' ? item?.strengths_zh_tw : item?.strengths_en?.length ? item.strengths_en : item?.strengths_zh_tw)?.join(listJoin) || '—'}</td>
+                      <td>{(locale === 'zh-TW' ? item?.improvements_zh_tw : item?.improvements_en?.length ? item.improvements_en : item?.improvements_zh_tw)?.join(listJoin) || '—'}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-        ) : <p className="muted">本場次沒有上傳作答。</p>}
+        ) : <p className="muted">{t('noUploadResults')}</p>}
       </section>
 
       <div className="report-two-column">
         <section className="report-section">
-          <h2>互動觀察</h2>
-          <h3>參與情形</h3>
-          <BulletList items={analysis.engagement_analysis.participation_observations} />
-          <h3>彈幕內容</h3>
-          <BulletList items={analysis.engagement_analysis.danmaku_observations} />
+          <h2>{t('interactionObserved')}</h2>
+          <h3>{t('participation')}</h3>
+          <BulletList items={report.engagement_analysis.participation_observations} />
+          <h3>{t('danmakuContent')}</h3>
+          <BulletList items={report.engagement_analysis.danmaku_observations} />
         </section>
         <section className="report-section">
-          <h2>學習理解</h2>
-          <p>{analysis.learning_analysis.overall_understanding}</p>
-          <h3>學習優勢</h3>
-          <BulletList items={analysis.learning_analysis.strengths} />
-          <h3>常見迷思</h3>
-          <BulletList items={analysis.learning_analysis.misconceptions} />
+          <h2>{t('learningUnderstanding')}</h2>
+          <p>{report.learning_analysis.overall_understanding}</p>
+          <h3>{t('learningStrengths')}</h3>
+          <BulletList items={report.learning_analysis.strengths} />
+          <h3>{t('commonMisconceptions')}</h3>
+          <BulletList items={report.learning_analysis.misconceptions} />
         </section>
       </div>
 
       <section className="report-section">
-        <h2>問題分析</h2>
-        {analysis.learning_analysis.question_findings.length ? (
+        <h2>{t('questionAnalysis')}</h2>
+        {report.learning_analysis.question_findings.length ? (
           <div className="report-table-wrap">
             <table className="report-table">
-              <thead><tr><th>題型</th><th>題次</th><th>題目</th><th>結果</th><th>資料證據</th></tr></thead>
+              <thead><tr><th>{t('colType')}</th><th>{t('colNumber')}</th><th>{t('colPrompt')}</th><th>{t('colResult')}</th><th>{t('colEvidence')}</th></tr></thead>
               <tbody>
-                {analysis.learning_analysis.question_findings.map((finding) => (
+                {report.learning_analysis.question_findings.map((finding) => (
                   <tr key={finding.question_id}>
                     <td>{questionMeta.get(finding.question_id)?.type || '—'}</td>
                     <td>{questionMeta.get(finding.question_id)?.number || '—'}</td>
@@ -476,24 +514,25 @@ export function SessionReportPage() {
               </tbody>
             </table>
           </div>
-        ) : <p className="muted">這個場次沒有可分析的題目。</p>}
+        ) : <p className="muted">{t('noAnalysableQuestions')}</p>}
       </section>
 
       <div className="report-two-column">
         <section className="report-section">
-          <h2>教學建議</h2>
-          <h3>立即可做</h3>
-          <BulletList items={analysis.teaching_recommendations.immediate_actions} />
-          <h3>下節課調整</h3>
-          <BulletList items={analysis.teaching_recommendations.next_lesson_actions} />
+          <h2>{t('teachingAdvice')}</h2>
+          <h3>{t('immediateActionsHeading')}</h3>
+          <BulletList items={report.teaching_recommendations.immediate_actions} />
+          <h3>{t('nextLessonActions')}</h3>
+          <BulletList items={report.teaching_recommendations.next_lesson_actions} />
         </section>
         <section className="report-section">
-          <h2>追問題目</h2>
-          <BulletList items={analysis.teaching_recommendations.follow_up_questions} />
-          <h3>分析限制</h3>
-          <BulletList items={analysis.limitations} />
+          <h2>{t('followUpQuestions')}</h2>
+          <BulletList items={report.teaching_recommendations.follow_up_questions} />
+          <h3>{t('analysisLimits')}</h3>
+          <BulletList items={report.limitations} />
         </section>
       </div>
     </main>
+    </PresenterLocaleContext.Provider>
   )
 }

@@ -52,7 +52,24 @@ function englishStrings() {
   return new Function(`return ${source.slice(open, end + 1)}`)()
 }
 
+// The catalogue outgrew one request: past roughly two hundred keys the model
+// starts returning a shorter object than it was given, and the check below
+// reports it as missing keys. Asking in batches is slower and reliable.
+const BATCH = 120
+
 async function translate(key, strings, target) {
+  const keys = Object.keys(strings)
+  const translated = {}
+  for (let at = 0; at < keys.length; at += BATCH) {
+    const slice = Object.fromEntries(keys.slice(at, at + BATCH).map((k) => [k, strings[k]]))
+    Object.assign(translated, await translateBatch(key, slice, target))
+  }
+  const missing = keys.filter((k) => typeof translated[k] !== 'string')
+  if (missing.length) throw new Error(`${target.code}: ${missing.length} keys missing, first is "${missing[0]}"`)
+  return translated
+}
+
+async function translateBatch(key, strings, target) {
   const prompt = [
     `Translate this UI string catalogue for LingoAct into ${target.name}.`,
     'These are read by the TEACHER running a live language class, not by students — the register is',
@@ -80,11 +97,7 @@ async function translate(key, strings, target) {
   if (!response.ok) throw new Error(`${target.code}: Gemini returned ${response.status} ${(await response.text()).slice(0, 200)}`)
   const payload = await response.json()
   const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
-  const translated = JSON.parse(text)
-
-  const missing = Object.keys(strings).filter((k) => typeof translated[k] !== 'string')
-  if (missing.length) throw new Error(`${target.code}: ${missing.length} keys missing, first is "${missing[0]}"`)
-  return translated
+  return JSON.parse(text)
 }
 
 const key = geminiKey()

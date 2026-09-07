@@ -1,3 +1,5 @@
+import { presenterLookup } from './presenterI18n'
+import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
 
 // The teacher's half of the four-panel picture. The panels and the target words
@@ -37,12 +39,12 @@ export async function generatePicture(input: {
   sessionId: string
   presenterToken: string
   direction: string
-}): Promise<GeneratedPicture> {
+}, t: PresenterT = presenterLookup('zh-TW')): Promise<GeneratedPicture> {
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: { action: 'generate_picture', ...input },
   })
   if (error) throw error
-  if (!data?.image || !data?.storyboard) throw new Error(data?.message || '無法生成四格圖。')
+  if (!data?.image || !data?.storyboard) throw new Error(data?.message || t('pictureGenerateFailed'))
   const mimeType = typeof data.mimeType === 'string' ? data.mimeType : 'image/jpeg'
   return {
     storyboard: data.storyboard as PictureStoryboard,
@@ -57,7 +59,7 @@ export async function generatePicture(input: {
 // buys is that no panel arrives with the corner of its neighbour in it.
 const GUTTER_TRIM = 0.012
 
-async function panelBlob(bitmap: ImageBitmap, column: number, row: number) {
+async function panelBlob(bitmap: ImageBitmap, column: number, row: number, t: PresenterT) {
   const width = Math.floor(bitmap.width / 2)
   const height = Math.floor(bitmap.height / 2)
   const trimX = Math.round(width * GUTTER_TRIM)
@@ -71,20 +73,20 @@ async function panelBlob(bitmap: ImageBitmap, column: number, row: number) {
   canvas.width = sourceWidth
   canvas.height = sourceHeight
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('無法處理圖片。')
+  if (!context) throw new Error(t('imageProcessFailed'))
   context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight)
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
-  if (!blob) throw new Error('無法處理圖片。')
+  if (!blob) throw new Error(t('imageProcessFailed'))
   return blob
 }
 
 // In reading order: 左上, 右上, 左下, 右下.
-export async function splitIntoPanels(file: File) {
+export async function splitIntoPanels(file: File, t: PresenterT = presenterLookup('zh-TW')) {
   const bitmap = await createImageBitmap(file)
   try {
     const panels: File[] = []
     for (const [column, row] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-      const blob = await panelBlob(bitmap, column, row)
+      const blob = await panelBlob(bitmap, column, row, t)
       panels.push(new File([blob], 'panel.jpg', { type: 'image/jpeg' }))
     }
     return panels
@@ -103,9 +105,9 @@ export async function dispatchPictureOrdering(input: {
   file: File
   promptText: string
   title: string
-}) {
+}, t: PresenterT = presenterLookup('zh-TW')) {
   const supabase = requireSupabase()
-  const panels = (await splitIntoPanels(input.file)).map((file, index) => ({ file, order: index + 1 }))
+  const panels = (await splitIntoPanels(input.file, t)).map((file, index) => ({ file, order: index + 1 }))
   for (let index = panels.length - 1; index > 0; index -= 1) {
     const swap = Math.floor(Math.random() * (index + 1))
     ;[panels[index], panels[swap]] = [panels[swap], panels[index]]
@@ -123,7 +125,7 @@ export async function dispatchPictureOrdering(input: {
     })
     if (prepareError) throw prepareError
     if (!prepared?.screenshotId || !prepared?.storagePath || !prepared?.uploadToken) {
-      throw new Error(prepared?.message || '無法準備圖片上傳。')
+      throw new Error(prepared?.message || t('pictureUploadPrepareFailed'))
     }
     const { error: uploadError } = await supabase.storage
       .from('lingoact-screenshots')
@@ -146,6 +148,6 @@ export async function dispatchPictureOrdering(input: {
     },
   })
   if (error) throw error
-  if (!data?.question) throw new Error(data?.message || '派送失敗。')
+  if (!data?.question) throw new Error(data?.message || t('sendFailed'))
   return data.question as { id: string }
 }

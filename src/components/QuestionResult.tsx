@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
 import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
+import { usePresenterText } from '../lib/presenterI18n'
+import type { PresenterMessageKey } from '../lib/presenterI18n'
 import type { Answer, AudioResponse, FileResponse, Question, QuestionAnalysis } from '../types'
 
 type Props = {
@@ -39,7 +41,8 @@ type AnalysisProps = Pick<Props,
   | 'fileResponses' | 'gradeProgress'>
 
 function ItemList({ items }: { items: string[] }) {
-  if (!items.length) return <p className="muted">目前沒有可列出的項目。</p>
+  const t = usePresenterText()
+  if (!items.length) return <p className="muted">{t('nothingToList')}</p>
   return (
     <ul className="analysis-list">
       {items.map((item) => <li key={item}>{item}</li>)}
@@ -56,6 +59,7 @@ function QuestionStatusActions({
   onResumeQuestion,
   question,
 }: Pick<Props, 'busy' | 'isCurrentQuestion' | 'onlineCount' | 'onDrawUnanswered' | 'onStopQuestion' | 'onResumeQuestion'> & { question: Question }) {
+  const t = usePresenterText()
   const [toggling, setToggling] = useState(false)
   const [toggleError, setToggleError] = useState('')
 
@@ -70,7 +74,7 @@ function QuestionStatusActions({
     try {
       await (resumable ? onResumeQuestion() : onStopQuestion())
     } catch (error) {
-      setToggleError(error instanceof Error ? error.message : '操作失敗。')
+      setToggleError(error instanceof Error ? error.message : t('actionFailed'))
     } finally {
       setToggling(false)
     }
@@ -89,15 +93,15 @@ function QuestionStatusActions({
     <div className="question-heading-actions">
       {secondsLeft !== null && (
         <span className={secondsLeft === 0 ? 'question-clock spent' : 'question-clock'}>
-          {secondsLeft === 0 ? '時間到' : `${secondsLeft} 秒`}
+          {secondsLeft === 0 ? t('timeUp') : t('secondsLeft', { n: secondsLeft })}
         </span>
       )}
       {canDrawUnanswered && (
         <button
-          aria-label="抽選本題未作答學生"
+          aria-label={t('drawUnanswered')}
           className="question-unanswered-draw"
           disabled={busy || !onlineCount}
-          title={onlineCount ? '抽選目前線上且未作答本題的學生' : '目前沒有線上學生'}
+          title={onlineCount ? t('drawUnansweredHint') : t('noStudentsOnline')}
           type="button"
           onClick={() => onDrawUnanswered(question.id)}
         >
@@ -108,12 +112,12 @@ function QuestionStatusActions({
         <button
           className={resumable ? 'question-answering-toggle is-resume' : 'question-answering-toggle'}
           disabled={busy || toggling}
-          title={toggleError || (resumable ? '讓學生可以再次作答' : '停止收答，之後仍可恢復')}
+          title={toggleError || (resumable ? t('resumeHint') : t('stopHint'))}
           type="button"
           onClick={() => void toggleAnswering()}
         >
           {resumable ? <Play size={15} weight="fill" /> : <Square size={15} />}
-          {resumable ? '恢復作答' : '停止作答'}
+          {resumable ? t('resumeAnswering') : t('stopAnswering')}
         </button>
       )}
       <span className={`status ${question.status}`}>{question.status}</span>
@@ -124,6 +128,7 @@ function QuestionStatusActions({
 function AiAnalysisPanel({
   question, answers, analysis, analysisBusy, analysisError, fileResponses, gradeProgress, onAnalyze, onSetCorrectAnswer,
 }: AnalysisProps) {
+  const t = usePresenterText()
   if (!question || ['send_screen', 'pronunciation', 'oral_response'].includes(question.type)) return null
 
   const isUpload = question.type === 'file_upload'
@@ -147,44 +152,44 @@ function AiAnalysisPanel({
   return (
     <section className="panel ai-analysis-panel">
       <div className="panel-heading">
-        <h2><Sparkle size={18} />AI 完整分析</h2>
+        <h2><Sparkle size={18} />{t('fullAnalysis')}</h2>
         <button disabled={!canAnalyze || analysisBusy} type="button" onClick={onAnalyze}>
           <Sparkle size={16} />
           {analysisBusy
-            ? gradeProgress ? `批改中 ${gradeProgress.done}/${gradeProgress.total}...` : '分析中...'
+            ? gradeProgress ? t('marking', { done: gradeProgress.done, total: gradeProgress.total }) : t('analysing')
             : isUpload
-              ? unmarked ? `批改剩下 ${unmarked} 人並分析` : analysis ? '重新分析' : '分析全班'
-              : analysis ? '重新分析' : 'AI 分析'}
+              ? unmarked ? t('markRestAndAnalyse', { n: unmarked }) : analysis ? t('analyseAgain') : t('analyseClass')
+              : analysis ? t('analyseAgain') : t('aiAnalyse')}
         </button>
       </div>
       {!canAnalyze && (
-        <p className="muted">停止作答且至少收到一份答案後，即可手動執行分析。</p>
+        <p className="muted">{t('analysisNeedsStop')}</p>
       )}
       {canAnalyze && isUpload && (
         // Marking is the expensive half, so say plainly what this button will and
         // will not spend: work already paid for is never redone.
         <p className="muted">
           {unmarked
-            ? `會先批改尚未批改的 ${unmarked} 人，已批改過的不再重算，再彙整全班表現。`
-            : '每個人都批改過了，這一步只讀批改結果彙整全班表現。'}
+            ? t('markRestNote', { n: unmarked })
+            : t('allMarkedNote')}
         </p>
       )}
       {analysisError && <p className="error">{analysisError}</p>}
       {analysis && (
         <div className="analysis-content">
           <section>
-            <h3>題目判讀</h3>
+            <h3>{t('questionRead')}</h3>
             <p>{analysis.question_understanding.detected_question}</p>
             <p className="muted">
               {analysis.question_understanding.subject} · {analysis.question_understanding.concepts.join('、')}
             </p>
             {suggestion && (
               <div className="ai-suggestion">
-                <span>AI 建議答案：<strong>{suggestion}</strong></span>
-                <span>信心：{analysis.question_understanding.confidence}</span>
+                <span>{t('suggestedAnswer')}<strong>{suggestion}</strong></span>
+                <span>{t('confidence')}{analysis.question_understanding.confidence}</span>
                 {canApplySuggestion && (
                   <button className="ghost-button" type="button" onClick={() => onSetCorrectAnswer(suggestion)}>
-                    <CheckCircle size={16} />採用為正確答案
+                    <CheckCircle size={16} />{t('useAsAnswer')}
                   </button>
                 )}
               </div>
@@ -193,32 +198,32 @@ function AiAnalysisPanel({
           </section>
 
           <details open>
-            <summary>作答理解</summary>
+            <summary>{t('responseUnderstanding')}</summary>
             <p>{analysis.response_analysis.understanding_summary}</p>
             <p className="muted">
-              作答 {analysis.response_analysis.response_count} 人 · 回覆率 {analysis.response_analysis.response_rate}%
+              {t('answeredCount', { n: analysis.response_analysis.response_count })} · {t('responseRate', { rate: analysis.response_analysis.response_rate })}
             </p>
-            <h4>已掌握</h4>
+            <h4>{t('grasped')}</h4>
             <ItemList items={analysis.response_analysis.strengths} />
-            <h4>可能誤解</h4>
+            <h4>{t('misconceptions')}</h4>
             <ItemList items={analysis.response_analysis.misconceptions} />
-            <h4>代表性作答模式</h4>
+            <h4>{t('responsePatterns')}</h4>
             <ItemList items={analysis.response_analysis.representative_patterns} />
           </details>
 
           <details open>
-            <summary>教學建議</summary>
-            <h4>立即處理</h4>
+            <summary>{t('teachingAdvice')}</summary>
+            <h4>{t('immediateActions')}</h4>
             <ItemList items={analysis.teaching_recommendations.immediate_actions} />
-            <h4>講解重點</h4>
+            <h4>{t('explanationPoints')}</h4>
             <ItemList items={analysis.teaching_recommendations.explanation_points} />
-            <h4>追問題目</h4>
+            <h4>{t('followUpQuestions')}</h4>
             <ItemList items={analysis.teaching_recommendations.follow_up_questions} />
           </details>
 
           {analysis.limitations.length > 0 && (
             <details>
-              <summary>分析限制</summary>
+              <summary>{t('analysisLimits')}</summary>
               <ItemList items={analysis.limitations} />
             </details>
           )}
@@ -228,19 +233,19 @@ function AiAnalysisPanel({
   )
 }
 
-const verdictLabels: Record<string, string> = {
-  correct: '正確',
-  partial: '部分正確',
-  incorrect: '不正確',
-  unscored: '未評分',
+const verdictLabels: Record<string, PresenterMessageKey> = {
+  correct: 'verdictCorrect',
+  partial: 'verdictPartial',
+  incorrect: 'verdictIncorrect',
+  unscored: 'verdictUnscored',
 }
 
-const uploadStatusLabels: Record<FileResponse['analysis_status'], string> = {
-  pending: '尚未批改',
-  analyzing: '批改中...',
-  success: '已批改',
-  failed: '批改失敗',
-  unsupported: 'AI 無法讀取此格式',
+const uploadStatusLabels: Record<FileResponse['analysis_status'], PresenterMessageKey> = {
+  pending: 'statusPending',
+  analyzing: 'statusAnalyzing',
+  success: 'statusSuccess',
+  failed: 'statusFailed',
+  unsupported: 'statusUnsupported',
 }
 
 function isImageFile(mimeType: string, name: string) {
@@ -252,6 +257,7 @@ function isImageFile(mimeType: string, name: string) {
 function UploadResults({
   anonymousEnabled, fileBusyId, fileResponses, question, onAnalyzeFile,
 }: Pick<Props, 'anonymousEnabled' | 'fileBusyId' | 'fileResponses' | 'onAnalyzeFile'> & { question: Question }) {
+  const t = usePresenterText()
   const [expanded, setExpanded] = useState('')
 
   const submissions = useMemo(() => {
@@ -274,14 +280,14 @@ function UploadResults({
   if (!submissions.length) {
     return (
       <p className="muted">
-        {question.status === 'active' ? '還沒有學生上傳作答。' : '這一題沒有收到任何上傳。'}
+        {question.status === 'active' ? t('noUploadsYet') : t('noUploadsAtAll')}
       </p>
     )
   }
 
   return (
     <>
-      <p className="muted">已上傳 {submissions.length} 人 · 已批改 {marked} 人</p>
+      <p className="muted">{t('uploadedCount', { n: submissions.length })} · {t('markedCount', { n: marked })}</p>
       <ul className="file-list upload-answer-list">
         {submissions.map((files, index) => {
           const lead = files[0]
@@ -299,17 +305,17 @@ function UploadResults({
                   </a>
                 ) : <span className="file-response-thumb is-placeholder"><FileArrowUp size={18} /></span>}
                 <div className="file-list-meta">
-                  <strong>{anonymousEnabled ? `匿名作答 ${index + 1}` : lead.participant_name}</strong>
+                  <strong>{anonymousEnabled ? t('anonymousUpload', { n: index + 1 }) : lead.participant_name}</strong>
                   <span className="muted">
                     {files.map((file) => file.name).join('、')}
-                    {files.length > 1 && ` · ${files.length} 個檔案`}
+                    {files.length > 1 && ` · ${t('fileCount', { n: files.length })}`}
                   </span>
                   <span className="upload-verdict-line">
-                    {verdict && <span className={`file-verdict is-${verdict}`}>{verdictLabels[verdict] || verdict}</span>}
-                    {typeof result?.score === 'number' && <span className="upload-score">{result.score} 分</span>}
+                    {verdict && <span className={`file-verdict is-${verdict}`}>{verdictLabels[verdict] ? t(verdictLabels[verdict]) : verdict}</span>}
+                    {typeof result?.score === 'number' && <span className="upload-score">{t('points', { n: result.score })}</span>}
                     {!verdict && (
                       <span className={`file-analysis-status is-${lead.analysis_status}`}>
-                        {uploadStatusLabels[lead.analysis_status]}
+                        {t(uploadStatusLabels[lead.analysis_status])}
                       </span>
                     )}
                   </span>
@@ -323,13 +329,13 @@ function UploadResults({
                       rel="noreferrer"
                       target="_blank"
                     >
-                      <DownloadSimple size={15} />下載{files.length > 1 ? ` ${fileIndex + 1}` : ''}
+                      <DownloadSimple size={15} />{t('download')}{files.length > 1 ? ` ${fileIndex + 1}` : ''}
                     </a>
                   ))}
                   {lead.analysis_status !== 'unsupported' && (
                     <button disabled={busy} type="button" onClick={() => onAnalyzeFile(lead.id)}>
                       {busy ? <CircleNotch className="spin" size={15} /> : <Sparkle size={15} />}
-                      {lead.analysis_status === 'success' ? '重批' : 'AI 批改'}
+                      {lead.analysis_status === 'success' ? t('markAgain') : t('aiMark')}
                     </button>
                   )}
                   {lead.analysis_status === 'success' && (
@@ -338,7 +344,7 @@ function UploadResults({
                       type="button"
                       onClick={() => setExpanded(expanded === lead.participant_id ? '' : lead.participant_id)}
                     >
-                      {expanded === lead.participant_id ? '收合' : '看批改'}
+                      {expanded === lead.participant_id ? t('collapse') : t('seeMarking')}
                     </button>
                   )}
                 </div>
@@ -359,13 +365,13 @@ function UploadResults({
                   <p>{result.summary_zh_tw}</p>
                   {result.strengths_zh_tw.length > 0 && (
                     <>
-                      <h4>做得好</h4>
+                      <h4>{t('didWell')}</h4>
                       <ul>{result.strengths_zh_tw.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ul>
                     </>
                   )}
                   {result.improvements_zh_tw.length > 0 && (
                     <>
-                      <h4>可改進</h4>
+                      <h4>{t('couldImprove')}</h4>
                       <ul>{result.improvements_zh_tw.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ul>
                     </>
                   )}
@@ -380,13 +386,14 @@ function UploadResults({
 }
 
 export function QuestionResult(props: Props) {
+  const t = usePresenterText()
   const { anonymousEnabled, question, answers, audioResponses, analysis, onSetCorrectAnswer } = props
 
   if (!question) {
     return (
       <section className="panel">
-        <h2>目前沒有題目</h2>
-        <p className="muted">截圖派題後，作答狀態會顯示在這裡。</p>
+        <h2>{t('noQuestionYet')}</h2>
+        <p className="muted">{t('noQuestionHint')}</p>
       </section>
     )
   }
@@ -395,10 +402,10 @@ export function QuestionResult(props: Props) {
     return (
       <section className="panel result-panel">
         <div className="panel-heading">
-          <h2>派送畫面</h2>
+          <h2>{t('typeSendScreen')}</h2>
           <span className={`status ${question.status}`}>{question.status}</span>
         </div>
-        <p className="muted">目前派送的是畫面，不需要作答。</p>
+        <p className="muted">{t('screenOnly')}</p>
       </section>
     )
   }
@@ -408,14 +415,14 @@ export function QuestionResult(props: Props) {
       <>
         <section className="panel result-panel">
           <div className="panel-heading">
-            <h2>問答題</h2>
+            <h2>{t('typeShortAnswer')}</h2>
             <QuestionStatusActions {...props} question={question} />
           </div>
-          <p className="muted">已作答 {answers.length} 人</p>
+          <p className="muted">{t('answeredPeople', { n: answers.length })}</p>
           <div className="answer-list">
             {answers.map((answer, index) => (
               <article className="answer-item" key={answer.id}>
-                <strong>{anonymousEnabled ? `匿名回答 ${index + 1}` : answer.participant_name}</strong>
+                <strong>{anonymousEnabled ? t('anonymousAnswer', { n: index + 1 }) : answer.participant_name}</strong>
                 <p>{answer.answer_text}</p>
               </article>
             ))}
@@ -457,9 +464,9 @@ export function QuestionResult(props: Props) {
           <QuestionStatusActions {...props} question={question} />
         </div>
         {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
-        <p className="muted">已錄音 {answers.length} 人</p>
+        <p className="muted">{t('recordedPeople', { n: answers.length })}</p>
         {question.status === 'active' ? (
-          <p className="muted">停止作答後會顯示個別 AI 評測與錄音播放器。</p>
+          <p className="muted">{t('audioAfterStop')}</p>
         ) : audioResponses.length ? (
           <div className="audio-result-list">
             {audioResponses.map((response, index) => {
@@ -467,39 +474,39 @@ export function QuestionResult(props: Props) {
               return (
                 <article className="audio-result-item" key={response.id}>
                   <div className="audio-result-heading">
-                    <strong>{anonymousEnabled ? `匿名回答 ${index + 1}` : response.participant_name}</strong>
-                    {typeof response.score === 'number' && <span className="audio-result-score">{response.score} 分</span>}
+                    <strong>{anonymousEnabled ? t('anonymousAnswer', { n: index + 1 }) : response.participant_name}</strong>
+                    {typeof response.score === 'number' && <span className="audio-result-score">{t('points', { n: response.score })}</span>}
                   </div>
                   {response.signed_url && <audio controls preload="metadata" src={response.signed_url} />}
                   {response.analysis_status === 'success' && result ? (
                     <>
                       <p className="audio-feedback-summary">{result.summary}</p>
                       <div className="audio-analysis-grid">
-                        <div><strong>內容對照</strong><p>{result.relevance}</p></div>
-                        <div><strong>表達清晰度</strong><p>{result.clarity}</p></div>
-                        <div><strong>完成度</strong><p>{result.completeness}</p></div>
+                        <div><strong>{t('audioRelevance')}</strong><p>{result.relevance}</p></div>
+                        <div><strong>{t('audioClarity')}</strong><p>{result.clarity}</p></div>
+                        <div><strong>{t('audioCompleteness')}</strong><p>{result.completeness}</p></div>
                       </div>
-                      <div className="audio-feedback-section"><strong>做得好的地方</strong><ul>{result.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                      <div className="audio-feedback-section"><strong>改善建議</strong><ul>{result.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                      <details><summary>查看辨識內容</summary><p>{result.transcript || '未辨識到語音內容'}</p></details>
+                      <div className="audio-feedback-section"><strong>{t('audioStrengths')}</strong><ul>{result.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                      <div className="audio-feedback-section"><strong>{t('audioImprovements')}</strong><ul>{result.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                      <details><summary>{t('seeTranscript')}</summary><p>{result.transcript || t('noSpeechFound')}</p></details>
                     </>
                   ) : response.analysis_status === 'failed' ? (
-                    <p className="error">AI 評測失敗，錄音仍可播放。</p>
+                    <p className="error">{t('audioMarkFailed')}</p>
                   ) : (
-                    <p className="muted">AI 評測仍在處理中。</p>
+                    <p className="muted">{t('audioMarking')}</p>
                   )}
                 </article>
               )
             })}
           </div>
         ) : (
-          <p className="muted">目前沒有錄音作答。</p>
+          <p className="muted">{t('noRecordings')}</p>
         )}
       </section>
     )
   }
 
-  const counts = countByAnswer(answers)
+  const counts = countByAnswer(answers, t('blankAnswer'))
   const correctness = correctnessStats(question, answers)
   const correctAnswers = question.correct_answers?.length
     ? question.correct_answers
@@ -517,7 +524,7 @@ export function QuestionResult(props: Props) {
         {(analysis?.question_understanding.detected_question || question.prompt_text) && (
           <p className="detected-question">{analysis?.question_understanding.detected_question || question.prompt_text}</p>
         )}
-        <p className="muted">已作答 {answers.length} 人</p>
+        <p className="muted">{t('answeredPeople', { n: answers.length })}</p>
         <div className="option-results">
           {question.options.map((option) => {
             const count = counts[option] || 0
@@ -545,18 +552,18 @@ export function QuestionResult(props: Props) {
         </div>
         {correctness ? (
           <div className="correctness">
-            <strong>答對 {correctness.correctRate}%</strong>
-            <span>答錯 {correctness.incorrectRate}%</span>
+            <strong>{t('correctRate', { rate: correctness.correctRate })}</strong>
+            <span>{t('incorrectRate', { rate: correctness.incorrectRate })}</span>
           </div>
         ) : (
           <p className="muted">
             {question.type === 'poll'
-              ? '投票題不需要正確答案。'
+              ? t('pollNeedsNoAnswer')
               : question.status === 'active'
-                ? '停止作答後可設定正確答案。'
+                ? t('answerAfterStop')
                 : question.allow_multiple
-                  ? '可點選一個或多個正確選項，再計算答對比例。'
-                  : '點選正確選項後即可計算答對比例。'}
+                  ? t('pickMultipleCorrect')
+                  : t('pickCorrect')}
           </p>
         )}
       </section>

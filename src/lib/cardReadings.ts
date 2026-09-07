@@ -1,3 +1,5 @@
+import { presenterLookup } from './presenterI18n'
+import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
 import { annotateReading } from './listening'
 import type { QuizItem } from '../types'
@@ -22,7 +24,7 @@ export async function annotateCardDeck(input: {
   questionId: string
   items: QuizItem[]
   mode: 'zhuyin' | 'pinyin'
-}) {
+}, t: PresenterT = presenterLookup('zh-TW')) {
   // One entry per option of every card, flattened, so the whole deck is one
   // request and the font subset is cut from every character at once.
   const words: string[] = []
@@ -57,7 +59,7 @@ export async function annotateCardDeck(input: {
     perWord.push(buffer.join(' ').trim())
   }
   // A split that does not line up would put one word's reading on another.
-  if (perWord.length !== words.length) throw new Error('標音結果與卡片數量對不上。')
+  if (perWord.length !== words.length) throw new Error(t('readingCountMismatch'))
 
   const items: Array<{ itemId: string; readings: string[] }> = []
   let at = 0
@@ -71,7 +73,7 @@ export async function annotateCardDeck(input: {
   let fontBase64 = ''
   if (input.mode === 'zhuyin') {
     const subset = window.lingoActDesktop?.subsetBopomofoFont
-    if (!subset) throw new Error('注音字型子集化只能在 LingoAct 桌面版執行。')
+    if (!subset) throw new Error(t('desktopOnlySubset'))
     const result = await subset(marked.annotationText)
     if (!result.ok) throw new Error(result.message)
     fontBase64 = result.woff2
@@ -97,11 +99,11 @@ export async function editQuizItems(input: {
   questionId: string
   removeItemId?: string
   addCount?: number
-}) {
+}, t: PresenterT = presenterLookup('zh-TW')) {
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: { action: 'edit_quiz_items', ...input },
   })
   if (error) throw error
-  if (typeof data?.count !== 'number') throw new Error(data?.message || '修改卡片失敗。')
+  if (typeof data?.count !== 'number') throw new Error(data?.message || t('deckEditFailed'))
   return data.count as number
 }

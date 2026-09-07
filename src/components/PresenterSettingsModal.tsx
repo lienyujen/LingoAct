@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES, defaultInterpretationLanguages } from '../lib/captionLanguages'
 import type { Session } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
 
 export type PresenterCaptionSettings = {
   sourceLanguage: string
@@ -51,6 +52,7 @@ export function PresenterSettingsModal({
   onRefreshMicrophones,
   onSave,
 }: Props) {
+  const t = usePresenterText()
   const [sourceLanguage, setSourceLanguage] = useState(session.caption_source_language)
   const [displayLanguage, setDisplayLanguage] = useState(session.caption_display_language)
   const [fontSize, setFontSize] = useState(session.caption_font_size ?? 32)
@@ -123,7 +125,7 @@ export function PresenterSettingsModal({
       updateLevel()
     }).catch((reason: unknown) => {
       setMicrophoneLevel(0)
-      setPreviewError(reason instanceof Error ? reason.message : '無法讀取麥克風。')
+      setPreviewError(reason instanceof Error ? reason.message : t('micReadFailed'))
     })
 
     return () => {
@@ -132,7 +134,7 @@ export function PresenterSettingsModal({
       stream?.getTracks().forEach((track) => track.stop())
       void audioContext?.close()
     }
-  }, [microphoneId, open])
+  }, [microphoneId, open, t])
 
   const availableInterpretationLanguages = useMemo(
     () => INTERPRETATION_LANGUAGES.filter((language) => language.code !== sourceLanguage),
@@ -155,16 +157,16 @@ export function PresenterSettingsModal({
       <form className="modal presenter-settings-modal" onSubmit={submit}>
         <div className="modal-heading">
           <div>
-            <h2><Gear size={20} />教師端設定</h2>
-            <p className="muted">設定課程語言、錄製、字幕外觀與學生端即時口譯語音</p>
+            <h2><Gear size={20} />{t('teacherSettings')}</h2>
+            <p className="muted">{t('settingsSub')}</p>
           </div>
-          <button className="ghost-button icon-button" aria-label="關閉設定" title="關閉" type="button" onClick={onClose}>
+          <button className="ghost-button icon-button" aria-label={t('closeSettings')} title={t('close')} type="button" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
         <section className="presenter-settings-section">
-          <div className="presenter-settings-section-heading"><span><Translate size={17} />課程語言</span></div>
+          <div className="presenter-settings-section-heading"><span><Translate size={17} />{t('courseLanguages')}</span></div>
           <LanguagePairFields
             guidanceLanguage={guidanceLanguage}
             levelCode={levelCode}
@@ -189,37 +191,37 @@ export function PresenterSettingsModal({
 
         <section className="presenter-settings-section">
           <div className="presenter-settings-section-heading">
-            <span><Microphone size={17} />麥克風</span>
+            <span><Microphone size={17} />{t('microphone')}</span>
             <button className="ghost-button settings-refresh-button" type="button" onClick={onRefreshMicrophones} disabled={busy}>
-              <ArrowsClockwise size={15} />重新掃描
+              <ArrowsClockwise size={15} />{t('rescan')}
             </button>
           </div>
           <label>
-            課程錄製音訊來源
+            {t('recordingSource')}
             <select value={microphoneId} onChange={(event) => setMicrophoneId(event.target.value)}>
-              <option value="">系統預設麥克風</option>
+              <option value="">{t('systemDefaultMic')}</option>
               {microphones
                 .filter((device) => device.deviceId !== 'default')
                 .map((device, index) => (
-                  <option key={device.deviceId} value={device.deviceId}>{device.label || `麥克風 ${index + 1}`}</option>
+                  <option key={device.deviceId} value={device.deviceId}>{device.label || t('micN', { n: index + 1 })}</option>
                 ))}
             </select>
           </label>
           <div className="microphone-meter-row">
-            <span>輸入音量</span>
-            <div className="microphone-meter" role="meter" aria-label="麥克風輸入音量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={microphoneLevel}>
+            <span>{t('inputLevel')}</span>
+            <div className="microphone-meter" role="meter" aria-label={t('micInputLevel')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={microphoneLevel}>
               <span style={{ width: `${microphoneLevel}%` }} />
             </div>
           </div>
-          {previewError && <p className="error compact-error">麥克風測試失敗：{previewError}</p>}
+          {previewError && <p className="error compact-error">{t('micTestFailed', { message: previewError })}</p>}
         </section>
 
         <section className="presenter-settings-section">
-          <div className="presenter-settings-section-heading"><span><Translate size={17} />課程錄製、字幕與即時口譯語音</span></div>
-          <p className="muted">錄製與字幕顯示分開控制；可只錄製供課後重點整理，不顯示即時字幕。所有功能預設關閉。</p>
+          <div className="presenter-settings-section-heading"><span><Translate size={17} />{t('captionSection')}</span></div>
+          <p className="muted">{t('captionSectionHint')}</p>
           <div className="caption-language-row">
             <label>
-              講師語言
+              {t('speakerLanguage')}
               <select value={sourceLanguage} onChange={(event) => {
                 const next = event.target.value
                 if (displayLanguage === sourceLanguage) setDisplayLanguage(next)
@@ -228,36 +230,40 @@ export function PresenterSettingsModal({
               }}>
                 {SPEAKER_LANGUAGES.map((language) => (
                   <option key={language.code} value={language.code}>
-                    {language.code === 'zh-tw' ? '字正腔圓' : language.label}
+                    {language.code === 'zh-tw' ? t('clearMandarin') : language.label}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              字幕語言
+              {t('captionLanguage')}
               <select value={displayLanguage} onChange={(event) => setDisplayLanguage(event.target.value)}>
-                {CAPTION_DISPLAY_LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}
+                {CAPTION_DISPLAY_LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {'labelKey' in language ? t(language.labelKey) : language.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
-              字幕大小
+              {t('captionSize')}
               <select value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))}>
                 {[...new Set([...captionFontSizes, fontSize])].sort((a, b) => a - b)
                   .map((size) => <option key={size} value={size}>{size} px</option>)}
               </select>
             </label>
             <label>
-              字幕位置
+              {t('captionPosition')}
               <select value={position} onChange={(event) => setPosition(event.target.value as PresenterCaptionSettings['position'])}>
-                <option value="top">螢幕上方</option>
-                <option value="bottom">螢幕下方</option>
-                <option value="center">螢幕置中</option>
+                <option value="top">{t('posTop')}</option>
+                <option value="bottom">{t('posBottom')}</option>
+                <option value="center">{t('posCenter')}</option>
               </select>
             </label>
           </div>
           <label className="caption-interpretation-toggle">
             <input checked={fontBold} type="checkbox" onChange={(event) => setFontBold(event.target.checked)} />
-            <span>字幕使用粗體</span>
+            <span>{t('captionBold')}</span>
           </label>
           <label className="caption-interpretation-toggle interpretation-audio-toggle">
             <input checked={interpretationAudioEnabled} type="checkbox" onChange={(event) => {
@@ -265,10 +271,10 @@ export function PresenterSettingsModal({
               if (enabled && !interpretationLanguages.length) setInterpretationLanguages(defaultInterpretationLanguages(sourceLanguage))
               setInterpretationAudioEnabled(enabled)
             }} />
-            <span>送出即時口譯語音</span>
+            <span>{t('sendInterpretation')}</span>
           </label>
           {interpretationAudioEnabled && (
-            <div className="caption-language-options" aria-label="學生端即時口譯語音語言">
+            <div className="caption-language-options" aria-label={t('interpretationLanguagesLabel')}>
               {availableInterpretationLanguages.map((language) => {
                 const checked = interpretationLanguages.includes(language.code)
                 return (
@@ -283,20 +289,20 @@ export function PresenterSettingsModal({
                         setInterpretationLanguages(next)
                       }}
                     />
-                    <span>{language.label}{language.code === 'en' && sourceLanguage !== 'en' ? '（預設）' : ''}</span>
+                    <span>{language.label}{language.code === 'en' && sourceLanguage !== 'en' ? t('defaultSuffix') : ''}</span>
                   </label>
                 )
               })}
             </div>
           )}
-          <p className="muted caption-cost-note">字幕語言與講師語言不同時會建立一條即時翻譯連線。中文授課預設英文口譯，英文授課預設繁體中文；每種口譯語言各建立一條付費即時翻譯連線，學生人數不增加連線數。</p>
+          <p className="muted caption-cost-note">{t('captionCostNote')}</p>
         </section>
 
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
-          <button className="ghost-button" type="button" onClick={onClose}>取消</button>
+          <button className="ghost-button" type="button" onClick={onClose}>{t('cancel')}</button>
           <button disabled={busy || (interpretationAudioEnabled && !interpretationLanguages.length)} type="submit">
-            <Gear size={17} />{busy ? '儲存中...' : '儲存設定'}
+            <Gear size={17} />{busy ? t('saving') : t('saveSettings')}
           </button>
         </div>
       </form>

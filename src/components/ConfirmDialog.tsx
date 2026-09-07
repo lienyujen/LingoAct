@@ -1,4 +1,5 @@
 import { CircleNotch, PauseCircle, Warning, X } from '@phosphor-icons/react'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   busy?: boolean
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   onConfirm,
   onSecondary,
 }: Props) {
+  const t = usePresenterText()
   if (!open) return null
 
   return (
@@ -34,12 +36,12 @@ export function ConfirmDialog({
             <h2 id="confirm-dialog-title">{title}</h2>
             <p>{description}</p>
           </div>
-          <button aria-label="取消" className="icon-button ghost-button" disabled={busy} type="button" onClick={onCancel}>
+          <button aria-label={t('cancel')} className="icon-button ghost-button" disabled={busy} type="button" onClick={onCancel}>
             <X size={18} />
           </button>
         </div>
         <div className="confirm-dialog-actions">
-          <button className="ghost-button" disabled={busy} type="button" onClick={onCancel}>取消</button>
+          <button className="ghost-button" disabled={busy} type="button" onClick={onCancel}>{t('cancel')}</button>
           {secondaryLabel && onSecondary && (
             <button className="pause-button" disabled={busy} type="button" onClick={onSecondary}>
               {busy ? <CircleNotch className="spin" size={18} /> : <PauseCircle size={18} />}
@@ -48,7 +50,7 @@ export function ConfirmDialog({
           )}
           <button className="danger-button" disabled={busy} type="button" onClick={onConfirm}>
             {busy ? <CircleNotch className="spin" size={18} /> : <Warning size={18} />}
-            {busy ? '處理中...' : confirmLabel}
+            {busy ? t('processing') : confirmLabel}
           </button>
         </div>
       </section>

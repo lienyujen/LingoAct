@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { isBuzzerAccepting } from '../lib/buzzer'
 import type { BuzzerSessionEvent } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   event: BuzzerSessionEvent | null
@@ -15,6 +16,7 @@ type Props = {
 const RESULT_DURATION_MS = 6000
 
 export function BuzzerOverlay({ event, participantId, busy = false, onStart, onBuzz }: Props) {
+  const t = usePresenterText()
   const [visible, setVisible] = useState(false)
   const [pressed, setPressed] = useState(false)
 
@@ -82,23 +84,23 @@ export function BuzzerOverlay({ event, participantId, busy = false, onStart, onB
         {finalized ? (
           <>
             <Confetti size={participantId ? 54 : 68} />
-            <p>{isWinner ? '恭喜！' : '得獎的是'}</p>
+            <p>{isWinner ? t('congrats') : t('winnerIs')}</p>
             <strong>{event.payload.winner_name}</strong>
           </>
         ) : (
           <>
-            <p>{participantId ? (accepting ? '現在可以搶答' : '請等待主講者開始') : (accepting ? '搶答進行中' : '按下開始搶答')}</p>
+            <p>{participantId ? (accepting ? t('buzzerNowOpen') : t('waitForPresenter')) : (accepting ? t('buzzerRunning') : t('pressToStart'))}</p>
             <button
-              aria-label={participantId ? '搶答' : '開始搶答'}
+              aria-label={participantId ? t('buzz') : t('startBuzzer')}
               className={`buzzer-button${accepting ? '' : ' waiting'}`}
               disabled={participantId ? !canBuzz : !presenterCanStart}
               type="button"
               onClick={participantId ? buzz : start}
             >
               <Lightning fill="currentColor" size={84} />
-              <span>{pressed || busy ? '送出中' : participantId ? (accepting ? '搶答' : '準備中') : (accepting ? '進行中' : '開始搶答')}</span>
+              <span>{pressed || busy ? t('submitting') : participantId ? (accepting ? t('buzz') : t('gettingReady')) : (accepting ? t('inProgress') : t('startBuzzer'))}</span>
             </button>
-            {!participantId && <small>{event.payload.candidate_count} 人可搶答</small>}
+            {!participantId && <small>{t('candidatesCanBuzz', { n: event.payload.candidate_count })}</small>}
           </>
         )}
       </div>

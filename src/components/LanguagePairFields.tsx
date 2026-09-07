@@ -1,6 +1,7 @@
 import { GUIDANCE_LOCALES } from '../lib/participantI18n'
 import { TEACHING_TRACKS, resolveFramework, resolveTrack } from '../lib/teachingTracks'
 import { frameworkById } from '../lib/proficiency'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   teachingTrack: string
@@ -36,6 +37,7 @@ export function LanguagePairFields({
   onLevelChange,
   onAnnotationChange,
 }: Props) {
+  const t = usePresenterText()
   const track = resolveTrack(teachingTrack)
   const activeId = resolveFramework(teachingTrack, levelFramework)
   const framework = frameworkById(activeId)
@@ -44,10 +46,8 @@ export function LanguagePairFields({
   return (
     <div className="language-pair">
       <div className="language-pair-field">
-        <span className="language-pair-label">主要教學語言</span>
-        <p className="language-pair-hint">
-          決定整堂課的方向：出題語言與難度、聽力語音的腔調，以及朗讀標音。
-        </p>
+        <span className="language-pair-label">{t('mainTeachingLanguage')}</span>
+        <p className="language-pair-hint">{t('mainTeachingHint')}</p>
         <div className="language-pair-options">
           {TEACHING_TRACKS.map((option) => (
             <button
@@ -66,8 +66,8 @@ export function LanguagePairFields({
 
       {choices.length > 1 && (
         <div className="language-pair-field">
-          <span className="language-pair-label">能力基準</span>
-          <p className="language-pair-hint">這個班在準備的目標。同樣是英語，照課綱教和準備全民英檢、多益，出題的方向並不一樣。</p>
+          <span className="language-pair-label">{t('proficiencyFramework')}</span>
+          <p className="language-pair-hint">{t('proficiencyFrameworkHint')}</p>
           <div className="language-pair-options">
             {choices.map((option) => (
               <button
@@ -88,10 +88,10 @@ export function LanguagePairFields({
       {framework && (
         <div className="language-pair-field">
           <span className="language-pair-label">
-            程度
-            {choices.length > 1 ? <em>{framework.name}</em> : <em>依教學語言採用{framework.name}</em>}
+            {t('levelLabel')}
+            {choices.length > 1 ? <em>{framework.name}</em> : <em>{t('levelFromTrack', { name: framework.name })}</em>}
           </span>
-          <p className="language-pair-hint">出題會照這個程度控制用詞與句長，也決定題目可以照抄多少原文。</p>
+          <p className="language-pair-hint">{t('levelHint')}</p>
           <div className="language-pair-options">
             <button
               aria-pressed={!levelCode}
@@ -99,7 +99,7 @@ export function LanguagePairFields({
               type="button"
               onClick={() => onLevelChange('')}
             >
-              <strong>未指定</strong>
+              <strong>{t('levelUnset')}</strong>
             </button>
             {framework.levels.map((level) => (
               <button
@@ -120,13 +120,13 @@ export function LanguagePairFields({
           class has nothing to annotate. */}
       {track.annotationChoice && (
         <div className="language-pair-field">
-          <span className="language-pair-label">朗讀標音</span>
-          <p className="language-pair-hint">派朗讀練習時標在字上。初學繁體多半用注音，從簡體或羅馬拼音教材來的班級用拼音。</p>
+          <span className="language-pair-label">{t('readingAnnotationLabel')}</span>
+          <p className="language-pair-hint">{t('readingAnnotationHint')}</p>
           <div className="language-pair-options">
             {[
-              { code: 'zhuyin', label: '注音' },
-              { code: 'pinyin', label: '拼音' },
-              { code: 'none', label: '不標音' },
+              { code: 'zhuyin', label: t('annotationZhuyin') },
+              { code: 'pinyin', label: t('annotationPinyin') },
+              { code: 'none', label: t('annotationNone') },
             ].map((option) => (
               <button
                 aria-pressed={readingAnnotation === option.code}
@@ -143,8 +143,8 @@ export function LanguagePairFields({
       )}
 
       <div className="language-pair-field">
-        <span className="language-pair-label">主要導引語</span>
-        <p className="language-pair-hint">用來說明的語言。學生加入時的介面預設就是這個，學生仍可自己切換。</p>
+        <span className="language-pair-label">{t('mainGuidanceLanguage')}</span>
+        <p className="language-pair-hint">{t('mainGuidanceHint')}</p>
         <div className="language-pair-options">
           {GUIDANCE_LOCALES.map((locale) => (
             <button

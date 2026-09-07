@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sparkle, Square, Trash, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   anonymousEnabled: boolean
@@ -38,6 +39,7 @@ function acceptedAnswersFor(results: PresenterQuizResults, itemId: string) {
 }
 
 export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswers, results, onDraftChange, onUpdateAnswer }: QuizReviewProps) {
+  const t = usePresenterText()
   return (
     <div className="presenter-quiz-review-list">
       {results.items.map((item, index) => {
@@ -47,11 +49,11 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
             <div className="presenter-quiz-question-heading">
               <span>{index + 1}</span>
               <strong>{item.prompt_text}</strong>
-              {!writing && <small>{item.points} 分</small>}
+              {!writing && <small>{t('points', { n: item.points })}</small>}
             </div>
             {writing ? null : item.type === 'matching' ? (
               !showAnswers ? (
-                <p className="muted presenter-answer-hidden">配對答案已隱藏，勾選「顯示正確答案」即可檢視。</p>
+                <p className="muted presenter-answer-hidden">{t('matchingAnswerHidden')}</p>
               ) : (
                 <div className="presenter-quiz-pairs">
                   {item.pair_prompts.map((prompt, pairIndex) => (
@@ -66,7 +68,7 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
               // 圖片排序. There is no reference answer to type here — the
               // sequence is the answer, and it only means anything as pictures.
               !showAnswers ? (
-                <p className="muted presenter-answer-hidden">正確順序已隱藏，勾選「顯示正確答案」即可檢視。</p>
+                <p className="muted presenter-answer-hidden">{t('orderAnswerHidden')}</p>
               ) : (
                 <ol className="presenter-quiz-panels">
                   {acceptedAnswers.map((value, panelIndex) => (
@@ -96,10 +98,10 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
                 })}
               </div>
             ) : !showAnswers ? (
-              <p className="muted presenter-answer-hidden">參考答案已隱藏，勾選「顯示正確答案」即可檢視與修改。</p>
+              <p className="muted presenter-answer-hidden">{t('referenceAnswerHidden')}</p>
             ) : (
               <div className="presenter-reference-answer">
-                <label htmlFor={`quiz-key-${item.id}`}>參考答案（每行一個可接受答案）</label>
+                <label htmlFor={`quiz-key-${item.id}`}>{t('referenceAnswerLabel')}</label>
                 <textarea
                   id={`quiz-key-${item.id}`}
                   value={draftAnswers[item.id] ?? acceptedAnswers.join('\n')}
@@ -110,7 +112,7 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
                   type="button"
                   onClick={() => void onUpdateAnswer(item.id, (draftAnswers[item.id] ?? acceptedAnswers.join('\n')).split('\n').map((answer) => answer.trim()).filter(Boolean))}
                 >
-                  <FloppyDisk size={16} />儲存參考答案
+                  <FloppyDisk size={16} />{t('saveReferenceAnswer')}
                 </button>
               </div>
             )}
@@ -122,6 +124,7 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
 }
 
 export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onEditDeck, onStopQuestion, onResumeQuestion }: Props) {
+  const t = usePresenterText()
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [busyItemId, setBusyItemId] = useState('')
@@ -136,7 +139,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     try {
       await onEditDeck(input)
     } catch (caught) {
-      setDeckError(caught instanceof Error ? caught.message : '修改卡片失敗。')
+      setDeckError(caught instanceof Error ? caught.message : t('deckEditFailed'))
     } finally {
       setDeckBusy('')
     }
@@ -156,10 +159,10 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   }, [expanded])
 
   if (!results) {
-    return <section className="panel result-panel"><p className="muted">正在載入自訂測驗...</p></section>
+    return <section className="panel result-panel"><p className="muted">{t('loadingQuiz')}</p></section>
   }
   if (!results.quiz) {
-    return <section className="panel result-panel"><p className="muted">AI 正在出題中，請稍候...</p></section>
+    return <section className="panel result-panel"><p className="muted">{t('quizGenerating')}</p></section>
   }
   // 寫作教練 is not marked, so a missing score means there was never one to
   // wait for. Everything below that reads as scoring is switched off rather
@@ -176,7 +179,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     try {
       await onReviewWriting(attemptId, force)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '批改失敗。')
+      setError(caught instanceof Error ? caught.message : t('markFailed'))
     } finally {
       setReviewingId('')
     }
@@ -263,7 +266,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     try {
       await (resumable ? onResumeQuestion() : onStopQuestion())
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '操作失敗。')
+      setError(caught instanceof Error ? caught.message : t('actionFailed'))
     } finally {
       setToggling(false)
     }
@@ -275,7 +278,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     try {
       await onUpdateAnswer(itemId, acceptedAnswers)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '正確答案更新失敗。')
+      setError(caught instanceof Error ? caught.message : t('answerUpdateFailed'))
     } finally {
       setBusyItemId('')
     }
@@ -302,37 +305,37 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">
-        <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作教練' : flashcard ? '單字卡練習' : pictureOrdering ? '故事排序' : '自訂測驗'}</p><h2>{results.quiz.title || question.title}</h2></div>
+        <div><p className="eyebrow"><Brain size={17} />{writing ? t('writingCoachShort') : flashcard ? t('flashcards') : pictureOrdering ? t('storyOrdering') : t('typeCustomQuiz')}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
-          <span>{results.attempts.length}/{onlineCount} 人作答</span>
+          <span>{t('answeredOf', { n: results.attempts.length, online: onlineCount })}</span>
           {(stoppable || resumable) && (
             <button
               className={resumable ? 'question-answering-toggle is-resume' : 'question-answering-toggle'}
               disabled={toggling}
-              title={resumable ? '讓學生可以再次作答' : '停止收答，之後仍可恢復'}
+              title={resumable ? t('resumeHint') : t('stopHint')}
               type="button"
               onClick={() => void toggleAnswering()}
             >
               {resumable ? <Play size={15} weight="fill" /> : <Square size={15} />}
-              {resumable ? '恢復作答' : '停止作答'}
+              {resumable ? t('resumeAnswering') : t('stopAnswering')}
             </button>
           )}
-          <button aria-label="放大檢視測驗" className="icon-button" title="放大檢視測驗" type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>
+          <button aria-label={t('expandQuiz')} className="icon-button" title={t('expandQuiz')} type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>
         </div>
       </div>
       <div className="quiz-result-stats">
-        <div><strong>{results.items.length}</strong><span>{writing ? '欄位' : flashcard ? '張卡片' : '題'}</span></div>
+        <div><strong>{results.items.length}</strong><span>{writing ? t('fieldCount') : flashcard ? t('cardCount') : t('itemCount')}</span></div>
         {writing || flashcard
-          ? <div><strong>{results.attempts.length}</strong><span>{flashcard ? '人在練' : '已回收'}</span></div>
+          ? <div><strong>{results.attempts.length}</strong><span>{flashcard ? t('practising') : t('collected')}</span></div>
           : <>
-              <div><strong>{average === null ? '—' : average.toFixed(1)}</strong><span>平均分數</span></div>
-              <div><strong>{grading.length}</strong><span>評分中</span></div>
+              <div><strong>{average === null ? '—' : average.toFixed(1)}</strong><span>{t('averageScore')}</span></div>
+              <div><strong>{grading.length}</strong><span>{t('grading')}</span></div>
             </>}
       </div>
       {!writing && !flashcard && (
         <label className="show-answers-toggle">
           <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
-          顯示正確答案，若 AI 錯判答案請自行更正
+          {t('showAnswersToggle')}
         </label>
       )}
       {error && <p className="error">{error}</p>}
@@ -343,7 +346,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
           there. Both re-cut the 標音, because a new card brings new characters. */}
       {flashcard && (
         <div className="deck-size-bar">
-          <span>這疊有 {results.items.length} 張</span>
+          <span>{t('deckHasN', { n: results.items.length })}</span>
           <div className="deck-size-actions">
             {[3, 5].map((count) => (
               <button
@@ -353,7 +356,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                 onClick={() => void runDeck(`add${count}`, { addCount: count })}
               >
                 {deckBusy === `add${count}` ? <CircleNotch className="spin" size={15} /> : <Plus size={15} />}
-                再出 {count} 張
+                {t('addNCards', { n: count })}
               </button>
             ))}
           </div>
@@ -370,12 +373,12 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                 <div className={misses ? 'flashcard-card-row is-missed' : 'flashcard-card-row'} key={item.id}>
                   <span>{item.prompt_text}</span>
                   {item.option_readings?.length > 0 && <em className="card-reading">{item.option_readings.join('・')}</em>}
-                  <strong>{misses ? `答錯 ${misses} 次` : '沒人答錯'}</strong>
+                  <strong>{misses ? t('missedNTimes', { n: misses }) : t('noMisses')}</strong>
                   <button
-                    aria-label="移除這張"
+                    aria-label={t('removeCard')}
                     className="ghost-button icon-button"
                     disabled={Boolean(deckBusy) || results.items.length <= 1}
-                    title="移除這張"
+                    title={t('removeCard')}
                     type="button"
                     onClick={() => void runDeck(item.id, { removeItemId: item.id })}
                   >
@@ -386,7 +389,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
             })}
         </div>
       )}
-      {!writing && grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />AI 正在背景評分，完成後會自動更新。</p>}
+      {!writing && grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />{t('gradingNote')}</p>}
       {/* 寫作教練 is unscored by design, so this gives feedback rather than a
           mark — a first pass the teacher can skim, correct and ignore. Already
           reviewed students are skipped, so a second press costs nothing. */}
@@ -394,24 +397,24 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         <div className="writing-review-bar">
           <button disabled={Boolean(reviewingId) || !unreviewed.length} type="button" onClick={() => void reviewAll()}>
             {reviewingId === 'all'
-              ? <><CircleNotch className="spin" size={16} />批改中 {reviewProgress.done}/{reviewProgress.total}…</>
-              : <><Sparkle size={16} />{unreviewed.length ? `AI 批改剩下的 ${unreviewed.length} 人` : '每個人都批改過了'}</>}
+              ? <><CircleNotch className="spin" size={16} />{t('marking', { done: reviewProgress.done, total: reviewProgress.total })}</>
+              : <><Sparkle size={16} />{unreviewed.length ? t('reviewRest', { n: unreviewed.length }) : t('allReviewed')}</>}
           </button>
-          <span className="muted">不打分數，只給回饋；已批改過的不會重跑。</span>
+          <span className="muted">{t('reviewNote')}</span>
         </div>
       )}
       <div className="quiz-attempt-list">
         {results.attempts.map((attempt, index) => (
           <article key={attempt.id}>
             <div>
-              <strong>{anonymousEnabled ? `匿名學員 ${index + 1}` : attempt.participant_name}</strong>
+              <strong>{anonymousEnabled ? t('anonymousStudent', { n: index + 1 }) : attempt.participant_name}</strong>
               <span>{flashcard
-                ? `第一次就對 ${firstTryRight(attempt.id)}/${results.items.length}`
+                ? t('firstTryRight', { right: firstTryRight(attempt.id), total: results.items.length })
                 : writing
-                ? coaching ? `已送出 · 問了教練 ${roundsFor(attempt.participant_id)} 次` : '已送出'
+                ? coaching ? t('submittedWithCoach', { n: roundsFor(attempt.participant_id) }) : t('submitted')
                 : attempt.status === 'graded'
                   ? `${attempt.total_score}/${attempt.max_score}`
-                  : attempt.status === 'failed' ? '評分失敗' : '評分中'}</span>
+                  : attempt.status === 'failed' ? t('gradeFailed') : t('grading')}</span>
             </div>
             {/* The writing itself is the result here — a score would be the one
                 thing the teacher did not ask for, and the words are the thing
@@ -433,10 +436,10 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                           is above; this is how it got there. */}
                       {coaching && turnsFor(attempt.participant_id, answer.item_id).length > 0 && (
                         <details className="writing-history">
-                          <summary>寫作歷程（{turnsFor(attempt.participant_id, answer.item_id).length} 次）</summary>
+                          <summary>{t('writingHistory', { n: turnsFor(attempt.participant_id, answer.item_id).length })}</summary>
                           {turnsFor(attempt.participant_id, answer.item_id).map((turn) => (
                             <div className="writing-history-turn" key={turn.id}>
-                              <strong>第 {turn.round} 稿</strong>
+                              <strong>{t('draftN', { n: turn.round })}</strong>
                               <p className="writing-history-draft">{turn.draft}</p>
                               <ul>{turn.reply.questions.map((q) => <li key={q}>{q}</li>)}</ul>
                               {turn.reply.fix && <p className="writing-history-fix">{turn.reply.fix.point}</p>}
@@ -458,36 +461,36 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                   onClick={() => void reviewOne(attempt.id, Boolean(attempt.feedback?.zh_tw))}
                 >
                   {reviewingId === attempt.id
-                    ? <><CircleNotch className="spin" size={15} />批改中…</>
-                    : <><Sparkle size={15} />{attempt.feedback?.zh_tw ? '重批' : 'AI 批改'}</>}
+                    ? <><CircleNotch className="spin" size={15} />{t('markingOne')}</>
+                    : <><Sparkle size={15} />{attempt.feedback?.zh_tw ? t('markAgain') : t('aiMark')}</>}
                 </button>
               </div>
             )}
             {!writing && attempt.feedback?.zh_tw && <p>{attempt.feedback.zh_tw}</p>}
           </article>
         ))}
-        {!results.attempts.length && <p className="muted">{writing ? '尚無學員回傳。' : '尚無學員作答。'}</p>}
+        {!results.attempts.length && <p className="muted">{writing ? t('noSubmissionsYet') : t('noAnswersYet')}</p>}
       </div>
       {expanded && createPortal(
         <div className="custom-quiz-review-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpanded(false) }}>
-          <section aria-label="自訂測驗放大檢視" aria-modal="true" className="custom-quiz-review-modal" role="dialog">
+          <section aria-label={t('quizExpandedView')} aria-modal="true" className="custom-quiz-review-modal" role="dialog">
             <header>
-              <div><p className="eyebrow"><Brain size={17} />{writing ? '寫作欄位檢視' : '自訂測驗檢視與答案調整'}</p><h2>{results.quiz.title || question.title}</h2></div>
-              <button aria-label="關閉放大視窗" className="icon-button" title="關閉" type="button" onClick={() => setExpanded(false)}><X size={22} /></button>
+              <div><p className="eyebrow"><Brain size={17} />{writing ? t('writingFieldsView') : t('quizReviewTitle')}</p><h2>{results.quiz.title || question.title}</h2></div>
+              <button aria-label={t('closeExpanded')} className="icon-button" title={t('close')} type="button" onClick={() => setExpanded(false)}><X size={22} /></button>
             </header>
             <div className={`custom-quiz-review-content${results.screenshot ? '' : ' is-single'}`}>
               {results.screenshot && (
                 <aside className="custom-quiz-source-panel">
-                  <h3>原始截圖</h3>
-                  <img alt="自訂測驗原始截圖" src={results.screenshot.public_url} />
+                  <h3>{t('sourceScreenshot')}</h3>
+                  <img alt={t('sourceScreenshotAlt')} src={results.screenshot.public_url} />
                 </aside>
               )}
               <div className="custom-quiz-question-panel">
-                <h3>{writing ? '寫作欄位' : '題目與正確答案'}</h3>
+                <h3>{writing ? t('writingFields') : t('questionsAndAnswers')}</h3>
                 {!writing && (
                   <label className="show-answers-toggle">
                     <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
-                    顯示正確答案，若 AI 錯判答案請自行更正
+                    {t('showAnswersToggle')}
                   </label>
                 )}
                 {error && <p className="error">{error}</p>}

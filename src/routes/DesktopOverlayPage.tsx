@@ -11,10 +11,15 @@ import { finalizeLottery } from '../lib/lottery'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import type { Answer, BuzzerSessionEvent, CaptionSegment, LotterySessionEvent, Message, Question, Session, SessionEvent } from '../types'
+import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
 
 export function DesktopOverlayPage() {
   const { sessionId = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
+  // The overlay is its own transparent window, so it resolves the class's
+  // teaching language itself and provides it to the overlays it renders.
+  const locale = presenterLocaleFor(session?.teaching_language)
+  const t = presenterLookup(locale)
   const [messages, setMessages] = useState<Message[]>([])
   const [lotteryEvent, setLotteryEvent] = useState<LotterySessionEvent | null>(null)
   const [buzzerEvent, setBuzzerEvent] = useState<BuzzerSessionEvent | null>(null)
@@ -241,18 +246,18 @@ export function DesktopOverlayPage() {
 
   async function selectLotteryCandidate(winnerId: string) {
     if (!lotteryEvent) return
-    setLotteryEvent(await finalizeLottery(sessionId, lotteryEvent.id, winnerId))
+    setLotteryEvent(await finalizeLottery(sessionId, lotteryEvent.id, winnerId, t))
   }
 
   async function activateBuzzer() {
     if (!buzzerEvent || !isBuzzerPending(buzzerEvent) || isBuzzerAccepting(buzzerEvent)) return
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者操作權限。')
+    if (!presenterToken) throw new Error(t('noControlRights'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'activate_buzzer', sessionId, presenterToken, eventId: buzzerEvent.id },
     })
     if (error) throw error
-    if (!data?.event) throw new Error(data?.message || '搶答沒有成功開始。')
+    if (!data?.event) throw new Error(data?.message || t('buzzerNotStarted'))
     const nextEvent = data.event as BuzzerSessionEvent
     setBuzzerEvent(nextEvent)
     await window.lingoActDesktop?.showLottery(nextEvent)
@@ -260,6 +265,7 @@ export function DesktopOverlayPage() {
 
   if (!session) return null
   return (
+    <PresenterLocaleContext.Provider value={locale}>
     <div className="desktop-overlay-root">
       <DanmakuLayer messages={messages} session={session} />
       {session.captions_enabled && (
@@ -281,5 +287,6 @@ export function DesktopOverlayPage() {
       <LotteryOverlay event={lotteryEvent} onSelect={selectLotteryCandidate} />
       <BuzzerOverlay event={buzzerEvent} onStart={activateBuzzer} />
     </div>
+    </PresenterLocaleContext.Provider>
   )
 }

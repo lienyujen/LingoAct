@@ -28,8 +28,10 @@ export const SOURCE_CAPTION_LANGUAGE = 'source'
 
 export const CAPTION_DISPLAY_LANGUAGES = [
   ...CAPTION_LANGUAGES.filter((language) => ['zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'].includes(language.code)),
-  { code: SOURCE_CAPTION_LANGUAGE, label: '原始語言（不改寫用詞）' },
-]
+  // The only entry here that is a description rather than a language name, so
+  // it is the only one the teacher's own locale has anything to say about.
+  { code: SOURCE_CAPTION_LANGUAGE, label: '原始語言（不改寫用詞）', labelKey: 'captionSourceLanguage' },
+] as const
 
 // Everything downstream works in real languages, so this resolves the choice
 // back to one before the captions are looked up or translated.

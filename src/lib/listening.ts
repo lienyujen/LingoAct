@@ -1,3 +1,5 @@
+import { presenterLookup } from './presenterI18n'
+import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
 import type { ListeningClip, ListeningKind, PresenterListeningClip } from '../types'
 
@@ -44,14 +46,14 @@ export async function synthesizeListening(input: {
 // Puts the captured image somewhere the analyser can read it. It is recorded as
 // a screenshot but never attached to a question, so nothing about it reaches the
 // class — the audio is the only thing they get.
-export async function uploadListeningScreenshot(sessionId: string, presenterToken: string, file: File) {
+export async function uploadListeningScreenshot(sessionId: string, presenterToken: string, file: File, t: PresenterT = presenterLookup('zh-TW')) {
   const supabase = requireSupabase()
   const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
     body: { action: 'prepare_screenshot_upload', sessionId, presenterToken, fileName: file.name },
   })
   if (prepareError) throw prepareError
   if (!prepared?.screenshotId || !prepared?.storagePath || !prepared?.uploadToken) {
-    throw new Error(prepared?.message || '無法準備截圖上傳。')
+    throw new Error(prepared?.message || t('shotUploadPrepareFailed'))
   }
 
   const { error: uploadError } = await supabase.storage
@@ -147,11 +149,11 @@ export async function applyAnnotation(input: {
   clipId: string
   mode: AnnotationMode
   annotationText: string
-}) {
+}, t: PresenterT = presenterLookup('zh-TW')) {
   let fontBase64 = ''
   if (input.mode === 'zhuyin') {
     const subset = window.lingoActDesktop?.subsetBopomofoFont
-    if (!subset) throw new Error('注音字型子集化只能在 LingoAct 桌面版執行。')
+    if (!subset) throw new Error(t('desktopOnlySubset'))
     const result = await subset(input.annotationText)
     if (!result.ok) throw new Error(result.message)
     fontBase64 = result.woff2

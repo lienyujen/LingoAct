@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { QuizAnswerEditor } from '../components/CustomQuizResult'
 import type { QuizReviewProps } from '../components/CustomQuizResult'
 import { getPresenterToken } from '../lib/presenterAuth'
+import { PresenterLocaleContext, presenterLookup, storedPresenterLocale } from '../lib/presenterI18n'
 import { requireSupabase } from '../lib/supabase'
 import type { PresenterQuizResults } from '../types'
 
@@ -22,6 +23,10 @@ async function functionErrorMessage(error: unknown, fallback: string) {
 
 export function CustomQuizReviewPage() {
   const { sessionId = '', questionId = '' } = useParams()
+  // This window has no provider above it, so it reads the class's locale once
+  // and then provides it for QuizAnswerEditor the same way the main one does.
+  const [locale] = useState(() => storedPresenterLocale(sessionId))
+  const t = presenterLookup(locale)
   const [results, setResults] = useState<PresenterQuizResults | null>(null)
   const [busyItemId, setBusyItemId] = useState('')
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
@@ -31,19 +36,19 @@ export function CustomQuizReviewPage() {
   const loadQuiz = useCallback(async () => {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setError('找不到講者權限，請關閉視窗後重新開啟。')
+      setError(t('noPresenterRightsHere'))
       return
     }
     const { data, error: loadError } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'get_custom_quiz_results', sessionId, presenterToken, questionId },
     })
     if (loadError) {
-      setError(await functionErrorMessage(loadError, '無法載入自訂測驗。'))
+      setError(await functionErrorMessage(loadError, t('quizLoadFailed')))
       return
     }
     setResults((data as PresenterQuizResults | null) || null)
     setError('')
-  }, [questionId, sessionId])
+  }, [questionId, sessionId, t])
 
   useEffect(() => {
     void loadQuiz()
@@ -53,7 +58,7 @@ export function CustomQuizReviewPage() {
 
   async function updateAnswer(itemId: string, acceptedAnswers: string[]) {
     const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error('找不到講者權限。')
+    if (!presenterToken) throw new Error(t('noPresenterRights'))
     setBusyItemId(itemId)
     setError('')
     try {
@@ -67,11 +72,11 @@ export function CustomQuizReviewPage() {
           acceptedAnswers,
         },
       })
-      if (updateError) throw new Error(await functionErrorMessage(updateError, '正確答案更新失敗。'))
-      if (!data?.success) throw new Error(data?.message || '正確答案更新失敗。')
+      if (updateError) throw new Error(await functionErrorMessage(updateError, t('answerUpdateFailed')))
+      if (!data?.success) throw new Error(data?.message || t('answerUpdateFailed'))
       await loadQuiz()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '正確答案更新失敗。')
+      setError(caught instanceof Error ? caught.message : t('answerUpdateFailed'))
     } finally {
       setBusyItemId('')
     }
@@ -91,13 +96,14 @@ export function CustomQuizReviewPage() {
   } : null
 
   return (
+    <PresenterLocaleContext.Provider value={locale}>
     <main className="custom-quiz-native-page">
       <header>
         <div>
-          <p className="eyebrow"><Brain size={18} />{writing ? '寫作欄位檢視' : '自訂測驗檢視與答案調整'}</p>
-          <h1>{results?.quiz?.title || (results ? 'AI 正在出題中，請稍候...' : '正在載入自訂測驗...')}</h1>
+          <p className="eyebrow"><Brain size={18} />{writing ? t('writingFieldsView') : t('quizReviewTitle')}</p>
+          <h1>{results?.quiz?.title || (results ? t('quizGenerating') : t('loadingQuiz'))}</h1>
         </div>
-        <button aria-label="關閉測驗檢視視窗" className="icon-button" title="關閉" type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>
+        <button aria-label={t('closeQuizWindow')} className="icon-button" title={t('close')} type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>
       </header>
       {error && <p className="error custom-quiz-native-error">{error}</p>}
       {results && reviewProps ? (
@@ -106,22 +112,23 @@ export function CustomQuizReviewPage() {
               half the window empty for the questions to squeeze beside. */}
           {results.screenshot && (
             <aside className="custom-quiz-source-panel">
-              <h2>原始截圖</h2>
-              <img alt="自訂測驗原始截圖" src={results.screenshot.public_url} />
+              <h2>{t('sourceScreenshot')}</h2>
+              <img alt={t('sourceScreenshotAlt')} src={results.screenshot.public_url} />
             </aside>
           )}
           <section className="custom-quiz-question-panel">
-            <h2>{writing ? '寫作欄位' : '題目與正確答案'}</h2>
+            <h2>{writing ? t('writingFields') : t('questionsAndAnswers')}</h2>
             {!writing && (
               <label className="show-answers-toggle">
                 <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
-                顯示正確答案，若 AI 錯判答案請自行更正
+                {t('showAnswersToggle')}
               </label>
             )}
             <QuizAnswerEditor {...reviewProps} />
           </section>
         </div>
-      ) : !error ? <p className="muted custom-quiz-native-loading">正在載入題目與截圖...</p> : null}
+      ) : !error ? <p className="muted custom-quiz-native-loading">{t('loadingQuizAndShot')}</p> : null}
     </main>
+    </PresenterLocaleContext.Provider>
   )
 }

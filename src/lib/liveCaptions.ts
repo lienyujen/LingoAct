@@ -10,6 +10,8 @@ type RealtimeCaptionConnection = {
   close: () => void
 }
 
+import type { PresenterT } from './presenterI18n'
+
 type ConnectionOptions = {
   sessionId: string
   presenterToken: string
@@ -22,6 +24,7 @@ type ConnectionOptions = {
   onTranslatedAudio?: (stream: MediaStream) => void
   onError: (message: string) => void
   onDisconnected?: (message: string) => void
+  t: PresenterT
 }
 
 function eventText(event: Record<string, unknown>) {
@@ -29,21 +32,21 @@ function eventText(event: Record<string, unknown>) {
   return typeof value === 'string' ? value : ''
 }
 
-function realtimeErrorMessage(event: Record<string, unknown>) {
+function realtimeErrorMessage(event: Record<string, unknown>, t: PresenterT) {
   const detail = event.error && typeof event.error === 'object'
     ? (event.error as Record<string, unknown>).message
     : undefined
-  if (typeof detail !== 'string') return '即時字幕服務回報錯誤。'
-  if (detail.includes('no credits remaining')) return 'OpenAI API 額度已用完，請儲值後再重新啟動字幕。'
+  if (typeof detail !== 'string') return t('captionServiceError')
+  if (detail.includes('no credits remaining')) return t('openAiNoCredits')
   return detail
 }
 
-function readableServiceError(detail: string) {
+function readableServiceError(detail: string, t: PresenterT) {
   if (detail.includes('no credits remaining') || detail.includes('credit_balance_exhausted')) {
-    return 'OpenAI API 額度已用完；ChatGPT 訂閱不包含 API 點數，請確認儲值的是這支 API key 所屬的 Organization。'
+    return t('openAiNoCreditsOrg')
   }
   if (detail.includes('<!DOCTYPE html') || detail.includes('<html')) {
-    return 'OpenAI 即時字幕服務暫時無法連線。'
+    return t('openAiUnreachable')
   }
   try {
     const parsed = JSON.parse(detail)
@@ -54,19 +57,19 @@ function readableServiceError(detail: string) {
   }
 }
 
-async function directRealtimeError(response: Response) {
+async function directRealtimeError(response: Response, t: PresenterT) {
   const detail = await response.text()
-  return readableServiceError(detail)
+  return readableServiceError(detail, t)
 }
 
-async function functionErrorMessage(error: unknown) {
-  if (!(error instanceof Error)) return '即時字幕服務連線失敗。'
+async function functionErrorMessage(error: unknown, t: PresenterT) {
+  if (!(error instanceof Error)) return t('captionConnectFailed')
   const response = (error as Error & { context?: Response }).context
   if (response) {
     try {
       const body = await response.clone().json()
-      if (typeof body?.detail === 'string') return readableServiceError(body.detail)
-      if (typeof body?.message === 'string') return readableServiceError(body.message)
+      if (typeof body?.detail === 'string') return readableServiceError(body.detail, t)
+      if (typeof body?.message === 'string') return readableServiceError(body.message, t)
     } catch {
       // Fall through to the SDK error message.
     }
@@ -124,7 +127,7 @@ export async function createRealtimeCaptionConnection(options: ConnectionOptions
       const event = JSON.parse(message.data) as Record<string, unknown>
       const type = typeof event.type === 'string' ? event.type : ''
       if (type === 'error' || type.endsWith('.failed')) {
-        options.onError(realtimeErrorMessage(event))
+        options.onError(realtimeErrorMessage(event, options.t))
         return
       }
       const isTranscription = type.includes('input_audio_transcription')
@@ -161,19 +164,19 @@ export async function createRealtimeCaptionConnection(options: ConnectionOptions
       // Ignore non-JSON WebRTC messages.
     }
   })
-  dataChannel.addEventListener('error', () => reportDisconnected('即時字幕資料連線發生錯誤。'))
-  dataChannel.addEventListener('close', () => reportDisconnected('即時字幕資料連線已關閉。'))
+  dataChannel.addEventListener('error', () => reportDisconnected(options.t('captionDataError')))
+  dataChannel.addEventListener('close', () => reportDisconnected(options.t('captionDataClosed')))
   peer.addEventListener('connectionstatechange', () => {
     if (peer.connectionState === 'connected') {
       clearDisconnectTimer()
       return
     }
     if (peer.connectionState === 'disconnected') {
-      reportDisconnected('即時字幕音訊連線中斷。', 5_000)
+      reportDisconnected(options.t('captionAudioDropped'), 5_000)
       return
     }
     if (peer.connectionState === 'failed' || peer.connectionState === 'closed') {
-      reportDisconnected('即時字幕音訊連線中斷。')
+      reportDisconnected(options.t('captionAudioDropped'))
     }
   })
 
@@ -191,7 +194,7 @@ export async function createRealtimeCaptionConnection(options: ConnectionOptions
   })
   if (error) {
     peer.close()
-    throw new Error(await functionErrorMessage(error))
+    throw new Error(await functionErrorMessage(error, options.t))
   }
   if (options.mode === 'transcription' && data?.clientSecret) {
     const response = await fetch('https://api.openai.com/v1/realtime/calls', {
@@ -204,7 +207,7 @@ export async function createRealtimeCaptionConnection(options: ConnectionOptions
       signal: AbortSignal.timeout(15_000),
     })
     if (!response.ok) {
-      const message = await directRealtimeError(response)
+      const message = await directRealtimeError(response, options.t)
       peer.close()
       throw new Error(message)
     }
@@ -251,7 +254,7 @@ export async function createRealtimeCaptionConnection(options: ConnectionOptions
   } else {
     if (!data?.sdp) {
       peer.close()
-      throw new Error(data?.message || '沒有取得即時字幕連線。')
+      throw new Error(data?.message || options.t('noCaptionConnection'))
     }
     await peer.setRemoteDescription({ type: 'answer', sdp: data.sdp })
   }

@@ -13,6 +13,8 @@ export type GeminiCaptionEvent = {
   final: boolean
 }
 
+import type { PresenterT } from './presenterI18n'
+
 type Options = {
   sessionId: string
   presenterToken: string
@@ -27,6 +29,7 @@ type Options = {
   onCaption: (event: GeminiCaptionEvent) => void
   onError: (message: string) => void
   onDisconnected?: (message: string) => void
+  t: PresenterT
 }
 
 const TARGET_RATE = 16000
@@ -44,7 +47,7 @@ const ROTATE_AFTER_MS = 50_000
 
 function relayUrl(options: Options, resumeHandle: string) {
   const base = backendConfig?.url
-  if (!base) throw new Error('尚未設定後端專案。')
+  if (!base) throw new Error(options.t('noBackendProject'))
   const url = new URL(`${base}/functions/v1/gemini-caption-relay`)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.searchParams.set('sessionId', options.sessionId)
@@ -64,7 +67,7 @@ export async function createGeminiCaptionConnection(options: Options): Promise<{
   // Fails early and with a real message if the relay was never deployed.
   const probe = await requireSupabase().functions.invoke('gemini-caption-relay', { body: {} }).catch(() => null)
   if (probe?.error && /not found/i.test(String(probe.error.message || ''))) {
-    throw new Error('後端缺少 gemini-caption-relay，請到系統設定重新執行自動部署。')
+    throw new Error(options.t('relayMissing'))
   }
 
   const audioContext = new AudioContext()
@@ -109,7 +112,7 @@ export async function createGeminiCaptionConnection(options: Options): Promise<{
       }
       // Kept here rather than in the relay, which does not outlive a rotation.
       if (type === 'resume') { resumeHandle = String(payload.handle || ''); return }
-      if (type === 'error') { options.onError(String(payload.message || 'Gemini 字幕發生錯誤。')); return }
+      if (type === 'error') { options.onError(String(payload.message || options.t('geminiCaptionError'))); return }
       if (type !== 'caption') return
       // Only the socket currently carrying audio may speak, or a relay that is
       // being retired would keep emitting stale lines.
@@ -129,7 +132,7 @@ export async function createGeminiCaptionConnection(options: Options): Promise<{
     })
 
     socket.addEventListener('close', () => {
-      if (!settled) { settled = true; reject(new Error('即時字幕連線中斷。')) }
+      if (!settled) { settled = true; reject(new Error(options.t('captionDropped'))) }
       // The platform kills a relay after about a minute without a close frame,
       // so an unexpected close is routine: bring the next one up immediately
       // rather than telling the presenter anything went wrong.
@@ -140,7 +143,7 @@ export async function createGeminiCaptionConnection(options: Options): Promise<{
       if (settled) return
       settled = true
       try { socket.close() } catch { /* already closing */ }
-      reject(new Error('即時字幕連線逾時。'))
+      reject(new Error(options.t('captionTimeout')))
     }, 15_000)
   })
 
@@ -162,7 +165,7 @@ export async function createGeminiCaptionConnection(options: Options): Promise<{
       failures += 1
       if (closed) return
       if (failures >= 5) {
-        options.onDisconnected?.(error instanceof Error ? error.message : '即時字幕連線中斷。')
+        options.onDisconnected?.(error instanceof Error ? error.message : options.t('captionDropped'))
         return
       }
       rotateTimer = window.setTimeout(() => void rotate(true), immediate ? 500 * failures : 2_000)
@@ -191,7 +194,7 @@ export async function createGeminiCaptionConnection(options: Options): Promise<{
     worklet.connect(sink).connect(audioContext.destination)
   } catch (error) {
     cleanup()
-    throw error instanceof Error ? error : new Error('無法啟動音訊擷取。')
+    throw error instanceof Error ? error : new Error(options.t('audioCaptureFailed'))
   }
 
   return { close: cleanup }

@@ -11,6 +11,8 @@ import {
   applyAnnotation,
 } from '../lib/listening'
 import type { ListeningKind, PresenterListeningClip } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
+import type { PresenterMessageKey } from '../lib/presenterI18n'
 
 type Props = {
   // 注音 or 拼音, decided with the rest of the class rather than per clip.
@@ -22,10 +24,10 @@ type Props = {
   onClose: () => void
 }
 
-const KIND_LABELS: Record<ListeningKind, string> = {
-  passage: '課文段落',
-  dialogue: '對話',
-  scene: '圖片描述',
+const KIND_LABELS: Record<ListeningKind, PresenterMessageKey> = {
+  passage: 'kindPassage',
+  dialogue: 'kindDialogue',
+  scene: 'kindScene',
 }
 
 // Two voices is the synthesis API's ceiling, so the assignment UI never offers
@@ -69,6 +71,7 @@ function PlayIcon({ size = 17 }: { size?: number }) {
 }
 
 export function ListeningStudioModal({ open, sessionId, presenterToken, teachingLanguage, readingAnnotation, onClose }: Props) {
+  const t = usePresenterText()
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
   const [kind, setKind] = useState<ListeningKind>('passage')
@@ -110,11 +113,11 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
 
   async function readImage(file: File) {
     setError('')
-    setBusy('正在讀取截圖…')
+    setBusy(t('readingShot'))
     try {
-      const id = await uploadListeningScreenshot(sessionId, presenterToken, file)
+      const id = await uploadListeningScreenshot(sessionId, presenterToken, file, t)
       setScreenshotId(id)
-      setBusy('AI 正在辨識內容…')
+      setBusy(t('recognising'))
       const analysis = await analyzeListeningSource({ sessionId, presenterToken, screenshotId: id, teachingLanguage })
       setTranscript(analysis.transcript)
       setKind(analysis.kind)
@@ -125,7 +128,7 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
       // would otherwise be read out to the whole class as the thing they are
       // meant to be hearing.
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '辨識失敗，請再試一次。')
+      setError(caught instanceof Error ? caught.message : t('recogniseFailed'))
     } finally {
       setBusy('')
     }
@@ -138,7 +141,7 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
 
   async function synthesize() {
     setError('')
-    setBusy('正在合成語音…')
+    setBusy(t('synthesising'))
     try {
       const result = await synthesizeListening({
         sessionId,
@@ -152,7 +155,7 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
       })
       setClip(result.clip)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '語音合成失敗。')
+      setError(caught instanceof Error ? caught.message : t('synthFailed'))
     } finally {
       setBusy('')
     }
@@ -161,7 +164,7 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
   async function dispatch(target: 'audio' | 'quiz' | 'read_aloud') {
     if (!clip) return
     setError('')
-    setBusy(target === 'quiz' ? '正在出題…' : '正在派送…')
+    setBusy(target === 'quiz' ? t('generatingQuiz') : t('dispatching'))
     try {
       if (target === 'quiz') {
         await dispatchListeningQuiz({
@@ -177,7 +180,7 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
         // dispatched as audio, as a quiz, or read aloud, and only the last of
         // those needs — or may safely carry — the text and its font.
         if (readingAnnotation !== 'none' && teachingLanguage.startsWith('zh')) {
-          setBusy('正在標音…')
+          setBusy(t('annotating'))
           try {
             const marked = await annotateReading({
               sessionId, presenterToken, text: clip.transcript,
@@ -187,14 +190,14 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
               sessionId, presenterToken, clipId: clip.id,
               mode: readingAnnotation as 'zhuyin' | 'pinyin',
               annotationText: marked.annotationText,
-            })
+            }, t)
           } catch (caught) {
             // Losing the annotation is a shame; losing the activity is worse.
             // The words still read, just without 注音 above them.
             console.error('annotation failed', caught)
-            setError(caught instanceof Error ? `標音失敗，改以無標音派送：${caught.message}` : '標音失敗，改以無標音派送。')
+            setError(caught instanceof Error ? t('annotateFailedWith', { message: caught.message }) : t('annotateFailed'))
           }
-          setBusy('正在派送…')
+          setBusy(t('dispatching'))
         }
         // The learner sees the words and hears the model, then records their
         // own take against it — so the clip stops being a test and becomes a
@@ -216,7 +219,7 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
       }
       setOnAir(true)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '派送失敗。')
+      setError(caught instanceof Error ? caught.message : t('sendFailed'))
     } finally {
       setBusy('')
     }
@@ -230,25 +233,25 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
 
         <header className="ls-head">
           <span className="ls-mark"><MicIcon /></span>
-          <h2>聽力播音室</h2>
+          <h2>{t('listeningStudio')}</h2>
           <span className="ls-spacer" />
           {onAir && <span className="ls-onair"><span className="ls-dot" />ON AIR</span>}
-          <button className="ls-close" type="button" aria-label="關閉" onClick={onClose}>
+          <button className="ls-close" type="button" aria-label={t('close')} onClick={onClose}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </header>
 
         <div className="ls-body">
           <div className="ls-tabs" role="tablist">
-            <button role="tab" aria-selected={source === 'screenshot'} className={source === 'screenshot' ? 'is-on' : ''} type="button" onClick={() => setSource('screenshot')}>從截圖</button>
-            <button role="tab" aria-selected={source === 'text'} className={source === 'text' ? 'is-on' : ''} type="button" onClick={() => setSource('text')}>貼上文字</button>
+            <button role="tab" aria-selected={source === 'screenshot'} className={source === 'screenshot' ? 'is-on' : ''} type="button" onClick={() => setSource('screenshot')}>{t('fromScreenshot')}</button>
+            <button role="tab" aria-selected={source === 'text'} className={source === 'text' ? 'is-on' : ''} type="button" onClick={() => setSource('text')}>{t('pasteText')}</button>
             <span className="ls-spacer" />
-            {source === 'text' && <span className="ls-hint">不呼叫辨識，較省用量</span>}
+            {source === 'text' && <span className="ls-hint">{t('textCheaperHint')}</span>}
           </div>
 
           {source === 'screenshot' && !transcript && (
             <div className="ls-drop" onPaste={onPaste} tabIndex={0}>
-              <p>把教材截圖貼上（Ctrl+V），或選擇檔案</p>
+              <p>{t('listeningDropHint')}</p>
               <input
                 accept="image/png,image/jpeg,image/webp"
                 type="file"
@@ -262,12 +265,12 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
               <div className="ls-chips">
                 {(Object.keys(KIND_LABELS) as ListeningKind[]).map((value) => (
                   <button key={value} className={kind === value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => setKind(value)}>
-                    {KIND_LABELS[value]}
+                    {t(KIND_LABELS[value])}
                   </button>
                 ))}
                 {teachingLanguage.startsWith('zh') && (
                   <button className="ls-chip ls-chip-script" type="button" onClick={() => setScript(script === 'traditional' ? 'simplified' : 'traditional')}>
-                    {script === 'traditional' ? '繁體・台灣腔' : '簡體・普通話'}
+                    {script === 'traditional' ? t('scriptTraditional') : t('scriptSimplified')}
                   </button>
                 )}
               </div>
@@ -275,20 +278,20 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
               <div className="ls-transcript">
                 <div className="ls-transcript-head">
                   <HiddenIcon />
-                  <span>逐字稿・學生看不到</span>
+                  <span>{t('transcriptHidden')}</span>
                   <span className="ls-spacer" />
-                  <span className="ls-count">{transcript.length} 字</span>
+                  <span className="ls-count">{t('charCount', { n: transcript.length })}</span>
                 </div>
                 <textarea
                   maxLength={4000}
-                  placeholder="貼上或修改要朗讀的文字。對話請每行以「說話者：」開頭。"
+                  placeholder={t('transcriptPlaceholder')}
                   value={transcript}
                   onChange={(event) => { setTranscript(event.target.value); setClip(null) }}
                 />
               </div>
 
               {kind === 'dialogue' && speakers.length < 2 && (
-                <p className="ls-note">對話需要每行以「說話者：」開頭才能分成兩個聲音，目前會用單一聲音朗讀。</p>
+                <p className="ls-note">{t('dialogueNeedsSpeakers')}</p>
               )}
 
               {kind === 'dialogue' && speakers.length > 0 && (
@@ -311,27 +314,27 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
                   <button className="ls-play" type="button" onClick={() => audioRef.current?.play()}><PlayIcon /></button>
                   <audio ref={audioRef} preload="auto" src={clip.public_url} />
                   <div className="ls-player-meta">
-                    <strong>語音已就緒</strong>
-                    <span>{((clip.duration_ms || 0) / 1000).toFixed(1)} 秒</span>
+                    <strong>{t('audioReady')}</strong>
+                    <span>{t('clipLength', { n: ((clip.duration_ms || 0) / 1000).toFixed(1) })}</span>
                   </div>
                 </div>
               ) : (
                 <button className="ls-synth" disabled={!canSynthesize} type="button" onClick={() => void synthesize()}>
-                  {busy || '轉成語音'}
+                  {busy || t('toSpeech')}
                 </button>
               )}
 
               {clip && (
                 <div className="ls-timing">
-                  <TimingRow label="準備時間" offLabel="不準備" presets={[null, 10, 20, 30]} value={prepareSeconds} onChange={setPrepareSeconds} />
-                  <TimingRow label="朗讀時間" offLabel="不限時" presets={[null, 30, 60, 90]} value={answerSeconds} onChange={setAnswerSeconds} />
-                  <p className="ls-note">只有「派朗讀練習」會用到這兩個時間。</p>
+                  <TimingRow label={t('prepareTime')} offLabel={t('noPrepare')} presets={[null, 10, 20, 30]} value={prepareSeconds} onChange={setPrepareSeconds} />
+                  <TimingRow label={t('readAloudTime')} offLabel={t('noTimeLimit')} presets={[null, 30, 60, 90]} value={answerSeconds} onChange={setAnswerSeconds} />
+                  <p className="ls-note">{t('listeningTimingNote')}</p>
                 </div>
               )}
 
               {clip && (
                 <div className="ls-replay">
-                  <span>可聽次數</span>
+                  <span>{t('replayCount')}</span>
                   <span className="ls-spacer" />
                   <div className="ls-replay-set">
                     {[1, 2, 3].map((value) => (
@@ -348,9 +351,9 @@ export function ListeningStudioModal({ open, sessionId, presenterToken, teaching
         </div>
 
         <footer className="ls-foot">
-          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>只派語音</button>
-          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>派朗讀練習</button>
-          <button className="ls-primary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>派聽力測驗</button>
+          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>{t('sendAudioOnly')}</button>
+          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>{t('sendReadAloud')}</button>
+          <button className="ls-primary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>{t('sendListeningQuiz')}</button>
         </footer>
       </div>
     </div>

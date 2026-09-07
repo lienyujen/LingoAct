@@ -1,6 +1,7 @@
 import { ArrowCounterClockwise, CaretDown, CaretUp, ClockCounterClockwise } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
 import type { Question } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   questions: Question[]
@@ -17,6 +18,7 @@ export function QuestionHistory({
   answerCounts,
   onSelect,
 }: Props) {
+  const t = usePresenterText()
   const [open, setOpen] = useState(false)
   const history = useMemo(
     () => questions
@@ -37,7 +39,7 @@ export function QuestionHistory({
         onClick={() => setOpen((current) => !current)}
       >
         <ClockCounterClockwise size={17} />
-        <span>歷史題目</span>
+        <span>{t('pastQuestions')}</span>
         <strong>{history.length}</strong>
         {open ? <CaretUp size={17} /> : <CaretDown size={17} />}
       </button>
@@ -46,7 +48,7 @@ export function QuestionHistory({
         <div className="question-history-list">
           {selectedQuestionId !== activeQuestionId && activeQuestionId && (
             <button className="question-history-return" type="button" onClick={() => onSelect(activeQuestionId)}>
-              <ArrowCounterClockwise size={15} />回到目前題目
+              <ArrowCounterClockwise size={15} />{t('backToCurrent')}
             </button>
           )}
           {history.map(({ question, number }) => (
@@ -56,9 +58,9 @@ export function QuestionHistory({
               type="button"
               onClick={() => onSelect(question.id)}
             >
-              <span>第 {number} 題</span>
+              <span>{t('questionNumber', { n: number })}</span>
               <strong>{question.prompt_text || question.title}</strong>
-              <small>{answerCounts[question.id] || 0} 份作答</small>
+              <small>{t('answerCount', { n: answerCounts[question.id] || 0 })}</small>
             </button>
           ))}
         </div>

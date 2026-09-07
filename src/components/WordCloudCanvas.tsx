@@ -1,6 +1,7 @@
 import cloud from 'd3-cloud'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Message } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type CloudWord = {
   text: string
@@ -59,6 +60,7 @@ function wordCounts(messages: Message[]) {
 }
 
 export function WordCloudCanvas({ messages }: { messages: Message[] }) {
+  const t = usePresenterText()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [layoutWords, setLayoutWords] = useState<CloudWord[]>([])
@@ -104,8 +106,8 @@ export function WordCloudCanvas({ messages }: { messages: Message[] }) {
 
   return (
     <div className="word-cloud-canvas" ref={containerRef}>
-      {!messages.length && <p className="word-cloud-empty">等待第一則彈幕...</p>}
-      {messages.length > 0 && !counts.length && <p className="word-cloud-empty">正在累積可分析的關鍵詞...</p>}
+      {!messages.length && <p className="word-cloud-empty">{t('waitingFirstMessage')}</p>}
+      {messages.length > 0 && !counts.length && <p className="word-cloud-empty">{t('buildingKeywords')}</p>}
       {layoutWords.map((word) => (
         <span
           className="word-cloud-word"
@@ -117,7 +119,7 @@ export function WordCloudCanvas({ messages }: { messages: Message[] }) {
             top: '50%',
             transform: `translate(${word.x || 0}px, ${word.y || 0}px) translate(-50%, -50%)`,
           }}
-          title={`${word.text}：${word.value} 次`}
+          title={t('wordTimes', { word: word.text, n: word.value })}
         >
           {word.text}
         </span>

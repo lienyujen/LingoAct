@@ -7,6 +7,7 @@ type Props = {
 }
 
 export function LiveCaptionOverlay({ fontBold = false, fontSize = 36, position = 'bottom', text, status = 'live' }: Props) {
+  const t = usePresenterText()
   const [displayText, setDisplayText] = useState(text)
 
   useEffect(() => {
@@ -22,9 +23,10 @@ export function LiveCaptionOverlay({ fontBold = false, fontSize = 36, position =
   const visibleText = latestCaptionLines(displayText, fontSize)
   return (
     <div className={`live-caption-overlay caption-position-${position}`} aria-live="polite">
-      <p style={{ fontSize: `${fontSize}px`, fontWeight: fontBold ? 800 : 400 }}>{visibleText || '正在連接麥克風...'}</p>
+      <p style={{ fontSize: `${fontSize}px`, fontWeight: fontBold ? 800 : 400 }}>{visibleText || t('connectingMic')}</p>
     </div>
   )
 }
 import { useEffect, useState } from 'react'
 import { latestCaptionLines } from '../lib/captionDisplay'
+import { usePresenterText } from '../lib/presenterI18n'

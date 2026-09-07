@@ -70,7 +70,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
     setSent(false)
     setBusy(t('drawing'))
     try {
-      const drawn = await generatePicture({ sessionId, presenterToken, direction: direction.trim() })
+      const drawn = await generatePicture({ sessionId, presenterToken, direction: direction.trim() }, t)
       setPicture(drawn)
       setPromptTouched(false)
       setPromptText(promptFor(mode, drawn.storyboard))
@@ -93,7 +93,7 @@ export function PictureStudioModal({ open, sessionId, presenterToken, onClose, o
           file: picture.file,
           promptText: promptText.trim(),
           title: picture.storyboard.title,
-        })
+        }, t)
         setSent(true)
         return
       }

@@ -1,10 +1,10 @@
 import type { Answer, Question } from '../types'
 
-export function countByAnswer(answers: Answer[]) {
+export function countByAnswer(answers: Answer[], blankLabel = '未填答') {
   return answers.reduce<Record<string, number>>((acc, answer) => {
     const values = answer.answer_values?.length
       ? answer.answer_values
-      : [answer.answer_value || answer.answer_text || '未填答']
+      : [answer.answer_value || answer.answer_text || blankLabel]
     values.forEach((key) => {
       acc[key] = (acc[key] || 0) + 1
     })

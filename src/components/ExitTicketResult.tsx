@@ -1,11 +1,13 @@
 import { ChatText, Star } from '@phosphor-icons/react'
 import type { ExitTicket, ExitTicketCategory } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
+import type { PresenterMessageKey } from '../lib/presenterI18n'
 
-const categoryLabels: Record<ExitTicketCategory, string> = {
-  lesson_summary: '課程總結',
-  learning_assessment: '學習程度評估',
-  course_satisfaction: '課程建議與回饋',
-  student_question: '提出疑問',
+const categoryLabels: Record<ExitTicketCategory, PresenterMessageKey> = {
+  lesson_summary: 'catLessonSummary',
+  learning_assessment: 'catLearningAssessment',
+  course_satisfaction: 'catCourseSatisfaction',
+  student_question: 'catStudentQuestion',
 }
 
 type Props = {
@@ -17,6 +19,7 @@ type Props = {
 }
 
 export function ExitTicketResult({ anonymousEnabled, category, onlineCount, prompt, tickets }: Props) {
+  const t = usePresenterText()
   const ratings = tickets.map((ticket) => ticket.rating).filter((rating): rating is number => rating !== null)
   const average = ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : 0
   const distribution = [1, 2, 3, 4, 5].map((rating) => ({
@@ -27,32 +30,32 @@ export function ExitTicketResult({ anonymousEnabled, category, onlineCount, prom
   return (
     <section className="panel exit-ticket-result">
       <div className="panel-heading">
-        <h2>Exit Ticket 作答狀態</h2>
+        <h2>{t('exitTicketStatus')}</h2>
         <span className="status active">{tickets.length}/{onlineCount || '—'}</span>
       </div>
       <div className="exit-ticket-rating-summary">
         <Star fill="currentColor" size={24} />
-        <div><strong>{average ? average.toFixed(1) : '—'}</strong><span>平均學習程度</span></div>
+        <div><strong>{average ? average.toFixed(1) : '—'}</strong><span>{t('averageLevel')}</span></div>
       </div>
-      <div className="rating-distribution" aria-label="星等分布">
+      <div className="rating-distribution" aria-label={t('starDistribution')}>
         {distribution.map((item) => (
-          <div key={item.rating}><span>{item.rating} 星</span><b>{item.count}</b></div>
+          <div key={item.rating}><span>{t('stars', { n: item.rating })}</span><b>{item.count}</b></div>
         ))}
       </div>
       <div className="exit-ticket-response-heading">
         <ChatText size={18} />
-        <div><span>{categoryLabels[category]}</span><p>{prompt}</p></div>
+        <div><span>{t(categoryLabels[category])}</span><p>{prompt}</p></div>
       </div>
       {tickets.some((ticket) => ticket.response_text) ? (
         <ul className="exit-ticket-response-list">
           {tickets.filter((ticket) => ticket.response_text).map((ticket, index) => (
             <li key={ticket.id}>
-              <strong>{anonymousEnabled ? `匿名回答 ${index + 1}` : ticket.participant_name}</strong>
+              <strong>{anonymousEnabled ? t('anonymousAnswer', { n: index + 1 }) : ticket.participant_name}</strong>
               <span>{ticket.response_text}</span>
             </li>
           ))}
         </ul>
-      ) : <p className="muted">尚未收到文字回答。</p>}
+      ) : <p className="muted">{t('noTextAnswers')}</p>}
     </section>
   )
 }

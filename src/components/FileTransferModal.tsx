@@ -7,6 +7,8 @@ import { isAnalyzableFile, quizSettingsFrom } from '../lib/customQuiz'
 import { CustomQuizFields } from './CustomQuizFields'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import type { FileResponse, Question, QuizRequestedType, SharedFile } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
+import type { PresenterMessageKey } from '../lib/presenterI18n'
 
 type Tab = 'share' | 'collect'
 
@@ -36,19 +38,19 @@ function isImage(mimeType: string, name: string) {
   return mimeType.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(name)
 }
 
-const analysisLabels: Record<FileResponse['analysis_status'], string> = {
-  pending: '尚未批改',
-  analyzing: '批改中...',
-  success: '已批改',
-  failed: '批改失敗',
-  unsupported: 'AI 無法讀取此格式',
+const analysisLabels: Record<FileResponse['analysis_status'], PresenterMessageKey> = {
+  pending: 'statusPending',
+  analyzing: 'statusAnalyzing',
+  success: 'statusSuccess',
+  failed: 'statusFailed',
+  unsupported: 'statusUnsupported',
 }
 
-const verdictLabels: Record<string, string> = {
-  correct: '正確',
-  partial: '部分正確',
-  incorrect: '不正確',
-  unscored: '未評分',
+const verdictLabels: Record<string, PresenterMessageKey> = {
+  correct: 'verdictCorrect',
+  partial: 'verdictPartial',
+  incorrect: 'verdictIncorrect',
+  unscored: 'verdictUnscored',
 }
 
 export function FileTransferModal({
@@ -66,6 +68,7 @@ export function FileTransferModal({
   onAnalyzeResponse,
   onCreateFileQuiz,
 }: Props) {
+  const t = usePresenterText()
   const [tab, setTab] = useState<Tab>('share')
   const [dragging, setDragging] = useState(false)
   const [prompt, setPrompt] = useState('')
@@ -93,11 +96,11 @@ export function FileTransferModal({
     try {
       await onShareFiles(files)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '檔案上傳失敗。')
+      setError(caught instanceof Error ? caught.message : t('uploadFailed'))
     } finally {
       setUploading(false)
     }
-  }, [onShareFiles])
+  }, [onShareFiles, t])
 
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -110,7 +113,7 @@ export function FileTransferModal({
     try {
       await run()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '操作失敗。')
+      setError(caught instanceof Error ? caught.message : t('actionFailed'))
     }
   }
 
@@ -120,19 +123,19 @@ export function FileTransferModal({
         <div className="modal-heading">
           <div>
             <p className="eyebrow">LingoAct</p>
-            <h2 id="file-transfer-title">檔案傳送</h2>
+            <h2 id="file-transfer-title">{t('fileTransfer')}</h2>
           </div>
-          <button aria-label="關閉檔案傳送" className="icon-button ghost-button" type="button" onClick={onClose}>
+          <button aria-label={t('closeFileTransfer')} className="icon-button ghost-button" type="button" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
         <div className="file-transfer-tabs">
           <button className={tab === 'share' ? 'is-active' : ''} type="button" onClick={() => setTab('share')}>
-            <Share size={16} />教師檔案分享
+            <Share size={16} />{t('teacherShare')}
           </button>
           <button className={tab === 'collect' ? 'is-active' : ''} type="button" onClick={() => setTab('collect')}>
-            <FileArrowUp size={16} />學生檔案上傳
+            <FileArrowUp size={16} />{t('studentUpload')}
           </button>
         </div>
 
@@ -140,7 +143,7 @@ export function FileTransferModal({
 
         {tab === 'share' ? (
           <div className="file-transfer-body">
-            <p className="muted">拖曳檔案到下方，或點選選擇檔案。上傳後學生端會立刻出現檔名與下載連結。</p>
+            <p className="muted">{t('shareHint')}</p>
             <div
               className={`file-dropzone${dragging ? ' is-dragging' : ''}`}
               role="button"
@@ -152,8 +155,8 @@ export function FileTransferModal({
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') inputRef.current?.click() }}
             >
               {uploading ? <CircleNotch className="spin" size={26} /> : <UploadSimple size={26} />}
-              <strong>{uploading ? '上傳中...' : '拖曳檔案到這裡'}</strong>
-              <span className="muted">或點選這個區塊從檔案總管選擇，可一次選多個</span>
+              <strong>{uploading ? t('uploadingNow') : t('dragHere')}</strong>
+              <span className="muted">{t('orPickFiles')}</span>
             </div>
             <input
               hidden
@@ -166,7 +169,7 @@ export function FileTransferModal({
               }}
             />
 
-            <h3>已分享 <span>{sharedFiles.length}</span></h3>
+            <h3>{t('sharedCount')} <span>{sharedFiles.length}</span></h3>
             {sharedFiles.length ? (
               <ul className="file-list">
                 {sharedFiles.map((file) => (
@@ -178,7 +181,7 @@ export function FileTransferModal({
                     <div className="file-list-actions">
                       {file.file_url && (
                         <a className="ghost-button" href={downloadHref(file.file_url, file.name)} rel="noreferrer" target="_blank">
-                          <DownloadSimple size={15} />開啟
+                          <DownloadSimple size={15} />{t('openFile')}
                         </a>
                       )}
                       <button
@@ -187,7 +190,7 @@ export function FileTransferModal({
                         type="button"
                         onClick={() => void guard(() => onDeleteSharedFile(file.id))}
                       >
-                        <Trash size={15} />移除
+                        <Trash size={15} />{t('remove')}
                       </button>
                       {/* Only for formats Gemini can actually read: offering it on a
                           .pptx would fail after the question was already dispatched. */}
@@ -198,23 +201,23 @@ export function FileTransferModal({
                           type="button"
                           onClick={() => { setQuizFile(file); setQuizCount('auto'); setQuizType('random'); setQuizDirection('') }}
                         >
-                          <Sparkle size={15} />自訂測驗
+                          <Sparkle size={15} />{t('typeCustomQuiz')}
                         </button>
                       )}
                     </div>
                   </li>
                 ))}
               </ul>
-            ) : <p className="muted">還沒有分享任何檔案。</p>}
+            ) : <p className="muted">{t('noSharedFiles')}</p>}
           </div>
         ) : (
           <div className="file-transfer-body">
-            <p className="muted">派送後學生端會出現上傳按鈕，可傳文件與圖片，手機、平板還能直接拍照。每份都要按下 AI 批改才會送出，不會自動計費。</p>
+            <p className="muted">{t('collectHint')}</p>
             <label>
-              題目（選填）
+              {t('promptLabel')}
               <textarea
                 disabled={collecting}
-                placeholder="例如：請上傳你這週的專題進度截圖"
+                placeholder={t('collectPlaceholder')}
                 rows={2}
                 value={collecting ? collectQuestion?.prompt_text || '' : prompt}
                 onChange={(event) => setPrompt(event.target.value)}
@@ -223,23 +226,23 @@ export function FileTransferModal({
             <div className="file-transfer-controls">
               {collecting ? (
                 <button disabled={busy} type="button" onClick={() => void guard(onStopCollect)}>
-                  <Square size={16} />停止收件
+                  <Square size={16} />{t('stopCollect')}
                 </button>
               ) : (
                 <button disabled={busy} type="button" onClick={() => void guard(() => onStartCollect(prompt))}>
-                  <PaperPlaneTilt size={16} />派送上傳功能
+                  <PaperPlaneTilt size={16} />{t('sendUpload')}
                 </button>
               )}
               {collectQuestion && (
                 <button className="ghost-button" disabled={busy} type="button" onClick={() => void guard(onRefreshResponses)}>
-                  <CircleNotch size={16} />重新整理
+                  <CircleNotch size={16} />{t('refresh')}
                 </button>
               )}
             </div>
 
             {collectQuestion && (
               <>
-                <h3>學生回傳 <span>{fileResponses.length}</span></h3>
+                <h3>{t('studentReturns')} <span>{fileResponses.length}</span></h3>
                 {fileResponses.length ? (
                   <ul className="file-list">
                     {fileResponses.map((response) => (
@@ -256,15 +259,15 @@ export function FileTransferModal({
                             <span className="upload-verdict-line">
                               {response.analysis_json?.verdict && (
                                 <span className={`file-verdict is-${response.analysis_json.verdict}`}>
-                                  {verdictLabels[response.analysis_json.verdict] || response.analysis_json.verdict}
+                                  {verdictLabels[response.analysis_json.verdict] ? t(verdictLabels[response.analysis_json.verdict]) : response.analysis_json.verdict}
                                 </span>
                               )}
                               {typeof response.analysis_json?.score === 'number' && (
-                                <span className="upload-score">{response.analysis_json.score} 分</span>
+                                <span className="upload-score">{t('points', { n: response.analysis_json.score })}</span>
                               )}
                               {!response.analysis_json?.verdict && (
                                 <span className={`file-analysis-status is-${response.analysis_status}`}>
-                                  {analysisLabels[response.analysis_status]}
+                                  {t(analysisLabels[response.analysis_status])}
                                 </span>
                               )}
                             </span>
@@ -272,7 +275,7 @@ export function FileTransferModal({
                           <div className="file-list-actions">
                             {response.file_url && (
                               <a className="ghost-button" href={downloadHref(response.file_url, response.name)} rel="noreferrer" target="_blank">
-                                <DownloadSimple size={15} />下載
+                                <DownloadSimple size={15} />{t('download')}
                               </a>
                             )}
                             {response.analysis_status !== 'unsupported' && (
@@ -281,7 +284,7 @@ export function FileTransferModal({
                                 type="button"
                                 onClick={() => void guard(() => onAnalyzeResponse(response.id))}
                               >
-                                <Sparkle size={15} />{response.analysis_status === 'success' ? '重批' : 'AI 批改'}
+                                <Sparkle size={15} />{response.analysis_status === 'success' ? t('markAgain') : t('aiMark')}
                               </button>
                             )}
                             {response.analysis_status === 'success' && (
@@ -290,7 +293,7 @@ export function FileTransferModal({
                                 type="button"
                                 onClick={() => setExpanded(expanded === response.id ? '' : response.id)}
                               >
-                                {expanded === response.id ? '收合' : '看批改'}
+                                {expanded === response.id ? t('collapse') : t('seeMarking')}
                               </button>
                             )}
                           </div>
@@ -303,13 +306,13 @@ export function FileTransferModal({
                             <p>{response.analysis_json.summary_zh_tw}</p>
                             {response.analysis_json.strengths_zh_tw.length > 0 && (
                               <>
-                                <h4>做得好</h4>
+                                <h4>{t('didWell')}</h4>
                                 <ul>{response.analysis_json.strengths_zh_tw.map((item, index) => <li key={index}>{item}</li>)}</ul>
                               </>
                             )}
                             {response.analysis_json.improvements_zh_tw.length > 0 && (
                               <>
-                                <h4>可改進</h4>
+                                <h4>{t('couldImprove')}</h4>
                                 <ul>{response.analysis_json.improvements_zh_tw.map((item, index) => <li key={index}>{item}</li>)}</ul>
                               </>
                             )}
@@ -318,7 +321,7 @@ export function FileTransferModal({
                       </li>
                     ))}
                   </ul>
-                ) : <p className="muted">還沒有學生上傳檔案。</p>}
+                ) : <p className="muted">{t('noStudentFiles')}</p>}
               </>
             )}
           </div>
@@ -341,8 +344,8 @@ export function FileTransferModal({
               void guard(() => onCreateFileQuiz(file.id, quizSettingsFrom(quizCount, quizType, direction, quizCoaching)))
             }}
           >
-            <h2 id="file-quiz-title">自訂測驗</h2>
-            <p className="muted">以「{quizFile.name}」為教材出題，派送後學生端會立刻看到題目。</p>
+            <h2 id="file-quiz-title">{t('typeCustomQuiz')}</h2>
+            <p className="muted">{t('fileQuizSub', { name: quizFile.name })}</p>
             <CustomQuizFields
               coaching={quizCoaching}
               count={quizCount}
@@ -355,10 +358,10 @@ export function FileTransferModal({
             />
             <div className="modal-actions">
               <button className="ghost-button" type="button" onClick={() => setQuizFile(null)}>
-                <X size={17} />取消
+                <X size={17} />{t('cancel')}
               </button>
               <button disabled={busy || !quizDirection.trim()} type="submit">
-                <Sparkle size={17} />AI 出題並派送
+                <Sparkle size={17} />{t('generateAndSend')}
               </button>
             </div>
           </form>

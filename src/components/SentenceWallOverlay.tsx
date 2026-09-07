@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Answer, Question } from '../types'
+import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   question: Question | null
@@ -20,6 +21,7 @@ function sizeClass(count: number) {
 }
 
 export function SentenceWallOverlay({ question, answers, anonymousEnabled }: Props) {
+  const t = usePresenterText()
   // Which cards are new since the last render, so they can arrive rather than
   // appear. Held in a ref because it must not itself cause a render.
   const seenRef = useRef<Set<string>>(new Set())
@@ -50,7 +52,7 @@ export function SentenceWallOverlay({ question, answers, anonymousEnabled }: Pro
         <span className="sentence-wall-count">{sentences.length}</span>
       </header>
       {sentences.length === 0 ? (
-        <p className="sentence-wall-waiting">等大家的句子…</p>
+        <p className="sentence-wall-waiting">{t('waitingForSentences')}</p>
       ) : (
         <div className={`sentence-wall-grid ${sizeClass(sentences.length)}`}>
           {sentences.map((answer, index) => (

@@ -1,4 +1,5 @@
 import { ArrowLeft, DotsSixVertical, Minus, X } from '@phosphor-icons/react'
+import { usePresenterText } from '../lib/presenterI18n'
 
 interface DesktopWindowChromeProps {
   confirmClose?: boolean
@@ -6,6 +7,7 @@ interface DesktopWindowChromeProps {
 }
 
 export function DesktopWindowChrome({ confirmClose = true, onBack }: DesktopWindowChromeProps) {
+  const t = usePresenterText()
   if (!window.lingoActDesktop) return null
 
   function requestClose() {
@@ -13,25 +15,25 @@ export function DesktopWindowChrome({ confirmClose = true, onBack }: DesktopWind
       void onBack()
       return
     }
-    if (!confirmClose || window.confirm('確定要關閉 LingoAct？')) window.lingoActDesktop?.close()
+    if (!confirmClose || window.confirm(t('confirmCloseApp'))) window.lingoActDesktop?.close()
   }
 
   return (
     <header className="desktop-window-chrome">
-      <div className="desktop-drag-handle" title="拖曳視窗">
+      <div className="desktop-drag-handle" title={t('dragWindow')}>
         <DotsSixVertical size={16} />
         <span>LingoAct</span>
       </div>
       <div className="desktop-window-actions">
         {onBack && (
-          <button aria-label="返回場次管理" title="返回場次管理" type="button" onClick={() => void onBack()}>
+          <button aria-label={t('backToSessions')} title={t('backToSessions')} type="button" onClick={() => void onBack()}>
             <ArrowLeft size={16} />
           </button>
         )}
-        <button aria-label="最小化" title="最小化" type="button" onClick={() => window.lingoActDesktop?.minimize()}>
+        <button aria-label={t('minimize')} title={t('minimize')} type="button" onClick={() => window.lingoActDesktop?.minimize()}>
           <Minus size={16} />
         </button>
-        <button aria-label={onBack ? '關閉報告' : '關閉'} title={onBack ? '關閉報告' : '關閉'} type="button" onClick={requestClose}>
+        <button aria-label={onBack ? t('closeReport') : t('close')} title={onBack ? t('closeReport') : t('close')} type="button" onClick={requestClose}>
           <X size={16} />
         </button>
       </div>

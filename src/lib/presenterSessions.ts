@@ -1,3 +1,5 @@
+import { presenterLookup } from './presenterI18n'
+import type { PresenterT } from './presenterI18n'
 import type { Session } from '../types'
 import { listPresenterCredentials, removePresenterToken } from './presenterAuth'
 import { requireSupabase } from './supabase'
@@ -28,11 +30,11 @@ export async function listManagedSessions() {
   return (data?.sessions || []) as ManagedSession[]
 }
 
-export async function endManagedSession(sessionId: string, presenterToken?: string | null) {
+export async function endManagedSession(sessionId: string, presenterToken?: string | null, t: PresenterT = presenterLookup('zh-TW')) {
   const { error } = await requireSupabase().functions.invoke('presenter-action', {
     body: presenterToken ? { action: 'end_session', sessionId, presenterToken } : { action: 'end_session', sessionId },
   })
-  if (error) throw new Error(await functionErrorMessage(error, '無法關閉場次。'))
+  if (error) throw new Error(await functionErrorMessage(error, t('sessionCloseFailed')))
 }
 
 export async function deleteManagedSession(sessionId: string, presenterToken?: string | null) {

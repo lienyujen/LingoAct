@@ -1,10 +1,12 @@
+import { presenterLookup } from './presenterI18n'
+import type { PresenterT } from './presenterI18n'
 import { getPresenterToken } from './presenterAuth'
 import { requireSupabase } from './supabase'
 import type { LotterySessionEvent } from '../types'
 
-export async function finalizeLottery(sessionId: string, eventId: string, winnerId: string) {
+export async function finalizeLottery(sessionId: string, eventId: string, winnerId: string, t: PresenterT = presenterLookup('zh-TW')) {
   const presenterToken = getPresenterToken(sessionId)
-  if (!presenterToken) throw new Error('這個場次沒有講者操作權限。')
+  if (!presenterToken) throw new Error(t('rosterNoRights'))
 
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: {
@@ -16,6 +18,6 @@ export async function finalizeLottery(sessionId: string, eventId: string, winner
     },
   })
   if (error) throw error
-  if (!data?.event) throw new Error(data?.message || '無法確認抽籤結果。')
+  if (!data?.event) throw new Error(data?.message || t('lotteryConfirmFailed'))
   return data.event as LotterySessionEvent
 }

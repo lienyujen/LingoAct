@@ -1,3 +1,5 @@
+import { presenterLookup } from './presenterI18n'
+import type { PresenterT } from './presenterI18n'
 import type { Answer, FileResponse, Message, Participant, Question, QuizAttempt } from '../types'
 
 // One definition of "how involved was this student", shared by the live roster
@@ -61,7 +63,10 @@ export function answerableQuestions(questions: Question[]) {
   return questions.filter((question) => answerableTypes.has(question.type))
 }
 
-export function participationRows(input: Input): ParticipationRow[] {
+// The badge wording is prose about a student, so it takes the teacher's own
+// lookup. It defaults to Chinese for the Excel export, whose every heading is
+// Chinese: a workbook half in one language reads worse than one wholly in it.
+export function participationRows(input: Input, t: PresenterT = presenterLookup('zh-TW')): ParticipationRow[] {
   const askedIds = new Set(answerableQuestions(input.questions).map((question) => question.id))
   const askedCount = askedIds.size
 
@@ -150,23 +155,23 @@ export function participationRows(input: Input): ParticipationRow[] {
 
     const badges: Badge[] = []
     if (askedCount >= 3 && answeredQuestionIds.size >= askedCount) {
-      badges.push({ key: 'perfect', icon: '🏅', label: '全勤', detail: `${askedCount} 題全數作答` })
+      badges.push({ key: 'perfect', icon: '🏅', label: t('badgePerfect'), detail: t('badgePerfectDetail', { n: askedCount }) })
     }
     if (quickCount >= 3 || buzzerWins >= 2) {
       const detail = [
-        quickCount >= 3 ? `${quickCount} 次搶先作答` : '',
-        buzzerWins >= 2 ? `${buzzerWins} 次搶答成功` : '',
+        quickCount >= 3 ? t('badgeQuickFirst', { n: quickCount }) : '',
+        buzzerWins >= 2 ? t('badgeQuickBuzz', { n: buzzerWins }) : '',
       ].filter(Boolean).join('、')
-      badges.push({ key: 'quick', icon: '⚡', label: '手快', detail })
+      badges.push({ key: 'quick', icon: '⚡', label: t('badgeQuick'), detail })
     }
     if (gradedCount >= 3 && correctCount / gradedCount >= 0.8) {
-      badges.push({ key: 'accurate', icon: '🎯', label: '神準', detail: `${correctCount}/${gradedCount} 題答對` })
+      badges.push({ key: 'accurate', icon: '🎯', label: t('badgeAccurate'), detail: t('badgeAccurateDetail', { correct: correctCount, total: gradedCount }) })
     }
     if (messageCount > 4) {
-      badges.push({ key: 'vocal', icon: '💬', label: '熱烈', detail: `${messageCount} 則彈幕` })
+      badges.push({ key: 'vocal', icon: '💬', label: t('badgeVocal'), detail: t('badgeVocalDetail', { n: messageCount }) })
     }
     if (focusStreakMs >= 10 * 60_000) {
-      badges.push({ key: 'focused', icon: '👀', label: '專注', detail: `連續專注 ${Math.floor(focusStreakMs / 60_000)} 分鐘` })
+      badges.push({ key: 'focused', icon: '👀', label: t('badgeFocused'), detail: t('badgeFocusedDetail', { n: Math.floor(focusStreakMs / 60_000) }) })
     }
     score += badges.length * BADGE_POINTS
 

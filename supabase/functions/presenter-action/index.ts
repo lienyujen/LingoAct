@@ -1248,9 +1248,12 @@ Deno.serve(async (req) => {
       if (fontBase64) {
         const bytes = Uint8Array.from(atob(fontBase64), (character) => character.charCodeAt(0))
         if (bytes.length > 2 * 1024 * 1024) return jsonResponse({ message: '字型子集過大。' }, 413)
-        const fontPath = `${sessionId}/cards-${questionId}.woff2`
+        // A rebuilt subset must have a new URL. Reusing the old object path
+        // left browsers holding the already-loaded FontFace, so cards added
+        // later carried readings the old subset had no glyphs for.
+        const fontPath = `${sessionId}/cards-${questionId}-${crypto.randomUUID()}.woff2`
         const { error: uploadError } = await supabase.storage
-          .from('lingoact-listening').upload(fontPath, bytes, { contentType: 'font/woff2', upsert: true })
+          .from('lingoact-listening').upload(fontPath, bytes, { contentType: 'font/woff2' })
         if (uploadError) throw uploadError
         fontUrl = supabase.storage.from('lingoact-listening').getPublicUrl(fontPath).data.publicUrl
       }

@@ -16,6 +16,7 @@ type Props = {
   onReviewWriting: (attemptId: string, force: boolean) => Promise<void>
   // 單字卡 only: drop a card, or ask for more from the same screenshot.
   onEditDeck: (input: { removeItemId?: string; addCount?: number }) => Promise<void>
+  onActivateQuestion: (questionId: string) => Promise<void>
   // The same pair the plain question panel carries, for the same reason: a
   // quiz is stopped and reopened where it is shown, not from 課堂收尾.
   onStopQuestion: () => Promise<void>
@@ -124,7 +125,7 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
   )
 }
 
-export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onEditDeck, onStopQuestion, onResumeQuestion }: Props) {
+export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onEditDeck, onActivateQuestion, onStopQuestion, onResumeQuestion }: Props) {
   const t = usePresenterText()
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
@@ -141,6 +142,17 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
       await onEditDeck(input)
     } catch (caught) {
       setDeckError(caught instanceof Error ? caught.message : t('deckEditFailed'))
+    } finally {
+      setDeckBusy('')
+    }
+  }
+  async function runActivateDeck() {
+    setDeckBusy('activate')
+    setDeckError('')
+    try {
+      await onActivateQuestion(question.id)
+    } catch (caught) {
+      setDeckError(caught instanceof Error ? caught.message : t('actionFailed'))
     } finally {
       setDeckBusy('')
     }
@@ -349,6 +361,11 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         <div className="deck-size-bar">
           <span>{t('deckHasN', { n: results.items.length })}</span>
           <div className="deck-size-actions">
+            {!isCurrentQuestion && (
+              <button disabled={Boolean(deckBusy)} type="button" onClick={() => void runActivateDeck()}>
+                <Play size={15} weight="fill" />{t('activateDeck')}
+              </button>
+            )}
             {[3, 5].map((count) => (
               <button
                 disabled={Boolean(deckBusy) || results.items.length + count > 30}

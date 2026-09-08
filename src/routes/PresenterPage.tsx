@@ -1904,6 +1904,7 @@ export function PresenterPage() {
             results={quizResults}
             onUpdateAnswer={updateCustomQuizAnswer}
             onEditDeck={editDeck}
+            onActivateQuestion={activateQuestion}
             onReviewWriting={reviewWritingAttempt}
             onStopQuestion={stopQuestion}
             onResumeQuestion={resumeQuestion}

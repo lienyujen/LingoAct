@@ -5,13 +5,16 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SetupNotice } from '../components/SetupNotice'
 import { LanguagePairFields } from '../components/LanguagePairFields'
-import { DEFAULT_TRACK, resolveTrack } from '../lib/teachingTracks'
+import { resolveTrack } from '../lib/teachingTracks'
 import { BackendSetup } from '../components/BackendSetup'
 import { getPresenterToken, savePresenterToken } from '../lib/presenterAuth'
 import { hasOwnerKey } from '../lib/ownerKey'
 import { deleteManagedSession, endManagedSession, listManagedSessions } from '../lib/presenterSessions'
 import type { ManagedSession } from '../lib/presenterSessions'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
+import { courseSummary, defaultCourse, readCoursePresets, saveCoursePreset } from '../lib/coursePresets'
+import type { CoursePreset } from '../lib/coursePresets'
+import { LessonPlan } from '../components/LessonPlan'
 
 async function getFunctionErrorMessage(error: unknown) {
   if (!(error instanceof Error)) return '建立場次失敗'
@@ -30,15 +33,40 @@ async function getFunctionErrorMessage(error: unknown) {
 }
 
 export function PresenterNewPage() {
-  const [title, setTitle] = useState('')
+  const [courses, setCourses] = useState(readCoursePresets)
+  const initialCourse = courses[0] || defaultCourse
+  const [title, setTitle] = useState(initialCourse.title)
   // 華語文 explained in Chinese, because that is the room this was built for.
   // All of it travels with the session, so the class is set up before anyone
   // joins and no activity has to ask again.
-  const [teachingTrack, setTeachingTrack] = useState(DEFAULT_TRACK)
-  const [guidanceLanguage, setGuidanceLanguage] = useState('zh-TW')
-  const [levelFramework, setLevelFramework] = useState(() => resolveTrack(DEFAULT_TRACK).frameworks[0] as string)
-  const [levelCode, setLevelCode] = useState('')
-  const [readingAnnotation, setReadingAnnotation] = useState('zhuyin')
+  const [teachingTrack, setTeachingTrack] = useState(initialCourse.teachingTrack)
+  const [guidanceLanguage, setGuidanceLanguage] = useState(initialCourse.guidanceLanguage)
+  const [levelFramework, setLevelFramework] = useState(initialCourse.levelFramework)
+  const [levelCode, setLevelCode] = useState(initialCourse.levelCode)
+  const [readingAnnotation, setReadingAnnotation] = useState(initialCourse.readingAnnotation)
+  const [courseSettingsOpen, setCourseSettingsOpen] = useState(!courses.length)
+  const [courseNotice, setCourseNotice] = useState('')
+  const course = { title: title.trim(), teachingTrack, guidanceLanguage, levelFramework, levelCode, readingAnnotation }
+
+  function chooseCourse(value: CoursePreset) {
+    setTitle(value.title)
+    setTeachingTrack(value.teachingTrack)
+    setGuidanceLanguage(value.guidanceLanguage)
+    setLevelFramework(value.levelFramework)
+    setLevelCode(value.levelCode)
+    setReadingAnnotation(value.readingAnnotation)
+    setCourseSettingsOpen(false)
+    setCourseNotice('')
+  }
+
+  function rememberCourse() {
+    if (!course.title) { setCourseNotice('請先填寫課程名稱。'); return }
+    if (saveCoursePreset(course)) {
+      setCourses(readCoursePresets())
+      setCourseNotice('已儲存在這台電腦，下次可直接選用。')
+      setCourseSettingsOpen(false)
+    } else setCourseNotice('這台電腦無法儲存設定，仍可直接開始上課。')
+  }
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [managementOpen, setManagementOpen] = useState(false)
@@ -187,12 +215,25 @@ export function PresenterNewPage() {
       <SetupNotice />
       <form className="panel form-panel" onSubmit={createSession}>
         <span className="form-heading-icon"><Sparkle size={24} /></span>
-        <h1>建立新場次</h1>
-        <p className="muted">建立場次，讓學生掃碼即可加入</p>
+        <h1>今天，讓學生開口表達</h1>
+        <p className="muted">選好課程，掃碼加入，就能開始練習。</p>
+        {courses.length > 0 && <label>最近的課程
+          <select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
+            const selected = courses.find((item) => item.title === event.target.value)
+            if (selected) chooseCourse(selected)
+            else { chooseCourse(defaultCourse); setCourseSettingsOpen(true) }
+          }}>
+            <option value="">新增課程設定</option>
+            {courses.map((item) => <option key={item.title} value={item.title}>{item.title}</option>)}
+          </select>
+        </label>}
         <label>
-          場次名稱
-          <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：AI 教學工作坊" />
+          課程名稱
+          <input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：華語初級班・週二" />
         </label>
+        <div className="course-summary"><strong>{courseSummary(course)}</strong><span>每次開始上課，都會建立新的課堂紀錄。</span></div>
+        <details className="teacher-disclosure" open={courseSettingsOpen} onToggle={(event) => setCourseSettingsOpen(event.currentTarget.open)}>
+        <summary>調整語言與程度</summary>
         <LanguagePairFields
           guidanceLanguage={guidanceLanguage}
           levelCode={levelCode}
@@ -217,13 +258,17 @@ export function PresenterNewPage() {
             setReadingAnnotation(resolveTrack(id).annotation)
           }}
         />
+        </details>
+        <button className="ghost-button" type="button" onClick={rememberCourse}>記住這個課程設定</button>
+        {courseNotice && <p className="muted" role="status">{courseNotice}</p>}
+        {title.trim() && <LessonPlan key={title.trim()} courseName={title.trim()} />}
         {error && <p className="error">{error}</p>}
         <button disabled={busy} type="submit">
-          {busy ? '建立中...' : '建立場次'}
+          {busy ? '準備教室中...' : '開始上課'}
           {!busy && <ArrowRight size={18} />}
         </button>
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={openManagement}>
-          <ArrowsClockwise size={18} />管理場次
+          <ArrowsClockwise size={18} />課堂紀錄與進行中的課
         </button>
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={() => setSystemSetupOpen(true)}>
           <Gear size={18} />系統設定

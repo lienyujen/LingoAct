@@ -110,7 +110,7 @@ export function ParticipantPage() {
     if (!isSupabaseConfigured || !sessionId || !participantId) return
     const requestId = ++loadSequence.current
     const supabase = requireSupabase()
-    const [{ data: sessionData }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }] = await Promise.all([
+    const [{ data: sessionData }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }, { data: sessionQuizzes }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', sessionId).single(),
       supabase.from('participants').select('*').eq('id', participantId).single(),
       supabase.from('exit_tickets').select('*').eq('session_id', sessionId).eq('participant_id', participantId).maybeSingle(),
@@ -118,6 +118,7 @@ export function ParticipantPage() {
       supabase.from('session_events').select('*').eq('session_id', sessionId).eq('event_type', 'buzzer').order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at'),
       supabase.from('answers').select('*').eq('session_id', sessionId).eq('participant_id', participantId).order('submitted_at'),
+      supabase.from('quizzes').select('question_id, requested_type').eq('session_id', sessionId),
     ])
     if (requestId !== loadSequence.current) return
     const nextSession = sessionData as Session | null
@@ -129,6 +130,12 @@ export function ParticipantPage() {
     setBuzzerEvent((buzzerData as BuzzerSessionEvent | null) || null)
     const participantAnswers = (allAnswers || []) as Answer[]
     const answeredQuestionIds = new Set(participantAnswers.map((item) => item.question_id))
+    // Flashcards are class material as well as an answer activity. Keep every
+    // deck in history even when this student only reviewed it and never sent a
+    // try, so it remains available after another activity or after class.
+    for (const quiz of sessionQuizzes || []) {
+      if (quiz.requested_type === 'flashcard') answeredQuestionIds.add(quiz.question_id)
+    }
     const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => answeredQuestionIds.has(item.id))
     setHistoryAnswers(participantAnswers)
     setHistoryQuestions(answeredQuestions)
@@ -731,7 +738,7 @@ export function ParticipantPage() {
       )}
       {question?.type === 'custom_quiz' ? (quizData ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">

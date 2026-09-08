@@ -4,6 +4,7 @@ import type { Question } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
+  expanded?: boolean
   questions: Question[]
   activeQuestionId: string | null
   selectedQuestionId: string | null
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export function QuestionHistory({
+  expanded = false,
   questions,
   activeQuestionId,
   selectedQuestionId,
@@ -19,7 +21,7 @@ export function QuestionHistory({
   onSelect,
 }: Props) {
   const t = usePresenterText()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(expanded)
   const history = useMemo(
     () => questions
       .map((question, index) => ({ question, number: index + 1 }))

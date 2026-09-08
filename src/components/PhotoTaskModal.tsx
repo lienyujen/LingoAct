@@ -3,6 +3,7 @@ import { Camera, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
+  initialPrompt?: string
   busy: boolean
   error: string
   open: boolean
@@ -12,13 +13,13 @@ type Props = {
 
 // 拍照描述. No screenshot behind it and no timer: the material is whatever the
 // student walks up to, and walking up to it takes as long as it takes.
-export function PhotoTaskModal({ busy, error, open, onCancel, onOpen }: Props) {
+export function PhotoTaskModal({ busy, error, open, onCancel, onOpen, initialPrompt = '' }: Props) {
   const t = usePresenterText()
   const [promptText, setPromptText] = useState('')
 
   useEffect(() => {
-    if (!open) setPromptText('')
-  }, [open])
+    setPromptText(open ? initialPrompt : '')
+  }, [open, initialPrompt])
 
   if (!open) return null
 

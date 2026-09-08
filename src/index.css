@@ -456,6 +456,146 @@ h2 {
   color: var(--success);
 }
 
+[hidden] {
+  display: none !important;
+}
+
+.teacher-disclosure {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.lesson-plan-list {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+}
+
+.lesson-plan-list li {
+  padding: 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+
+.lesson-plan-list p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.lesson-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lesson-plan-actions button { min-height: 40px; }
+
+.teacher-disclosure > summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 0;
+}
+
+.teacher-disclosure[open] > :not(summary) {
+  margin-top: 12px;
+}
+
+.course-summary {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background: var(--primary-soft);
+  border-radius: var(--radius-md);
+  line-height: 1.5;
+}
+
+.course-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workspace-navigation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 5px;
+}
+
+.workspace-navigation button,
+.activity-categories button {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  min-height: 44px;
+  padding: 8px 5px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.workspace-navigation button[aria-current],
+.activity-categories button[aria-pressed="true"] {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.activity-categories {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.activity-library h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.activity-library > .muted {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.workspace-next {
+  position: sticky;
+  bottom: 4px;
+  z-index: 4;
+  width: 100%;
+  min-height: 44px;
+}
+
+.qr-panel .join-disclosure,
+.qr-panel .panel-toggle {
+  font-size: 12px;
+  padding: 6px 10px;
+  min-height: 32px;
+}
+
+.teacher-workspace .control-action {
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: 68px;
+  gap: 8px;
+}
+
+.teacher-workspace .control-action-icon {
+  flex-shrink: 0;
+}
+
+.teacher-workspace .control-action-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .presenter-page {
   background: transparent;
   min-height: 100svh;
@@ -467,6 +607,7 @@ h2 {
 }
 
 .desktop-shell .presenter-page {
+  align-content: start;
   display: grid;
   gap: 10px;
   height: 100vh;
@@ -558,6 +699,7 @@ h2 {
 }
 
 .desktop-shell .presenter-controls-overlay {
+  align-content: start;
   background: transparent;
   border: 0;
   box-shadow: none;
@@ -817,8 +959,10 @@ h2 {
 }
 
 .desktop-shell .join-url {
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: 12px;
+  line-height: 1.3;
+  justify-self: center;
+  max-width: 174px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2083,8 +2227,15 @@ h2 {
 }
 
 .quiz-choice-list label.selected {
-  background: var(--primary-soft);
+  background: var(--primary);
   border-color: var(--primary);
+  color: #fff;
+}
+
+.quiz-choice-list label:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
 }
 
 .option-edit-row {
@@ -2539,9 +2690,15 @@ h2 {
 }
 
 .multi-choice-option.selected {
-  background: var(--primary-soft);
+  background: var(--primary);
   border-color: var(--primary);
-  color: var(--primary-dark);
+  color: #fff;
+}
+
+.multi-choice-option:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
 }
 
 .choice-list button {
@@ -2556,9 +2713,9 @@ h2 {
 }
 
 .choice-list button:hover {
-  background: var(--primary-soft);
-  border-color: var(--primary);
-  color: var(--primary-dark);
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
 }
 
 .message-form {
@@ -5890,6 +6047,12 @@ h2 {
   margin: 6px 0;
   text-align: center;
 }
+.flashcard-prompt.is-word.has-reading {
+  font-size: 2.8rem;
+  line-height: 1.35;
+  margin: 18px 0 10px;
+  overflow-wrap: anywhere;
+}
 .flashcard-options { display: flex; flex-direction: column; gap: 10px; }
 .flashcard-option {
   align-items: center;
@@ -5907,7 +6070,17 @@ h2 {
   text-align: left;
   width: 100%;
 }
-.flashcard-option:hover:not(:disabled) { border-color: var(--primary); }
+.flashcard-option.has-reading {
+  font-size: 2.125rem;
+  line-height: 1.3;
+  min-height: 88px;
+  overflow-wrap: anywhere;
+}
+.flashcard-option:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
+}
 .flashcard-option:disabled { cursor: default; }
 .flashcard-option.is-right { background: var(--success-soft); border-color: var(--success); color: var(--success); }
 .flashcard-option.is-wrong { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
@@ -5932,6 +6105,71 @@ h2 {
   text-align: center;
 }
 .flashcard-done h2 { margin: 0; }
+
+.flashcard-review-heading {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+.flashcard-review-heading h2 { margin: 0 0 3px; }
+.flashcard-review-heading small,
+.flashcard-review-heading > span { color: var(--muted); font-size: 13px; }
+.flashcard-review-card,
+.flashcard-review-card:hover,
+.flashcard-review-card:focus-visible {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  display: block;
+  min-height: 280px;
+  padding: 0;
+  perspective: 1000px;
+  width: 100%;
+}
+.flashcard-review-inner {
+  display: grid;
+  min-height: 280px;
+  transform-style: preserve-3d;
+  transition: transform 360ms cubic-bezier(.2,.72,.25,1);
+  width: 100%;
+}
+.flashcard-review-card.is-flipped .flashcard-review-inner { transform: rotateY(180deg); }
+.flashcard-review-face {
+  align-items: center;
+  backface-visibility: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  grid-area: 1 / 1;
+  justify-content: center;
+  min-height: 280px;
+  overflow-wrap: anywhere;
+  padding: 28px;
+  text-align: center;
+}
+.flashcard-review-front { background: var(--surface); }
+.flashcard-review-front > strong { color: var(--primary-dark); font-size: clamp(2.8rem, 10vw, 5.2rem); line-height: 1.3; }
+.flashcard-review-face > small { color: var(--muted); font-size: 13px; font-weight: 750; letter-spacing: .08em; }
+.flashcard-review-face em { color: var(--muted); font-size: 13px; font-style: normal; }
+.flashcard-review-back {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  transform: rotateY(180deg);
+}
+.flashcard-review-back > strong { font-size: clamp(1.5rem, 5vw, 2.4rem); line-height: 1.5; }
+.flashcard-review-back > small,
+.flashcard-review-back > em { color: rgb(255 255 255 / 78%); }
+.flashcard-review-controls { display: flex; justify-content: space-between; }
+.flashcard-review-controls button { min-width: 122px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .flashcard-review-inner { transition: none; }
+}
 
 /* The teacher's read on a deck: which card the class keeps missing. */
 .flashcard-card-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }

@@ -175,6 +175,21 @@ Deno.serve(async (req) => {
           if (error) throw error
           answers = data || []
         }
+        // A learned card may be reviewed without exposing the rest of the key.
+        // Once answering is stopped, the activity itself becomes the study
+        // deck, so every card is deliberately revealed and remains available.
+        const reviewAnswers = Object.fromEntries((answers as Array<{ item_id?: string; answer_values?: string[]; score?: number | null }>)
+          .filter((answer) => Number(answer.score) > 0 && answer.item_id && answer.answer_values?.[0])
+          .map((answer) => [answer.item_id as string, answer.answer_values![0]]))
+        if (quiz.requested_type === 'flashcard' && question.status !== 'active' && (items || []).length) {
+          const { data: keys, error: keyError } = await supabase.from('quiz_item_keys')
+            .select('item_id, accepted_answers').in('item_id', (items || []).map((item) => item.id))
+          if (keyError) throw keyError
+          for (const key of keys || []) {
+            const answer = (key.accepted_answers as string[])?.[0]
+            if (answer) reviewAnswers[key.item_id] = answer
+          }
+        }
         // The student's own coaching rounds, so a reload does not lose the
         // conversation they are in the middle of. Only their own: the table is
         // granted to nobody, and this is read with the service role.
@@ -187,7 +202,7 @@ Deno.serve(async (req) => {
           if (error) throw error
           coachTurns = data || []
         }
-        return jsonResponse({ quiz, items: items || [], attempt: attempt || null, answers, coachTurns })
+        return jsonResponse({ quiz, items: items || [], attempt: attempt || null, answers, coachTurns, reviewAnswers })
       }
 
       if (!quiz) return jsonResponse({ message: '自訂測驗仍在出題中，請稍候。' }, 409)

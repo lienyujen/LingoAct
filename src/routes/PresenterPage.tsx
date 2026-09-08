@@ -11,6 +11,8 @@ import { ExitTicketResult } from '../components/ExitTicketResult'
 import { LotteryOverlay } from '../components/LotteryOverlay'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { resolveTrack } from '../lib/teachingTracks'
+import { workspaceText } from '../lib/workspaceText'
+import { LessonPlan } from '../components/LessonPlan'
 import type { QuestionDraft } from '../components/QuestionEditor'
 import type { QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
@@ -90,6 +92,18 @@ export function PresenterPage() {
   // not readable from here — the locale comes from the session row directly.
   const locale = presenterLocaleFor(session?.teaching_language)
   const t = presenterLookup(locale)
+  const w = workspaceText(locale)
+  const [workspaceView, setWorkspaceView] = useState<'activities' | 'current' | 'history'>('activities')
+  const [plannedPrompt, setPlannedPrompt] = useState('')
+  const previousActivity = useRef<string | null>(null)
+  useEffect(() => {
+    const current = session?.current_question_id || null
+    if (current && current !== previousActivity.current) {
+      setWorkspaceView('current')
+      setSelectedQuestionId(current)
+    }
+    previousActivity.current = current
+  }, [session?.current_question_id])
   const [participants, setParticipants] = useState<Participant[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [answerCounts, setAnswerCounts] = useState<Record<string, number>>({})
@@ -105,6 +119,8 @@ export function PresenterPage() {
   const [endClassConfirmOpen, setEndClassConfirmOpen] = useState(false)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [closingSession, setClosingSession] = useState(false)
+  // A class opens on the one thing students need first: the join code. The
+  // teacher opens the larger workspace when they are ready to start an activity.
   const [controlsOpen, setControlsOpen] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
@@ -382,13 +398,13 @@ export function PresenterPage() {
   }, [session])
 
   useEffect(() => {
-    if (!window.lingoActDesktop || selectionMode) return
+    if (!window.lingoActDesktop || !session?.id || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
       controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen || photoTaskOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, selectionMode, sentenceWallOpen, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, selectionMode, sentenceWallOpen, session?.id, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return
@@ -1077,6 +1093,9 @@ export function PresenterPage() {
     })
     if (error) throw error
     if (!data?.question) throw new Error(data?.message || t('stopFailed'))
+    const stopped = data.question as Question
+    setQuestion(stopped)
+    setQuestions((current) => current.map((item) => item.id === stopped.id ? stopped : item))
   }
 
   async function resumeQuestion() {
@@ -1093,6 +1112,9 @@ export function PresenterPage() {
     })
     if (error) throw error
     if (!data?.question) throw new Error(data?.message || t('resumeFailed'))
+    const resumed = data.question as Question
+    setQuestion(resumed)
+    setQuestions((current) => current.map((item) => item.id === resumed.id ? resumed : item))
   }
 
   async function setCorrectAnswer(answer: string) {
@@ -1219,6 +1241,10 @@ export function PresenterPage() {
     // A deck that changed needs its 標音 redone: a new card brings characters
     // the font subset was not cut for.
     annotatingDeck.current = ''
+    // Adding cards means there is new work to answer. If the teacher had
+    // stopped the old deck to review it, reopen this same question so student
+    // pages return from flip-card review to retrieval practice automatically.
+    if (input.addCount && question.status === 'stopped') await resumeQuestion()
     await loadAll()
   }
 
@@ -1764,6 +1790,8 @@ export function PresenterPage() {
         <aside className="qr-floating">
           <QRCodePanel
             joinUrl={joinUrl}
+            compact={controlsOpen}
+            onToggleControls={() => setControlsOpen((current) => !current)}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
             onMinimize={window.lingoActDesktop ? () => window.lingoActDesktop?.minimize() : undefined}
             qrInteractionProps={{
@@ -1778,9 +1806,19 @@ export function PresenterPage() {
       )}
       {controlsOpen && (
         <aside
-          className={question ? 'presenter-controls-overlay results-first' : 'presenter-controls-overlay'}
+          className="presenter-controls-overlay teacher-workspace"
           onDoubleClick={(event) => event.stopPropagation()}
         >
+        <nav className="workspace-navigation" aria-label={w.classroom}>
+          {(['activities', 'current', 'history'] as const).map((view) => <button
+            key={view} type="button" aria-current={workspaceView === view ? 'page' : undefined}
+            onClick={() => {
+              setWorkspaceView(view)
+              if (view === 'current') setSelectedQuestionId(session.current_question_id)
+            }}
+          >{w[view]}</button>)}
+        </nav>
+        <div hidden={workspaceView !== 'activities'}>
         <PresenterControlPanel
           busy={busy}
           buzzerActive={isBuzzerPending(buzzerEvent)}
@@ -1793,15 +1831,17 @@ export function PresenterPage() {
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
           onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen() : undefined}
           onCaptureFlashcards={window.lingoActDesktop ? () => void captureWindowsScreen('flashcard') : undefined}
+          onCaptureWriting={window.lingoActDesktop ? () => void captureWindowsScreen('writing') : undefined}
+          onOpenPicture={() => setPictureOpen(true)}
           onGenerateExitTicket={generateExitTicket}
           onEndClass={() => setEndClassConfirmOpen(true)}
           onOpenFileTransfer={() => {
             setFileTransferOpen(true)
             void refreshSharedFiles()
           }}
-          onOpenListeningStudio={() => setListeningOpen(true)}
-          onOpenSentenceWall={() => setSentenceWallOpen(true)}
-          onOpenPhotoTask={() => setPhotoTaskOpen(true)}
+          onOpenListeningStudio={() => { setPlannedPrompt(''); setListeningOpen(true) }}
+          onOpenSentenceWall={() => { setPlannedPrompt(''); setSentenceWallOpen(true) }}
+          onOpenPhotoTask={() => { setPlannedPrompt(''); setPhotoTaskOpen(true) }}
           onOpenTextDispatch={() => {
             setTextDispatchError('')
             setTextDispatchOpen(true)
@@ -1812,14 +1852,26 @@ export function PresenterPage() {
           onToggleRecording={toggleCourseRecording}
           onToggleCaptionVisibility={toggleCaptionVisibility}
         />
+        <div className="panel"><LessonPlan key={session.title} courseName={session.title} busy={busy} onStart={(activity) => {
+          setPlannedPrompt(activity.prompt)
+          if (activity.kind === 'listen') setListeningOpen(true)
+          if (activity.kind === 'sentence') setSentenceWallOpen(true)
+          if (activity.kind === 'photo') setPhotoTaskOpen(true)
+          if (activity.kind === 'text') { setTextDispatchDraft(activity.prompt); setTextDispatchOpen(true) }
+        }} /></div>
+        </div>
+        <div hidden={workspaceView !== 'history'}>
+        {questions.filter((item) => item.id !== session.current_question_id).length === 0 && <p className="panel muted">{w.historyEmpty}</p>}
         <QuestionHistory
+          expanded
           activeQuestionId={session.current_question_id}
           answerCounts={answerCounts}
           questions={questions}
           selectedQuestionId={selectedQuestionId}
           onSelect={selectQuestion}
         />
-        <div className="presenter-results">
+        </div>
+        <div className="presenter-results" hidden={workspaceView === 'activities' || (workspaceView === 'history' && selectedQuestionId === session.current_question_id)}>
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
             anonymousEnabled={session.anonymous_enabled}
@@ -1877,6 +1929,7 @@ export function PresenterPage() {
           />
         )}
         </div>
+        {workspaceView === 'current' && <button className="workspace-next" type="button" onClick={() => setWorkspaceView('activities')}>{w.next}</button>}
       </aside>
       )}
       {!window.lingoActDesktop && session.captions_enabled && (
@@ -1942,6 +1995,7 @@ export function PresenterPage() {
         />
       )}
       <ListeningStudioModal
+        initialTranscript={plannedPrompt}
         capturedScreen={listeningCapture}
         open={listeningOpen}
         // Hidden rather than closed while the teacher drags out the crop: the
@@ -1968,6 +2022,7 @@ export function PresenterPage() {
         onDispatch={uploadQuestionScreenshot}
       />
       <SentenceWallModal
+        initialPrompt={plannedPrompt}
         busy={busy}
         error={sentenceWallError}
         open={sentenceWallOpen}
@@ -1975,6 +2030,7 @@ export function PresenterPage() {
         onOpen={openWall}
       />
       <PhotoTaskModal
+        initialPrompt={plannedPrompt}
         busy={busy}
         error={photoTaskError}
         open={photoTaskOpen}

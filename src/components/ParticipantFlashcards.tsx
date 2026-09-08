@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle, Confetti, XCircle } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { participantText } from '../lib/participantI18n'
 import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -11,61 +11,108 @@ type Props = {
   cardFontUrl?: string | null
   data: ParticipantQuizData
   locale: ParticipantLocale
+  active: boolean
   onTry: (itemId: string, answerValue: string) => Promise<{ correct: boolean; correctAnswer: string | null }>
 }
 
 type Verdict = { correct: boolean; correctAnswer: string | null; chosen: string }
 
-// 數位 Flashcard: one card at a time, at the student's own pace, with the cards
-// they miss coming back.
-//
-// The queue lives here rather than on the server because it is a pacing
-// decision, not a marking one: the server says whether a card was right, and
-// this decides when to show it again. A missed card goes to the back rather
-// than reappearing immediately — answering it again while the right answer is
-// still on screen would be copying, not recall.
 const REQUEUE_GAP = 2
 
-export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Props) {
+function learnedFrom(data: ParticipantQuizData) {
+  return Object.fromEntries(data.answers
+    .filter((answer) => Number(answer.score) > 0 && answer.answer_values?.[0])
+    .map((answer) => [answer.item_id, answer.answer_values![0]]))
+}
+
+function reviewSides(item: QuizItem, answer: string, locale: ParticipantLocale) {
+  const translation = localizedFields(item.translations, locale)
+  if (item.prompt_is_word === true) {
+    const answerIndex = item.options.indexOf(answer)
+    const translatedAnswer = translation?.options?.length === item.options.length
+      ? translation.options[answerIndex]
+      : ''
+    return {
+      word: item.prompt_text,
+      reading: item.prompt_reading || '',
+      explanation: translatedAnswer || answer,
+    }
+  }
+  const answerIndex = item.options.indexOf(answer)
+  return {
+    word: answer,
+    reading: item.option_readings?.[answerIndex] || '',
+    explanation: translation?.prompt_text || item.prompt_text,
+  }
+}
+
+// During answering this is retrieval practice. Once the teacher stops it, the
+// same deck becomes a reference students can keep turning over instead of a
+// completion screen that makes the vocabulary disappear.
+export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry }: Props) {
   const readingFamily = useReadingFont(cardFontUrl)
-  const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id))
+  const initialLearned = useMemo(() => learnedFrom(data), [data])
+  const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id).filter((id) => !initialLearned[id]))
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  // Which cards have been answered right at least once, so the counter shows
-  // progress through the deck rather than through the queue.
-  const [cleared, setCleared] = useState<string[]>([])
+  const [cleared, setCleared] = useState<string[]>(() => Object.keys(initialLearned))
+  const [learnedAnswers, setLearnedAnswers] = useState<Record<string, string>>(() => ({ ...initialLearned, ...data.reviewAnswers }))
   const [firstTryRight, setFirstTryRight] = useState(0)
   const [seen, setSeen] = useState<string[]>([])
+  const [reviewIndex, setReviewIndex] = useState(0)
+  const [flipped, setFlipped] = useState(false)
 
-  const itemById = useMemo(
-    () => new Map(data.items.map((item) => [item.id, item])),
-    [data.items],
-  )
+  const itemById = useMemo(() => new Map(data.items.map((item) => [item.id, item])), [data.items])
+  const itemSignature = data.items.map((item) => item.id).join('|')
 
-  // Keyed on the deck, not on data.items: the page refetches the quiz on every
-  // realtime event, handing back a fresh array each time. Depending on that
-  // array reset the queue and threw away the verdict mid-answer — the card the
-  // student had just tapped went back to unanswered under their finger.
   useEffect(() => {
-    setQueue(data.items.map((item) => item.id))
+    const learned = learnedFrom(data)
+    setQueue(data.items.map((item) => item.id).filter((id) => !learned[id]))
     setVerdict(null)
-    setCleared([])
+    setCleared(Object.keys(learned))
+    setLearnedAnswers({ ...learned, ...data.reviewAnswers })
     setFirstTryRight(0)
     setSeen([])
+    setReviewIndex(0)
+    setFlipped(false)
+    // A new server object for the same deck must not erase the card under a
+    // student's finger. Only moving to another deck is a full reset.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.quiz.id])
 
-  const current: QuizItem | undefined = queue.length ? itemById.get(queue[0]) : undefined
+  useEffect(() => {
+    const valid = new Set(data.items.map((item) => item.id))
+    setQueue((current) => {
+      const kept = current.filter((id) => valid.has(id))
+      const known = new Set([...kept, ...cleared])
+      return [...kept, ...data.items.map((item) => item.id).filter((id) => !known.has(id))]
+    })
+    setLearnedAnswers((current) => ({ ...current, ...learnedFrom(data), ...data.reviewAnswers }))
+    setReviewIndex((current) => Math.min(current, Math.max(0, data.items.length - 1)))
+    // IDs, rather than the fresh array returned by each realtime fetch, make
+    // newly generated cards appear without restarting the cards already done.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemSignature, data.reviewAnswers])
+
+  useEffect(() => {
+    setFlipped(false)
+    setVerdict(null)
+  }, [active])
+
+  const current = queue.length ? itemById.get(queue[0]) : undefined
   const done = queue.length === 0
+  const reviewMode = !active || done
 
   async function answer(option: string) {
-    if (!current || busy || verdict) return
+    if (!current || busy || verdict || !active) return
     setBusy(true)
     setError('')
     try {
       const result = await onTry(current.id, option)
       setVerdict({ ...result, chosen: option })
+      const correctAnswer = result.correct ? option : result.correctAnswer
+      if (correctAnswer) setLearnedAnswers((answers) => ({ ...answers, [current.id]: correctAnswer }))
       if (result.correct) {
         setCleared((list) => (list.includes(current.id) ? list : [...list, current.id]))
         if (!seen.includes(current.id)) setFirstTryRight((count) => count + 1)
@@ -83,41 +130,65 @@ export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Prop
     setQueue((list) => {
       const rest = list.slice(1)
       if (verdict.correct) return rest
-      // Back into the deck, a couple of cards later.
       const at = Math.min(REQUEUE_GAP, rest.length)
       return [...rest.slice(0, at), current.id, ...rest.slice(at)]
     })
     setVerdict(null)
   }
 
-  if (done) {
+  if (!data.items.length) return null
+
+  if (reviewMode) {
+    const reviewItem = data.items[reviewIndex]
+    const sides = reviewSides(reviewItem, learnedAnswers[reviewItem.id] || '', locale)
     return (
-      <section className="panel participant-question participant-flashcards">
-        <div className="flashcard-done">
-          <Confetti size={34} />
-          <h2>{participantText(locale, 'flashcardDone')}</h2>
-          <p className="muted">
-            {participantText(locale, 'flashcardFirstTry', { right: firstTryRight, total: data.items.length })}
-          </p>
+      <section className="panel participant-question participant-flashcards flashcard-review">
+        <div className="flashcard-review-heading">
+          <div>
+            <h2>{participantText(locale, 'flashcardReview')}</h2>
+            {done && active && <small>{participantText(locale, 'flashcardFirstTry', { right: firstTryRight, total: data.items.length })}</small>}
+          </div>
+          <span>{participantText(locale, 'flashcardCardCount', { current: reviewIndex + 1, total: data.items.length })}</span>
+        </div>
+        <button
+          aria-label={participantText(locale, 'flashcardFlipHint')}
+          className={`flashcard-review-card${flipped ? ' is-flipped' : ''}`}
+          type="button"
+          onClick={() => setFlipped((value) => !value)}
+        >
+          <span className="flashcard-review-inner">
+            <span className="flashcard-review-face flashcard-review-front">
+              <small>{participantText(locale, 'flashcardFront')}</small>
+              {readingFamily && sides.reading
+                ? <strong style={{ fontFamily: readingFamily }}>{sides.reading}</strong>
+                : <strong className="flashcard-word">{sides.word}{sides.reading && <small>{sides.reading}</small>}</strong>}
+              <em>{participantText(locale, 'flashcardFlipHint')}</em>
+            </span>
+            <span className="flashcard-review-face flashcard-review-back">
+              <small>{participantText(locale, 'flashcardBack')}</small>
+              <strong>{sides.explanation || '—'}</strong>
+              <em>{sides.word}</em>
+            </span>
+          </span>
+        </button>
+        <div className="flashcard-review-controls">
+          <button className="ghost-button" disabled={reviewIndex === 0} type="button" onClick={() => { setReviewIndex((value) => value - 1); setFlipped(false) }}>
+            <ArrowLeft size={17} />{participantText(locale, 'flashcardPrevious')}
+          </button>
+          <button disabled={reviewIndex === data.items.length - 1} type="button" onClick={() => { setReviewIndex((value) => value + 1); setFlipped(false) }}>
+            {participantText(locale, 'flashcardNext')}<ArrowRight size={17} />
+          </button>
         </div>
       </section>
     )
   }
 
   if (!current) return null
-
-  // Two halves with different jobs. The WORD is what is being learned, so it
-  // stays in the language being taught and carries the 標音; the GLOSS exists to
-  // be understood, so it is read in whatever language the student is on —
-  // generated in the 導引語 and translated where a translation exists.
   const translation = localizedFields(current.translations, locale)
   const promptIsWord = current.prompt_is_word === true
   const promptReading = current.prompt_reading || ''
-  // Never localise the word: a translated 詞彙 is no longer the thing on the card.
   const promptText = promptIsWord ? current.prompt_text : (translation?.prompt_text || current.prompt_text)
-  const options = promptIsWord && translation?.options?.length === current.options.length
-    ? translation.options
-    : current.options
+  const options = promptIsWord && translation?.options?.length === current.options.length ? translation.options : current.options
 
   return (
     <section className="panel participant-question participant-flashcards">
@@ -125,28 +196,20 @@ export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Prop
         <span>{participantText(locale, 'flashcardProgress', { done: cleared.length, total: data.items.length })}</span>
         <div className="flashcard-bar"><span style={{ width: `${(cleared.length / data.items.length) * 100}%` }} /></div>
       </div>
-
-      {/* 注音 replaces the word, because the reading is inside its glyphs; 拼音
-          sits under it, which is where a vocabulary card puts it. */}
-      <p className={promptIsWord ? 'flashcard-prompt is-word' : 'flashcard-prompt'}>
+      <p className={promptIsWord ? `flashcard-prompt is-word${promptReading ? ' has-reading' : ''}` : 'flashcard-prompt'}>
         {readingFamily && promptReading
           ? <span style={{ fontFamily: readingFamily }}>{promptReading}</span>
           : <span className="flashcard-word">{promptText}{promptReading && <small>{promptReading}</small>}</span>}
       </p>
-
       <div className="flashcard-options">
         {current.options.map((option, index) => {
           const chosen = verdict?.chosen === option
           const isAnswer = verdict && !verdict.correct && verdict.correctAnswer === option
-          // Empty on a card whose word is the prompt: these are the glosses.
           const reading = current.option_readings?.[index] || ''
           return (
             <button
-              className={`flashcard-option${chosen ? (verdict.correct ? ' is-right' : ' is-wrong') : ''}${isAnswer ? ' is-answer' : ''}`}
-              disabled={busy || Boolean(verdict)}
-              key={option}
-              type="button"
-              onClick={() => void answer(option)}
+              className={`flashcard-option${reading ? ' has-reading' : ''}${chosen ? (verdict.correct ? ' is-right' : ' is-wrong') : ''}${isAnswer ? ' is-answer' : ''}`}
+              disabled={busy || Boolean(verdict)} key={option} type="button" onClick={() => void answer(option)}
             >
               {readingFamily && reading
                 ? <span style={{ fontFamily: readingFamily }}>{reading}</span>
@@ -157,18 +220,11 @@ export function ParticipantFlashcards({ cardFontUrl, data, locale, onTry }: Prop
           )
         })}
       </div>
-
       {error && <p className="error">{error}</p>}
-
       {verdict && (
         <div className="flashcard-verdict">
-          <p className={verdict.correct ? 'success' : 'muted'}>
-            {participantText(locale, verdict.correct ? 'flashcardRight' : 'flashcardWrong')}
-          </p>
-          <button type="button" onClick={next}>
-            {participantText(locale, verdict.correct ? 'flashcardNext' : 'flashcardTryLater')}
-            <ArrowRight size={17} />
-          </button>
+          <p className={verdict.correct ? 'success' : 'muted'}>{participantText(locale, verdict.correct ? 'flashcardRight' : 'flashcardWrong')}</p>
+          <button type="button" onClick={next}>{participantText(locale, verdict.correct ? 'flashcardNext' : 'flashcardTryLater')}<ArrowRight size={17} /></button>
         </div>
       )}
     </section>

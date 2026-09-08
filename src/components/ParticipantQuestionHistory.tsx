@@ -4,6 +4,7 @@ import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { Answer, AudioResponse, ParticipantQuizData, Question, Screenshot } from '../types'
+import { ParticipantFlashcards } from './ParticipantFlashcards'
 
 type Props = {
   activeQuestionId?: string | null
@@ -99,7 +100,15 @@ export function ParticipantQuestionHistory({
                   <div className="participant-history-body">
                     {screenshot && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
                     {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}
-                    {question.type === 'custom_quiz' && quiz?.attempt ? (
+                    {question.type === 'custom_quiz' && quiz?.quiz.requested_type === 'flashcard' ? (
+                      <ParticipantFlashcards
+                        active={false}
+                        cardFontUrl={question.card_font_url}
+                        data={quiz}
+                        locale={locale}
+                        onTry={async () => ({ correct: false, correctAnswer: null })}
+                      />
+                    ) : question.type === 'custom_quiz' && quiz?.attempt ? (
                       <div className="participant-history-quiz">
                         <p><CheckCircle size={17} />{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score}</p>
                         {quiz.items.map((item, itemIndex) => {

@@ -468,6 +468,9 @@ export type ParticipantQuizData = {
   attempt: QuizAttempt | null
   answers: QuizItemAnswer[]
   coachTurns?: WritingCoachTurn[]
+  // Answer keys are revealed only after a flashcard drill is stopped. During
+  // practice this contains at most the cards this student has already learned.
+  reviewAnswers?: Record<string, string>
 }
 
 // One attempt at one card. A 單字卡 deck is the only thing that produces

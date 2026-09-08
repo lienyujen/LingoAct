@@ -15,6 +15,7 @@ import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 
 type Props = {
+  initialTranscript?: string
   // 注音 or 拼音, decided with the rest of the class rather than per clip.
   readingAnnotation: string
   open: boolean
@@ -90,6 +91,7 @@ function PlayIcon({ size = 17 }: { size?: number }) {
 }
 
 export function ListeningStudioModal({
+  initialTranscript = '',
   open,
   suspended = false,
   sessionId,
@@ -119,6 +121,13 @@ export function ListeningStudioModal({
   const [error, setError] = useState('')
   const [onAir, setOnAir] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    if (open && initialTranscript) {
+      setSource('text')
+      setTranscript(initialTranscript)
+    }
+  }, [open, initialTranscript])
 
   useEffect(() => {
     if (open) return

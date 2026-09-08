@@ -45,7 +45,7 @@ const APP_WINDOW_ICON_PATH = isDesktopDev
   : path.join(process.resourcesPath, 'icon.ico')
 const APP_EXECUTABLE_PATH = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
 const APP_RELAUNCH_ICON_PATH = isDesktopDev ? APP_WINDOW_ICON_PATH : APP_EXECUTABLE_PATH
-const CONTROL_COLLAPSED = { width: 194, height: 242 }
+const CONTROL_COLLAPSED = { width: 194, height: 282 }
 const CONTROL_EXPANDED = { width: 420, height: 760 }
 const CONTROL_WITH_SETTINGS = { width: 1100, height: 760 }
 const WINDOW_MARGIN = 12

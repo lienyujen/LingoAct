@@ -1399,6 +1399,17 @@ Deno.serve(async (req) => {
         if (item.position === index + 1) continue
         await supabase.from('quiz_items').update({ position: index + 1 }).eq('id', item.id)
       }
+      // New words change the glyph subset. Clearing every reading makes the
+      // existing annotation pass rebuild one coherent deck, including the new
+      // cards, rather than leaving only those cards unlabelled.
+      const { error: clearReadingError } = await supabase.from('quiz_items')
+        .update({ prompt_reading: null, option_readings: [] }).eq('quiz_id', quiz.id)
+      if (clearReadingError) throw clearReadingError
+      // quiz_items is intentionally not a public realtime table. Touching the
+      // parent question safely tells every student page to refetch the deck.
+      const { error: notifyError } = await supabase.from('questions')
+        .update({ card_font_url: null }).eq('id', questionId).eq('session_id', sessionId)
+      if (notifyError) throw notifyError
       return jsonResponse({ count: (finalItems || []).length })
     }
 

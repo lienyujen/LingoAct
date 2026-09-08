@@ -1,17 +1,23 @@
 import { QRCodeSVG } from 'qrcode.react'
 import { Minus, QrCode, X } from '@phosphor-icons/react'
+import { useState } from 'react'
 import type { HTMLAttributes } from 'react'
+import { useWorkspaceText } from '../lib/workspaceText'
 import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
+  compact?: boolean
+  onToggleControls?: () => void
   joinUrl: string
   onClose?: () => void
   onMinimize?: () => void
   qrInteractionProps?: Pick<HTMLAttributes<HTMLDivElement>, 'onDoubleClick'>
 }
 
-export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps }: Props) {
+export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps, compact = false, onToggleControls }: Props) {
   const t = usePresenterText()
+  const w = useWorkspaceText()
+  const [joinExpanded, setJoinExpanded] = useState(false)
   return (
     <section className="panel qr-panel">
       <div className="panel-heading">
@@ -46,10 +52,12 @@ export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps }
           </div>
         )}
       </div>
-      <div className="qr-box" {...qrInteractionProps}>
+      {compact && <button className="ghost-button join-disclosure" aria-expanded={joinExpanded} type="button" onClick={() => setJoinExpanded(!joinExpanded)}><QrCode size={16} />{w.showJoin}</button>}
+      <div className="qr-box" hidden={compact && !joinExpanded} {...qrInteractionProps}>
         <QRCodeSVG marginSize={2} value={joinUrl} size={172} />
       </div>
-      <p className="join-url" title={joinUrl}>{joinUrl}</p>
+      {(!compact || joinExpanded) && <p className="join-url" title={joinUrl}>{joinUrl}</p>}
+      {onToggleControls && <button className="ghost-button panel-toggle" type="button" onClick={onToggleControls}>{compact ? w.hideControls : w.openControls}</button>}
     </section>
   )
 }

@@ -7,6 +7,7 @@ import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 import { TimingRow } from './TimingRow'
 import type { CustomQuizSettings } from '../lib/customQuiz'
+import { useWorkspaceText } from '../lib/workspaceText'
 
 export type { CustomQuizSettings }
 
@@ -58,6 +59,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
 
 export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCreate, onPictureTalk }: Props) {
   const t = usePresenterText()
+  const w = useWorkspaceText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
   const [allowMultiple, setAllowMultiple] = useState(false)
@@ -125,7 +127,7 @@ export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCr
           })
         }}
       >
-        <h2>{t('captureTitle')}</h2>
+        <h2>{w.source}</h2>
         {previewUrl && <img alt={t('capturePreviewAlt')} className="capture-preview" src={previewUrl} />}
         {error && <p className="error">{error}</p>}
         <div className="type-grid">
@@ -225,7 +227,8 @@ export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCr
           </label>
         )}
         {timed && (
-          <div className="timing-editor">
+          <details className="teacher-disclosure timing-editor">
+            <summary>{w.timing}</summary>
             {SPOKEN_TYPES.includes(type) && (
               <TimingRow
                 label={t('prepareTime')}
@@ -242,7 +245,7 @@ export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCr
               value={answerSeconds}
               onChange={setAnswerSeconds}
             />
-          </div>
+          </details>
         )}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>

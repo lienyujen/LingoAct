@@ -52,21 +52,44 @@ function extractText(data: Record<string, unknown>) {
   return candidate?.content?.parts?.map((part) => part.text || '').join('') || ''
 }
 
+// 注音 is stored as variation selectors sitting after each Han character, which
+// is what makes the reading render inside the glyph. They mean nothing to a
+// model reading the sentence, so the reference text is cleaned before it goes
+// out — the question keeps them, because the class needs them to see the 注音.
+const VARIATION_SELECTORS = /[\u{E0100}-\u{E01EF}︀-️]/gu
+
 export async function analyzeAudioResponse(input: {
   mode: 'pronunciation' | 'oral_response'
   promptText: string | null
-  screenshotUrl: string
+  // Absent for a read-aloud dispatched from 聽力播音室: the words are on the
+  // question, and there is no slide behind them.
+  screenshotUrl: string | null
   audioBytes: Uint8Array
   audioMimeType: string
 }) {
-  const imageResponse = await fetch(input.screenshotUrl)
-  if (!imageResponse.ok) throw new Error(`Could not download screenshot (${imageResponse.status}).`)
-  const imageBytes = new Uint8Array(await imageResponse.arrayBuffer())
-  const imageMimeType = imageResponse.headers.get('content-type') || 'image/png'
+  let imagePart: Record<string, unknown> | null = null
+  if (input.screenshotUrl) {
+    const imageResponse = await fetch(input.screenshotUrl)
+    if (!imageResponse.ok) throw new Error(`Could not download screenshot (${imageResponse.status}).`)
+    const imageBytes = new Uint8Array(await imageResponse.arrayBuffer())
+    imagePart = {
+      inlineData: {
+        mimeType: imageResponse.headers.get('content-type') || 'image/png',
+        data: bytesToBase64(imageBytes),
+      },
+    }
+  }
+  const reference = (input.promptText || '').replace(VARIATION_SELECTORS, '') || null
 
+  // Two shapes of question reach this. One shows the class a slide and asks
+  // them to read what is on it; the other puts the words on the question and
+  // gives them a model recording to copy. Telling the model to read a screenshot
+  // that was never sent is how it ends up reporting that it cannot tell what
+  // should have been read.
+  const source = imagePart ? '題目文字與截圖' : '題目文字'
   const modeInstruction = input.mode === 'pronunciation'
-    ? '這是發音正確度評測。先從題目文字與截圖推斷應朗讀的內容，再自動辨識錄音語言，評估讀音、流暢度、漏讀、誤讀與可理解度。relevance 請描述錄音與指定朗讀內容的一致性，completeness 請描述是否完整朗讀。'
-    : '這是口語回應評測。先從題目文字與截圖判讀問題，再自動辨識錄音語言，評估回答與問題的關聯性、表達清楚度與內容完整度；不要把口音本身視為錯誤。'
+    ? `這是發音正確度評測。應朗讀的內容就是${source}所指定的文字，請以它為準，再自動辨識錄音語言，評估讀音、流暢度、漏讀、誤讀與可理解度。relevance 請描述錄音與指定朗讀內容的一致性，completeness 請描述是否完整朗讀。`
+    : `這是口語回應評測。先從${source}判讀問題，再自動辨識錄音語言，評估回答與問題的關聯性、表達清楚度與內容完整度；不要把口音本身視為錯誤。`
 
   const response = await requestGemini(JSON.stringify({
       systemInstruction: {
@@ -77,8 +100,8 @@ export async function analyzeAudioResponse(input: {
       contents: [{
         role: 'user',
         parts: [
-          { text: JSON.stringify({ mode: input.mode, presenter_question: input.promptText }) },
-          { inlineData: { mimeType: imageMimeType, data: bytesToBase64(imageBytes) } },
+          { text: JSON.stringify({ mode: input.mode, presenter_question: reference }) },
+          ...(imagePart ? [imagePart] : []),
           { inlineData: { mimeType: input.audioMimeType, data: bytesToBase64(input.audioBytes) } },
         ],
       }],

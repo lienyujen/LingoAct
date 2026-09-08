@@ -812,16 +812,25 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const { data: screenshot, error: screenshotError } = await supabase
-          .from('screenshots')
-          .select('public_url')
-          .eq('id', question.screenshot_id)
-          .single()
-        if (screenshotError || !screenshot?.public_url) throw new Error('找不到錄音題目的截圖。')
+        // A 朗讀發音 from 截圖派題 carries the screenshot the class was reading
+        // from; one from 聽力播音室 carries no screenshot at all, because the
+        // words are on the question itself. Demanding one failed every single
+        // studio read-aloud with 「找不到錄音題目的截圖。」 while the recording sat
+        // there perfectly playable.
+        let screenshotUrl: string | null = null
+        if (question.screenshot_id) {
+          const { data: screenshot, error: screenshotError } = await supabase
+            .from('screenshots')
+            .select('public_url')
+            .eq('id', question.screenshot_id)
+            .single()
+          if (screenshotError || !screenshot?.public_url) throw new Error('找不到錄音題目的截圖。')
+          screenshotUrl = screenshot.public_url
+        }
         const request = {
           mode: question.type as 'pronunciation' | 'oral_response',
           promptText: question.prompt_text,
-          screenshotUrl: screenshot.public_url,
+          screenshotUrl,
           audioBytes: new Uint8Array(await audioBlob.arrayBuffer()),
           audioMimeType: 'audio/wav',
         }

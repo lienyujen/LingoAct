@@ -1096,6 +1096,7 @@ export function PresenterPage() {
     const stopped = data.question as Question
     setQuestion(stopped)
     setQuestions((current) => current.map((item) => item.id === stopped.id ? stopped : item))
+    await loadAll()
   }
 
   async function resumeQuestion() {
@@ -1115,6 +1116,25 @@ export function PresenterPage() {
     const resumed = data.question as Question
     setQuestion(resumed)
     setQuestions((current) => current.map((item) => item.id === resumed.id ? resumed : item))
+    await loadAll()
+  }
+
+  async function activateQuestion(questionId: string) {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
+    const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'activate_question', sessionId, presenterToken, questionId },
+    })
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, t('resumeFailed')))
+    if (!data?.question) throw new Error(data?.message || t('resumeFailed'))
+    const activated = data.question as Question
+    setSession((current) => current ? { ...current, current_question_id: activated.id } : current)
+    setQuestion(activated)
+    setQuestions((current) => current.map((item) => item.id === activated.id
+      ? activated
+      : item.status === 'active' ? { ...item, status: 'stopped' as const } : item))
+    setSelectedQuestionId(activated.id)
+    setWorkspaceView('current')
   }
 
   async function setCorrectAnswer(answer: string) {
@@ -1241,11 +1261,14 @@ export function PresenterPage() {
     // A deck that changed needs its 標音 redone: a new card brings characters
     // the font subset was not cut for.
     annotatingDeck.current = ''
-    // Adding cards means there is new work to answer. If the teacher had
-    // stopped the old deck to review it, reopen this same question so student
-    // pages return from flip-card review to retrieval practice automatically.
-    if (input.addCount && question.status === 'stopped') await resumeQuestion()
-    await loadAll()
+    // Adding cards means there is new work to answer. An older deck selected
+    // from history becomes the current activity; otherwise the new cards would
+    // exist only in the record while students stayed on a different deck.
+    if (input.addCount && (question.id !== session?.current_question_id || question.status === 'stopped')) {
+      await activateQuestion(question.id)
+    } else {
+      await loadAll()
+    }
   }
 
   async function reviewWritingAttempt(attemptId: string, force: boolean) {

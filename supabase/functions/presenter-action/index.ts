@@ -1928,6 +1928,37 @@ Deno.serve(async (req) => {
       return jsonResponse({ question: data })
     }
 
+    // Editing an older flashcard deck is the teacher choosing to use that deck
+    // again. Handle that as one server action: stop the question currently
+    // accepting answers, revive the selected deck, then point the class at it.
+    if (action === 'activate_question') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+      const { data: target, error: targetError } = await supabase.from('questions')
+        .select('id, type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (targetError) throw targetError
+      if (!target) return jsonResponse({ message: '找不到這個題目。' }, 404)
+
+      const { data: liveSession, error: liveSessionError } = await supabase.from('sessions')
+        .select('status').eq('id', sessionId).maybeSingle()
+      if (liveSessionError) throw liveSessionError
+      if (liveSession?.status !== 'active') return jsonResponse({ message: '課堂已結束。' }, 409)
+
+      const now = new Date().toISOString()
+      const { error: stopError } = await supabase.from('questions')
+        .update({ status: 'stopped', stopped_at: now })
+        .eq('session_id', sessionId).eq('status', 'active').neq('id', questionId)
+      if (stopError) throw stopError
+      const { data: question, error: questionError } = await supabase.from('questions')
+        .update({ status: 'active', stopped_at: null, started_at: now })
+        .eq('id', questionId).eq('session_id', sessionId).select('*').single()
+      if (questionError) throw questionError
+      const { error: sessionError } = await supabase.from('sessions')
+        .update({ current_question_id: questionId }).eq('id', sessionId).eq('status', 'active')
+      if (sessionError) throw sessionError
+      return jsonResponse({ question })
+    }
+
     if (action === 'get_recording_results') {
       const questionId = input.questionId
       if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)

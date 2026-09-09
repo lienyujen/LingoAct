@@ -86,26 +86,10 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (existingError) throw existingError
 
-      // A returning student's device still owns its history after class. The
-      // old read-only shortcut ran before this lookup and replaced that real
-      // identity with a throwaway one, so recordings and decks appeared empty.
-      if (session.status === 'ended' && !existing) {
-        const now = new Date().toISOString()
-        return jsonResponse({
-          session,
-          readOnly: true,
-          participant: {
-            id: crypto.randomUUID(),
-            session_id: session.id,
-            name,
-            device_id: deviceId,
-            joined_at: now,
-            last_seen_at: now,
-          },
-          participantToken: `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', ''),
-        })
-      }
-
+      // A real key is still issued after class: it cannot submit to an ended
+      // session, but it can open the public study decks. A returning device gets
+      // its original participant row and therefore its own private recording;
+      // a new device gets no one else's recording, only the shared class cards.
       let participant = existing
       if (!participant) {
         const { data, error } = await supabase

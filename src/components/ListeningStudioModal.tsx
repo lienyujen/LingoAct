@@ -24,6 +24,9 @@ type Props = {
   sessionId: string
   presenterToken: string
   teachingLanguage: string
+  teachingTrack: string
+  levelFramework: string | null
+  levelCode: string | null
   // The desktop app's own screen capture, the same drag-select 截圖派題 uses.
   // Absent in the browser, where there is no screen to grab.
   onCaptureScreen?: () => void
@@ -35,10 +38,11 @@ type Props = {
   onClose: () => void
 }
 
-const KIND_LABELS: Record<ListeningKind, PresenterMessageKey> = {
+type StudioKind = Extract<ListeningKind, 'passage' | 'dialogue'>
+
+const KIND_LABELS: Record<StudioKind, PresenterMessageKey> = {
   passage: 'kindPassage',
   dialogue: 'kindDialogue',
-  scene: 'kindScene',
 }
 
 // Two voices is the synthesis API's ceiling, so the assignment UI never offers
@@ -86,10 +90,6 @@ function HiddenIcon() {
   )
 }
 
-function PlayIcon({ size = 17 }: { size?: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-}
-
 export function ListeningStudioModal({
   initialTranscript = '',
   open,
@@ -97,6 +97,9 @@ export function ListeningStudioModal({
   sessionId,
   presenterToken,
   teachingLanguage,
+  teachingTrack,
+  levelFramework,
+  levelCode,
   readingAnnotation,
   onCaptureScreen,
   capturedScreen,
@@ -106,13 +109,14 @@ export function ListeningStudioModal({
   const t = usePresenterText()
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
-  const [kind, setKind] = useState<ListeningKind>('passage')
+  const [kind, setKind] = useState<StudioKind>('passage')
   const [script, setScript] = useState<'traditional' | 'simplified'>('traditional')
   const [speakers, setSpeakers] = useState<string[]>([])
   const [speakersTouched, setSpeakersTouched] = useState(false)
   const [screenshotId, setScreenshotId] = useState<string | null>(null)
+  const [includeScreenshot, setIncludeScreenshot] = useState(false)
   const [clip, setClip] = useState<PresenterListeningClip | null>(null)
-  const [replayLimit, setReplayLimit] = useState<number | null>(2)
+  const [replayLimit, setReplayLimit] = useState<number | null>(null)
   // Only the read-aloud dispatch uses these: a listening item is paced by its
   // own audio, and a quiz runs through the attempt flow.
   const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
@@ -137,6 +141,7 @@ export function ListeningStudioModal({
     setSpeakers([])
     setSpeakersTouched(false)
     setScreenshotId(null)
+    setIncludeScreenshot(false)
     setClip(null)
     setBusy('')
     setError('')
@@ -168,13 +173,32 @@ export function ListeningStudioModal({
     try {
       const id = await uploadListeningScreenshot(sessionId, presenterToken, file, t)
       setScreenshotId(id)
-      setBusy(t('recognising'))
-      const analysis = await analyzeListeningSource({ sessionId, presenterToken, screenshotId: id, teachingLanguage })
+      setTranscript('')
+      setClip(null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t('recogniseFailed'))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function analyzeScreenshot() {
+    if (!screenshotId) return
+    setError('')
+    setBusy(t('recognising'))
+    try {
+      const analysis = await analyzeListeningSource({
+        sessionId,
+        presenterToken,
+        screenshotId,
+        teachingTrack,
+        requestedKind: kind,
+        levelFramework,
+        levelCode,
+      })
       setTranscript(analysis.transcript)
-      setKind(analysis.kind)
       setSpeakers(analysis.speakers.slice(0, VOICES.length))
       setSpeakersTouched(true)
-      if (analysis.script) setScript(analysis.script)
       // Synthesis is deliberately NOT chained on: a character the model misread
       // would otherwise be read out to the whole class as the thing they are
       // meant to be hearing.
@@ -225,6 +249,7 @@ export function ListeningStudioModal({
           replayLimit,
           direction: '根據學生聽到的內容出理解題',
           requestedCount: null,
+          screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
       } else if (target === 'read_aloud') {
         // Marked up on the way out, not when the clip was made: a clip can be
@@ -262,10 +287,12 @@ export function ListeningStudioModal({
           mode: 'read_aloud',
           prepareSeconds,
           answerSeconds,
+          screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
       } else {
         await dispatchListeningQuestion({
           sessionId, presenterToken, listeningClipId: clip.id, replayLimit, promptText: '',
+          screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
       }
       setOnAir(true)
@@ -304,7 +331,20 @@ export function ListeningStudioModal({
             {source === 'text' && <span className="ls-hint">{t('textCheaperHint')}</span>}
           </div>
 
-          {source === 'screenshot' && !transcript && (
+          <div className="ls-chips">
+            {(Object.keys(KIND_LABELS) as StudioKind[]).map((value) => (
+              <button key={value} className={kind === value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => { setKind(value); setClip(null) }}>
+                {t(KIND_LABELS[value])}
+              </button>
+            ))}
+            {teachingLanguage.startsWith('zh') && (
+              <button className="ls-chip ls-chip-script" type="button" onClick={() => { setScript(script === 'traditional' ? 'simplified' : 'traditional'); setClip(null) }}>
+                {script === 'traditional' ? t('scriptTraditional') : t('scriptSimplified')}
+              </button>
+            )}
+          </div>
+
+          {source === 'screenshot' && !screenshotId && (
             <div className="ls-drop" onPaste={onPaste} tabIndex={0}>
               {/* The teacher already has the page on screen — a textbook, a
                   slide, a PDF. Making them save it as a file first was the
@@ -323,21 +363,14 @@ export function ListeningStudioModal({
             </div>
           )}
 
+          {source === 'screenshot' && screenshotId && !transcript && (
+            <button className="ls-synth" disabled={Boolean(busy)} type="button" onClick={() => void analyzeScreenshot()}>
+              {busy || t('generateListeningText')}
+            </button>
+          )}
+
           {(transcript || source === 'text') && (
             <>
-              <div className="ls-chips">
-                {(Object.keys(KIND_LABELS) as ListeningKind[]).map((value) => (
-                  <button key={value} className={kind === value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => setKind(value)}>
-                    {t(KIND_LABELS[value])}
-                  </button>
-                ))}
-                {teachingLanguage.startsWith('zh') && (
-                  <button className="ls-chip ls-chip-script" type="button" onClick={() => setScript(script === 'traditional' ? 'simplified' : 'traditional')}>
-                    {script === 'traditional' ? t('scriptTraditional') : t('scriptSimplified')}
-                  </button>
-                )}
-              </div>
-
               <div className="ls-transcript">
                 <div className="ls-transcript-head">
                   <HiddenIcon />
@@ -352,6 +385,13 @@ export function ListeningStudioModal({
                   onChange={(event) => { setTranscript(event.target.value); setClip(null) }}
                 />
               </div>
+
+              {source === 'screenshot' && screenshotId && (
+                <label className="ls-include-shot">
+                  <input type="checkbox" checked={includeScreenshot} onChange={(event) => setIncludeScreenshot(event.target.checked)} />
+                  <span>{t('includeListeningScreenshot')}</span>
+                </label>
+              )}
 
               {kind === 'dialogue' && speakers.length < 2 && (
                 <p className="ls-note">{t('dialogueNeedsSpeakers')}</p>
@@ -374,12 +414,11 @@ export function ListeningStudioModal({
 
               {clip ? (
                 <div className="ls-player">
-                  <button className="ls-play" type="button" onClick={() => audioRef.current?.play()}><PlayIcon /></button>
-                  <audio ref={audioRef} preload="auto" src={clip.public_url} />
                   <div className="ls-player-meta">
                     <strong>{t('audioReady')}</strong>
                     <span>{t('clipLength', { n: ((clip.duration_ms || 0) / 1000).toFixed(1) })}</span>
                   </div>
+                  <audio ref={audioRef} controls preload="metadata" src={clip.public_url} />
                 </div>
               ) : (
                 <button className="ls-synth" disabled={!canSynthesize} type="button" onClick={() => void synthesize()}>
@@ -398,12 +437,11 @@ export function ListeningStudioModal({
               {clip && (
                 <div className="ls-replay">
                   <span>{t('replayCount')}</span>
-                  <span className="ls-spacer" />
                   <div className="ls-replay-set">
+                    <button className={replayLimit === null ? 'is-on' : ''} type="button" onClick={() => setReplayLimit(null)}>∞</button>
                     {[1, 2, 3].map((value) => (
                       <button key={value} className={replayLimit === value ? 'is-on' : ''} type="button" onClick={() => setReplayLimit(value)}>{value}</button>
                     ))}
-                    <button className={replayLimit === null ? 'is-on' : ''} type="button" onClick={() => setReplayLimit(null)}>∞</button>
                   </div>
                 </div>
               )}
@@ -415,9 +453,9 @@ export function ListeningStudioModal({
 
         <footer className="ls-foot">
           {!clip && <p className="ls-dispatch-hint">{t('synthesizeBeforeDispatch')}</p>}
-          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>{t('sendAudioOnly')}</button>
-          <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>{t('sendReadAloud')}</button>
-          <button className="ls-primary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>{t('sendListeningQuiz')}</button>
+          <button className="ls-dispatch" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>{t('sendAudioOnly')}</button>
+          <button className="ls-dispatch" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>{t('sendReadAloud')}</button>
+          <button className="ls-dispatch" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>{t('sendListeningQuiz')}</button>
         </footer>
       </div>
     </div>

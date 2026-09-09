@@ -7,6 +7,7 @@ import { LessonPlan } from '../components/LessonPlan'
 import { SentenceWallModal } from '../components/SentenceWallModal'
 import { PresenterNewPage } from '../routes/PresenterNewPage'
 import { ParticipantFlashcards } from '../components/ParticipantFlashcards'
+import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import type { ParticipantQuizData } from '../types'
 import type { Session } from '../types'
 import '../index.css'
@@ -40,6 +41,18 @@ export function Preview() {
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
   if (location.hash === '#flashcard-review') return <main className="participant-page"><ParticipantFlashcards active={false} data={{ ...flashcard, reviewAnswers: { word: '大家一起做的事情' } }} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
+  if (location.hash === '#listening') return <ListeningStudioModal
+    initialTranscript={'小明：週末要不要一起去圖書館？\n小華：好啊，我想借一本中文故事書。'}
+    open
+    sessionId="preview"
+    presenterToken="preview"
+    teachingLanguage="zh-tw"
+    teachingTrack="huayu"
+    levelFramework="tbcl"
+    levelCode="2"
+    readingAnnotation="zhuyin"
+    onClose={() => undefined}
+  />
   return <div style={{ maxWidth: 420, margin: '0 auto' }} className="desktop-shell">
     <main className={`presenter-page${compact ? ' controls-open' : ''}`}>
       <aside className="qr-floating"><QRCodePanel compact={compact} joinUrl="https://example.org/preview" onToggleControls={() => setCompact(!compact)} /></aside>

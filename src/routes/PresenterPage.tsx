@@ -2030,6 +2030,9 @@ export function PresenterPage() {
         sessionId={sessionId}
         readingAnnotation={session?.reading_annotation || resolveTrack(session?.teaching_language).annotation}
         teachingLanguage={resolveTrack(session?.teaching_language).language}
+        teachingTrack={session?.teaching_language || 'huayu'}
+        levelFramework={session?.level_framework || null}
+        levelCode={session?.level_code || null}
         onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'listening') : undefined}
         onCapturedScreenRead={() => setListeningCapture(null)}
         onClose={() => { setListeningCapture(null); setListeningOpen(false) }}

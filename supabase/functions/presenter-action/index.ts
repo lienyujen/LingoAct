@@ -963,9 +963,8 @@ Deno.serve(async (req) => {
       // screenshot row is recorded alongside it.
       const sharedFileId = input.sharedFileId
       const fromSharedFile = sharedFileId !== undefined && sharedFileId !== null && sharedFileId !== ''
-      // A listening quiz is built from the clip's transcript and never from the
-      // slide behind it: the class hears the material, so no screenshot is
-      // recorded and none is attached to the question.
+      // A listening quiz is built from the clip's transcript. Its source image
+      // remains private unless the teacher explicitly asks to send it too.
       const listeningClipId = input.listeningClipId
       const fromListening = listeningClipId !== undefined && listeningClipId !== null && listeningClipId !== ''
       if (fromListening && !validUuid(listeningClipId)) return jsonResponse({ message: '語音素材不正確。' }, 400)
@@ -982,6 +981,7 @@ Deno.serve(async (req) => {
       let sourceText = ''
       let extraInstruction = ''
       let replayLimit: number | null = null
+      let listeningScreenshotId: string | null = null
       if (fromListening) {
         const rawLimit = input.replayLimit
         replayLimit = rawLimit === null || rawLimit === undefined || rawLimit === '' ? null : Number(rawLimit)
@@ -991,6 +991,13 @@ Deno.serve(async (req) => {
         const { data: clip } = await supabase.from('listening_clips')
           .select('transcript').eq('id', listeningClipId).eq('session_id', sessionId).maybeSingle()
         if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+        if (input.screenshotId !== null && input.screenshotId !== undefined && input.screenshotId !== '') {
+          if (!validUuid(input.screenshotId)) return jsonResponse({ message: '圖片資料不正確。' }, 400)
+          const { data: sourceScreenshot } = await supabase.from('screenshots')
+            .select('id').eq('id', input.screenshotId).eq('session_id', sessionId).maybeSingle()
+          if (!sourceScreenshot) return jsonResponse({ message: '找不到這張圖片。' }, 404)
+          listeningScreenshotId = sourceScreenshot.id
+        }
         sourceText = clip.transcript
         extraInstruction = [
           'This is a LISTENING comprehension test. The learners hear the passage read aloud and never see it written down.',
@@ -1048,7 +1055,7 @@ Deno.serve(async (req) => {
       const { data: pendingQuestion, error: questionError } = await supabase.from('questions').insert({
         id: questionId,
         session_id: sessionId,
-        screenshot_id: fromSharedFile || fromListening ? null : screenshotId,
+        screenshot_id: fromListening ? listeningScreenshotId : (fromSharedFile ? null : screenshotId),
         listening_clip_id: fromListening ? listeningClipId : null,
         replay_limit: replayLimit,
         type: 'custom_quiz',
@@ -1684,11 +1691,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ clips: clips || [] })
     }
 
-    // Its own action rather than a branch of create_question. That one demands a
-    // screenshot and writes screenshot_id onto the question; a listening question
-    // carrying one would let the class read the passage out of the public bucket
-    // instead of hearing it. Keeping them apart makes that mistake impossible
-    // rather than merely unlikely.
+    // Its own action rather than a branch of create_question. The source image
+    // is attached only when the teacher explicitly chooses it in the studio.
     if (action === 'create_listening_question') {
       const clipId = input.listeningClipId
       if (!validUuid(clipId)) return jsonResponse({ message: '缺少語音素材。' }, 400)
@@ -1706,6 +1710,15 @@ Deno.serve(async (req) => {
         .eq('session_id', sessionId)
         .maybeSingle()
       if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+
+      let listeningScreenshotId: string | null = null
+      if (input.screenshotId !== null && input.screenshotId !== undefined && input.screenshotId !== '') {
+        if (!validUuid(input.screenshotId)) return jsonResponse({ message: '圖片資料不正確。' }, 400)
+        const { data: sourceScreenshot } = await supabase.from('screenshots')
+          .select('id').eq('id', input.screenshotId).eq('session_id', sessionId).maybeSingle()
+        if (!sourceScreenshot) return jsonResponse({ message: '找不到這張圖片。' }, 404)
+        listeningScreenshotId = sourceScreenshot.id
+      }
 
       // Reading aloud inverts a listening item: the learner must see the words
       // and hear a model, so the transcript moves onto the question — the one
@@ -1759,7 +1772,7 @@ Deno.serve(async (req) => {
         .from('questions')
         .insert({
           session_id: sessionId,
-          screenshot_id: null,
+          screenshot_id: listeningScreenshotId,
           listening_clip_id: clipId,
           // Practice, not assessment: a learner comparing themselves to a model
           // should hear it as often as they need.

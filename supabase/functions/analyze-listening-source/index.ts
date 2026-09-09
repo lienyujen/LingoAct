@@ -1,7 +1,9 @@
 import { corsHeaders, errorDetail, geminiThinkingConfig, jsonResponse, requestGemini } from '../_shared/ai.ts'
+import { resolveLevel } from '../_shared/proficiency.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { resolveTrack, trackInstruction } from '../_shared/teaching.ts'
 
-// Reading the teacher's slide, and stopping there.
+// Reading the teacher's source and shaping it for this particular class.
 //
 // Synthesis is a separate call on purpose. Vision and speech together run close
 // to the gateway's wall clock limit, and more importantly the teacher gets to
@@ -12,7 +14,7 @@ const schema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    kind: { type: 'string', enum: ['passage', 'dialogue', 'scene'] },
+    kind: { type: 'string', enum: ['passage', 'dialogue'] },
     language: { type: 'string' },
     script: { type: 'string', enum: ['traditional', 'simplified', 'none'] },
     speakers: { type: 'array', items: { type: 'string' } },
@@ -39,7 +41,12 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const screenshotId = typeof input.screenshotId === 'string' ? input.screenshotId : ''
-    const teachingLanguage = typeof input.teachingLanguage === 'string' ? input.teachingLanguage : 'zh-tw'
+    const teachingTrack = typeof input.teachingTrack === 'string' ? input.teachingTrack : 'huayu'
+    const requestedKind = input.requestedKind === 'dialogue' ? 'dialogue' : 'passage'
+    const levelFramework = typeof input.levelFramework === 'string' ? input.levelFramework : null
+    const levelCode = typeof input.levelCode === 'string' ? input.levelCode : null
+    const track = resolveTrack(teachingTrack)
+    const resolvedLevel = resolveLevel(levelFramework, levelCode)
     if (!sessionId || !presenterToken || !screenshotId) return jsonResponse({ message: '缺少辨識所需資料。' }, 400)
 
     const supabase = getAdminClient()
@@ -67,17 +74,22 @@ Deno.serve(async (req) => {
 
     const instruction = [
       'You are preparing listening material for a language class.',
-      `The class is being taught in the language with code "${teachingLanguage}".`,
+      trackInstruction(teachingTrack),
+      resolvedLevel
+        ? `The class is working at ${resolvedLevel.level.label} on the ${resolvedLevel.framework.name} scale. Its listening material must stay within this ceiling: ${resolvedLevel.level.ceiling}`
+        : 'No proficiency level was set, so write for an intermediate learner and keep the wording plain.',
       '',
-      'Look at the image and decide what it is:',
-      '- "dialogue" when it shows a conversation between two or more people. List the speaker names in the order they first speak, and write the transcript with each line prefixed by that speaker name and a colon.',
-      '- "passage" when it is continuous prose, a reading text, or a list of sentences. Transcribe it as it stands.',
-      '- "scene" when it is a picture, photograph, diagram or chart rather than text meant to be read aloud. Do not transcribe labels; instead write what a teacher would say to introduce this image to the class, in the language being taught, in three to six sentences.',
+      `The teacher chose ${requestedKind === 'dialogue' ? 'a dialogue' : 'a listening passage'}. Return exactly that kind; do not decide another format.`,
+      'First read all useful information in the image, including printed text, labels, people, actions, objects and setting.',
+      'Then turn that source into natural listening material in the language being taught, at the class level above. Preserve the source meaning and facts, but rewrite vocabulary, sentence length and organisation when needed for the learners.',
+      requestedKind === 'dialogue'
+        ? 'Write a natural two-speaker dialogue. Prefix every turn with a short speaker name and a colon. List the same two names in speakers, in first-speaking order.'
+        : 'Write one coherent passage that sounds natural when read aloud. Keep speakers empty.',
+      'If the image mainly contains text, use OCR to recover its content before adapting it. If it mainly shows a visual situation, use only details actually visible in the image; do not invent unsupported facts.',
       '',
       'Report "language" as a lowercase code such as zh-tw, en, ja, ko, es, fr, de or vi.',
       'Report "script" as "traditional" or "simplified" for Chinese, and "none" for every other language.',
-      'Transcribe exactly what is written, including punctuation. Do not translate, summarise, correct or add anything.',
-      'Leave "speakers" empty unless kind is "dialogue".',
+      `Set kind to "${requestedKind}" and language to "${track.language}".`,
     ].join('\n')
 
     const response = await requestGemini(
@@ -107,8 +119,8 @@ Deno.serve(async (req) => {
     if (!transcript) return jsonResponse({ message: '這張截圖沒有可以朗讀的內容。' }, 422)
 
     return jsonResponse({
-      kind: result.kind,
-      language: (result.language || teachingLanguage).toLowerCase(),
+      kind: requestedKind,
+      language: track.language,
       script: result.script === 'none' ? null : result.script,
       speakers: Array.isArray(result.speakers) ? result.speakers.filter((name) => typeof name === 'string') : [],
       transcript: transcript.slice(0, 4000),

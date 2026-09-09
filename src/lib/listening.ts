@@ -20,7 +20,10 @@ export async function analyzeListeningSource(input: {
   sessionId: string
   presenterToken: string
   screenshotId: string
-  teachingLanguage: string
+  teachingTrack: string
+  requestedKind: 'passage' | 'dialogue'
+  levelFramework: string | null
+  levelCode: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('analyze-listening-source', { body: input })
   if (error) throw error
@@ -43,9 +46,8 @@ export async function synthesizeListening(input: {
 }
 
 
-// Puts the captured image somewhere the analyser can read it. It is recorded as
-// a screenshot but never attached to a question, so nothing about it reaches the
-// class — the audio is the only thing they get.
+// Puts the captured image somewhere the analyser can read it. The teacher later
+// decides whether it remains private source material or accompanies the audio.
 export async function uploadListeningScreenshot(sessionId: string, presenterToken: string, file: File, t: PresenterT = presenterLookup('zh-TW')) {
   const supabase = requireSupabase()
   const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
@@ -96,6 +98,7 @@ export async function dispatchListeningQuestion(input: {
   mode?: 'read_aloud'
   prepareSeconds?: number | null
   answerSeconds?: number | null
+  screenshotId?: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: { action: 'create_listening_question', ...input },
@@ -115,6 +118,7 @@ export async function dispatchListeningQuiz(input: {
   replayLimit: number | null
   direction: string
   requestedCount: number | null
+  screenshotId?: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: { action: 'create_custom_quiz', requestedType: 'random', ...input },

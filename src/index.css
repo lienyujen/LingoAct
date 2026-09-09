@@ -4999,6 +4999,7 @@ h2 {
   color: var(--ls-muted); font-family: inherit; font-size: 12px; font-weight: 700;
 }
 .ls-tabs button.is-on { background: var(--ls-accent); border-color: var(--ls-accent); color: #fff; }
+.ls-tabs button:hover { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
 .ls-hint { font-size: 11px; color: var(--ls-muted); }
 
 .ls-drop {
@@ -5026,6 +5027,7 @@ h2 {
   color: var(--ls-muted); font-family: inherit; font-size: 11.5px; font-weight: 600;
 }
 .ls-chip.is-on { background: var(--ls-accent); border-color: var(--ls-accent); color: #fff; }
+.ls-chip:hover { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
 .ls-chip-script { margin-left: auto; }
 
 .ls-transcript {
@@ -5067,6 +5069,7 @@ h2 {
   color: var(--ls-accent); font-family: inherit; font-size: 13px; font-weight: 800;
 }
 .ls-synth:disabled { border-color: var(--ls-line); background: var(--ls-card); color: var(--ls-muted); cursor: not-allowed; }
+.ls-synth:not(:disabled):hover { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
 
 .ls-player {
   display: flex; align-items: center; gap: 12px;
@@ -5090,6 +5093,7 @@ h2 {
   color: var(--ls-muted); font-family: inherit; font-size: 11.5px; font-weight: 800;
 }
 .ls-replay-set button.is-on { background: var(--ls-accent); border-color: var(--ls-accent); color: #fff; }
+.ls-replay-set button:hover { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
 
 .ls-note {
   margin: 0;
@@ -5107,8 +5111,12 @@ h2 {
 }
 
 .ls-foot {
-  display: flex; gap: 9px; padding: 13px 18px;
+  display: flex; flex-wrap: wrap; gap: 9px; padding: 13px 18px;
   background: var(--ls-card); border-top: 1px solid var(--ls-line);
+}
+.ls-dispatch-hint {
+  flex: 1 0 100%; margin: 0 0 2px; color: var(--ls-muted);
+  font-size: 11.5px; line-height: 1.5; text-align: center;
 }
 .ls-foot button {
   flex-grow: 1; padding: 12px; border-radius: 11px; cursor: pointer;
@@ -5116,7 +5124,12 @@ h2 {
 }
 .ls-secondary { border: 1px solid #d5d3da; background: var(--ls-card); color: var(--ls-ink); }
 .ls-primary { border: none; background: var(--ls-accent); color: #fff; }
-.ls-foot button:disabled { opacity: .45; cursor: not-allowed; }
+.ls-foot button:not(:disabled):hover { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+.ls-foot button:disabled,
+.ls-foot button:disabled:hover {
+  background: var(--ls-ground); border: 1px solid var(--ls-line); color: var(--ls-muted);
+  cursor: not-allowed; opacity: 1;
+}
 
 /* 拼音 above the line. The row needs room the plain line does not, and the
    syllables want to read as a guide rather than compete with the characters. */
@@ -5705,7 +5718,9 @@ h2 {
   cursor: pointer;
 }
 .timing-preset:hover {
-  border-color: var(--primary);
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
 }
 .timing-preset.selected {
   background: var(--primary);

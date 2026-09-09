@@ -193,6 +193,7 @@ const messages = {
     readAloudTime: '朗讀時間', listeningTimingNote: '只有「派朗讀練習」會用到這兩個時間。',
     replayCount: '可聽次數',
     sendAudioOnly: '只派語音', sendReadAloud: '派朗讀練習', sendListeningQuiz: '派聽力測驗',
+    synthesizeBeforeDispatch: '請先輸入內容並轉成語音，再選擇派送方式。',
 
     // 課程語言
     mainTeachingLanguage: '主要教學語言',
@@ -576,6 +577,7 @@ const messages = {
     readAloudTime: 'Reading time', listeningTimingNote: 'Only "Send the read-aloud" uses these two.',
     replayCount: 'Times they may listen',
     sendAudioOnly: 'Audio only', sendReadAloud: 'Send the read-aloud', sendListeningQuiz: 'Send the listening quiz',
+    synthesizeBeforeDispatch: 'Enter the content and turn it into audio before choosing how to send it.',
 
     mainTeachingLanguage: 'The language you teach in',
     mainTeachingHint: 'It sets the direction of the whole class: the language and difficulty of the questions, the accent of the listening audio, and the readings above the characters.',

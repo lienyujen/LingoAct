@@ -414,6 +414,7 @@ export function ListeningStudioModal({
         </div>
 
         <footer className="ls-foot">
+          {!clip && <p className="ls-dispatch-hint">{t('synthesizeBeforeDispatch')}</p>}
           <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>{t('sendAudioOnly')}</button>
           <button className="ls-secondary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>{t('sendReadAloud')}</button>
           <button className="ls-primary" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>{t('sendListeningQuiz')}</button>

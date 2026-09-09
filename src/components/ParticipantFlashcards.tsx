@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, CheckCircle, SpeakerHigh, SpinnerGap, XCircle } from '@phosphor-icons/react'
 import { participantText } from '../lib/participantI18n'
 import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -12,6 +12,7 @@ type Props = {
   data: ParticipantQuizData
   locale: ParticipantLocale
   active: boolean
+  onSpeak: (itemId: string) => Promise<string>
   onTry: (itemId: string, answerValue: string) => Promise<{ correct: boolean; correctAnswer: string | null }>
 }
 
@@ -49,7 +50,7 @@ function reviewSides(item: QuizItem, answer: string, locale: ParticipantLocale) 
 // During answering this is retrieval practice. Once the teacher stops it, the
 // same deck becomes a reference students can keep turning over instead of a
 // completion screen that makes the vocabulary disappear.
-export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry }: Props) {
+export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onSpeak, onTry }: Props) {
   const readingFamily = useReadingFont(cardFontUrl)
   const initialLearned = useMemo(() => learnedFrom(data), [data])
   const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id).filter((id) => !initialLearned[id]))
@@ -62,6 +63,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
   const [seen, setSeen] = useState<string[]>([])
   const [reviewIndex, setReviewIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [speakingId, setSpeakingId] = useState('')
 
   const itemById = useMemo(() => new Map(data.items.map((item) => [item.id, item])), [data.items])
   const itemSignature = data.items.map((item) => item.id).join('|')
@@ -136,6 +138,22 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
     setVerdict(null)
   }
 
+  async function speak(itemId: string) {
+    if (speakingId) return
+    setSpeakingId(itemId)
+    setError('')
+    try {
+      const url = await onSpeak(itemId)
+      const audio = new Audio(url)
+      audio.addEventListener('ended', () => setSpeakingId(''), { once: true })
+      audio.addEventListener('error', () => setSpeakingId(''), { once: true })
+      await audio.play()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '無法播放發音。')
+      setSpeakingId('')
+    }
+  }
+
   if (!data.items.length) return null
 
   if (reviewMode) {
@@ -150,13 +168,17 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
           </div>
           <span>{participantText(locale, 'flashcardCardCount', { current: reviewIndex + 1, total: data.items.length })}</span>
         </div>
-        <button
-          aria-label={participantText(locale, 'flashcardFlipHint')}
-          className={`flashcard-review-card${flipped ? ' is-flipped' : ''}`}
-          type="button"
-          onClick={() => setFlipped((value) => !value)}
-        >
-          <span className="flashcard-review-inner">
+        <div className="flashcard-review-stage">
+          <button className="flashcard-speaker" type="button" aria-label={`Play pronunciation: ${sides.word}`} onClick={() => void speak(reviewItem.id)}>
+            {speakingId === reviewItem.id ? <SpinnerGap className="spin" size={25} /> : <SpeakerHigh size={25} weight="fill" />}
+          </button>
+          <button
+            aria-label={participantText(locale, 'flashcardFlipHint')}
+            className={`flashcard-review-card${flipped ? ' is-flipped' : ''}`}
+            type="button"
+            onClick={() => setFlipped((value) => !value)}
+          >
+            <span className="flashcard-review-inner">
             <span className="flashcard-review-face flashcard-review-front">
               <small>{participantText(locale, 'flashcardFront')}</small>
               {readingFamily && sides.reading
@@ -169,8 +191,10 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
               <strong>{sides.explanation || '—'}</strong>
               <em>{sides.word}</em>
             </span>
-          </span>
-        </button>
+            </span>
+          </button>
+        </div>
+        {error && <p className="error">{error}</p>}
         <div className="flashcard-review-controls">
           <button className="ghost-button" disabled={reviewIndex === 0} type="button" onClick={() => { setReviewIndex((value) => value - 1); setFlipped(false) }}>
             <ArrowLeft size={17} />{participantText(locale, 'flashcardPrevious')}

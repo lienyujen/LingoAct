@@ -2118,6 +2118,19 @@ Deno.serve(async (req) => {
         if (storageError) throw storageError
       }
 
+      const { data: listeningClips, error: listeningListError } = await supabase
+        .from('listening_clips')
+        .select('storage_path')
+        .eq('session_id', sessionId)
+      if (listeningListError) throw listeningListError
+      const listeningPaths = (listeningClips || []).map((clip) => clip.storage_path).filter(Boolean)
+      for (let index = 0; index < listeningPaths.length; index += 100) {
+        const { error: storageError } = await supabase.storage
+          .from('lingoact-listening')
+          .remove(listeningPaths.slice(index, index + 100))
+        if (storageError) throw storageError
+      }
+
 
       // 檔案傳送：清掉這場次底下所有教師分享與學生回傳的檔案。
       const filePrefix = `sessions/${sessionId}/files`

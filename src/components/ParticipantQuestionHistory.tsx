@@ -13,6 +13,7 @@ type Props = {
   loadingQuestionIds: Set<string>
   locale: ParticipantLocale
   onLoadDetails: (question: Question) => Promise<void>
+  onSpeakFlashcard: (questionId: string, itemId: string) => Promise<string>
   questions: Question[]
   quizData: Record<string, ParticipantQuizData | null>
   screenshots: Record<string, Screenshot>
@@ -44,6 +45,7 @@ export function ParticipantQuestionHistory({
   loadingQuestionIds,
   locale,
   onLoadDetails,
+  onSpeakFlashcard,
   questions,
   quizData,
   screenshots,
@@ -106,6 +108,7 @@ export function ParticipantQuestionHistory({
                         cardFontUrl={question.card_font_url}
                         data={quiz}
                         locale={locale}
+                        onSpeak={(itemId) => onSpeakFlashcard(question.id, itemId)}
                         onTry={async () => ({ correct: false, correctAnswer: null })}
                       />
                     ) : question.type === 'custom_quiz' && quiz?.attempt ? (

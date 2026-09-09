@@ -38,8 +38,8 @@ export function Preview() {
   const [compact, setCompact] = useState(false)
   const action = () => setNotice('介面預覽：此操作在桌面版中使用。')
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
-  if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
-  if (location.hash === '#flashcard-review') return <main className="participant-page"><ParticipantFlashcards active={false} data={{ ...flashcard, reviewAnswers: { word: '大家一起做的事情' } }} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
+  if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onSpeak={async () => ''} onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
+  if (location.hash === '#flashcard-review') return <main className="participant-page"><ParticipantFlashcards active={false} data={{ ...flashcard, reviewAnswers: { word: '大家一起做的事情' } }} locale="zh-TW" onSpeak={async () => ''} onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
   return <div style={{ maxWidth: 420, margin: '0 auto' }} className="desktop-shell">
     <main className={`presenter-page${compact ? ' controls-open' : ''}`}>
       <aside className="qr-floating"><QRCodePanel compact={compact} joinUrl="https://example.org/preview" onToggleControls={() => setCompact(!compact)} /></aside>

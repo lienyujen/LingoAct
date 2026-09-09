@@ -6128,8 +6128,29 @@ h2 {
   justify-content: space-between;
 }
 .flashcard-review-heading h2 { margin: 0 0 3px; }
-.flashcard-review-heading small,
-.flashcard-review-heading > span { color: var(--muted); font-size: 13px; }
+  .flashcard-review-heading small,
+  .flashcard-review-heading > span { color: var(--muted); font-size: 13px; }
+  .flashcard-review-stage { position: relative; }
+  .flashcard-speaker,
+  .flashcard-speaker:hover,
+  .flashcard-speaker:focus-visible {
+    align-items: center;
+    background: rgb(255 255 255 / 94%);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--primary);
+    display: flex;
+    height: 48px;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    width: 48px;
+    z-index: 3;
+  }
+  .flashcard-speaker:hover { background: #fff; color: var(--primary-dark); }
+  .flashcard-speaker .spin { animation: spin .8s linear infinite; }
 .flashcard-review-card,
 .flashcard-review-card:hover,
 .flashcard-review-card:focus-visible {

@@ -1,8 +1,11 @@
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { analyzeAudioResponse, removeRecording } from '../_shared/audio-analysis.ts'
-import { gradeCustomQuizAttempt } from '../_shared/custom-quiz.ts'
+import { gradeCustomQuizAttempt, translateFlashcardItems } from '../_shared/custom-quiz.ts'
 import { getAdminClient, hashParticipantToken } from '../_shared/supabase.ts'
 import { askWritingCoach } from '../_shared/writing-coach.ts'
+import { buildVoicePlan, contentHash, durationMs, synthesize, wavFromPcm } from '../_shared/listening.ts'
+import { resolveTrack } from '../_shared/teaching.ts'
+import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
@@ -146,7 +149,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true })
     }
 
-    if (['get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try', 'ask_writing_coach'].includes(action)) {
+    if (['get_custom_quiz', 'speak_flashcard', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try', 'ask_writing_coach'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限失效，請重新掃描 QR Code 加入場次。' }, 403)
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
@@ -164,11 +167,34 @@ Deno.serve(async (req) => {
           return jsonResponse({ message: 'AI 出題暫時失敗，請等待教師重新派送。' }, 503)
         }
         if (!quiz) return jsonResponse({ generating: true })
-        const [{ data: items, error: itemError }, { data: attempt, error: attemptError }] = await Promise.all([
+        const [{ data: loadedItems, error: itemError }, { data: attempt, error: attemptError }] = await Promise.all([
           supabase.from('quiz_items').select('*').eq('quiz_id', quiz.id).order('position'),
           supabase.from('quiz_attempts').select('*').eq('quiz_id', quiz.id).eq('participant_id', participantId).maybeSingle(),
         ])
         if (itemError || attemptError) throw itemError || attemptError
+        let items = loadedItems || []
+        const requestedLocale = guidanceLanguages.has(input.locale) ? input.locale as string : ''
+        const contentLocale = requestedLocale === 'zh-TW' ? 'zh_tw' : requestedLocale
+        if (quiz.requested_type === 'flashcard' && contentLocale && items.some((item) => !item.translations?.[contentLocale])) {
+          const translated = await translateFlashcardItems(items.map((item) => ({
+            id: item.id,
+            prompt_text: item.prompt_text,
+            options: item.options,
+            prompt_is_word: item.prompt_is_word === true,
+          })), guidanceLanguageName(requestedLocale))
+          items = await Promise.all(items.map(async (item) => {
+            const fields = translated.get(item.id)
+            if (!fields || !Array.isArray(fields.options) || fields.options.length !== item.options.length) return item
+            const translations = { ...(item.translations || {}), [contentLocale]: {
+              prompt_text: fields.prompt_text || item.prompt_text,
+              options: fields.options,
+              pair_prompts: [],
+            } }
+            const { error } = await supabase.from('quiz_items').update({ translations }).eq('id', item.id)
+            if (error) throw error
+            return { ...item, translations }
+          }))
+        }
         let answers: unknown[] = []
         if (attempt) {
           const { data, error } = await supabase.from('quiz_item_answers').select('*').eq('attempt_id', attempt.id)
@@ -206,6 +232,56 @@ Deno.serve(async (req) => {
       }
 
       if (!quiz) return jsonResponse({ message: '自訂測驗仍在出題中，請稍候。' }, 409)
+
+      if (action === 'speak_flashcard') {
+        if (quiz.requested_type !== 'flashcard') return jsonResponse({ message: '這不是單字卡活動。' }, 400)
+        const itemId = typeof input.itemId === 'string' ? input.itemId : ''
+        if (!validUuid(itemId)) return jsonResponse({ message: '字卡資料格式不正確。' }, 400)
+        const [{ data: item }, { data: key }, { data: session }] = await Promise.all([
+          supabase.from('quiz_items').select('id, prompt_text, prompt_is_word').eq('id', itemId).eq('quiz_id', quiz.id).maybeSingle(),
+          supabase.from('quiz_item_keys').select('accepted_answers').eq('item_id', itemId).maybeSingle(),
+          supabase.from('sessions').select('teaching_language').eq('id', sessionId).maybeSingle(),
+        ])
+        if (!item || !key) return jsonResponse({ message: '找不到這張字卡。' }, 404)
+        const word = item.prompt_is_word
+          ? item.prompt_text
+          : ((key.accepted_answers as string[] | null)?.[0] || '')
+        if (!word) return jsonResponse({ message: '這張字卡沒有可朗讀的詞。' }, 400)
+
+        const language = resolveTrack(session?.teaching_language).language
+        const hash = await contentHash(word, language, null, 'passage')
+        const { data: existing } = await supabase.from('listening_clips')
+          .select('public_url').eq('session_id', sessionId).eq('content_hash', hash).maybeSingle()
+        if (existing?.public_url) return jsonResponse({ audioUrl: existing.public_url, reused: true })
+
+        const plan = buildVoicePlan('passage', language, null, [])
+        // This is a word card, not a passage: the shared voice still supplies
+        // the class's native accent, while this shorter instruction prevents a
+        // one-word item being padded with an explanation.
+        plan.instruction = `${plan.instruction} Pronounce only the supplied word or phrase once. Do not add any other words.`
+        const pcm = await synthesize(word, plan)
+        const wav = wavFromPcm(pcm)
+        const storagePath = `${sessionId}/flashcards/${hash}.wav`
+        const { error: uploadError } = await supabase.storage.from('lingoact-listening')
+          .upload(storagePath, wav, { contentType: 'audio/wav', upsert: true })
+        if (uploadError) throw uploadError
+        const publicUrl = supabase.storage.from('lingoact-listening').getPublicUrl(storagePath).data.publicUrl
+        const { error: insertError } = await supabase.from('listening_clips').insert({
+          session_id: sessionId,
+          source: 'text',
+          kind: 'passage',
+          language,
+          script: null,
+          transcript: word,
+          storage_path: storagePath,
+          public_url: publicUrl,
+          duration_ms: durationMs(pcm.length),
+          voices: { instruction: plan.instruction, speakers: [] },
+          content_hash: hash,
+        })
+        if (insertError && insertError.code !== '23505') throw insertError
+        return jsonResponse({ audioUrl: publicUrl, reused: false })
+      }
 
       // 寫作教練 with the scaffolding on. One round: the student shows what they
       // have, the coach asks about it, and the student writes the next draft.

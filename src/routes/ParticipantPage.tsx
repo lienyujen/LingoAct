@@ -195,7 +195,7 @@ export function ParticipantPage() {
 
       if (nextQuestion?.type === 'custom_quiz' && participantToken) {
         const { data: loadedQuiz, error: quizError } = await supabase.functions.invoke('participant-action', {
-          body: { action: 'get_custom_quiz', sessionId, participantId, participantToken, questionId: nextQuestion.id },
+          body: { action: 'get_custom_quiz', sessionId, participantId, participantToken, questionId: nextQuestion.id, locale },
         })
         if (requestId !== loadSequence.current) return
         if (quizError) {
@@ -255,7 +255,7 @@ export function ParticipantPage() {
     try {
       const action = historyQuestion.type === 'custom_quiz' ? 'get_custom_quiz' : 'get_recording_result'
       const { data, error: detailError } = await requireSupabase().functions.invoke('participant-action', {
-        body: { action, sessionId, participantId, participantToken, questionId: historyQuestion.id },
+        body: { action, sessionId, participantId, participantToken, questionId: historyQuestion.id, locale },
       })
       if (detailError) throw detailError
       if (historyQuestion.type === 'custom_quiz') {
@@ -273,7 +273,7 @@ export function ParticipantPage() {
         return next
       })
     }
-  }, [historyAudioResponses, historyQuizData, participantId, participantToken, sessionId])
+  }, [historyAudioResponses, historyQuizData, locale, participantId, participantToken, sessionId])
 
   useEffect(() => {
     if (!participantId) navigate(`/join/${sessionId}${location.search}`)
@@ -456,6 +456,16 @@ export function ParticipantPage() {
     })
     if (tryError) throw new Error(await participantFunctionMessage(tryError, '無法送出這張卡片。'))
     return data as { correct: boolean; correctAnswer: string | null }
+  }
+
+  async function speakFlashcard(questionId: string, itemId: string) {
+    if (!participant || !participantToken) throw new Error('找不到字卡權限。')
+    const { data, error: speakError } = await requireSupabase().functions.invoke('participant-action', {
+      body: { action: 'speak_flashcard', sessionId, participantId: participant.id, participantToken, questionId, itemId },
+    })
+    if (speakError) throw new Error(await participantFunctionMessage(speakError, '暫時無法產生發音，請再試一次。'))
+    if (!data?.audioUrl) throw new Error(data?.message || '暫時無法產生發音，請再試一次。')
+    return data.audioUrl as string
   }
 
   async function discardAudio() {
@@ -659,6 +669,7 @@ export function ParticipantPage() {
           quizData={historyQuizData}
           screenshots={historyScreenshots}
           onLoadDetails={loadHistoryDetails}
+          onSpeakFlashcard={speakFlashcard}
         />
       </main>
     )
@@ -738,7 +749,7 @@ export function ParticipantPage() {
       )}
       {question?.type === 'custom_quiz' ? (quizData ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onSpeak={(itemId) => speakFlashcard(question.id, itemId)} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
@@ -766,6 +777,7 @@ export function ParticipantPage() {
         quizData={historyQuizData}
         screenshots={historyScreenshots}
         onLoadDetails={loadHistoryDetails}
+        onSpeakFlashcard={speakFlashcard}
       />
       <form className="panel message-form" onSubmit={sendMessage}>
         <label>

@@ -12,7 +12,7 @@ const flashcardTranslationSchema = {
     items: {
       type: 'array',
       minItems: 1,
-      maxItems: 30,
+      maxItems: 10,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -32,16 +32,20 @@ export async function translateFlashcardItems(
   items: Array<{ id: string; prompt_text: string; options: string[]; prompt_is_word?: boolean }>,
   languageName: string,
 ) {
-  const result = await callAiJson(
-    `Translate the explanatory side of these vocabulary flashcards into ${languageName}. If prompt_is_word is true, keep prompt_text unchanged and translate every option. If it is false, translate prompt_text and keep every option unchanged. Preserve item_id, option count, option order, names, numbers, and meaning exactly. Return only the requested JSON.`,
-    { items },
-    flashcardTranslationSchema,
-    null,
-    'realtime',
-  )
-  if (result.status !== 'success') throw new Error(result.message || 'Flashcard translation failed.')
-  const translated = (result.output as { items?: Array<{ item_id?: string; prompt_text?: string; options?: string[] }> }).items || []
-  return new Map(translated.filter((item) => typeof item.item_id === 'string').map((item) => [item.item_id!, item]))
+  const translated = new Map<string, { item_id?: string; prompt_text?: string; options?: string[] }>()
+  for (let start = 0; start < items.length; start += 10) {
+    const result = await callAiJson(
+      `Translate the explanatory side of these vocabulary flashcards into ${languageName}. If prompt_is_word is true, keep prompt_text unchanged and translate every option. If it is false, translate prompt_text and keep every option unchanged. Preserve item_id, option count, option order, names, numbers, and meaning exactly. Return only the requested JSON.`,
+      { items: items.slice(start, start + 10) },
+      flashcardTranslationSchema,
+      null,
+      'realtime',
+    )
+    if (result.status !== 'success') throw new Error(result.message || 'Flashcard translation failed.')
+    const batch = (result.output as { items?: Array<{ item_id?: string; prompt_text?: string; options?: string[] }> }).items || []
+    for (const item of batch) if (typeof item.item_id === 'string') translated.set(item.item_id, item)
+  }
+  return translated
 }
 
 const itemTypes = new Set<ItemType>(['multiple_choice', 'fill_blank', 'short_answer', 'ordering', 'matching'])
@@ -78,10 +82,7 @@ const translatedFieldsSchema = {
   required: ['prompt_text', 'options', 'pair_prompts'],
 }
 
-const flashcardLocales = ['zh_tw', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi'] as const
-
-function quizGenerationSchema(flashcard: boolean) {
-  const translationProperties = Object.fromEntries(flashcardLocales.map((locale) => [locale, translatedFieldsSchema]))
+function quizGenerationSchema(_flashcard: boolean) {
   return {
   type: 'object',
   additionalProperties: false,
@@ -111,18 +112,9 @@ function quizGenerationSchema(flashcard: boolean) {
           target_word: { type: 'string' },
           rubric: { type: 'string' },
           translation_en: translatedFieldsSchema,
-          ...(flashcard ? {
-            translations: {
-              type: 'object',
-              additionalProperties: false,
-              properties: translationProperties,
-              required: [...flashcardLocales],
-            },
-          } : {}),
         },
         required: [
           'type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'target_word', 'rubric', 'translation_en',
-          ...(flashcard ? ['translations'] : []),
         ],
       },
     },
@@ -315,7 +307,7 @@ export async function generateCustomQuiz(input: {
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${flashcard ? '每張單字卡的 translations 必須把解釋完整翻成臺灣繁體中文、英文、日文、韓文、西班牙文、法文、德文與越南文；詞彙本身保持教學語言，不要翻譯。每個語言的選項數量及順序必須與原文完全相同。' : ''}${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{
@@ -435,9 +427,7 @@ ${input.sourceText}` }] : []),
       if (options.length !== pairPrompts.length) throw new Error(`Item ${index + 1} has mismatched columns.`)
     }
     if (type === 'fill_blank' && !acceptedAnswers.length) throw new Error(`Item ${index + 1} needs an accepted answer.`)
-    const rawTranslations = (flashcard && item.translations && typeof item.translations === 'object')
-      ? item.translations as Record<string, unknown>
-      : { en: item.translation_en }
+    const rawTranslations = { en: item.translation_en }
     // Every type with options gets them in a different order from the one the
     // model produced; what differs is why.
     //

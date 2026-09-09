@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CaretDown, CaretUp, CheckCircle, Clock, ClockCounterClockwise, MicrophoneStage } from '@phosphor-icons/react'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
@@ -10,10 +10,10 @@ type Props = {
   activeQuestionId?: string | null
   answers: Answer[]
   audioResponses: Record<string, AudioResponse | null>
+  defaultExpandAll?: boolean
   loadingQuestionIds: Set<string>
   locale: ParticipantLocale
   onLoadDetails: (question: Question) => Promise<void>
-  onSpeakFlashcard: (questionId: string, itemId: string) => Promise<string>
   questions: Question[]
   quizData: Record<string, ParticipantQuizData | null>
   screenshots: Record<string, Screenshot>
@@ -42,10 +42,10 @@ export function ParticipantQuestionHistory({
   activeQuestionId,
   answers,
   audioResponses,
+  defaultExpandAll = false,
   loadingQuestionIds,
   locale,
   onLoadDetails,
-  onSpeakFlashcard,
   questions,
   quizData,
   screenshots,
@@ -53,12 +53,19 @@ export function ParticipantQuestionHistory({
   const history = useMemo(() => questions.filter((item) => item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
   const [sectionExpanded, setSectionExpanded] = useState(true)
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  const requestedDetails = useRef(new Set<string>())
   const newestId = history[0]?.id || ''
 
   useEffect(() => {
     if (!newestId) return
-    setOpenIds((current) => current.has(newestId) ? current : new Set([newestId]))
-  }, [newestId])
+    const visible = defaultExpandAll ? history : history.slice(0, 1)
+    setOpenIds(new Set(visible.map((question) => question.id)))
+    for (const question of visible) {
+      if (requestedDetails.current.has(question.id)) continue
+      requestedDetails.current.add(question.id)
+      void onLoadDetails(question)
+    }
+  }, [defaultExpandAll, history, newestId, onLoadDetails])
 
   if (!history.length) return null
 
@@ -108,7 +115,6 @@ export function ParticipantQuestionHistory({
                         cardFontUrl={question.card_font_url}
                         data={quiz}
                         locale={locale}
-                        onSpeak={(itemId) => onSpeakFlashcard(question.id, itemId)}
                         onTry={async () => ({ correct: false, correctAnswer: null })}
                       />
                     ) : question.type === 'custom_quiz' && quiz?.attempt ? (

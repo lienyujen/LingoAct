@@ -9,6 +9,7 @@ import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
 import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
+import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 
 type ParticipantRecord = { id: string; name: string }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -1128,6 +1129,10 @@ Deno.serve(async (req) => {
           })))
           if (keyError) throw keyError
 
+          if (requestedType === 'flashcard') {
+            await ensureFlashcardAudio(sessionId, quizId, classRow?.teaching_language)
+          }
+
           const { error: questionUpdateError } = await supabase.from('questions').update({
             title: generated.title,
             translations: { en: { title: 'AI custom quiz', prompt_text: direction, options: [] } },
@@ -1389,6 +1394,7 @@ Deno.serve(async (req) => {
             rubric: item.rubric,
           })))
           if (keyError) throw keyError
+          await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
         } catch (error) {
           return jsonResponse({ message: errorDetail(error, '再出卡失敗，請再試一次。') }, 503)
         }
@@ -1466,6 +1472,11 @@ Deno.serve(async (req) => {
           return jsonResponse({ generating: true, quiz: null, items: [], attempts: [], answers: [], keys: [], tries: [], screenshot: null }, 202)
         }
         return jsonResponse({ message: '找不到自訂測驗。' }, 404)
+      }
+      if (quiz.requested_type === 'flashcard') {
+        const { data: classRow } = await supabase.from('sessions')
+          .select('teaching_language').eq('id', sessionId).maybeSingle()
+        await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
       }
       const [{ data: items, error: itemError }, { data: attempts, error: attemptError }, { data: question, error: questionError }] = await Promise.all([
         supabase.from('quiz_items').select('*').eq('quiz_id', quiz.id).order('position'),

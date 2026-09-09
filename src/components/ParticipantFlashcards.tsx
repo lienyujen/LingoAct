@@ -12,7 +12,6 @@ type Props = {
   data: ParticipantQuizData
   locale: ParticipantLocale
   active: boolean
-  onSpeak: (itemId: string) => Promise<string>
   onTry: (itemId: string, answerValue: string) => Promise<{ correct: boolean; correctAnswer: string | null }>
 }
 
@@ -50,7 +49,7 @@ function reviewSides(item: QuizItem, answer: string, locale: ParticipantLocale) 
 // During answering this is retrieval practice. Once the teacher stops it, the
 // same deck becomes a reference students can keep turning over instead of a
 // completion screen that makes the vocabulary disappear.
-export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onSpeak, onTry }: Props) {
+export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry }: Props) {
   const readingFamily = useReadingFont(cardFontUrl)
   const initialLearned = useMemo(() => learnedFrom(data), [data])
   const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id).filter((id) => !initialLearned[id]))
@@ -138,13 +137,16 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onSpe
     setVerdict(null)
   }
 
-  async function speak(itemId: string) {
+  async function speak(item: QuizItem) {
     if (speakingId) return
-    setSpeakingId(itemId)
+    if (!item.audio_url) {
+      setError('發音檔仍在準備，請稍後重新整理。')
+      return
+    }
+    setSpeakingId(item.id)
     setError('')
     try {
-      const url = await onSpeak(itemId)
-      const audio = new Audio(url)
+      const audio = new Audio(item.audio_url)
       audio.addEventListener('ended', () => setSpeakingId(''), { once: true })
       audio.addEventListener('error', () => setSpeakingId(''), { once: true })
       await audio.play()
@@ -169,7 +171,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onSpe
           <span>{participantText(locale, 'flashcardCardCount', { current: reviewIndex + 1, total: data.items.length })}</span>
         </div>
         <div className="flashcard-review-stage">
-          <button className="flashcard-speaker" type="button" aria-label={`Play pronunciation: ${sides.word}`} onClick={() => void speak(reviewItem.id)}>
+          <button className="flashcard-speaker" type="button" aria-label={`Play pronunciation: ${sides.word}`} onClick={() => void speak(reviewItem)}>
             {speakingId === reviewItem.id ? <SpinnerGap className="spin" size={25} /> : <SpeakerHigh size={25} weight="fill" />}
           </button>
           <button

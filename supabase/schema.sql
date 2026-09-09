@@ -1063,6 +1063,22 @@ alter table public.quiz_items
 alter table public.quiz_items
   add column if not exists option_readings jsonb not null default '[]'::jsonb;
 
+alter table public.quiz_items
+  add column if not exists prompt_is_word boolean not null default false;
+
+alter table public.quiz_items
+  add column if not exists prompt_reading text null;
+
+-- Generated once with the deck and served from Storage thereafter. Keeping the
+-- URL on the public card row means thirty students pressing the speaker do not
+-- turn into thirty speech-model calls.
+alter table public.quiz_items
+  add column if not exists audio_url text null;
+
+alter table public.quiz_items
+  add column if not exists audio_status text not null default 'pending'
+  check (audio_status in ('pending', 'processing', 'ready'));
+
 -- One font subset for the whole deck, cut from the characters its cards use.
 alter table public.questions
   add column if not exists card_font_url text null;

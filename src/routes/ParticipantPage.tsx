@@ -458,16 +458,6 @@ export function ParticipantPage() {
     return data as { correct: boolean; correctAnswer: string | null }
   }
 
-  async function speakFlashcard(questionId: string, itemId: string) {
-    if (!participant || !participantToken) throw new Error('找不到字卡權限。')
-    const { data, error: speakError } = await requireSupabase().functions.invoke('participant-action', {
-      body: { action: 'speak_flashcard', sessionId, participantId: participant.id, participantToken, questionId, itemId },
-    })
-    if (speakError) throw new Error(await participantFunctionMessage(speakError, '暫時無法產生發音，請再試一次。'))
-    if (!data?.audioUrl) throw new Error(data?.message || '暫時無法產生發音，請再試一次。')
-    return data.audioUrl as string
-  }
-
   async function discardAudio() {
     if (!participant || !participantToken || !question) return
     setAudioBusy(true)
@@ -663,13 +653,13 @@ export function ParticipantPage() {
         <ParticipantQuestionHistory
           answers={historyAnswers}
           audioResponses={historyAudioResponses}
+          defaultExpandAll
           loadingQuestionIds={historyLoadingQuestionIds}
           locale={locale}
           questions={historyQuestions}
           quizData={historyQuizData}
           screenshots={historyScreenshots}
           onLoadDetails={loadHistoryDetails}
-          onSpeakFlashcard={speakFlashcard}
         />
       </main>
     )
@@ -749,7 +739,7 @@ export function ParticipantPage() {
       )}
       {question?.type === 'custom_quiz' ? (quizData ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onSpeak={(itemId) => speakFlashcard(question.id, itemId)} onTry={submitFlashcardTry} />
+          ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
@@ -777,7 +767,6 @@ export function ParticipantPage() {
         quizData={historyQuizData}
         screenshots={historyScreenshots}
         onLoadDetails={loadHistoryDetails}
-        onSpeakFlashcard={speakFlashcard}
       />
       <form className="panel message-form" onSubmit={sendMessage}>
         <label>

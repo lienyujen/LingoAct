@@ -391,6 +391,10 @@ export type QuizItem = {
   // the student reads in their own language.
   prompt_is_word?: boolean
   prompt_reading?: string | null
+  // Generated once when the teacher creates the deck; students only play the
+  // stored file, including after class ends.
+  audio_url?: string | null
+  audio_status?: 'pending' | 'processing' | 'ready'
   points: number
   translations: Translated<{
     prompt_text?: string

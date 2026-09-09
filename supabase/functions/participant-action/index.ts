@@ -176,24 +176,31 @@ Deno.serve(async (req) => {
         const requestedLocale = guidanceLanguages.has(input.locale) ? input.locale as string : ''
         const contentLocale = requestedLocale === 'zh-TW' ? 'zh_tw' : requestedLocale
         if (quiz.requested_type === 'flashcard' && contentLocale && items.some((item) => !item.translations?.[contentLocale])) {
-          const translated = await translateFlashcardItems(items.map((item) => ({
-            id: item.id,
-            prompt_text: item.prompt_text,
-            options: item.options,
-            prompt_is_word: item.prompt_is_word === true,
-          })), guidanceLanguageName(requestedLocale))
-          items = await Promise.all(items.map(async (item) => {
-            const fields = translated.get(item.id)
-            if (!fields || !Array.isArray(fields.options) || fields.options.length !== item.options.length) return item
-            const translations = { ...(item.translations || {}), [contentLocale]: {
-              prompt_text: fields.prompt_text || item.prompt_text,
-              options: fields.options,
-              pair_prompts: [],
-            } }
-            const { error } = await supabase.from('quiz_items').update({ translations }).eq('id', item.id)
-            if (error) throw error
-            return { ...item, translations }
-          }))
+          try {
+            const translated = await translateFlashcardItems(items.map((item) => ({
+              id: item.id,
+              prompt_text: item.prompt_text,
+              options: item.options,
+              prompt_is_word: item.prompt_is_word === true,
+            })), guidanceLanguageName(requestedLocale))
+            items = await Promise.all(items.map(async (item) => {
+              const fields = translated.get(item.id)
+              if (!fields || !Array.isArray(fields.options) || fields.options.length !== item.options.length) return item
+              const translations = { ...(item.translations || {}), [contentLocale]: {
+                prompt_text: fields.prompt_text || item.prompt_text,
+                options: fields.options,
+                pair_prompts: [],
+              } }
+              const { error } = await supabase.from('quiz_items').update({ translations }).eq('id', item.id)
+              if (error) throw error
+              return { ...item, translations }
+            }))
+          } catch (error) {
+            // A translation outage must never make the original deck disappear.
+            // The missing locale is retried on the next load and the student can
+            // still study from the language the teacher dispatched meanwhile.
+            console.warn('flashcard translation unavailable', errorDetail(error, 'translation failed'))
+          }
         }
         let answers: unknown[] = []
         if (attempt) {

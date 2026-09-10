@@ -18,9 +18,10 @@ const schema = {
     language: { type: 'string' },
     script: { type: 'string', enum: ['traditional', 'simplified', 'none'] },
     speakers: { type: 'array', items: { type: 'string' } },
+    speaker_genders: { type: 'array', items: { type: 'string', enum: ['male', 'female', 'unknown'] } },
     transcript: { type: 'string' },
   },
-  required: ['kind', 'language', 'script', 'speakers', 'transcript'],
+  required: ['kind', 'language', 'script', 'speakers', 'speaker_genders', 'transcript'],
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -83,8 +84,8 @@ Deno.serve(async (req) => {
       'First read all useful information in the image, including printed text, labels, people, actions, objects and setting.',
       'Then turn that source into natural listening material in the language being taught, at the class level above. Preserve the source meaning and facts, but rewrite vocabulary, sentence length and organisation when needed for the learners.',
       requestedKind === 'dialogue'
-        ? 'Write a natural two-speaker dialogue. Prefix every turn with a short speaker name and a colon. List the same two names in speakers, in first-speaking order.'
-        : 'Write one coherent passage that sounds natural when read aloud. Keep speakers empty.',
+        ? 'Write a natural two-speaker dialogue. Prefix every turn with a short speaker name and a colon. List the same two names in speakers, in first-speaking order. Return one speaker_genders entry per speaker: male or female only when the name, title, role, or visible person makes it clear; otherwise unknown. Never guess from an ambiguous name.'
+        : 'Write one coherent passage that sounds natural when read aloud. Keep speakers and speaker_genders empty.',
       'If the image mainly contains text, use OCR to recover its content before adapting it. If it mainly shows a visual situation, use only details actually visible in the image; do not invent unsupported facts.',
       '',
       'Report "language" as a lowercase code such as zh-tw, en, ja, ko, es, fr, de or vi.',
@@ -108,7 +109,7 @@ Deno.serve(async (req) => {
     const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || ''
     if (!raw) return jsonResponse({ message: 'AI 沒有回傳辨識結果。' }, 502)
 
-    let result: { kind: string; language: string; script: string; speakers: string[]; transcript: string }
+    let result: { kind: string; language: string; script: string; speakers: string[]; speaker_genders: string[]; transcript: string }
     try {
       result = JSON.parse(raw)
     } catch {
@@ -123,6 +124,9 @@ Deno.serve(async (req) => {
       language: track.language,
       script: result.script === 'none' ? null : result.script,
       speakers: Array.isArray(result.speakers) ? result.speakers.filter((name) => typeof name === 'string') : [],
+      speakerGenders: Array.isArray(result.speaker_genders)
+        ? result.speaker_genders.map((gender) => ['male', 'female'].includes(gender) ? gender : 'unknown')
+        : [],
       transcript: transcript.slice(0, 4000),
     })
   } catch (error) {

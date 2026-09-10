@@ -10,6 +10,7 @@ import {
   annotateReading,
   applyAnnotation,
 } from '../lib/listening'
+import type { ListeningAccent, SpeakerGender } from '../lib/listening'
 import type { ListeningKind, PresenterListeningClip } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
@@ -47,7 +48,28 @@ const KIND_LABELS: Record<StudioKind, PresenterMessageKey> = {
 
 // Two voices is the synthesis API's ceiling, so the assignment UI never offers
 // more than the audio can actually distinguish.
-const VOICES = ['Kore', 'Puck']
+const VOICE_LIMIT = 2
+
+const ACCENTS: Array<{ value: ListeningAccent; label: PresenterMessageKey }> = [
+  { value: 'standard_guoyu', label: 'accentStandardGuoyu' },
+  { value: 'putonghua', label: 'accentPutonghua' },
+  { value: 'taiwanese', label: 'accentTaiwanese' },
+]
+
+// Only decide when the name or role says it plainly. Ambiguous personal names
+// stay unknown and get contrasting voices without inventing a gender.
+function inferSpeakerGender(name: string): SpeakerGender {
+  const normalised = name.trim().toLowerCase()
+  if (/(先生|爸爸|父親|哥哥|弟弟|叔叔|伯伯|舅舅|爺爺|外公|男生|男孩|mr\.?|sir|father|dad|brother|grandpa|お父さん|お兄さん|형|오빠|아버지)/i.test(normalised)) return 'male'
+  if (/(女士|小姐|媽媽|母親|姐姐|妹妹|阿姨|姑姑|奶奶|外婆|女生|女孩|mrs\.?|ms\.?|miss|madam|mother|mom|sister|grandma|お母さん|お姉さん|언니|누나|어머니)/i.test(normalised)) return 'female'
+  if (/^(小明|阿明|志明|大雄|建宏|俊傑|家豪|宇軒)$/.test(normalised)) return 'male'
+  if (/^(小美|小芳|美玲|雅婷|怡君|淑芬|靜香)$/.test(normalised)) return 'female'
+  return 'unknown'
+}
+
+function assignedSpeakerGender(gender: SpeakerGender | undefined, index: number): Exclude<SpeakerGender, 'unknown'> {
+  return gender === 'male' || gender === 'female' ? gender : index % 2 === 0 ? 'female' : 'male'
+}
 
 // A pasted dialogue already names its speakers on every line, so read them from
 // there rather than making the teacher type them twice. Without this a dialogue
@@ -59,7 +81,7 @@ function speakersFromTranscript(text: string) {
     const match = line.match(/^\s*([^：:]{1,12})[：:]/)
     const name = match?.[1]?.trim()
     if (name && !names.includes(name)) names.push(name)
-    if (names.length >= VOICES.length) break
+    if (names.length >= VOICE_LIMIT) break
   }
   return names
 }
@@ -110,8 +132,9 @@ export function ListeningStudioModal({
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
   const [kind, setKind] = useState<StudioKind>('passage')
-  const [script, setScript] = useState<'traditional' | 'simplified'>('traditional')
+  const [accent, setAccent] = useState<ListeningAccent>('standard_guoyu')
   const [speakers, setSpeakers] = useState<string[]>([])
+  const [speakerGenders, setSpeakerGenders] = useState<SpeakerGender[]>([])
   const [speakersTouched, setSpeakersTouched] = useState(false)
   const [screenshotId, setScreenshotId] = useState<string | null>(null)
   const [includeScreenshot, setIncludeScreenshot] = useState(false)
@@ -138,7 +161,9 @@ export function ListeningStudioModal({
     setSource('screenshot')
     setTranscript('')
     setKind('passage')
+    setAccent('standard_guoyu')
     setSpeakers([])
+    setSpeakerGenders([])
     setSpeakersTouched(false)
     setScreenshotId(null)
     setIncludeScreenshot(false)
@@ -150,7 +175,9 @@ export function ListeningStudioModal({
 
   useEffect(() => {
     if (kind !== 'dialogue' || speakersTouched) return
-    setSpeakers(speakersFromTranscript(transcript))
+    const names = speakersFromTranscript(transcript)
+    setSpeakers(names)
+    setSpeakerGenders(names.map(inferSpeakerGender))
   }, [kind, transcript, speakersTouched])
 
   // A crop has come back from the desktop capture. readImage is a hoisted
@@ -197,7 +224,12 @@ export function ListeningStudioModal({
         levelCode,
       })
       setTranscript(analysis.transcript)
-      setSpeakers(analysis.speakers.slice(0, VOICES.length))
+      const names = analysis.speakers.slice(0, VOICE_LIMIT)
+      setSpeakers(names)
+      setSpeakerGenders(names.map((name, index) => {
+        const gender = analysis.speakerGenders[index]
+        return gender === 'male' || gender === 'female' ? gender : inferSpeakerGender(name)
+      }))
       setSpeakersTouched(true)
       // Synthesis is deliberately NOT chained on: a character the model misread
       // would otherwise be read out to the whole class as the thing they are
@@ -224,8 +256,9 @@ export function ListeningStudioModal({
         transcript: transcript.trim(),
         kind,
         language: teachingLanguage,
-        script: teachingLanguage.startsWith('zh') ? script : null,
+        accent: teachingLanguage.startsWith('zh') ? accent : null,
         speakers: kind === 'dialogue' ? speakers : [],
+        speakerGenders: kind === 'dialogue' ? speakerGenders : [],
         screenshotId,
       })
       setClip(result.clip)
@@ -338,9 +371,13 @@ export function ListeningStudioModal({
               </button>
             ))}
             {teachingLanguage.startsWith('zh') && (
-              <button className="ls-chip ls-chip-script" type="button" onClick={() => { setScript(script === 'traditional' ? 'simplified' : 'traditional'); setClip(null) }}>
-                {script === 'traditional' ? t('scriptTraditional') : t('scriptSimplified')}
-              </button>
+              <div className="ls-accent-set" aria-label={t('accentLabel')}>
+                {ACCENTS.map((choice) => (
+                  <button key={choice.value} className={accent === choice.value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => { setAccent(choice.value); setClip(null) }}>
+                    {t(choice.label)}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
@@ -404,9 +441,15 @@ export function ListeningStudioModal({
                       <span className={index === 0 ? 'ls-voice-dot' : 'ls-voice-dot alt'} />
                       <input
                         value={speaker}
-                        onChange={(event) => { setSpeakersTouched(true); setSpeakers(speakers.map((name, i) => (i === index ? event.target.value : name))) }}
+                        onChange={(event) => {
+                          const name = event.target.value
+                          setSpeakersTouched(true)
+                          setSpeakers(speakers.map((current, i) => (i === index ? name : current)))
+                          setSpeakerGenders(speakerGenders.map((gender, i) => (i === index ? inferSpeakerGender(name) : gender)))
+                          setClip(null)
+                        }}
                       />
-                      <span className="ls-voice-name">{VOICES[index]}</span>
+                      <span className="ls-voice-name">{t(assignedSpeakerGender(speakerGenders[index], index) === 'male' ? 'voiceMale' : 'voiceFemale')}</span>
                     </div>
                   ))}
                 </div>

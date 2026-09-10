@@ -13,8 +13,12 @@ export type ListeningAnalysis = {
   language: string
   script: 'traditional' | 'simplified' | null
   speakers: string[]
+  speakerGenders: SpeakerGender[]
   transcript: string
 }
+
+export type ListeningAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
+export type SpeakerGender = 'male' | 'female' | 'unknown'
 
 export async function analyzeListeningSource(input: {
   sessionId: string
@@ -36,8 +40,10 @@ export async function synthesizeListening(input: {
   transcript: string
   kind: ListeningKind
   language: string
+  accent?: ListeningAccent | null
   script?: 'traditional' | 'simplified' | null
   speakers?: string[]
+  speakerGenders?: SpeakerGender[]
   screenshotId?: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('synthesize-listening', { body: input })

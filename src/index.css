@@ -5028,7 +5028,7 @@ h2 {
 }
 .ls-chip.is-on { background: var(--ls-accent); border-color: var(--ls-accent); color: #fff; }
 .ls-chip:hover { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
-.ls-chip-script { margin-left: auto; }
+.ls-accent-set { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 
 .ls-transcript {
   display: flex; flex-direction: column;

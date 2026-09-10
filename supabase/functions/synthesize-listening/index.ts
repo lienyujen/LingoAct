@@ -1,7 +1,7 @@
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { buildVoicePlan, contentHash, durationMs, synthesize, wavFromPcm } from '../_shared/listening.ts'
-import type { ChineseScript, ClipKind } from '../_shared/listening.ts'
+import type { ChineseAccent, ChineseScript, ClipKind, SpeakerGender } from '../_shared/listening.ts'
 
 const KINDS: ClipKind[] = ['passage', 'dialogue', 'scene']
 
@@ -20,10 +20,22 @@ Deno.serve(async (req) => {
     const transcript = typeof input.transcript === 'string' ? input.transcript.trim() : ''
     const kind = KINDS.includes(input.kind) ? input.kind as ClipKind : 'passage'
     const language = (typeof input.language === 'string' ? input.language : 'zh-tw').toLowerCase()
-    const script = input.script === 'traditional' || input.script === 'simplified' ? input.script as ChineseScript : null
+    const accent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+      ? input.accent as ChineseAccent
+      : input.script === 'simplified' ? 'putonghua'
+        : input.script === 'traditional' ? 'taiwanese' : null
+    // Kept in the legacy script column so existing deployments need no schema
+    // migration. Speech generation reads accent directly; this value is only a
+    // durable marker for old presenter views.
+    const script: ChineseScript | null = accent === 'putonghua'
+      ? 'simplified'
+      : accent === 'taiwanese' ? 'traditional' : null
     const screenshotId = typeof input.screenshotId === 'string' ? input.screenshotId : null
     const speakers = Array.isArray(input.speakers)
       ? input.speakers.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
+      : []
+    const speakerGenders: SpeakerGender[] = Array.isArray(input.speakerGenders)
+      ? input.speakerGenders.slice(0, 2).map((gender: unknown) => gender === 'male' || gender === 'female' ? gender : 'unknown')
       : []
 
     if (!sessionId || !presenterToken || !transcript) return jsonResponse({ message: '缺少語音合成所需資料。' }, 400)
@@ -42,7 +54,7 @@ Deno.serve(async (req) => {
     // Asking for the same words twice is the common case: a teacher tweaks a
     // question, not the passage. Returning the clip already paid for keeps the
     // second press of the button free.
-    const hash = await contentHash(transcript, language, script, kind)
+    const hash = await contentHash(transcript, language, accent, kind, speakers, speakerGenders)
     const { data: existing } = await supabase
       .from('listening_clips')
       .select('*')
@@ -51,7 +63,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (existing) return jsonResponse({ clip: existing, reused: true })
 
-    const plan = buildVoicePlan(kind, language, script, speakers)
+    const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders)
     const pcm = await synthesize(transcript, plan)
     const wav = wavFromPcm(pcm)
     if (wav.length > MAX_BYTES) {
@@ -79,7 +91,7 @@ Deno.serve(async (req) => {
         storage_path: storagePath,
         public_url: publicUrl.publicUrl,
         duration_ms: durationMs(pcm.length),
-        voices: { instruction: plan.instruction, speakers: plan.speakers },
+        voices: { instruction: plan.instruction, speakers: plan.speakers, voiceNames: plan.voiceNames, speakerGenders },
         content_hash: hash,
       })
       .select('*')

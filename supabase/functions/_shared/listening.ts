@@ -11,22 +11,25 @@ const BITS = 16
 
 export type ClipKind = 'passage' | 'dialogue' | 'scene'
 export type ChineseScript = 'traditional' | 'simplified'
+export type ChineseAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
+export type SpeakerGender = 'male' | 'female' | 'unknown'
 
 export type VoicePlan = {
   instruction: string
   speakers: string[]
+  voiceNames: string[]
 }
 
 // Two voices is the API's ceiling for a multi-speaker request, and also about
 // the point where a learner stops being able to tell characters apart by ear.
-const DIALOGUE_VOICES = ['Kore', 'Puck']
 const NARRATION_VOICE = 'Kore'
+const FEMALE_VOICES = ['Kore', 'Aoede']
+const MALE_VOICES = ['Puck', 'Orus']
 
 // Named so the model is told which variety to speak rather than left to guess
 // from the characters, which for Chinese it cannot do: the same sentence in the
 // same script is read differently either side of the strait.
 const accentByLanguage: Record<string, string> = {
-  'zh-tw': 'Taiwanese Mandarin as spoken in Taiwan, with natural Taiwanese phrasing and intonation',
   en: 'natural English',
   ja: 'natural standard Japanese',
   ko: 'natural standard Korean',
@@ -36,35 +39,61 @@ const accentByLanguage: Record<string, string> = {
   vi: 'natural northern Vietnamese',
 }
 
-function accentFor(language: string, script: ChineseScript | null) {
+function accentFor(language: string, accent: ChineseAccent | null) {
   if (language === 'zh-tw' || language === 'zh-cn') {
-    // The teacher's slide is the evidence: a simplified-script passage is
-    // almost always mainland material and sounds wrong read in a Taiwan accent,
-    // and the reverse is just as jarring to a class in Taipei.
-    return script === 'simplified'
-      ? 'Standard Mainland Mandarin (Putonghua) with a neutral Beijing-based accent'
-      : accentByLanguage['zh-tw']
+    if (accent === 'putonghua') {
+      return 'standard Putonghua (普通話) as defined and taught in Mainland China, with neutral standard pronunciation, accurate retroflex initials and erhua only where standard Putonghua calls for it; do not use Taiwanese Mandarin pronunciation or vocabulary'
+    }
+    if (accent === 'taiwanese') {
+      return 'natural Taiwanese Mandarin as spoken in Taiwan, with recognisably Taiwanese pronunciation, phrasing and intonation'
+    }
+    return 'Standard Guoyu (標準國語) as taught and used in formal broadcasting in Taiwan, with neutral careful diction and accurate tones; avoid strongly local Taiwanese Mandarin pronunciation, slang or exaggerated Taiwan-style intonation'
   }
   return accentByLanguage[language] || 'a natural native accent'
 }
 
-export function buildVoicePlan(kind: ClipKind, language: string, script: ChineseScript | null, speakers: string[]): VoicePlan {
-  const accent = accentFor(language, script)
+function assignedGender(gender: SpeakerGender | undefined, index: number): Exclude<SpeakerGender, 'unknown'> {
+  if (gender === 'male' || gender === 'female') return gender
+  return index % 2 === 0 ? 'female' : 'male'
+}
+
+export function buildVoicePlan(
+  kind: ClipKind,
+  language: string,
+  accentChoice: ChineseAccent | null,
+  speakers: string[],
+  speakerGenders: SpeakerGender[] = [],
+): VoicePlan {
+  const accent = accentFor(language, accentChoice)
   if (kind === 'dialogue' && speakers.length >= 2) {
+    const used = { female: 0, male: 0 }
+    const assignments = speakers.slice(0, 2).map((speaker, index) => {
+      const gender = assignedGender(speakerGenders[index], index)
+      const choices = gender === 'female' ? FEMALE_VOICES : MALE_VOICES
+      const voiceName = choices[used[gender]++ % choices.length]
+      return { speaker, gender, voiceName }
+    })
     return {
-      instruction: `Read this conversation in ${accent}. Give each speaker their own consistent voice and let them sound like people talking to each other, not like someone reciting a script. Keep the pace natural for a language learner to follow.`,
-      speakers: speakers.slice(0, DIALOGUE_VOICES.length),
+      instruction: [
+        `Read this conversation in ${accent}.`,
+        assignments.map(({ speaker, gender }) => `${speaker} must use a clearly ${gender} voice.`).join(' '),
+        'Keep each assigned voice consistent. Let them sound like people talking to each other, not like one narrator reciting a script. Keep the pace natural for a language learner to follow.',
+      ].join(' '),
+      speakers: assignments.map(({ speaker }) => speaker),
+      voiceNames: assignments.map(({ voiceName }) => voiceName),
     }
   }
   if (kind === 'scene') {
     return {
       instruction: `Describe this in ${accent}, in the warm, clear voice of a teacher introducing a picture to the class. Speak in complete sentences at a pace a learner can follow.`,
       speakers: [],
+      voiceNames: [],
     }
   }
   return {
     instruction: `Read this passage aloud in ${accent}, clearly and at a pace a language learner can follow, with the phrasing and emphasis a native speaker would use.`,
     speakers: [],
+    voiceNames: [],
   }
 }
 
@@ -74,7 +103,7 @@ function speechConfig(plan: VoicePlan) {
       multiSpeakerVoiceConfig: {
         speakerVoiceConfigs: plan.speakers.map((speaker, index) => ({
           speaker,
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: DIALOGUE_VOICES[index] } },
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: plan.voiceNames[index] } },
         })),
       },
     }
@@ -167,10 +196,17 @@ export function durationMs(pcmLength: number) {
 
 // Identical words in identical voices produce identical audio, so the hash is
 // what stops a teacher paying for the same clip twice.
-export async function contentHash(text: string, language: string, script: ChineseScript | null, kind: ClipKind) {
+export async function contentHash(
+  text: string,
+  language: string,
+  accent: ChineseAccent | null,
+  kind: ClipKind,
+  speakers: string[] = [],
+  speakerGenders: SpeakerGender[] = [],
+) {
   const digest = await crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode([kind, language, script || '', text].join('\u0000')),
+    new TextEncoder().encode([kind, language, accent || '', speakers.join('|'), speakerGenders.join('|'), text].join('\u0000')),
   )
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }

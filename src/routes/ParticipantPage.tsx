@@ -68,6 +68,7 @@ export function ParticipantPage() {
   const [historyQuestions, setHistoryQuestions] = useState<Question[]>([])
   const [historyAnswers, setHistoryAnswers] = useState<Answer[]>([])
   const [historyScreenshots, setHistoryScreenshots] = useState<Record<string, Screenshot>>({})
+  const [historyListeningClips, setHistoryListeningClips] = useState<Record<string, ListeningClip | null>>({})
   const [historyAudioResponses, setHistoryAudioResponses] = useState<Record<string, AudioResponse | null>>({})
   const [historyQuizData, setHistoryQuizData] = useState<Record<string, ParticipantQuizData | null>>({})
   const [historyLoadingQuestionIds, setHistoryLoadingQuestionIds] = useState<Set<string>>(new Set())
@@ -136,6 +137,12 @@ export function ParticipantPage() {
     for (const quiz of sessionQuizzes || []) {
       if (quiz.requested_type === 'flashcard') answeredQuestionIds.add(quiz.question_id)
     }
+    // Teacher audio is durable class material, even when it was sent as
+    // listen-only and therefore produced no answer row. Keep every dispatched
+    // clip in history so it survives the next activity and the end of class.
+    for (const item of (allQuestions || []) as Question[]) {
+      if (item.listening_clip_id) answeredQuestionIds.add(item.id)
+    }
     const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => answeredQuestionIds.has(item.id))
     setHistoryAnswers(participantAnswers)
     setHistoryQuestions(answeredQuestions)
@@ -147,6 +154,18 @@ export function ParticipantPage() {
       setHistoryScreenshots(Object.fromEntries(((historyScreenshotData || []) as Screenshot[]).map((item) => [item.id, item])))
     } else {
       setHistoryScreenshots({})
+    }
+
+    const listeningQuestions = answeredQuestions.filter((item) => Boolean(item.listening_clip_id))
+    if (listeningQuestions.length) {
+      const clips = await Promise.all(listeningQuestions.map(async (item) => [
+        item.id,
+        await fetchListeningClip(item.listening_clip_id!).catch(() => null),
+      ] as const))
+      if (requestId !== loadSequence.current) return
+      setHistoryListeningClips(Object.fromEntries(clips))
+    } else {
+      setHistoryListeningClips({})
     }
 
     if (nextSession?.status === 'ended') {
@@ -655,10 +674,12 @@ export function ParticipantPage() {
           audioResponses={historyAudioResponses}
           defaultExpandAll
           loadingQuestionIds={historyLoadingQuestionIds}
+          listeningClips={historyListeningClips}
           locale={locale}
           questions={historyQuestions}
           quizData={historyQuizData}
           screenshots={historyScreenshots}
+          unlimitedListening
           onLoadDetails={loadHistoryDetails}
         />
       </main>
@@ -762,6 +783,7 @@ export function ParticipantPage() {
         answers={historyAnswers}
         audioResponses={historyAudioResponses}
         loadingQuestionIds={historyLoadingQuestionIds}
+        listeningClips={historyListeningClips}
         locale={locale}
         questions={historyQuestions}
         quizData={historyQuizData}

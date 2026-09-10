@@ -3,8 +3,9 @@ import { CaretDown, CaretUp, CheckCircle, Clock, ClockCounterClockwise, Micropho
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
-import type { Answer, AudioResponse, ParticipantQuizData, Question, Screenshot } from '../types'
+import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, Screenshot } from '../types'
 import { ParticipantFlashcards } from './ParticipantFlashcards'
+import { ListeningPlayer } from './ListeningPlayer'
 
 type Props = {
   activeQuestionId?: string | null
@@ -12,11 +13,13 @@ type Props = {
   audioResponses: Record<string, AudioResponse | null>
   defaultExpandAll?: boolean
   loadingQuestionIds: Set<string>
+  listeningClips: Record<string, ListeningClip | null>
   locale: ParticipantLocale
   onLoadDetails: (question: Question) => Promise<void>
   questions: Question[]
   quizData: Record<string, ParticipantQuizData | null>
   screenshots: Record<string, Screenshot>
+  unlimitedListening?: boolean
 }
 
 function answerText(question: Question, answer: Answer, locale: ParticipantLocale) {
@@ -44,11 +47,13 @@ export function ParticipantQuestionHistory({
   audioResponses,
   defaultExpandAll = false,
   loadingQuestionIds,
+  listeningClips,
   locale,
   onLoadDetails,
   questions,
   quizData,
   screenshots,
+  unlimitedListening = false,
 }: Props) {
   const history = useMemo(() => questions.filter((item) => item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
   const [sectionExpanded, setSectionExpanded] = useState(true)
@@ -96,6 +101,7 @@ export function ParticipantQuestionHistory({
             const answer = answers.find((item) => item.question_id === question.id)
             const screenshot = question.screenshot_id ? screenshots[question.screenshot_id] : null
             const audio = audioResponses[question.id]
+            const listeningClip = listeningClips[question.id]
             const quiz = quizData[question.id]
             const loading = loadingQuestionIds.has(question.id)
             return (
@@ -109,6 +115,16 @@ export function ParticipantQuestionHistory({
                   <div className="participant-history-body">
                     {screenshot && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
                     {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}
+                    {listeningClip && (
+                      <ListeningPlayer
+                        clip={listeningClip}
+                        questionId={question.id}
+                        replayLimit={unlimitedListening ? null : question.replay_limit}
+                        variant={question.type === 'pronunciation' ? 'model' : 'listening'}
+                        prompt={localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
+                        locale={locale}
+                      />
+                    )}
                     {question.type === 'custom_quiz' && quiz?.quiz.requested_type === 'flashcard' ? (
                       <ParticipantFlashcards
                         active={false}

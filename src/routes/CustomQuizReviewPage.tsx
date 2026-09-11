@@ -31,6 +31,7 @@ export function CustomQuizReviewPage() {
   const [busyItemId, setBusyItemId] = useState('')
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
   const [showAnswers, setShowAnswers] = useState(false)
+  const [selectedAttemptId, setSelectedAttemptId] = useState('')
   const [error, setError] = useState('')
 
   const loadQuiz = useCallback(async () => {
@@ -84,7 +85,27 @@ export function CustomQuizReviewPage() {
 
   // 寫作教練 has no answer key to reveal or correct, so this window becomes a
   // reading of the fields rather than an editor for them.
-  const writing = results?.quiz?.graded === false
+  const pictureWriting = results?.quiz?.requested_type === 'picture_writing'
+  const writing = results?.quiz?.graded === false && !pictureWriting
+  const pictureItem = pictureWriting ? results?.items.find((item) => item.type === 'ordering') : null
+  function pictureSegments(attemptId: string) {
+    if (!results || !pictureItem) return []
+    const answer = results.answers.find((value) => value.attempt_id === attemptId && value.item_id === pictureItem.id)
+    try {
+      const parsed = JSON.parse(answer?.answer_text || '[]') as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter((segment) => segment?.panelId && typeof segment?.text === 'string').map((segment) => ({
+        panelId: String(segment.panelId),
+        text: String(segment.text),
+        image: pictureItem.option_images[pictureItem.options.indexOf(String(segment.panelId))] || '',
+      }))
+    } catch { return [] }
+  }
+
+  useEffect(() => {
+    if (!pictureWriting || !results?.attempts.length) return
+    setSelectedAttemptId((current) => results.attempts.some((attempt) => attempt.id === current) ? current : results.attempts[0].id)
+  }, [pictureWriting, results])
   const reviewProps: QuizReviewProps | null = results ? {
     busyItemId,
     draftAnswers,
@@ -100,13 +121,30 @@ export function CustomQuizReviewPage() {
     <main className="custom-quiz-native-page">
       <header>
         <div>
-          <p className="eyebrow"><Brain size={18} />{writing ? t('writingFieldsView') : t('quizReviewTitle')}</p>
+          <p className="eyebrow"><Brain size={18} />{pictureWriting ? t('storyOrdering') : writing ? t('writingFieldsView') : t('quizReviewTitle')}</p>
           <h1>{results?.quiz?.title || (results ? t('quizGenerating') : t('loadingQuiz'))}</h1>
         </div>
         <button aria-label={t('closeQuizWindow')} className="icon-button" title={t('close')} type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>
       </header>
       {error && <p className="error custom-quiz-native-error">{error}</p>}
-      {results && reviewProps ? (
+      {results && pictureWriting ? (
+        <div className="picture-writing-expanded picture-writing-native">
+          <aside>
+            {results.attempts.map((attempt) => (
+              <button className={selectedAttemptId === attempt.id ? 'is-on' : ''} key={attempt.id} type="button" onClick={() => setSelectedAttemptId(attempt.id)}>
+                <strong>{attempt.participant_name}</strong>
+                <small>{attempt.status === 'graded' ? `${attempt.total_score}/${attempt.max_score}` : t('grading')}</small>
+                <span>{pictureSegments(attempt.id).map((segment) => <img alt="" key={segment.panelId} src={segment.image} />)}</span>
+              </button>
+            ))}
+            {!results.attempts.length && <p className="muted">{t('noAnswersYet')}</p>}
+          </aside>
+          <main>
+            {results.attempts.find((attempt) => attempt.id === selectedAttemptId)?.feedback?.zh_tw && <p className="picture-writing-native-feedback">{results.attempts.find((attempt) => attempt.id === selectedAttemptId)?.feedback?.zh_tw}</p>}
+            {pictureSegments(selectedAttemptId).map((segment, index) => <article key={segment.panelId}><div><b>{index + 1}</b><img alt="" src={segment.image} /></div><p>{segment.text}</p></article>)}
+          </main>
+        </div>
+      ) : results && reviewProps ? (
         <div className={`custom-quiz-native-content${results.screenshot ? '' : ' is-single'}`}>
           {/* A file-sourced quiz has no screenshot; keeping the panel would leave
               half the window empty for the questions to squeeze beside. */}

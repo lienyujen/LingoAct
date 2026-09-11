@@ -324,7 +324,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   }
 
   function openExpandedReview() {
-    if (!pictureWriting && window.lingoActDesktop) {
+    if (window.lingoActDesktop) {
       void window.lingoActDesktop.openCustomQuizReview(question.session_id, question.id)
       return
     }

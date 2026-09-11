@@ -5768,6 +5768,10 @@ h2 {
 .picture-writing-expanded main article img { width: 100%; border-radius: 8px; }
 .picture-writing-expanded main article b { position: absolute; top: 7px; left: 7px; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; text-align: center; line-height: 28px; }
 .picture-writing-expanded main article p { margin: 9px 2px 2px; font-size: 16px; line-height: 1.7; white-space: pre-wrap; }
+.picture-writing-native { height: 100%; box-sizing: border-box; }
+.picture-writing-native aside button { display: flex; flex-direction: column; gap: 2px; }
+.picture-writing-native aside button small { color: var(--muted); }
+.picture-writing-native-feedback { grid-column: 1 / -1; margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--primary-soft); color: var(--text); }
 .participant-picture-writing-review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .participant-picture-writing-review article { padding: 9px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .participant-picture-writing-review article div { position: relative; }

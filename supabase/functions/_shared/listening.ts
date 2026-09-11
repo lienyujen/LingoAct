@@ -35,6 +35,26 @@ const MALE_VOICES = ['Orus', 'Gacrux']
 const BOY_VOICES = ['Puck', 'Fenrir']
 const GIRL_VOICES = ['Leda', 'Zephyr']
 
+// The reading annotation and the recording are made at different times. The
+// former can ask a text model to settle every character, while native TTS must
+// be given a short explicit correction for words it is known to mispronounce.
+// Keep this list phrase-based: context is what makes a reading unambiguous, and
+// a bare-character override would break the character's other valid readings.
+const MANDARIN_PRONUNCIATIONS = [
+  {
+    phrase: '操行',
+    instruction: 'Pronounce 操行 as cāo xíng: 操 is first tone (cāo), never second tone.',
+  },
+]
+
+function pronunciationInstruction(text: string, language: string) {
+  if (!language.startsWith('zh')) return ''
+  const matches = MANDARIN_PRONUNCIATIONS
+    .filter(({ phrase }) => text.includes(phrase))
+    .map(({ instruction }) => instruction)
+  return matches.length ? `Pronunciation requirement: ${matches.join(' ')}` : ''
+}
+
 // Named so the model is told which variety to speak rather than left to guess
 // from the characters, which for Chinese it cannot do: the same sentence in the
 // same script is read differently either side of the strait.
@@ -78,8 +98,10 @@ export function buildVoicePlan(
   accentChoice: ChineseAccent | null,
   speakers: string[],
   speakerGenders: SpeakerGender[] = [],
+  text = '',
 ): VoicePlan {
   const accent = accentFor(language, accentChoice)
+  const pronunciation = pronunciationInstruction(text, language)
   if (kind === 'dialogue' && speakers.length >= 2) {
     const used = { female: 0, male: 0, boy: 0, girl: 0 }
     const assignments = speakers.slice(0, 2).map((speaker, index) => {
@@ -95,20 +117,21 @@ export function buildVoicePlan(
         `Read this conversation in ${accent}.`,
         assignments.map(({ speaker, gender }) => `${speaker} must use a clearly ${voiceDescription(gender)} voice.`).join(' '),
         'Keep each assigned voice consistent. Let them sound like people talking to each other, not like one narrator reciting a script. Keep the pace natural for a language learner to follow.',
-      ].join(' '),
+        pronunciation,
+      ].filter(Boolean).join(' '),
       speakers: assignments.map(({ speaker }) => speaker),
       voiceNames: assignments.map(({ voiceName }) => voiceName),
     }
   }
   if (kind === 'scene') {
     return {
-      instruction: `Describe this in ${accent}, in the warm, clear voice of a teacher introducing a picture to the class. Speak in complete sentences at a pace a learner can follow.`,
+      instruction: [`Describe this in ${accent}, in the warm, clear voice of a teacher introducing a picture to the class. Speak in complete sentences at a pace a learner can follow.`, pronunciation].filter(Boolean).join(' '),
       speakers: [],
       voiceNames: [],
     }
   }
   return {
-    instruction: `Read this passage aloud in ${accent}, clearly and at a pace a language learner can follow, with the phrasing and emphasis a native speaker would use.`,
+    instruction: [`Read this passage aloud in ${accent}, clearly and at a pace a language learner can follow, with the phrasing and emphasis a native speaker would use.`, pronunciation].filter(Boolean).join(' '),
     speakers: [],
     voiceNames: [],
   }
@@ -391,9 +414,14 @@ export async function contentHash(
   speakers: string[] = [],
   speakerGenders: SpeakerGender[] = [],
 ) {
+  const parts = [kind, language, accent || '', speakers.join('|'), speakerGenders.join('|'), text]
+  const pronunciation = pronunciationInstruction(text, language)
+  // Only recordings affected by a pronunciation rule get a new cache key. An
+  // unrelated clip should remain reusable instead of costing another AI call.
+  if (pronunciation) parts.push(pronunciation)
   const digest = await crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode([kind, language, accent || '', speakers.join('|'), speakerGenders.join('|'), text].join('\u0000')),
+    new TextEncoder().encode(parts.join('\u0000')),
   )
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }

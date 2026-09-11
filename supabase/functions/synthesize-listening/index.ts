@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ clip: existing, reused: true })
     }
 
-    const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders)
+    const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, transcript)
     const pcm = await synthesize(transcript, plan)
     const wav = wavFromPcm(pcm)
     const clipDurationMs = durationMs(pcm.length)

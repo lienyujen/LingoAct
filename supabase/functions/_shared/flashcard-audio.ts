@@ -32,7 +32,7 @@ async function storeCardAudio(sessionId: string, card: Card, language: string) {
   let publicUrl = existing?.public_url || ''
 
   if (!publicUrl) {
-    const plan = buildVoicePlan('passage', language, null, [])
+    const plan = buildVoicePlan('passage', language, null, [], [], word)
     plan.instruction = `${plan.instruction} Pronounce only the supplied word or phrase once. Do not add any other words.`
     const pcm = await synthesize(word, plan)
     const wav = wavFromPcm(pcm)

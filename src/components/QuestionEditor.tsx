@@ -29,6 +29,7 @@ type Props = {
   // 單字卡 has its own 課堂活動 button, which captures the screen and then opens
   // this editor already on the right setting.
   preset?: QuizRequestedType | null
+  initialDraft?: Partial<QuestionDraft> | null
   // 看圖說話 leaves the editor for the picture studio, taking the crop with it:
   // choosing what to do with a picture is a page of its own, not a row of
   // fields under a type button.
@@ -57,7 +58,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
   { type: 'pronunciation', label: 'typePronunciation' },
 ]
 
-export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCreate, onPictureTalk }: Props) {
+export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, onCancel, onCreate, onPictureTalk }: Props) {
   const t = usePresenterText()
   const w = useWorkspaceText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
@@ -73,17 +74,18 @@ export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCr
 
   useEffect(() => {
     if (!open) return
-    setType(preset ? 'custom_quiz' : 'multiple_choice')
-    setOptions(['A', 'B', 'C', 'D'])
-    setAllowMultiple(false)
-    setPromptText('')
-    setQuizCount('auto')
-    setQuizType(preset || 'random')
-    setQuizDirection('')
-    setQuizCoaching(false)
-    setPrepareSeconds(null)
-    setAnswerSeconds(null)
-  }, [open, preset])
+    const quiz = initialDraft?.quizSettings
+    setType(initialDraft?.type || (preset ? 'custom_quiz' : 'multiple_choice'))
+    setOptions(initialDraft?.options?.length ? initialDraft.options : ['A', 'B', 'C', 'D'])
+    setAllowMultiple(initialDraft?.allowMultiple === true)
+    setPromptText(initialDraft?.promptText || '')
+    setQuizCount(quiz?.requestedCount == null ? 'auto' : String(quiz.requestedCount))
+    setQuizType(quiz?.requestedType || preset || 'random')
+    setQuizDirection(quiz?.direction || '')
+    setQuizCoaching(quiz?.coaching === true)
+    setPrepareSeconds(initialDraft?.prepareSeconds ?? null)
+    setAnswerSeconds(initialDraft?.answerSeconds ?? null)
+  }, [initialDraft, open, preset])
 
   const editableOptions = type === 'multiple_choice' || type === 'poll'
   const finalOptions = useMemo(() => {

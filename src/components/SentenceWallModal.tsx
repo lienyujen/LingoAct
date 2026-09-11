@@ -5,6 +5,7 @@ import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   initialPrompt?: string
+  initialAnswerSeconds?: number | null
   busy: boolean
   error: string
   open: boolean
@@ -16,15 +17,15 @@ type Props = {
 // a 句型, so it asks for the one thing it cannot guess and nothing else.
 const ANSWER_PRESETS: Array<number | null> = [null, 60, 120, 180]
 
-export function SentenceWallModal({ busy, error, open, onCancel, onOpen, initialPrompt = '' }: Props) {
+export function SentenceWallModal({ busy, error, open, onCancel, onOpen, initialPrompt = '', initialAnswerSeconds = 120 }: Props) {
   const t = usePresenterText()
   const [promptText, setPromptText] = useState('')
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(120)
 
   useEffect(() => {
     setPromptText(open ? initialPrompt : '')
-    setAnswerSeconds(120)
-  }, [open, initialPrompt])
+    setAnswerSeconds(initialAnswerSeconds)
+  }, [initialAnswerSeconds, open, initialPrompt])
 
   if (!open) return null
 

@@ -10,22 +10,26 @@ type Props = {
   // 造句牆 hands its write-up over here rather than sending it itself: it is the
   // class's own writing, and what of it goes out is the teacher's call.
   initialBody?: string
+  initialUrl?: string
   onCancel: () => void
   onSend: (body: string, url: string) => void
 }
 
-export function TextDispatchModal({ busy, error, initialBody = '', open, onCancel, onSend }: Props) {
+export function TextDispatchModal({ busy, error, initialBody = '', initialUrl = '', open, onCancel, onSend }: Props) {
   const t = usePresenterText()
   const [body, setBody] = useState('')
   const [url, setUrl] = useState('')
 
   useEffect(() => {
-    if (open) setBody(initialBody)
+    if (open) {
+      setBody(initialBody)
+      setUrl(initialUrl)
+    }
     else {
       setBody('')
       setUrl('')
     }
-  }, [initialBody, open])
+  }, [initialBody, initialUrl, open])
 
   if (!open) return null
 

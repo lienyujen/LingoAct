@@ -26,6 +26,7 @@ type Props = {
   onRefreshResponses: () => Promise<void>
   onAnalyzeResponse: (responseId: string) => Promise<void>
   onCreateFileQuiz: (fileId: string, settings: CustomQuizSettings) => Promise<void>
+  initialQuizSettings?: CustomQuizSettings | null
 }
 
 function formatSize(bytes: number) {
@@ -67,6 +68,7 @@ export function FileTransferModal({
   onRefreshResponses,
   onAnalyzeResponse,
   onCreateFileQuiz,
+  initialQuizSettings,
 }: Props) {
   const t = usePresenterText()
   const [tab, setTab] = useState<Tab>('share')
@@ -199,7 +201,13 @@ export function FileTransferModal({
                           className="ghost-button"
                           disabled={busy}
                           type="button"
-                          onClick={() => { setQuizFile(file); setQuizCount('auto'); setQuizType('random'); setQuizDirection('') }}
+                          onClick={() => {
+                            setQuizFile(file)
+                            setQuizCount(initialQuizSettings?.requestedCount == null ? 'auto' : String(initialQuizSettings.requestedCount))
+                            setQuizType(initialQuizSettings?.requestedType || 'random')
+                            setQuizCoaching(initialQuizSettings?.coaching === true)
+                            setQuizDirection(initialQuizSettings?.direction || '')
+                          }}
                         >
                           <Sparkle size={15} />{t('typeCustomQuiz')}
                         </button>

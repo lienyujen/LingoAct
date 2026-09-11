@@ -13,6 +13,7 @@ import { QuestionEditor } from '../components/QuestionEditor'
 import { resolveTrack } from '../lib/teachingTracks'
 import { workspaceText } from '../lib/workspaceText'
 import { LessonPlan } from '../components/LessonPlan'
+import type { PlannedActivity } from '../components/LessonPlan'
 import type { QuestionDraft } from '../components/QuestionEditor'
 import type { QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
@@ -58,6 +59,30 @@ function microphoneErrorMessage(error: unknown, t: PresenterT) {
   return error.message || t('micReadFailed')
 }
 
+function plannedDirection(prompt: string, goal: string) {
+  return goal ? `${prompt.trim()}\n\n這堂課的學習目標：${goal}` : prompt.trim()
+}
+
+function plannedQuizDraft(activity: PlannedActivity, goal: string): QuestionDraft {
+  const direction = plannedDirection(activity.prompt, goal)
+  const requestedType = activity.kind === 'flashcard'
+    ? 'flashcard'
+    : activity.kind === 'writing'
+      ? 'writing'
+      : activity.quizType || 'random'
+  const count = activity.count && activity.count !== 'auto' ? Number(activity.count) : null
+  return {
+    type: 'custom_quiz', options: [], allowMultiple: false, promptText: direction,
+    quizSettings: {
+      direction,
+      requestedCount: Number.isFinite(count) ? count : null,
+      requestedType,
+      coaching: activity.kind === 'writing' && activity.coaching === true,
+    },
+    prepareSeconds: null, answerSeconds: null,
+  }
+}
+
 function realtimeRetryDelay(message: string) {
   const match = message.match(/try again in\s+([\d.]+)\s*(ms|s)/i)
   if (!match) return null
@@ -95,6 +120,7 @@ export function PresenterPage() {
   const w = workspaceText(locale)
   const [workspaceView, setWorkspaceView] = useState<'activities' | 'current' | 'history'>('activities')
   const [plannedPrompt, setPlannedPrompt] = useState('')
+  const [plannedActivity, setPlannedActivity] = useState<PlannedActivity | null>(null)
   const previousActivity = useRef<string | null>(null)
   useEffect(() => {
     const current = session?.current_question_id || null
@@ -126,7 +152,7 @@ export function PresenterPage() {
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
   const [listeningOpen, setListeningOpen] = useState(false)
   const [pictureOpen, setPictureOpen] = useState(false)
-  const [pictureInitialMode, setPictureInitialMode] = useState<'spoken' | 'ordering'>('spoken')
+  const [pictureInitialMode, setPictureInitialMode] = useState<'spoken' | 'written' | 'ordering'>('spoken')
   const [sentenceWallOpen, setSentenceWallOpen] = useState(false)
   const [sentenceWallError, setSentenceWallError] = useState('')
   const [photoTaskOpen, setPhotoTaskOpen] = useState(false)
@@ -136,6 +162,7 @@ export function PresenterPage() {
   const [textDispatchDraft, setTextDispatchDraft] = useState('')
   const [textDispatchError, setTextDispatchError] = useState('')
   const [fileTransferOpen, setFileTransferOpen] = useState(false)
+  const [plannedFileQuizSettings, setPlannedFileQuizSettings] = useState<CustomQuizSettings | null>(null)
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([])
   const [fileResponses, setFileResponses] = useState<FileResponse[]>([])
   const [collectQuestion, setCollectQuestion] = useState<Question | null>(null)
@@ -155,6 +182,7 @@ export function PresenterPage() {
   // Which 課堂活動 button started the capture, so the editor opens on it
   // instead of on a generic multiple choice.
   const [capturePreset, setCapturePreset] = useState<QuizRequestedType | null>(null)
+  const [captureInitialDraft, setCaptureInitialDraft] = useState<Partial<QuestionDraft> | null>(null)
   const [capturePreviewUrl, setCapturePreviewUrl] = useState<string | null>(null)
   const [captureSource, setCaptureSource] = useState<LingoActCaptureSource | null>(null)
   // Where the cropped image goes. 聽力播音室 reads the same drag-select capture
@@ -924,10 +952,15 @@ export function PresenterPage() {
     return new File([bytes], filename, { type: mime })
   }
 
-  async function captureWindowsScreen(preset: QuizRequestedType | null = null, target: 'question' | 'listening' | 'picture' = 'question') {
+  async function captureWindowsScreen(
+    preset: QuizRequestedType | null = null,
+    target: 'question' | 'listening' | 'picture' = 'question',
+    initialDraft: Partial<QuestionDraft> | null = null,
+  ) {
     if (!window.lingoActDesktop) return
 
     setCapturePreset(preset)
+    setCaptureInitialDraft(initialDraft)
     setCaptureTarget(target)
     setControlsOpen(false)
     setCapturePreviewUrl(null)
@@ -1068,6 +1101,7 @@ export function PresenterPage() {
       await uploadQuestionScreenshot(captureFile, draft)
       setCaptureFile(null)
       setCapturePreviewUrl(null)
+      setCaptureInitialDraft(null)
     } catch (error) {
       setAnalysisError(t('captureSendFailedWith', { message: error instanceof Error ? error.message : t('tryAgainLater') }))
       setEditorOpen(true)
@@ -1078,6 +1112,7 @@ export function PresenterPage() {
     setEditorOpen(false)
     setCaptureFile(null)
     setCapturePreviewUrl(null)
+    setCaptureInitialDraft(null)
   }
 
   async function stopQuestion() {
@@ -1302,7 +1337,7 @@ export function PresenterPage() {
     await loadAll()
   }
 
-  async function generateExitTicket() {
+  async function generateExitTicket(lessonGoal = '') {
     if (session?.exit_ticket_prompt) return
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
@@ -1314,7 +1349,7 @@ export function PresenterPage() {
     setAnalysisError('')
     try {
       const { data, error } = await requireSupabase().functions.invoke('generate-exit-ticket', {
-        body: { sessionId, presenterToken },
+        body: { sessionId, presenterToken, lessonGoal: lessonGoal.trim().slice(0, 200) },
       })
       if (error) throw error
       if (!data?.prompt) throw new Error(data?.message || t('noExitTicket'))
@@ -1851,22 +1886,25 @@ export function PresenterPage() {
           onStartBuzzer={startBuzzer}
           onToggleAnonymous={() => updateSession({ anonymous_enabled: !session.anonymous_enabled })}
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
-          onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen() : undefined}
-          onCaptureFlashcards={window.lingoActDesktop ? () => void captureWindowsScreen('flashcard') : undefined}
-          onCaptureWriting={window.lingoActDesktop ? () => void captureWindowsScreen('writing') : undefined}
-          onOpenPicture={() => { setPictureInitialMode('spoken'); setPictureOpen(true) }}
-          onOpenPictureWriting={() => { setPictureInitialMode('ordering'); setPictureOpen(true) }}
-          onGenerateExitTicket={generateExitTicket}
+          onCaptureScreen={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen() } : undefined}
+          onCaptureFlashcards={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('flashcard') } : undefined}
+          onCaptureWriting={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('writing') } : undefined}
+          onOpenPicture={() => { setPlannedActivity(null); setPictureInitialMode('spoken'); setPictureOpen(true) }}
+          onOpenPictureWriting={() => { setPlannedActivity(null); setPictureInitialMode('ordering'); setPictureOpen(true) }}
+          onGenerateExitTicket={() => void generateExitTicket()}
           onEndClass={() => setEndClassConfirmOpen(true)}
           onOpenFileTransfer={() => {
+            setPlannedFileQuizSettings(null)
             setFileTransferOpen(true)
             void refreshSharedFiles()
           }}
-          onOpenListeningStudio={() => { setPlannedPrompt(''); setListeningOpen(true) }}
-          onOpenSentenceWall={() => { setPlannedPrompt(''); setSentenceWallOpen(true) }}
-          onOpenPhotoTask={() => { setPlannedPrompt(''); setPhotoTaskOpen(true) }}
+          onOpenListeningStudio={() => { setPlannedActivity(null); setPlannedPrompt(''); setListeningOpen(true) }}
+          onOpenSentenceWall={() => { setPlannedActivity(null); setPlannedPrompt(''); setSentenceWallOpen(true) }}
+          onOpenPhotoTask={() => { setPlannedActivity(null); setPlannedPrompt(''); setPhotoTaskOpen(true) }}
           onOpenTextDispatch={() => {
+            setPlannedActivity(null)
             setTextDispatchError('')
+            setTextDispatchDraft('')
             setTextDispatchOpen(true)
           }}
           onOpenSettings={openPresenterSettings}
@@ -1875,12 +1913,37 @@ export function PresenterPage() {
           onToggleRecording={toggleCourseRecording}
           onToggleCaptionVisibility={toggleCaptionVisibility}
         />
-        <div className="panel"><LessonPlan key={session.title} courseName={session.title} busy={busy} onStart={(activity) => {
+        <div className="panel"><LessonPlan key={session.title} courseName={session.title} busy={busy} onStart={(activity, goal) => {
+          setPlannedActivity(activity)
           setPlannedPrompt(activity.prompt)
           if (activity.kind === 'listen') setListeningOpen(true)
           if (activity.kind === 'sentence') setSentenceWallOpen(true)
           if (activity.kind === 'photo') setPhotoTaskOpen(true)
           if (activity.kind === 'text') { setTextDispatchDraft(activity.prompt); setTextDispatchOpen(true) }
+          if (activity.kind === 'picture' || activity.kind === 'picture_ordering') {
+            setPlannedPrompt(plannedDirection(activity.prompt, goal))
+            setPictureInitialMode(activity.kind === 'picture_ordering' ? 'ordering' : activity.pictureMode || 'spoken')
+            setPictureOpen(true)
+          }
+          if (activity.kind === 'capture') {
+            const draft: QuestionDraft = {
+              type: activity.questionType || 'multiple_choice', options: activity.options?.filter((item) => item.trim()) || ['A', 'B', 'C', 'D'], allowMultiple: activity.allowMultiple === true,
+              promptText: activity.prompt, prepareSeconds: activity.prepareSeconds ?? null, answerSeconds: activity.answerSeconds ?? null,
+            }
+            void captureWindowsScreen(null, 'question', draft)
+          }
+          if (activity.kind === 'flashcard' || activity.kind === 'quiz' || activity.kind === 'writing') {
+            const draft = plannedQuizDraft(activity, goal)
+            if (activity.source === 'file') {
+              setPlannedFileQuizSettings(draft.quizSettings || null)
+              setFileTransferOpen(true)
+              void refreshSharedFiles()
+            } else {
+              void captureWindowsScreen(draft.quizSettings?.requestedType || 'random', 'question', draft)
+            }
+          }
+          if (activity.kind === 'file') { setPlannedFileQuizSettings(null); setFileTransferOpen(true); void refreshSharedFiles() }
+          if (activity.kind === 'exit_ticket') void generateExitTicket(goal)
         }} /></div>
         </div>
         <div hidden={workspaceView !== 'history'}>
@@ -1994,12 +2057,13 @@ export function PresenterPage() {
       )}
       <QuestionEditor
         preset={capturePreset}
+        initialDraft={captureInitialDraft}
         error={analysisError}
         open={editorOpen}
         previewUrl={capturePreviewUrl}
         onCancel={cancelQuestionEditor}
         onCreate={createScreenshotQuestion}
-        onPictureTalk={() => { setEditorOpen(false); setPictureInitialMode('spoken'); setPictureCapture(captureFile); setPictureOpen(true) }}
+        onPictureTalk={() => { setPlannedActivity(null); setEditorOpen(false); setPictureInitialMode('spoken'); setPictureCapture(captureFile); setPictureOpen(true) }}
       />
       {fileTransferOpen && (
         <FileTransferModal
@@ -2007,6 +2071,7 @@ export function PresenterPage() {
           collectQuestion={collectQuestion}
           fileBusyId={fileBusyId}
           fileResponses={collectFileResponses}
+          initialQuizSettings={plannedFileQuizSettings}
           sharedFiles={sharedFiles}
           onAnalyzeResponse={async (responseId) => { await analyzeFileResponse(responseId) }}
           onClose={() => setFileTransferOpen(false)}
@@ -2020,6 +2085,11 @@ export function PresenterPage() {
       )}
       <ListeningStudioModal
         initialTranscript={plannedPrompt}
+        initialKind={plannedActivity?.kind === 'listen' ? plannedActivity.listeningKind : undefined}
+        initialAccent={plannedActivity?.kind === 'listen' ? plannedActivity.accent : undefined}
+        initialReplayLimit={plannedActivity?.kind === 'listen' ? plannedActivity.replayLimit : undefined}
+        initialPrepareSeconds={plannedActivity?.kind === 'listen' ? plannedActivity.prepareSeconds : undefined}
+        initialAnswerSeconds={plannedActivity?.kind === 'listen' ? plannedActivity.answerSeconds : undefined}
         capturedScreen={listeningCapture}
         open={listeningOpen}
         // Hidden rather than closed while the teacher drags out the crop: the
@@ -2044,6 +2114,10 @@ export function PresenterPage() {
       />
       <PictureStudioModal
         initialMode={pictureInitialMode}
+        initialDirection={(plannedActivity?.kind === 'picture' || plannedActivity?.kind === 'picture_ordering') ? plannedPrompt : ''}
+        initialAiGrading={plannedActivity?.kind === 'picture_ordering' && plannedActivity.aiGrading === true}
+        initialPrepareSeconds={plannedActivity?.kind === 'picture' ? plannedActivity.prepareSeconds : undefined}
+        initialAnswerSeconds={plannedActivity?.kind === 'picture' ? plannedActivity.answerSeconds : undefined}
         capturedScreen={pictureCapture}
         open={pictureOpen}
         suspended={selectionMode}
@@ -2057,6 +2131,7 @@ export function PresenterPage() {
       />
       <SentenceWallModal
         initialPrompt={plannedPrompt}
+        initialAnswerSeconds={plannedActivity?.kind === 'sentence' ? plannedActivity.answerSeconds : undefined}
         busy={busy}
         error={sentenceWallError}
         open={sentenceWallOpen}
@@ -2075,6 +2150,7 @@ export function PresenterPage() {
         busy={busy}
         error={textDispatchError}
         initialBody={textDispatchDraft}
+        initialUrl={plannedActivity?.kind === 'text' ? plannedActivity.url : undefined}
         open={textDispatchOpen}
         onCancel={() => { setTextDispatchOpen(false); setTextDispatchDraft('') }}
         onSend={sendSharedContent}

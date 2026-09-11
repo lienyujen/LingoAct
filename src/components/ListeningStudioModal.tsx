@@ -17,6 +17,11 @@ import type { PresenterMessageKey } from '../lib/presenterI18n'
 
 type Props = {
   initialTranscript?: string
+  initialKind?: StudioKind
+  initialAccent?: ListeningAccent
+  initialReplayLimit?: number | null
+  initialPrepareSeconds?: number | null
+  initialAnswerSeconds?: number | null
   // 注音 or 拼音, decided with the rest of the class rather than per clip.
   readingAnnotation: string
   open: boolean
@@ -142,6 +147,11 @@ function HiddenIcon() {
 
 export function ListeningStudioModal({
   initialTranscript = '',
+  initialKind = 'passage',
+  initialAccent = 'standard_guoyu',
+  initialReplayLimit = null,
+  initialPrepareSeconds = null,
+  initialAnswerSeconds = null,
   open,
   suspended = false,
   sessionId,
@@ -178,11 +188,15 @@ export function ListeningStudioModal({
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
-    if (open && initialTranscript) {
-      setSource('text')
-      setTranscript(initialTranscript)
-    }
-  }, [open, initialTranscript])
+    if (!open) return
+    if (initialTranscript) setSource('text')
+    setTranscript(initialTranscript)
+    setKind(initialKind)
+    setAccent(initialAccent)
+    setReplayLimit(initialReplayLimit)
+    setPrepareSeconds(initialPrepareSeconds)
+    setAnswerSeconds(initialAnswerSeconds)
+  }, [initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open])
 
   useEffect(() => {
     if (open) return

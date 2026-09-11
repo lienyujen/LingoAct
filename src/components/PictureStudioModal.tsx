@@ -8,7 +8,11 @@ import type { QuestionDraft } from './QuestionEditor'
 
 type Props = {
   open: boolean
-  initialMode?: 'spoken' | 'ordering'
+  initialMode?: Mode
+  initialDirection?: string
+  initialAiGrading?: boolean
+  initialPrepareSeconds?: number | null
+  initialAnswerSeconds?: number | null
   sessionId: string
   presenterToken: string
   // A picture the teacher grabbed off their own screen — a textbook page, a
@@ -42,6 +46,10 @@ function promptFor(mode: Mode, storyboard: PictureStoryboard) {
 export function PictureStudioModal({
   open,
   initialMode = 'spoken',
+  initialDirection = '',
+  initialAiGrading = false,
+  initialPrepareSeconds = null,
+  initialAnswerSeconds = null,
   sessionId,
   presenterToken,
   suspended = false,
@@ -72,21 +80,21 @@ export function PictureStudioModal({
   const [aiGrading, setAiGrading] = useState(false)
 
   useEffect(() => {
-    if (open) return
-    setDirection('')
+    if (!open) return
+    setDirection(initialDirection)
     setPicture(null)
     setMode(initialMode)
     setPromptText('')
     setPromptTouched(false)
-    setPrepareSeconds(null)
-    setAnswerSeconds(null)
+    setPrepareSeconds(initialPrepareSeconds)
+    setAnswerSeconds(initialAnswerSeconds)
     setBusy('')
     setError('')
     setSent(false)
     setDrawn(true)
     setCaution('')
-    setAiGrading(false)
-  }, [initialMode, open])
+    setAiGrading(initialAiGrading)
+  }, [initialAiGrading, initialAnswerSeconds, initialDirection, initialMode, initialPrepareSeconds, open])
 
   useEffect(() => {
     if (!picture || promptTouched) return

@@ -5727,6 +5727,92 @@ h2 {
   border-color: var(--primary-dark);
   color: #fff;
 }
+
+/* The two listening actions are separate decisions. A real gap makes that
+   visible on touch screens instead of reading as one segmented control. */
+.listening-heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.listening-heading h2 {
+  font-size: 1rem;
+}
+
+.listening-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.listening-controls > button {
+  border-radius: var(--radius-md);
+  flex: 0 1 auto;
+}
+
+.listening-transcript-wrap {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.listening-transcript-toggle {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 750;
+  gap: 10px;
+  justify-self: start;
+}
+
+.listening-transcript-toggle input {
+  accent-color: var(--primary);
+  height: 22px;
+  width: 22px;
+}
+
+/* The listening heading is 1rem in this panel. Three rem is deliberately large:
+   this is material to follow from a phone at desk distance, not body copy. */
+.listening-karaoke {
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: #17131a;
+  font-size: 3rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  line-height: 1.9;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding: 22px;
+}
+
+.listening-karaoke .karaoke-character {
+  border-radius: .16em;
+  box-decoration-break: clone;
+  padding: .04em .015em;
+  transition: background 70ms linear, color 70ms linear;
+  -webkit-box-decoration-break: clone;
+}
+
+.listening-karaoke .karaoke-character.active {
+  background: #6d1857;
+  color: #fff;
+  outline: .09em solid #ffd54a;
+}
+
+.listening-karaoke rt {
+  color: #332b36;
+  font-family: inherit;
+}
+
+@media (max-width: 560px) {
+  .listening-karaoke {
+    font-size: 2.55rem;
+    padding: 16px;
+  }
+}
 .timing-preset.selected {
   background: var(--primary);
   border-color: var(--primary);

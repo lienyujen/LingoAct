@@ -755,6 +755,9 @@ export function ParticipantPage() {
           replayLimit={question.replay_limit}
           variant={question.type === 'pronunciation' ? 'model' : 'listening'}
           prompt={localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
+          readingFontUrl={question.reading_font_url}
+          readingRuby={question.reading_ruby}
+          karaokeCues={question.karaoke_cues}
           locale={locale}
         />
       )}

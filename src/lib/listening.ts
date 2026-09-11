@@ -101,7 +101,7 @@ export async function dispatchListeningQuestion(input: {
   promptText: string
   // Read aloud turns the clip into a model recording the learner speaks against,
   // instead of a passage they are tested on.
-  mode?: 'read_aloud'
+  mode?: 'audio' | 'read_aloud'
   prepareSeconds?: number | null
   answerSeconds?: number | null
   screenshotId?: string | null

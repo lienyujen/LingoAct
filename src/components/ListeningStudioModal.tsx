@@ -284,10 +284,10 @@ export function ListeningStudioModal({
           requestedCount: null,
           screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
-      } else if (target === 'read_aloud') {
-        // Marked up on the way out, not when the clip was made: a clip can be
-        // dispatched as audio, as a quiz, or read aloud, and only the last of
-        // those needs — or may safely carry — the text and its font.
+      } else if (target === 'read_aloud' || target === 'audio') {
+        // Marked up on the way out, not when the clip was made: only the two
+        // teaching modes that deliberately show the transcript may carry its
+        // reading. A comprehension quiz still receives neither text nor font.
         if (readingAnnotation !== 'none' && teachingLanguage.startsWith('zh')) {
           setBusy(t('annotating'))
           try {
@@ -308,23 +308,17 @@ export function ListeningStudioModal({
           }
           setBusy(t('dispatching'))
         }
-        // The learner sees the words and hears the model, then records their
-        // own take against it — so the clip stops being a test and becomes a
-        // reference, and the transcript travels on the question.
+        // Both modes carry the transcript. Audio keeps it folded until the
+        // learner asks; read-aloud shows it in the ordinary prompt immediately.
         await dispatchListeningQuestion({
           sessionId,
           presenterToken,
           listeningClipId: clip.id,
-          replayLimit: null,
+          replayLimit: target === 'read_aloud' ? null : replayLimit,
           promptText: '',
-          mode: 'read_aloud',
-          prepareSeconds,
-          answerSeconds,
-          screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
-        })
-      } else {
-        await dispatchListeningQuestion({
-          sessionId, presenterToken, listeningClipId: clip.id, replayLimit, promptText: '',
+          mode: target,
+          prepareSeconds: target === 'read_aloud' ? prepareSeconds : null,
+          answerSeconds: target === 'read_aloud' ? answerSeconds : null,
           screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
       }

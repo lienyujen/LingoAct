@@ -95,6 +95,13 @@ export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_fa
 
 export type ListeningKind = 'passage' | 'dialogue' | 'scene'
 
+export type KaraokeCue = {
+  start_index: number
+  end_index: number
+  start_ms: number
+  end_ms: number
+}
+
 // What a student is allowed to know about a clip. The transcript and the source
 // screenshot are missing on purpose: the database does not grant them to the
 // anon role, because between them they are the answer to the exercise.
@@ -193,13 +200,15 @@ export type Question = {
   // Null means unlimited, which suits practice. A listening test that can be
   // replayed without limit is a transcription exercise.
   replay_limit: number | null
-  // Set only on a read-aloud item, where the words are meant to be seen. The
-  // subset is cut from the clip's own characters, so a listening item never
-  // carries it.
+  // Set on read-aloud and audio-only items, where the words may be seen. A
+  // comprehension quiz still never carries the subset or its transcript.
   reading_font_url?: string | null
   // 拼音 only: one syllable per character of prompt_text, rendered as ruby.
   // 注音 leaves this null — its reading is inside the font above.
   reading_ruby?: string[] | null
+  // Audio-only listening carries these with its visible-on-request transcript.
+  // The spans use character indexes in the unannotated text.
+  karaoke_cues?: KaraokeCue[]
   // 單字卡 注音: the deck's font subset, cut from the characters its cards use.
   card_font_url?: string | null
   // Null on both means untimed, which is every question that came before.

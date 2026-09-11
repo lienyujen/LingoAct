@@ -37,6 +37,10 @@ function answerText(question: Question, answer: Answer, locale: ParticipantLocal
 }
 
 function questionTitle(question: Question, locale: ParticipantLocale) {
+  // Audio-only questions now carry the whole transcript for the optional KTV
+  // view. Putting that paragraph in the collapsed history row would turn the
+  // navigation label into a wall of text.
+  if (question.type === 'listening') return participantText(locale, 'listening')
   const translation = localizedFields(question.translations, locale)
   return translation?.prompt_text || translation?.title || question.prompt_text || translation?.title || question.title
 }
@@ -122,6 +126,9 @@ export function ParticipantQuestionHistory({
                         replayLimit={unlimitedListening ? null : question.replay_limit}
                         variant={question.type === 'pronunciation' ? 'model' : 'listening'}
                         prompt={localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
+                        readingFontUrl={question.reading_font_url}
+                        readingRuby={question.reading_ruby}
+                        karaokeCues={question.karaoke_cues}
                         locale={locale}
                       />
                     )}

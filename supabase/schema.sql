@@ -955,6 +955,12 @@ alter table public.listening_clips
 alter table public.listening_clips
   add column if not exists font_url text null;
 
+-- Generated once with the audio, then copied only to an audio-only question.
+-- Listening quizzes keep both this and the transcript private.
+alter table public.listening_clips
+  add column if not exists karaoke_cues jsonb not null default '[]'::jsonb
+  check (jsonb_typeof(karaoke_cues) = 'array');
+
 create index if not exists listening_clips_session_idx
   on public.listening_clips (session_id, created_at desc);
 
@@ -972,6 +978,13 @@ create unique index if not exists listening_clips_reuse_idx
 -- to leak — the text is on screen.
 alter table public.questions
   add column if not exists reading_font_url text null;
+
+-- Character/word spans on prompt_text, measured against the stored recording.
+-- currentTime remains media time at every playbackRate, so slow playback needs
+-- no second set of timestamps.
+alter table public.questions
+  add column if not exists karaoke_cues jsonb not null default '[]'::jsonb
+  check (jsonb_typeof(karaoke_cues) = 'array');
 
 -- Timed activities: a countdown to think, then a countdown to answer.
 --

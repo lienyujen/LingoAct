@@ -1,6 +1,6 @@
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
-import { buildVoicePlan, contentHash, durationMs, synthesize, wavFromPcm } from '../_shared/listening.ts'
+import { buildVoicePlan, contentHash, durationMs, karaokeCues, synthesize, wavFromPcm } from '../_shared/listening.ts'
 import type { ChineseAccent, ChineseScript, ClipKind, SpeakerGender } from '../_shared/listening.ts'
 
 const KINDS: ClipKind[] = ['passage', 'dialogue', 'scene']
@@ -61,11 +61,28 @@ Deno.serve(async (req) => {
       .eq('session_id', sessionId)
       .eq('content_hash', hash)
       .maybeSingle()
-    if (existing) return jsonResponse({ clip: existing, reused: true })
+    if (existing) {
+      if (!Array.isArray(existing.karaoke_cues) || existing.karaoke_cues.length === 0) {
+        try {
+          const audioResponse = await fetch(existing.public_url, { signal: AbortSignal.timeout(8_000) })
+          if (!audioResponse.ok) throw new Error(`Stored audio returned ${audioResponse.status}.`)
+          const storedWav = new Uint8Array(await audioResponse.arrayBuffer())
+          const cues = await karaokeCues(storedWav, transcript, language, existing.duration_ms || 0)
+          const { data: aligned, error: alignError } = await supabase.from('listening_clips')
+            .update({ karaoke_cues: cues }).eq('id', existing.id).select('*').single()
+          if (alignError) throw alignError
+          return jsonResponse({ clip: aligned, reused: true })
+        } catch (error) {
+          console.warn('cached clip alignment failed', error instanceof Error ? error.message : error)
+        }
+      }
+      return jsonResponse({ clip: existing, reused: true })
+    }
 
     const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders)
     const pcm = await synthesize(transcript, plan)
     const wav = wavFromPcm(pcm)
+    const clipDurationMs = durationMs(pcm.length)
     if (wav.length > MAX_BYTES) {
       return jsonResponse({ message: '這段內容太長，語音超過 10MB。請分成兩段再轉換。' }, 413)
     }
@@ -77,6 +94,7 @@ Deno.serve(async (req) => {
     if (uploadError) throw uploadError
 
     const { data: publicUrl } = supabase.storage.from('lingoact-listening').getPublicUrl(storagePath)
+    const cues = await karaokeCues(wav, transcript, language, clipDurationMs)
 
     const { data: clip, error: insertError } = await supabase
       .from('listening_clips')
@@ -90,7 +108,8 @@ Deno.serve(async (req) => {
         transcript,
         storage_path: storagePath,
         public_url: publicUrl.publicUrl,
-        duration_ms: durationMs(pcm.length),
+        duration_ms: clipDurationMs,
+        karaoke_cues: cues,
         voices: { instruction: plan.instruction, speakers: plan.speakers, voiceNames: plan.voiceNames, speakerGenders },
         content_hash: hash,
       })

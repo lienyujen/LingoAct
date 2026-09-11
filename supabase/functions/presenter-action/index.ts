@@ -1705,7 +1705,7 @@ Deno.serve(async (req) => {
 
       const { data: clip } = await supabase
         .from('listening_clips')
-        .select('id, transcript, annotation, annotation_text, font_url')
+        .select('id, transcript, annotation, annotation_text, font_url, karaoke_cues')
         .eq('id', clipId)
         .eq('session_id', sessionId)
         .maybeSingle()
@@ -1724,6 +1724,7 @@ Deno.serve(async (req) => {
       // and hear a model, so the transcript moves onto the question — the one
       // place students may read — and the clip becomes the reference recording.
       const readAloud = input.mode === 'read_aloud'
+      const audioOnly = input.mode === 'audio'
 
       const prepareSeconds = readAloud ? timingSeconds(input.prepareSeconds, 300) : null
       const answerSeconds = readAloud ? timingSeconds(input.answerSeconds, 600) : null
@@ -1738,9 +1739,9 @@ Deno.serve(async (req) => {
       // It travels in reading_ruby instead and the prompt stays the sentence.
       const zhuyin = clip.annotation === 'zhuyin'
       const readingText = zhuyin ? (clip.annotation_text || clip.transcript) : clip.transcript
-      const promptText = readAloud ? readingText.slice(0, 1000) : teacherPrompt
+      const promptText = audioOnly ? readingText.slice(0, 4000) : readAloud ? readingText.slice(0, 1000) : teacherPrompt
       let readingRuby: string[] | null = null
-      if (readAloud && clip.annotation === 'pinyin' && clip.annotation_text) {
+      if ((readAloud || audioOnly) && clip.annotation === 'pinyin' && clip.annotation_text) {
         try {
           const syllables = JSON.parse(clip.annotation_text)
           // Aligned per character, so a list of the wrong length would put every
@@ -1755,10 +1756,15 @@ Deno.serve(async (req) => {
       }
       const title = readAloud ? '朗讀發音' : '聽力'
       let translations = {}
-      try {
-        translations = await translateQuestion(title, promptText, [])
-      } catch (translationError) {
-        console.error('listening question translation failed', translationError instanceof Error ? translationError.message : translationError)
+      // The audio-only prompt is the exact script being spoken, not guidance
+      // text. Translating it would make the highlighted words disagree with the
+      // recording for every student using another interface language.
+      if (!audioOnly) {
+        try {
+          translations = await translateQuestion(title, promptText, [])
+        } catch (translationError) {
+          console.error('listening question translation failed', translationError instanceof Error ? translationError.message : translationError)
+        }
       }
 
       const { error: stopError } = await supabase
@@ -1781,11 +1787,12 @@ Deno.serve(async (req) => {
           status: 'active',
           title,
           prompt_text: promptText || null,
-          // Only a read-aloud item carries the font. The subset is cut from the
-          // clip's characters, so handing it to a listening item would reveal
-          // which characters the passage uses.
-          reading_font_url: readAloud && zhuyin ? clip.font_url : null,
+          // Only modes that deliberately offer the words carry the font. A
+          // comprehension quiz gets neither subset nor transcript, because the
+          // characters themselves would reveal its source passage.
+          reading_font_url: (readAloud || audioOnly) && zhuyin ? clip.font_url : null,
           reading_ruby: readingRuby,
+          karaoke_cues: audioOnly && Array.isArray(clip.karaoke_cues) ? clip.karaoke_cues : [],
           prepare_seconds: prepareSeconds,
           answer_seconds: answerSeconds,
           translations,

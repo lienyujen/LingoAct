@@ -5786,6 +5786,9 @@ h2 {
   margin: 0;
   overflow-wrap: anywhere;
   padding: 22px;
+  /* Dialogue transcripts already put each speaker on their own source line.
+     Keep those turns instead of collapsing them into one dense paragraph. */
+  white-space: pre-wrap;
 }
 
 .listening-karaoke .karaoke-character {

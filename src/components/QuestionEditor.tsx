@@ -96,7 +96,7 @@ export function QuestionEditor({ preset, error, open, previewUrl, onCancel, onCr
   if (!open) return null
 
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop question-editor-backdrop">
       <form
         className="modal question-modal"
         onSubmit={(event) => {

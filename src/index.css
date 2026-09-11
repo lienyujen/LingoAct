@@ -1751,10 +1751,17 @@ h2 {
   max-width: 560px;
 }
 
+.question-editor-backdrop {
+  /* A captured image can make the editor taller than the window. Safe centering
+     keeps the top controls reachable instead of placing them above scroll zero. */
+  align-items: flex-start;
+  align-items: safe center;
+}
+
 .capture-preview {
   background: var(--surface-strong);
   border-radius: var(--radius-md);
-  max-height: 280px;
+  max-height: min(280px, 32svh);
   object-fit: contain;
   width: 100%;
 }

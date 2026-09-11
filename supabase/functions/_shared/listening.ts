@@ -67,8 +67,8 @@ function assignedGender(gender: SpeakerGender | undefined, index: number): Exclu
 }
 
 function voiceDescription(voice: Exclude<SpeakerGender, 'unknown'>) {
-  if (voice === 'boy') return 'young boy'
-  if (voice === 'girl') return 'young girl'
+  if (voice === 'boy') return 'youthful male voice'
+  if (voice === 'girl') return 'youthful female voice'
   return voice === 'male' ? 'adult male' : 'adult female'
 }
 

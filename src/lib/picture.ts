@@ -136,12 +136,13 @@ export async function splitIntoPanels(file: File, t: PresenterT = presenterLooku
 // as screenshots so deleting the class removes them, and students can read that
 // table — created_at included. Sending them up in reading order would leave the
 // answer in the timestamps.
-export async function dispatchPictureOrdering(input: {
+export async function dispatchPictureWriting(input: {
   sessionId: string
   presenterToken: string
   file: File
   promptText: string
   title: string
+  aiGrading: boolean
 }, t: PresenterT = presenterLookup('zh-TW')) {
   const supabase = requireSupabase()
   const panels = (await splitIntoPanels(input.file, t)).map((file, index) => ({ file, order: index + 1 }))
@@ -176,12 +177,13 @@ export async function dispatchPictureOrdering(input: {
 
   const { data, error } = await supabase.functions.invoke('presenter-action', {
     body: {
-      action: 'create_picture_ordering',
+      action: 'create_picture_writing',
       sessionId: input.sessionId,
       presenterToken: input.presenterToken,
       panels: uploaded,
       promptText: input.promptText,
       title: input.title,
+      aiGrading: input.aiGrading,
     },
   })
   if (error) throw error

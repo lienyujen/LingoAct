@@ -2051,6 +2051,7 @@ export function PresenterPage() {
         onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'picture') : undefined}
         onCapturedScreenRead={() => setPictureCapture(null)}
         onClose={() => { setPictureCapture(null); setPictureOpen(false) }}
+        onDispatched={() => { setPictureCapture(null); setPictureOpen(false); setWorkspaceView('activities') }}
         onDispatch={uploadQuestionScreenshot}
       />
       <SentenceWallModal

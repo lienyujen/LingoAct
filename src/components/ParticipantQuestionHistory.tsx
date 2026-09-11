@@ -153,8 +153,14 @@ export function ParticipantQuestionHistory({
                           const pictures = item.option_images?.length === item.options.length
                             ? (response?.answer_values || []).map((value) => item.option_images[item.options.indexOf(value)])
                             : []
+                          let pictureWriting: Array<{ panelId: string; text: string }> = []
+                          if (quiz.quiz.requested_type === 'picture_writing') {
+                            try { pictureWriting = JSON.parse(response?.answer_text || '[]') } catch { pictureWriting = [] }
+                          }
                           return <div key={item.id}><strong>{itemIndex + 1}. {prompt}</strong>
-                            {pictures.length
+                            {pictureWriting.length
+                              ? <div className="participant-picture-writing-review">{pictureWriting.map((segment, at) => <article key={segment.panelId}><div><b>{at + 1}</b><img alt="" src={item.option_images[item.options.indexOf(segment.panelId)]} /></div><p>{segment.text}</p></article>)}</div>
+                              : pictures.length
                               ? <p className="participant-history-panels">{pictures.map((src, at) => <img alt="" key={`${src}-${at}`} src={src} />)}</p>
                               : <p>{participantText(locale, 'yourAnswerLabel')}{submitted}</p>}
                             {feedback && <small>{feedback}</small>}</div>

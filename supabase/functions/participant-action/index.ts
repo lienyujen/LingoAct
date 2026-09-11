@@ -430,13 +430,14 @@ Deno.serve(async (req) => {
       // matches two words to the same translation is wrong, not shorter, and
       // collapsing the duplicate would silently shift every later pair.
       const listAnswerTypes = new Set(['multiple_choice', 'ordering', 'matching'])
+      const pictureWriting = quiz.requested_type === 'picture_writing'
       const submittedByItem = new Map<string, { itemId: string; answerText?: string; answerValues?: string[] }>()
       for (const raw of submittedAnswers) {
         if (!raw || typeof raw !== 'object') return jsonResponse({ message: '作答資料格式不正確。' }, 400)
         const answer = raw as Record<string, unknown>
         const itemId = typeof answer.itemId === 'string' ? answer.itemId : ''
         if (!validUuid(itemId) || submittedByItem.has(itemId)) return jsonResponse({ message: '作答題號不正確。' }, 400)
-        const answerText = typeof answer.answerText === 'string' ? answer.answerText.trim().slice(0, 4000) : ''
+        const answerText = typeof answer.answerText === 'string' ? answer.answerText.trim().slice(0, pictureWriting ? 6000 : 4000) : ''
         const answerValues = Array.isArray(answer.answerValues)
           ? answer.answerValues
             .filter((value): value is string => typeof value === 'string')
@@ -463,6 +464,14 @@ Deno.serve(async (req) => {
           if (values.length !== expected.length || [...values].sort().join('\u0000') !== [...expected].sort().join('\u0000')) {
             return jsonResponse({ message: `第 ${item.position} 題的排序不完整。` }, 400)
           }
+          if (pictureWriting) {
+            let segments: Array<{ panelId?: unknown; text?: unknown }> = []
+            try { segments = JSON.parse(submitted.answerText || '') } catch { /* handled below */ }
+            if (!Array.isArray(segments) || segments.length !== expected.length || segments.some((segment, index) => segment?.panelId !== values[index] || typeof segment?.text !== 'string' || !segment.text.trim())) {
+              return jsonResponse({ message: '請在每張圖下完成一段文字。' }, 400)
+            }
+            submitted.answerText = JSON.stringify(segments.map((segment) => ({ panelId: segment.panelId, text: String(segment.text).trim().slice(0, 1000) })))
+          }
         } else if (item.type === 'matching') {
           // One choice per left-hand item, each of them an offered option.
           const values = submitted.answerValues || []
@@ -478,7 +487,7 @@ Deno.serve(async (req) => {
       // 寫作教練: the fields were the working-out and this is the piece. It
       // is required wherever the exercise asked for it, because an exercise
       // whose point is the article cannot be finished without one.
-      const composing = quiz.graded === false && items.length > 1
+      const composing = quiz.graded === false && !pictureWriting && items.length > 1
       const composition = typeof input.composition === 'string' ? input.composition.trim().slice(0, 12000) : ''
       if (composing && !composition) {
         return jsonResponse({ message: '請先把各段整合成一篇文章再送出。' }, 400)
@@ -505,7 +514,7 @@ Deno.serve(async (req) => {
           return {
             attempt_id: attemptId,
             item_id: item.id,
-            answer_text: listAnswerTypes.has(item.type) ? null : submitted.answerText,
+            answer_text: pictureWriting && item.type === 'ordering' ? submitted.answerText : listAnswerTypes.has(item.type) ? null : submitted.answerText,
             answer_values: listAnswerTypes.has(item.type) ? submitted.answerValues : null,
           }
         }))
@@ -515,7 +524,7 @@ Deno.serve(async (req) => {
           question_id: questionId,
           participant_id: participantId,
           participant_name: participant.name,
-          answer_text: '[自訂測驗評分中]',
+          answer_text: pictureWriting ? '[排序寫作已送出]' : '[自訂測驗評分中]',
         })
         if (placeholderError) throw placeholderError
       } catch (error) {
@@ -523,7 +532,7 @@ Deno.serve(async (req) => {
         throw error
       }
 
-      if (quiz.graded === false || items.every((item) => ['multiple_choice', 'ordering', 'matching'].includes(item.type))) {
+      if (quiz.graded === false || (!pictureWriting && items.every((item) => ['multiple_choice', 'ordering', 'matching'].includes(item.type)))) {
         await gradeCustomQuizAttempt(attemptId)
         const { data: gradedAttempt, error: gradedAttemptError } = await supabase.from('quiz_attempts')
           .select('*').eq('id', attemptId).single()

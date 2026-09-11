@@ -9,6 +9,8 @@ type Props = {
   // 圖片排序: one picture per row, aligned to values. Empty means the rows are
   // text, which is what ordering sentences and paragraphs has always been.
   images?: string[]
+  textByValue?: Record<string, string>
+  onTextChange?: (value: string, text: string) => void
   locale: ParticipantLocale
   onChange: (values: string[]) => void
 }
@@ -20,7 +22,7 @@ type Props = {
 // fragments simply immovable. The arrows are not a fallback for old browsers but
 // the path for anyone using a keyboard, and they are quicker than dragging when
 // only one piece is out of place.
-export function QuizOrderingInput({ values, labels, images, locale, onChange }: Props) {
+export function QuizOrderingInput({ values, labels, images, textByValue, locale, onChange, onTextChange }: Props) {
   const pictures = images?.length === values.length
   const [dragging, setDragging] = useState<number | null>(null)
   const rowsRef = useRef<(HTMLLIElement | null)[]>([])
@@ -85,7 +87,7 @@ export function QuizOrderingInput({ values, labels, images, locale, onChange }: 
             </button>
             <span className="quiz-ordering-index">{index + 1}</span>
             {pictures
-              ? <img alt="" className="quiz-ordering-picture" draggable={false} src={images[index]} />
+              ? <div className="quiz-ordering-picture-writing"><img alt="" className="quiz-ordering-picture" draggable={false} src={images[index]} />{onTextChange && <textarea maxLength={1000} placeholder={participantText(locale, 'pictureWritingPlaceholder')} value={textByValue?.[value] || ''} onChange={(event) => onTextChange(value, event.target.value)} />}</div>
               : <span className="quiz-ordering-text">{labels[index] ?? value}</span>}
             <span className="quiz-ordering-moves">
               <button

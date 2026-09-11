@@ -807,15 +807,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ composition })
     }
 
-    // 故事排序, the picture version: the four panels arrive already cut apart and
-    // already shuffled, and the class drags them back into sequence.
+    // 排序寫作: the four panels arrive already cut apart and shuffled. Every
+    // learner may choose a different order, so no reference sequence is stored.
     //
     // The shuffle happens before the upload rather than here, and that is the
     // point of it. Panels are recorded as screenshots so that deleting the class
     // still removes them, and screenshots are readable by students — timestamps
     // included. Uploading them in reading order would leave the answer lying in
     // created_at for anyone who thought to sort by it.
-    if (action === 'create_picture_ordering') {
+    if (action === 'create_picture_writing') {
       const rawPanels = Array.isArray(input.panels) ? input.panels : []
       if (rawPanels.length !== 4) return jsonResponse({ message: '圖片排序需要四格。' }, 400)
       const panels = rawPanels.map((raw) => {
@@ -848,10 +848,11 @@ Deno.serve(async (req) => {
 
       const promptText = typeof input.promptText === 'string' && input.promptText.trim()
         ? input.promptText.trim().slice(0, 1000)
-        : '請把這四張圖排成正確的故事順序。'
+        : '請自行安排四張圖的順序，並在每張圖下寫出故事。'
       const title = typeof input.title === 'string' && input.title.trim()
         ? input.title.trim().slice(0, 200)
-        : '故事排序'
+        : '排序寫作題'
+      const aiGrading = input.aiGrading === true
 
       const stoppedAt = new Date().toISOString()
       const { error: stopError } = await supabase.from('questions')
@@ -905,8 +906,8 @@ Deno.serve(async (req) => {
         title,
         direction: promptText,
         requested_count: 1,
-        requested_type: 'picture_ordering',
-        graded: true,
+        requested_type: 'picture_writing',
+        graded: aiGrading,
       })
       if (quizError) throw quizError
 
@@ -926,8 +927,8 @@ Deno.serve(async (req) => {
 
       const { error: keyError } = await supabase.from('quiz_item_keys').insert({
         item_id: itemId,
-        accepted_answers: [...withUrls].sort((a, b) => a.order - b.order).map((panel) => panel.screenshotId),
-        rubric: '',
+        accepted_answers: [],
+        rubric: '評估故事是否完整連貫、四段文字是否能形成一篇故事，以及語言表達是否清楚。學生可自行決定圖片順序，不得因順序與原圖不同而扣分。',
       })
       if (keyError) throw keyError
 

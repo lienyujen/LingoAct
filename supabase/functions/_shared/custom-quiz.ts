@@ -499,9 +499,30 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     // 寫作教練 hands the writing straight back to the teacher. Marking it would
     // be the most expensive call this app makes, and it is not what was asked
     // for — so the attempt is simply complete, with no score to report.
-    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded').eq('id', attempt.quiz_id).single()
+    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type').eq('id', attempt.quiz_id).single()
     if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
     if (quiz.graded === false) {
+      if (quiz.requested_type === 'picture_writing') {
+        const { data: items, error: itemError } = await supabase.from('quiz_items').select('id, points').eq('quiz_id', attempt.quiz_id)
+        if (itemError || !items?.length) throw itemError || new Error('Quiz items are unavailable.')
+        for (const item of items) {
+          const { error } = await supabase.from('quiz_item_answers').update({
+            score: item.points,
+            feedback: { zh_tw: '已完成排序寫作。', en: 'Sequence writing completed.' },
+          }).eq('attempt_id', attemptId).eq('item_id', item.id)
+          if (error) throw error
+        }
+        const totalScore = items.reduce((sum, item) => sum + Number(item.points || 0), 0)
+        const { error: completeError } = await supabase.from('quiz_attempts').update({
+          status: 'graded', total_score: totalScore,
+          feedback: { zh_tw: '已完成繳交。', en: 'Submission completed.' },
+          error_message: null, graded_at: new Date().toISOString(),
+        }).eq('id', attemptId)
+        if (completeError) throw completeError
+        await supabase.from('answers').update({ answer_text: '[排序寫作已完成]' })
+          .eq('question_id', attempt.question_id).eq('participant_id', attempt.participant_id)
+        return
+      }
       const { error: submitError } = await supabase.from('quiz_attempts').update({
         status: 'submitted',
         total_score: null,
@@ -524,6 +545,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
 
     const keyByItem = new Map((keys || []).map((key) => [key.item_id, key]))
     const answerByItem = new Map((answers || []).map((answer) => [answer.item_id, answer]))
+    const pictureWriting = quiz.requested_type === 'picture_writing'
     const gradingInput = items.map((item) => {
       const key = keyByItem.get(item.id)
       const answer = answerByItem.get(item.id)
@@ -535,11 +557,11 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         points: item.points,
         accepted_answers: key?.accepted_answers || [],
         rubric: key?.rubric || '',
-        submitted_answer: answer?.answer_values?.length ? answer.answer_values : answer?.answer_text || '',
+        submitted_answer: pictureWriting ? answer?.answer_text || '' : answer?.answer_values?.length ? answer.answer_values : answer?.answer_text || '',
       }
     })
 
-    const aiGradingInput = gradingInput.filter((item) => !['multiple_choice', 'ordering', 'matching'].includes(item.type))
+    const aiGradingInput = gradingInput.filter((item) => pictureWriting || !['multiple_choice', 'ordering', 'matching'].includes(item.type))
     let output: {
       evaluations?: Array<{ item_id?: string; score?: number; feedback_zh_tw?: string; feedback_en?: string }>
       overall_feedback_zh_tw?: string
@@ -547,7 +569,9 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     } = { evaluations: [] }
     if (aiGradingInput.length) {
       const result = await callAiJson(
-        '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。以台灣繁體中文提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
+        pictureWriting
+          ? '你是 LingoAct 的形成性寫作評分助理。學生自行決定四格圖片順序，沒有標準順序，不得因順序與原圖不同扣分。依每格文字能否形成完整連貫的故事、內容發展與語言表達，按 rubric 與配分評分。每題分數不得小於 0 或超過 points。以台灣繁體中文提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。'
+          : '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。以台灣繁體中文提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
         { items: aiGradingInput },
         gradingSchema,
         null,
@@ -585,6 +609,11 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         feedbackEn = correctPairs === expected.length
           ? 'All pairs matched correctly.'
           : `${correctPairs} of ${expected.length} pairs matched.`
+      } else if (item.type === 'ordering' && pictureWriting) {
+        if (!evaluation) throw new Error('AI grading result is incomplete.')
+        score = Math.max(0, Math.min(item.points, Number(evaluation.score) || 0))
+        feedbackZhTw = String(evaluation.feedback_zh_tw || '')
+        feedbackEn = String(evaluation.feedback_en || '')
       } else if (item.type === 'ordering') {
         // Order is the whole answer, so this compares sequences rather than sets.
         const expected = key.accepted_answers || []

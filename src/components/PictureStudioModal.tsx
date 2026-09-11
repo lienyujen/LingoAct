@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowsClockwise, CardsThree, Crop, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
 import { TimingRow } from './TimingRow'
-import { dispatchPictureOrdering, describePicture, generatePicture } from '../lib/picture'
+import { dispatchPictureWriting, describePicture, generatePicture } from '../lib/picture'
 import type { GeneratedPicture, PictureStoryboard } from '../lib/picture'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { QuestionDraft } from './QuestionEditor'
@@ -20,13 +20,13 @@ type Props = {
   // The desktop app's drag-select capture, absent in the browser.
   onCaptureScreen?: () => void
   onClose: () => void
+  onDispatched: () => void
   onDispatch: (file: File, draft: QuestionDraft) => Promise<void>
 }
 
 // What to do with the picture. 口說 and 打字 send it whole as an ordinary
-// question that happens to carry an image; 排順序 cuts it into its four panels
-// and sends them shuffled as a 故事排序 quiz, so the intact picture — which is
-// the answer — never reaches the class at all.
+// question that happens to carry an image; 排序寫作 cuts it into four panels
+// and lets every learner choose an order and write a story beneath them.
 type Mode = 'written' | 'spoken' | 'ordering'
 
 const ANSWER_PRESETS: Array<number | null> = [null, 60, 120, 180]
@@ -47,6 +47,7 @@ export function PictureStudioModal({
   onCapturedScreenRead,
   onCaptureScreen,
   onClose,
+  onDispatched,
   onDispatch,
 }: Props) {
   const t = usePresenterText()
@@ -66,6 +67,7 @@ export function PictureStudioModal({
   // 排順序 needs the 2x2 grid the drawing prompt produces.
   const [drawn, setDrawn] = useState(true)
   const [caution, setCaution] = useState('')
+  const [aiGrading, setAiGrading] = useState(false)
 
   useEffect(() => {
     if (open) return
@@ -81,6 +83,7 @@ export function PictureStudioModal({
     setSent(false)
     setDrawn(true)
     setCaution('')
+    setAiGrading(false)
   }, [open])
 
   useEffect(() => {
@@ -147,14 +150,15 @@ export function PictureStudioModal({
     setBusy(mode === 'ordering' ? t('cuttingPanels') : t('sending'))
     try {
       if (mode === 'ordering') {
-        await dispatchPictureOrdering({
+        await dispatchPictureWriting({
           sessionId,
           presenterToken,
           file: picture.file,
           promptText: promptText.trim(),
           title: picture.storyboard.title,
+          aiGrading,
         }, t)
-        setSent(true)
+        onDispatched()
         return
       }
       await onDispatch(picture.file, {
@@ -165,7 +169,7 @@ export function PictureStudioModal({
         prepareSeconds: mode === 'spoken' ? prepareSeconds : null,
         answerSeconds,
       })
-      setSent(true)
+      onDispatched()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t('sendFailed'))
     } finally {
@@ -271,7 +275,13 @@ export function PictureStudioModal({
               </div>
 
               {mode === 'ordering' && (
-                <p className="ps-note">{t('pictureOrderingHint')}</p>
+                <>
+                  <p className="ps-note">{t('pictureOrderingHint')}</p>
+                  <label className="ps-ai-grading">
+                    <input checked={aiGrading} type="checkbox" onChange={(event) => setAiGrading(event.target.checked)} />
+                    <span><strong>{t('pictureAiGrading')}</strong><small>{t(aiGrading ? 'pictureAiGradingOn' : 'pictureAiGradingOff')}</small></span>
+                  </label>
+                </>
               )}
 
               <label className="ps-prompt">

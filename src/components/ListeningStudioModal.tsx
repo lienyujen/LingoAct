@@ -64,6 +64,12 @@ const VOICE_CHOICES: Array<{ value: Exclude<SpeakerGender, 'unknown'>; label: Pr
   { value: 'girl', label: 'voiceGirl' },
 ]
 
+function nextSpeakerVoice(current: SpeakerGender, index: number) {
+  const assigned = assignedSpeakerGender(current, index)
+  const at = VOICE_CHOICES.findIndex((choice) => choice.value === assigned)
+  return VOICE_CHOICES[(at + 1) % VOICE_CHOICES.length].value
+}
+
 // Only decide when the name or role says it plainly. Ambiguous personal names
 // stay unknown and get contrasting voices without inventing a gender.
 function inferSpeakerGender(name: string): SpeakerGender {
@@ -446,36 +452,30 @@ export function ListeningStudioModal({
                     const selectedVoice = assignedSpeakerGender(speakerGenders[index], index)
                     return (
                       <div key={index} className="ls-voice">
-                        <div className="ls-voice-speaker">
-                          <span className={index === 0 ? 'ls-voice-dot' : 'ls-voice-dot alt'} />
-                          <input
-                            aria-label={t('speakerName')}
-                            value={speaker}
-                            onChange={(event) => {
-                              const name = event.target.value
-                              setSpeakersTouched(true)
-                              setSpeakers(speakers.map((current, i) => (i === index ? name : current)))
-                              setSpeakerGenders(speakerGenders.map((gender, i) => (i === index ? assignedSpeakerGender(inferSpeakerGender(name), index) : gender)))
-                              setClip(null)
-                            }}
-                          />
-                        </div>
-                        <div className="ls-voice-options" aria-label={t('speakerVoice')}>
-                          {VOICE_CHOICES.map((choice) => (
-                            <button
-                              aria-pressed={selectedVoice === choice.value}
-                              className={selectedVoice === choice.value ? 'is-on' : ''}
-                              key={choice.value}
-                              type="button"
-                              onClick={() => {
-                                setSpeakerGenders(speakerGenders.map((voice, i) => (i === index ? choice.value : voice)))
-                                setClip(null)
-                              }}
-                            >
-                              {t(choice.label)}
-                            </button>
-                          ))}
-                        </div>
+                        <span className={index === 0 ? 'ls-voice-dot' : 'ls-voice-dot alt'} />
+                        <input
+                          aria-label={t('speakerName')}
+                          value={speaker}
+                          onChange={(event) => {
+                            const name = event.target.value
+                            setSpeakersTouched(true)
+                            setSpeakers(speakers.map((current, i) => (i === index ? name : current)))
+                            setSpeakerGenders(speakerGenders.map((gender, i) => (i === index ? assignedSpeakerGender(inferSpeakerGender(name), index) : gender)))
+                            setClip(null)
+                          }}
+                        />
+                        <button
+                          aria-label={t('speakerVoice')}
+                          className="ls-voice-cycle"
+                          title={t('speakerVoiceCycle')}
+                          type="button"
+                          onClick={() => {
+                            setSpeakerGenders(speakerGenders.map((voice, i) => (i === index ? nextSpeakerVoice(voice, index) : voice)))
+                            setClip(null)
+                          }}
+                        >
+                          {t(VOICE_CHOICES.find((choice) => choice.value === selectedVoice)?.label || 'voiceMale')}
+                        </button>
                       </div>
                     )
                   })}

@@ -162,6 +162,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
   // Off by default: this panel is on the screen the class is looking at.
   const [showAnswers, setShowAnswers] = useState(false)
+  const [selectedAttemptId, setSelectedAttemptId] = useState('')
 
   useEffect(() => {
     if (!expanded) return
@@ -183,6 +184,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   // than left showing dashes and a stuck "評分中" count.
   const flashcard = results.quiz.requested_type === 'flashcard'
   const pictureOrdering = results.quiz.requested_type === 'picture_ordering'
+  const pictureWriting = results.quiz.requested_type === 'picture_writing'
   const coaching = results.quiz.coaching === true
   const coachTurns = results.coachTurns || []
   const unreviewed = results.attempts.filter((attempt) => !attempt.feedback?.zh_tw)
@@ -228,7 +230,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   }
   // 寫作教練 and a deck are both ungraded, but for different reasons and with
   // different things worth showing, so they are not one branch.
-  const writing = results.quiz.graded === false && !flashcard
+  const writing = results.quiz.graded === false && !flashcard && !pictureWriting
   const graded = results.attempts.filter((attempt) => attempt.status === 'graded')
   const grading = results.attempts.filter((attempt) => attempt.status === 'grading')
   const average = graded.length
@@ -270,6 +272,19 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     missesByItem.set(attemptTry.item_id, (missesByItem.get(attemptTry.item_id) || 0) + 1)
   }
   const itemPrompt = new Map(results.items.map((item) => [item.id, item.prompt_text]))
+  const pictureItem = pictureWriting ? results.items.find((item) => item.type === 'ordering') : null
+  function pictureSegments(attemptId: string) {
+    const answer = (answersByAttempt.get(attemptId) || []).find((value) => value.item_id === pictureItem?.id)
+    try {
+      const parsed = JSON.parse(answer?.answer_text || '[]') as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter((segment) => segment.panelId && typeof segment.text === 'string').map((segment) => ({
+        panelId: segment.panelId!,
+        text: segment.text!,
+        image: pictureItem?.option_images[pictureItem.options.indexOf(segment.panelId!)] || '',
+      }))
+    } catch { return [] }
+  }
 
   const stoppable = isCurrentQuestion && question.status === 'active'
   const resumable = isCurrentQuestion && question.status === 'stopped'
@@ -309,17 +324,18 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   }
 
   function openExpandedReview() {
-    if (window.lingoActDesktop) {
+    if (!pictureWriting && window.lingoActDesktop) {
       void window.lingoActDesktop.openCustomQuizReview(question.session_id, question.id)
       return
     }
+    setSelectedAttemptId((current) => current || results!.attempts[0]?.id || '')
     setExpanded(true)
   }
 
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">
-        <div><p className="eyebrow"><Brain size={17} />{writing ? t('writingCoachShort') : flashcard ? t('flashcards') : pictureOrdering ? t('storyOrdering') : t('typeCustomQuiz')}</p><h2>{results.quiz.title || question.title}</h2></div>
+        <div><p className="eyebrow"><Brain size={17} />{writing ? t('writingCoachShort') : flashcard ? t('flashcards') : pictureOrdering || pictureWriting ? t('storyOrdering') : t('typeCustomQuiz')}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
           <QuestionActivityStatus audioOnly question={question} />
           <span>{t('answeredOf', { n: results.attempts.length, online: onlineCount })}</span>
@@ -347,14 +363,14 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               <div><strong>{grading.length}</strong><span>{t('grading')}</span></div>
             </>}
       </div>
-      {!writing && !flashcard && (
+      {!writing && !flashcard && !pictureWriting && (
         <label className="show-answers-toggle">
           <input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />
           {t('showAnswersToggle')}
         </label>
       )}
       {error && <p className="error">{error}</p>}
-      {!flashcard && <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>}
+      {!flashcard && !pictureWriting && <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>}
       {/* The deck the AI produced is a first draft; the teacher is the one who
           knows which words this class actually needs. Removing is immediate,
           adding goes back to the same screenshot and avoids what is already
@@ -512,6 +528,13 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               </div>
             )}
             {!writing && attempt.feedback?.zh_tw && <p>{attempt.feedback.zh_tw}</p>}
+            {pictureWriting && (
+              <button className="picture-writing-attempt" type="button" onClick={() => { setSelectedAttemptId(attempt.id); setExpanded(true) }}>
+                {pictureSegments(attempt.id).map((segment, panelIndex) => (
+                  <span key={segment.panelId}><b>{panelIndex + 1}</b><img alt="" src={segment.image} /><small>{segment.text}</small></span>
+                ))}
+              </button>
+            )}
           </article>
         ))}
         {!results.attempts.length && <p className="muted">{writing ? t('noSubmissionsYet') : t('noAnswersYet')}</p>}
@@ -523,7 +546,17 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               <div><p className="eyebrow"><Brain size={17} />{writing ? t('writingFieldsView') : t('quizReviewTitle')}</p><h2>{results.quiz.title || question.title}</h2></div>
               <button aria-label={t('closeExpanded')} className="icon-button" title={t('close')} type="button" onClick={() => setExpanded(false)}><X size={22} /></button>
             </header>
-            <div className={`custom-quiz-review-content${results.screenshot ? '' : ' is-single'}`}>
+            {pictureWriting ? (
+              <div className="picture-writing-expanded">
+                <aside>
+                  {results.attempts.map((attempt, index) => <button className={selectedAttemptId === attempt.id ? 'is-on' : ''} key={attempt.id} type="button" onClick={() => setSelectedAttemptId(attempt.id)}><strong>{anonymousEnabled ? t('anonymousStudent', { n: index + 1 }) : attempt.participant_name}</strong><span>{pictureSegments(attempt.id).map((segment) => <img alt="" key={segment.panelId} src={segment.image} />)}</span></button>)}
+                </aside>
+                <main>
+                  {pictureSegments(selectedAttemptId).map((segment, index) => <article key={segment.panelId}><div><b>{index + 1}</b><img alt="" src={segment.image} /></div><p>{segment.text}</p></article>)}
+                  {!selectedAttemptId && <p className="muted">{t('noAnswersYet')}</p>}
+                </main>
+              </div>
+            ) : <div className={`custom-quiz-review-content${results.screenshot ? '' : ' is-single'}`}>
               {results.screenshot && (
                 <aside className="custom-quiz-source-panel">
                   <h3>{t('sourceScreenshot')}</h3>
@@ -541,7 +574,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                 {error && <p className="error">{error}</p>}
                 <QuizAnswerEditor {...reviewProps} />
               </div>
-            </div>
+            </div>}
           </section>
         </div>,
         document.body,

@@ -2,7 +2,7 @@ import { callAiJson, errorDetail } from './ai.ts'
 import { levelInstruction } from './proficiency.ts'
 import { trackInstruction } from './teaching.ts'
 
-// 看圖說話: a four-panel picture the class describes or narrates.
+// 看圖說寫: a four-panel picture the class describes or narrates.
 //
 // Four panels rather than one, because one picture gets you nouns and four get
 // you a story — 先、再、然後、最後, a tense, a reason. That is what the activity
@@ -41,7 +41,7 @@ const storyboardSchema = {
 }
 
 const STORYBOARD_RULES = [
-  'You are planning a four-panel picture (四格圖) for a 看圖說話 activity. The learners see only the picture — no words appear in it — and then describe or narrate what happens, either aloud or in writing.',
+  'You are planning a four-panel picture (四格圖) for a 看圖說寫 activity. The learners see only the picture — no words appear in it — and then describe or narrate what happens, either aloud or in writing.',
   'The four panels are ONE small everyday story read 左上 → 右上 → 左下 → 右下, with a beginning, something that happens, and an end. Four related pictures with no sequence between them turn the activity into a vocabulary test: the learner names objects instead of telling a story.',
   'Because nothing in the picture can be read, everything the learner is meant to say has to be visible — an action, an object, a facial expression, weather, a time of day. Anything that exists only as a word (a name, a price, a date, someone\'s thoughts) cannot be part of the story.',
   'The level decides how much happens, not merely which words are used. Near the bottom of a scale: one unmistakable action per panel, few objects, no implied feelings, nothing to work out. Higher up: a complication, a reaction, a change of mind — something the learner has to infer and explain rather than only name.',
@@ -52,7 +52,7 @@ const STORYBOARD_RULES = [
   'Do not build the story around anything that carries writing — a sign, a menu, a notice, a label, a screen, a ticket, a nameplate. The drawing model letters whatever normally carries lettering, and the characters it invents come out malformed, which is the last thing to put in front of a class learning to read them. Choose a moment that can be understood from what people are doing.',
   '`target_words` are the words the picture is meant to pull out of the learner, `pattern` the sentence pattern or connectives it should lead them into. Both must be within the class\'s level.',
   '`spoken_prompt` and `written_prompt` are the instruction the class is given, in the language being taught: one for saying it aloud, one for writing it down. They differ by more than the verb — speaking asks for a sequence out loud within a minute or two, writing asks for connected sentences or a short paragraph.',
-  '`order_prompt` is the instruction for a third use of the same picture: the four panels are cut apart and shuffled, and the class puts them back in order. Say what to work from — what happens first, what it leads to — without naming anything that appears in a particular panel.',
+  '`order_prompt` is the instruction for sequence writing: the four panels are cut apart and shuffled, each learner chooses a sensible order, and writes under every panel to create a complete story. There is no single correct order. Say that clearly without naming anything that appears in a particular panel.',
   'Never state the story in the prompts. Telling the class what happens is the answer.',
 ].join('\n')
 
@@ -72,7 +72,7 @@ export function drawingPrompt(storyboard: PictureStoryboard) {
   const panels = ['第一格', '第二格', '第三格', '第四格']
     .map((label, index) => `${label}：${storyboard.panels[index]}`)
     .join('\n')
-  return `一張 2x2 四格圖，給語言課的看圖說話練習用。閱讀順序：左上、右上、左下、右下。
+  return `一張 2x2 四格圖，給語言課的看圖說寫練習用。閱讀順序：左上、右上、左下、右下。
 
 固定角色與物品：${storyboard.cast}
 
@@ -94,7 +94,7 @@ function cleanLine(value: unknown, limit: number) {
 // keep consistent and no story to invent, and the risk runs the other way, into
 // a prompt that gives the picture away.
 const DESCRIBE_RULES = [
-  'You are looking at a picture a teacher has just grabbed off their screen to use for a 看圖說話 activity. The class will see this same picture and then describe or narrate it, aloud or in writing.',
+  'You are looking at a picture a teacher has just grabbed off their screen to use for a 看圖說寫 activity. The class will see this same picture and then describe or narrate it, aloud or in writing.',
   'Your job is the instruction they are given, not the answer. Do not say what is in the picture: naming the people, the actions or the objects hands the class the words the activity exists to pull out of them.',
   '`spoken_prompt` and `written_prompt` are that instruction in the language being taught — one for saying it aloud, one for writing it down, and they differ by more than the verb: speaking asks for a minute or two of connected speech, writing asks for sentences or a short paragraph.',
   'Point them at what the picture can actually support. A single scene with people doing something supports who, where, what they are doing and why; a diagram or a chart supports comparing and explaining; a photograph of one object supports describing it and saying what it is for. Look before you write the instruction.',
@@ -144,7 +144,7 @@ export async function describePictureSource(input: {
     ? output.target_words.map((word) => cleanLine(word, 40)).filter(Boolean).slice(0, 8)
     : []
   return {
-    title: cleanLine(output.title, 80) || '看圖說話',
+    title: cleanLine(output.title, 80) || '看圖說寫',
     // A captured picture has no cast to keep consistent and no panels: nothing
     // is being drawn, so both stay empty and 排順序 is not offered for it.
     cast: '',
@@ -197,7 +197,7 @@ export async function planPictureStory(input: {
     : []
 
   return {
-    title: cleanLine(output.title, 60) || '看圖說話',
+    title: cleanLine(output.title, 60) || '看圖說寫',
     cast: cleanLine(output.cast, 400),
     panels,
     targetWords,

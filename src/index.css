@@ -5064,12 +5064,11 @@ h2 {
 }
 .ls-transcript textarea:focus { outline: none; }
 
-.ls-voices { display: grid; gap: 8px; }
+.ls-voices { display: flex; gap: 8px; }
 .ls-voice {
-  display: grid; gap: 8px;
+  display: flex; align-items: center; gap: 7px; flex: 1 1 0; min-width: 0;
   padding: 7px 10px; border-radius: 9px; background: var(--ls-tint);
 }
-.ls-voice-speaker { display: flex; align-items: center; gap: 7px; }
 .ls-voice-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ls-accent); }
 .ls-voice-dot.alt { background: #c96a99; }
 .ls-voice input {
@@ -5077,13 +5076,8 @@ h2 {
   color: var(--ls-ink); font-family: inherit; font-size: 12px;
 }
 .ls-voice input:focus { outline: none; }
-.ls-voice-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-.ls-voice-options button {
-  min-height: 30px; padding: 4px 5px; border: 1px solid var(--ls-line); border-radius: 8px;
-  background: var(--ls-card); color: var(--ls-muted); font: inherit; font-size: 11px; font-weight: 750;
-}
-.ls-voice-options button:hover,
-.ls-voice-options button.is-on { background: var(--ls-accent); border-color: var(--ls-accent); color: #fff; }
+.ls-voice-cycle { flex: 0 0 auto; border: 0; background: transparent; color: var(--ls-muted); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.ls-voice-cycle:hover { color: var(--ls-accent); }
 
 
 .ls-synth {
@@ -5548,6 +5542,11 @@ h2 {
 .ps-prompt textarea:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 .ps-timing { display: flex; flex-direction: column; gap: 8px; }
+.ps-ai-grading { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.ps-ai-grading input { width: 17px; height: 17px; accent-color: var(--primary); }
+.ps-ai-grading span { display: flex; flex-direction: column; gap: 2px; }
+.ps-ai-grading strong { font-size: 12.5px; }
+.ps-ai-grading small { color: var(--muted); font-size: 11px; }
 
 .ps-error {
   margin: 0; padding: 9px 11px; border-radius: 9px;
@@ -5750,6 +5749,31 @@ h2 {
   border-color: var(--primary-dark);
   color: #fff;
 }
+.quiz-ordering-picture-writing { display: flex; flex: 1; flex-direction: column; gap: 9px; min-width: 0; }
+.quiz-ordering-picture-writing textarea { width: 100%; min-height: 72px; padding: 10px 12px; resize: vertical; border: 1px solid var(--border); border-radius: 10px; font: inherit; line-height: 1.6; box-sizing: border-box; }
+.picture-writing-attempt { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; text-align: left; }
+.picture-writing-attempt > span { position: relative; min-width: 0; }
+.picture-writing-attempt img { display: block; width: 100%; border-radius: 7px; }
+.picture-writing-attempt b { position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; text-align: center; line-height: 22px; }
+.picture-writing-attempt small { display: block; margin-top: 5px; overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+.picture-writing-expanded { display: grid; grid-template-columns: 210px 1fr; gap: 18px; padding: 18px; min-height: 0; overflow: hidden; }
+.picture-writing-expanded aside { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.picture-writing-expanded aside button { padding: 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); text-align: left; cursor: pointer; }
+.picture-writing-expanded aside button.is-on { border-color: var(--primary); background: var(--primary-soft); }
+.picture-writing-expanded aside span { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 6px; }
+.picture-writing-expanded aside img { width: 100%; border-radius: 3px; }
+.picture-writing-expanded main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; overflow-y: auto; }
+.picture-writing-expanded main article { padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.picture-writing-expanded main article div { position: relative; }
+.picture-writing-expanded main article img { width: 100%; border-radius: 8px; }
+.picture-writing-expanded main article b { position: absolute; top: 7px; left: 7px; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; text-align: center; line-height: 28px; }
+.picture-writing-expanded main article p { margin: 9px 2px 2px; font-size: 16px; line-height: 1.7; white-space: pre-wrap; }
+.participant-picture-writing-review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.participant-picture-writing-review article { padding: 9px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.participant-picture-writing-review article div { position: relative; }
+.participant-picture-writing-review img { width: 100%; border-radius: 8px; }
+.participant-picture-writing-review b { position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; text-align: center; line-height: 26px; }
+.participant-picture-writing-review p { margin: 8px 2px 2px; line-height: 1.65; white-space: pre-wrap; }
 
 /* The two listening actions are separate decisions. A real gap makes that
    visible on touch screens instead of reading as one segmented control. */

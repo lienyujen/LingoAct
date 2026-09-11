@@ -52,6 +52,7 @@ export function Preview() {
     levelCode="2"
     readingAnnotation="zhuyin"
     onClose={() => undefined}
+    onDispatched={() => undefined}
   />
   return <div style={{ maxWidth: 420, margin: '0 auto' }} className="desktop-shell">
     <main className={`presenter-page${compact ? ' controls-open' : ''}`}>

@@ -18,7 +18,7 @@ const schema = {
     language: { type: 'string' },
     script: { type: 'string', enum: ['traditional', 'simplified', 'none'] },
     speakers: { type: 'array', items: { type: 'string' } },
-    speaker_genders: { type: 'array', items: { type: 'string', enum: ['male', 'female', 'unknown'] } },
+    speaker_genders: { type: 'array', items: { type: 'string', enum: ['male', 'female', 'boy', 'girl', 'unknown'] } },
     transcript: { type: 'string' },
   },
   required: ['kind', 'language', 'script', 'speakers', 'speaker_genders', 'transcript'],
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       'First read all useful information in the image, including printed text, labels, people, actions, objects and setting.',
       'Then turn that source into natural listening material in the language being taught, at the class level above. Preserve the source meaning and facts, but rewrite vocabulary, sentence length and organisation when needed for the learners.',
       requestedKind === 'dialogue'
-        ? 'Write a natural two-speaker dialogue. Prefix every turn with a short speaker name and a colon. List the same two names in speakers, in first-speaking order. Return one speaker_genders entry per speaker: male or female only when the name, title, role, or visible person makes it clear; otherwise unknown. Never guess from an ambiguous name.'
+        ? 'Write a natural two-speaker dialogue. Prefix every turn with a short speaker name and a colon. List the same two names in speakers, in first-speaking order. Return one speaker_genders entry per speaker: boy or girl for a clearly child role, male or female for a clearly adult role, and unknown when age or gender is ambiguous. Use names, titles, roles, and visible people as evidence; never guess from an ambiguous name.'
         : 'Write one coherent passage that sounds natural when read aloud. Keep speakers and speaker_genders empty.',
       'If the image mainly contains text, use OCR to recover its content before adapting it. If it mainly shows a visual situation, use only details actually visible in the image; do not invent unsupported facts.',
       '',
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       script: result.script === 'none' ? null : result.script,
       speakers: Array.isArray(result.speakers) ? result.speakers.filter((name) => typeof name === 'string') : [],
       speakerGenders: Array.isArray(result.speaker_genders)
-        ? result.speaker_genders.map((gender) => ['male', 'female'].includes(gender) ? gender : 'unknown')
+        ? result.speaker_genders.map((gender) => ['male', 'female', 'boy', 'girl'].includes(gender) ? gender : 'unknown')
         : [],
       transcript: transcript.slice(0, 4000),
     })

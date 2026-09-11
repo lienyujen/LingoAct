@@ -12,7 +12,7 @@ const BITS = 16
 export type ClipKind = 'passage' | 'dialogue' | 'scene'
 export type ChineseScript = 'traditional' | 'simplified'
 export type ChineseAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
-export type SpeakerGender = 'male' | 'female' | 'unknown'
+export type SpeakerGender = 'male' | 'female' | 'boy' | 'girl' | 'unknown'
 
 export type VoicePlan = {
   instruction: string
@@ -31,7 +31,9 @@ export type KaraokeCue = {
 // the point where a learner stops being able to tell characters apart by ear.
 const NARRATION_VOICE = 'Kore'
 const FEMALE_VOICES = ['Kore', 'Aoede']
-const MALE_VOICES = ['Puck', 'Orus']
+const MALE_VOICES = ['Orus', 'Gacrux']
+const BOY_VOICES = ['Puck', 'Fenrir']
+const GIRL_VOICES = ['Leda', 'Zephyr']
 
 // Named so the model is told which variety to speak rather than left to guess
 // from the characters, which for Chinese it cannot do: the same sentence in the
@@ -60,8 +62,14 @@ function accentFor(language: string, accent: ChineseAccent | null) {
 }
 
 function assignedGender(gender: SpeakerGender | undefined, index: number): Exclude<SpeakerGender, 'unknown'> {
-  if (gender === 'male' || gender === 'female') return gender
+  if (gender && gender !== 'unknown') return gender
   return index % 2 === 0 ? 'female' : 'male'
+}
+
+function voiceDescription(voice: Exclude<SpeakerGender, 'unknown'>) {
+  if (voice === 'boy') return 'young boy'
+  if (voice === 'girl') return 'young girl'
+  return voice === 'male' ? 'adult male' : 'adult female'
 }
 
 export function buildVoicePlan(
@@ -73,17 +81,19 @@ export function buildVoicePlan(
 ): VoicePlan {
   const accent = accentFor(language, accentChoice)
   if (kind === 'dialogue' && speakers.length >= 2) {
-    const used = { female: 0, male: 0 }
+    const used = { female: 0, male: 0, boy: 0, girl: 0 }
     const assignments = speakers.slice(0, 2).map((speaker, index) => {
       const gender = assignedGender(speakerGenders[index], index)
-      const choices = gender === 'female' ? FEMALE_VOICES : MALE_VOICES
+      const choices = gender === 'female' ? FEMALE_VOICES
+        : gender === 'male' ? MALE_VOICES
+          : gender === 'boy' ? BOY_VOICES : GIRL_VOICES
       const voiceName = choices[used[gender]++ % choices.length]
       return { speaker, gender, voiceName }
     })
     return {
       instruction: [
         `Read this conversation in ${accent}.`,
-        assignments.map(({ speaker, gender }) => `${speaker} must use a clearly ${gender} voice.`).join(' '),
+        assignments.map(({ speaker, gender }) => `${speaker} must use a clearly ${voiceDescription(gender)} voice.`).join(' '),
         'Keep each assigned voice consistent. Let them sound like people talking to each other, not like one narrator reciting a script. Keep the pace natural for a language learner to follow.',
       ].join(' '),
       speakers: assignments.map(({ speaker }) => speaker),

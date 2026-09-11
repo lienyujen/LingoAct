@@ -7,6 +7,7 @@ import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 import type { Answer, AudioResponse, FileResponse, Question, QuestionAnalysis } from '../types'
+import { QuestionActivityStatus } from './QuestionActivityStatus'
 
 type Props = {
   anonymousEnabled: boolean
@@ -120,7 +121,7 @@ function QuestionStatusActions({
           {resumable ? t('resumeAnswering') : t('stopAnswering')}
         </button>
       )}
-      <span className={`status ${question.status}`}>{question.status}</span>
+      <QuestionActivityStatus question={question} />
     </div>
   )
 }
@@ -403,7 +404,7 @@ export function QuestionResult(props: Props) {
       <section className="panel result-panel">
         <div className="panel-heading">
           <h2>{t('typeSendScreen')}</h2>
-          <span className={`status ${question.status}`}>{question.status}</span>
+          <QuestionActivityStatus question={question} />
         </div>
         <p className="muted">{t('screenOnly')}</p>
       </section>

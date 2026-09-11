@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       ? input.speakers.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
       : []
     const speakerGenders: SpeakerGender[] = Array.isArray(input.speakerGenders)
-      ? input.speakerGenders.slice(0, 2).map((gender: unknown) => gender === 'male' || gender === 'female' ? gender : 'unknown')
+      ? input.speakerGenders.slice(0, 2).map((gender: unknown) => ['male', 'female', 'boy', 'girl'].includes(String(gender)) ? gender as SpeakerGender : 'unknown')
       : []
 
     if (!sessionId || !presenterToken || !transcript) return jsonResponse({ message: '缺少語音合成所需資料。' }, 400)

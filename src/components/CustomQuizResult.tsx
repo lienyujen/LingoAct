@@ -4,6 +4,7 @@ import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sp
 import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 import { RevisedWriting } from './RevisedWriting'
+import { QuestionActivityStatus } from './QuestionActivityStatus'
 
 type Props = {
   anonymousEnabled: boolean
@@ -320,6 +321,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
       <div className="result-heading">
         <div><p className="eyebrow"><Brain size={17} />{writing ? t('writingCoachShort') : flashcard ? t('flashcards') : pictureOrdering ? t('storyOrdering') : t('typeCustomQuiz')}</p><h2>{results.quiz.title || question.title}</h2></div>
         <div className="custom-quiz-heading-actions">
+          <QuestionActivityStatus audioOnly question={question} />
           <span>{t('answeredOf', { n: results.attempts.length, online: onlineCount })}</span>
           {(stoppable || resumable) && (
             <button

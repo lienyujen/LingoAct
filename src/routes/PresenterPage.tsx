@@ -2036,6 +2036,11 @@ export function PresenterPage() {
         onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'listening') : undefined}
         onCapturedScreenRead={() => setListeningCapture(null)}
         onClose={() => { setListeningCapture(null); setListeningOpen(false) }}
+        onDispatched={() => {
+          setListeningCapture(null)
+          setListeningOpen(false)
+          setWorkspaceView('current')
+        }}
       />
       <PictureStudioModal
         capturedScreen={pictureCapture}

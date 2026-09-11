@@ -938,6 +938,22 @@ h2 {
   color: var(--danger-dark);
 }
 
+.status.on-air {
+  align-items: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: inline-flex;
+  gap: 6px;
+  letter-spacing: .08em;
+}
+
+.status-live-dot {
+  background: currentColor;
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
 .qr-panel,
 .control-panel,
 .result-panel,
@@ -4981,13 +4997,6 @@ h2 {
 }
 .ls-head h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
 .ls-mark { display: flex; color: var(--ls-accent); }
-.ls-onair {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 10px; border-radius: 999px;
-  background: var(--ls-accent-soft); color: var(--ls-accent);
-  font-size: 11px; font-weight: 800; letter-spacing: .08em;
-}
-.ls-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ls-accent); }
 .ls-close {
   display: flex; padding: 5px; border: none; border-radius: 8px;
   background: transparent; color: var(--ls-muted); cursor: pointer;
@@ -5055,11 +5064,12 @@ h2 {
 }
 .ls-transcript textarea:focus { outline: none; }
 
-.ls-voices { display: flex; gap: 8px; }
+.ls-voices { display: grid; gap: 8px; }
 .ls-voice {
-  display: flex; align-items: center; gap: 7px; flex-grow: 1;
+  display: grid; gap: 8px;
   padding: 7px 10px; border-radius: 9px; background: var(--ls-tint);
 }
+.ls-voice-speaker { display: flex; align-items: center; gap: 7px; }
 .ls-voice-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ls-accent); }
 .ls-voice-dot.alt { background: #c96a99; }
 .ls-voice input {
@@ -5067,7 +5077,13 @@ h2 {
   color: var(--ls-ink); font-family: inherit; font-size: 12px;
 }
 .ls-voice input:focus { outline: none; }
-.ls-voice-name { font-size: 11px; font-weight: 700; color: var(--ls-muted); }
+.ls-voice-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.ls-voice-options button {
+  min-height: 30px; padding: 4px 5px; border: 1px solid var(--ls-line); border-radius: 8px;
+  background: var(--ls-card); color: var(--ls-muted); font: inherit; font-size: 11px; font-weight: 750;
+}
+.ls-voice-options button:hover,
+.ls-voice-options button.is-on { background: var(--ls-accent); border-color: var(--ls-accent); color: #fff; }
 
 
 .ls-synth {

@@ -29,6 +29,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
   const [slow, setSlow] = useState(false)
   const [failed, setFailed] = useState(false)
   const [showTranscript, setShowTranscript] = useState(false)
+  const [plainText, setPlainText] = useState(false)
   const [activeCue, setActiveCue] = useState(-1)
 
   // A different question means a different allowance, and the component is
@@ -38,6 +39,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
     setPlaying(false)
     setFailed(false)
     setShowTranscript(false)
+    setPlainText(false)
     setActiveCue(-1)
   }, [questionId])
 
@@ -116,17 +118,25 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
 
       {!isModel && prompt && (
         <div className="listening-transcript-wrap">
-          <label className="listening-transcript-toggle">
-            <input checked={showTranscript} type="checkbox" onChange={(event) => setShowTranscript(event.target.checked)} />
-            <span>{participantText(locale, 'listeningShowText')}</span>
-          </label>
+          <div className="listening-transcript-options">
+            <label className="listening-transcript-toggle">
+              <input checked={showTranscript} type="checkbox" onChange={(event) => setShowTranscript(event.target.checked)} />
+              <span>{participantText(locale, 'listeningShowText')}</span>
+            </label>
+            {showTranscript && Boolean(readingFontUrl || readingRuby?.length) && (
+              <label className="listening-transcript-toggle">
+                <input checked={plainText} type="checkbox" onChange={(event) => setPlainText(event.target.checked)} />
+                <span>{participantText(locale, readingRuby?.length ? 'listeningHidePinyin' : 'listeningHideZhuyin')}</span>
+              </label>
+            )}
+          </div>
           {showTranscript && (
             <KaraokeText
               activeCue={activeCue}
               cues={karaokeCues || []}
-              fontFamily={readingFamily}
-              ruby={readingRuby || []}
-              text={prompt}
+              fontFamily={plainText ? null : readingFamily}
+              ruby={plainText ? [] : readingRuby || []}
+              text={plainText ? stripReadingSelectors(prompt) : prompt}
             />
           )}
         </div>
@@ -143,6 +153,10 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
       </p>
     </section>
   )
+}
+
+function stripReadingSelectors(text: string) {
+  return text.replace(/[\u{E0100}-\u{E01EF}]/gu, '')
 }
 
 function KaraokeText({ activeCue, cues, fontFamily, ruby, text }: {

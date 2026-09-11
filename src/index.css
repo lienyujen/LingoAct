@@ -5757,6 +5757,13 @@ h2 {
   margin-top: 18px;
 }
 
+.listening-transcript-options {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+}
+
 .listening-transcript-toggle {
   align-items: center;
   cursor: pointer;
@@ -5772,14 +5779,13 @@ h2 {
   width: 22px;
 }
 
-/* The listening heading is 1rem in this panel. Three rem is deliberately large:
-   this is material to follow from a phone at desk distance, not body copy. */
+/* Larger than the heading without letting a short dialogue fill the screen. */
 .listening-karaoke {
   background: #fff;
   border: 2px solid var(--border);
   border-radius: var(--radius-lg);
   color: #17131a;
-  font-size: 3rem;
+  font-size: 2.25rem;
   font-weight: 750;
   letter-spacing: .04em;
   line-height: 1.9;
@@ -5812,7 +5818,7 @@ h2 {
 
 @media (max-width: 560px) {
   .listening-karaoke {
-    font-size: 2.55rem;
+    font-size: 2rem;
     padding: 16px;
   }
 }

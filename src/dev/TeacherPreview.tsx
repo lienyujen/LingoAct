@@ -56,7 +56,7 @@ export function Preview() {
   />
   return <div style={{ maxWidth: 420, margin: '0 auto' }} className="desktop-shell">
     <main className={`presenter-page${compact ? ' controls-open' : ''}`}>
-      <aside className="qr-floating"><QRCodePanel compact={compact} joinUrl="https://example.org/preview" onToggleControls={() => setCompact(!compact)} /></aside>
+      <aside className="qr-floating"><QRCodePanel joinUrl="https://example.org/preview" qrInteractionProps={{ onDoubleClick: () => setCompact(!compact) }} /></aside>
       {compact && <aside className="presenter-controls-overlay teacher-workspace">
         <nav className="workspace-navigation">{['開始活動', '目前活動', '課堂紀錄'].map((label) => <button key={label} type="button" aria-current={view === label ? 'page' : undefined} onClick={() => setView(label)}>{label}</button>)}</nav>
         {view === '開始活動' ? <>

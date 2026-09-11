@@ -1,23 +1,17 @@
 import { QRCodeSVG } from 'qrcode.react'
-import { Minus, QrCode, X } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { Minus, X } from '@phosphor-icons/react'
 import type { HTMLAttributes } from 'react'
-import { useWorkspaceText } from '../lib/workspaceText'
 import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
-  compact?: boolean
-  onToggleControls?: () => void
   joinUrl: string
   onClose?: () => void
   onMinimize?: () => void
   qrInteractionProps?: Pick<HTMLAttributes<HTMLDivElement>, 'onDoubleClick'>
 }
 
-export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps, compact = false, onToggleControls }: Props) {
+export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps }: Props) {
   const t = usePresenterText()
-  const w = useWorkspaceText()
-  const [joinExpanded, setJoinExpanded] = useState(false)
   return (
     <section className="panel qr-panel">
       <div className="panel-heading">
@@ -27,9 +21,7 @@ export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps, 
             English 「加入場次」 becomes "Join the class", which took the close
             button off the edge of the window entirely. */}
         <h2>
-          <span className="heading-icon">
-            <QrCode size={16} />
-          </span>
+          <img alt="" className="qr-lingoact-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} />
           <span className="qr-heading-label">{t('joinClass')}</span>
         </h2>
         {(onMinimize || onClose) && (
@@ -52,12 +44,10 @@ export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps, 
           </div>
         )}
       </div>
-      {compact && <button className="ghost-button join-disclosure" aria-expanded={joinExpanded} type="button" onClick={() => setJoinExpanded(!joinExpanded)}><QrCode size={16} />{w.showJoin}</button>}
-      <div className="qr-box" hidden={compact && !joinExpanded} {...qrInteractionProps}>
+      <div className="qr-box" {...qrInteractionProps}>
         <QRCodeSVG marginSize={2} value={joinUrl} size={172} />
       </div>
-      {(!compact || joinExpanded) && <p className="join-url" title={joinUrl}>{joinUrl}</p>}
-      {onToggleControls && <button className="ghost-button panel-toggle" type="button" onClick={onToggleControls}>{compact ? w.hideControls : w.openControls}</button>}
+      <p className="join-url" title={joinUrl}>{joinUrl}</p>
     </section>
   )
 }

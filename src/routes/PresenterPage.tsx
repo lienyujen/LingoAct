@@ -1814,8 +1814,6 @@ export function PresenterPage() {
         <aside className="qr-floating">
           <QRCodePanel
             joinUrl={joinUrl}
-            compact={controlsOpen}
-            onToggleControls={() => setControlsOpen((current) => !current)}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
             onMinimize={window.lingoActDesktop ? () => window.lingoActDesktop?.minimize() : undefined}
             qrInteractionProps={{

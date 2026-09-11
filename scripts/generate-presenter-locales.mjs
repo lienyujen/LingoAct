@@ -31,12 +31,12 @@ const targets = [
 // translation preference. Keep these fixed when the rest of the catalogue is
 // regenerated so the model cannot grow the old explanatory labels back.
 const fixed = {
-  ja: { flashcards: '単語カードを配信', typeFlashcard: '単語カード', readingAnnotationHint: 'リスニング練習、音読練習、単語カードで使用します。リスニングと音読では文に、単語カードでは学習する語彙に表示されます。' },
-  ko: { flashcards: '단어 카드 보내기', typeFlashcard: '단어 카드', readingAnnotationHint: '듣기 연습, 낭독 연습, 단어 카드에 사용됩니다. 듣기와 낭독에서는 문장에, 단어 카드에서는 학습할 어휘에 표시됩니다.' },
-  es: { flashcards: 'Enviar tarjetas de vocabulario', typeFlashcard: 'Tarjetas de vocabulario', readingAnnotationHint: 'Se usa en prácticas de comprensión auditiva, lectura en voz alta y tarjetas de vocabulario. En comprensión auditiva y lectura se muestra en las frases; en las tarjetas, en el vocabulario estudiado.' },
-  fr: { flashcards: 'Envoyer des cartes de vocabulaire', typeFlashcard: 'Cartes de vocabulaire', readingAnnotationHint: 'Utilisé pour l’écoute, la lecture à voix haute et les cartes de vocabulaire. L’écoute et la lecture annotent les phrases ; les cartes annotent le vocabulaire étudié.' },
-  de: { flashcards: 'Wortkarten senden', typeFlashcard: 'Wortkarten', readingAnnotationHint: 'Wird bei Hörübungen, Vorleseübungen und Wortkarten verwendet. Hör- und Vorleseübungen markieren Sätze; Wortkarten markieren den Lernwortschatz.' },
-  vi: { flashcards: 'Gửi thẻ từ vựng', typeFlashcard: 'Thẻ từ vựng', readingAnnotationHint: 'Dùng trong bài luyện nghe, luyện đọc thành tiếng và thẻ từ vựng. Bài nghe và bài đọc đánh dấu trên câu; thẻ từ đánh dấu trên từ vựng cần học.' },
+  ja: { flashcards: '単語カードを配信', typeFlashcard: '単語カード', sentenceWall: '文づくり・作文ウォール', sentenceWallShort: '文づくり・作文ウォール', readingAnnotationHint: 'リスニング練習、音読練習、単語カードで使用します。リスニングと音読では文に、単語カードでは学習する語彙に表示されます。' },
+  ko: { flashcards: '단어 카드 보내기', typeFlashcard: '단어 카드', sentenceWall: '문장 쓰기 벽', sentenceWallShort: '문장 쓰기 벽', readingAnnotationHint: '듣기 연습, 낭독 연습, 단어 카드에 사용됩니다. 듣기와 낭독에서는 문장에, 단어 카드에서는 학습할 어휘에 표시됩니다.' },
+  es: { flashcards: 'Enviar tarjetas de vocabulario', typeFlashcard: 'Tarjetas de vocabulario', sentenceWall: 'Muro de escritura de frases', sentenceWallShort: 'Muro de escritura de frases', readingAnnotationHint: 'Se usa en prácticas de comprensión auditiva, lectura en voz alta y tarjetas de vocabulario. En comprensión auditiva y lectura se muestra en las frases; en las tarjetas, en el vocabulario estudiado.' },
+  fr: { flashcards: 'Envoyer des cartes de vocabulaire', typeFlashcard: 'Cartes de vocabulaire', sentenceWall: 'Mur d’écriture de phrases', sentenceWallShort: 'Mur d’écriture de phrases', readingAnnotationHint: 'Utilisé pour l’écoute, la lecture à voix haute et les cartes de vocabulaire. L’écoute et la lecture annotent les phrases ; les cartes annotent le vocabulaire étudié.' },
+  de: { flashcards: 'Wortkarten senden', typeFlashcard: 'Wortkarten', sentenceWall: 'Satz-Schreibwand', sentenceWallShort: 'Satz-Schreibwand', readingAnnotationHint: 'Wird bei Hörübungen, Vorleseübungen und Wortkarten verwendet. Hör- und Vorleseübungen markieren Sätze; Wortkarten markieren den Lernwortschatz.' },
+  vi: { flashcards: 'Gửi thẻ từ vựng', typeFlashcard: 'Thẻ từ vựng', sentenceWall: 'Tường viết câu', sentenceWallShort: 'Tường viết câu', readingAnnotationHint: 'Dùng trong bài luyện nghe, luyện đọc thành tiếng và thẻ từ vựng. Bài nghe và bài đọc đánh dấu trên câu; thẻ từ đánh dấu trên từ vựng cần học.' },
 }
 
 function geminiKey() {

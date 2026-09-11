@@ -27,6 +27,18 @@ const targets = [
   { code: 'vi', name: 'Vietnamese' },
 ]
 
+// Menu labels where brevity is part of the product wording, not merely a
+// translation preference. Keep these fixed when the rest of the catalogue is
+// regenerated so the model cannot grow the old explanatory labels back.
+const fixed = {
+  ja: { flashcards: '単語カードを配信', typeFlashcard: '単語カード', readingAnnotationHint: 'リスニング練習、音読練習、単語カードで使用します。リスニングと音読では文に、単語カードでは学習する語彙に表示されます。' },
+  ko: { flashcards: '단어 카드 보내기', typeFlashcard: '단어 카드', readingAnnotationHint: '듣기 연습, 낭독 연습, 단어 카드에 사용됩니다. 듣기와 낭독에서는 문장에, 단어 카드에서는 학습할 어휘에 표시됩니다.' },
+  es: { flashcards: 'Enviar tarjetas de vocabulario', typeFlashcard: 'Tarjetas de vocabulario', readingAnnotationHint: 'Se usa en prácticas de comprensión auditiva, lectura en voz alta y tarjetas de vocabulario. En comprensión auditiva y lectura se muestra en las frases; en las tarjetas, en el vocabulario estudiado.' },
+  fr: { flashcards: 'Envoyer des cartes de vocabulaire', typeFlashcard: 'Cartes de vocabulaire', readingAnnotationHint: 'Utilisé pour l’écoute, la lecture à voix haute et les cartes de vocabulaire. L’écoute et la lecture annotent les phrases ; les cartes annotent le vocabulaire étudié.' },
+  de: { flashcards: 'Wortkarten senden', typeFlashcard: 'Wortkarten', readingAnnotationHint: 'Wird bei Hörübungen, Vorleseübungen und Wortkarten verwendet. Hör- und Vorleseübungen markieren Sätze; Wortkarten markieren den Lernwortschatz.' },
+  vi: { flashcards: 'Gửi thẻ từ vựng', typeFlashcard: 'Thẻ từ vựng', readingAnnotationHint: 'Dùng trong bài luyện nghe, luyện đọc thành tiếng và thẻ từ vựng. Bài nghe và bài đọc đánh dấu trên câu; thẻ từ đánh dấu trên từ vựng cần học.' },
+}
+
 function geminiKey() {
   const envPath = path.join(root, 'supabase/.env')
   if (!fs.existsSync(envPath)) throw new Error('supabase/.env not found — it holds GEMINI_API_KEY.')
@@ -107,7 +119,7 @@ console.log(`English catalogue: ${Object.keys(strings).length} keys`)
 const generated = {}
 for (const target of targets) {
   process.stdout.write(`  ${target.code} (${target.name})... `)
-  generated[target.code] = await translate(key, strings, target)
+  generated[target.code] = { ...await translate(key, strings, target), ...fixed[target.code] }
   console.log(`${Object.keys(generated[target.code]).length} keys`)
 }
 

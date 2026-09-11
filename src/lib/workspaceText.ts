@@ -3,7 +3,7 @@ import { usePresenterLocale } from './presenterI18n'
 const zh = {
   activities: '開始活動', current: '目前活動', history: '課堂紀錄',
   choose: '想讓學生練習什麼？', listen: '聽與朗讀', express: '說與寫',
-  understand: '閱讀與詞彙', tools: '課堂工具與設定', wrap: '收尾與回顧',
+  understand: '閱讀與詞彙', tools: '課堂工具', wrap: '收尾與回顧',
   listenHint: '聽音訊、跟讀，再確認理解', expressHint: '從一句話開始，練習完整表達',
   understandHint: '沿用眼前的教材，練詞彙與理解',
   currentEmpty: '還沒有活動。選一個練習，讓學生開始。',
@@ -16,7 +16,7 @@ const zh = {
 const en: Record<keyof typeof zh, string> = {
   activities: 'Start activity', current: 'Current activity', history: 'Class record',
   choose: 'What will students practise?', listen: 'Listen & read aloud', express: 'Speak & write',
-  understand: 'Reading & vocabulary', tools: 'Class tools & settings', wrap: 'Wrap up',
+  understand: 'Reading & vocabulary', tools: 'Class tools', wrap: 'Wrap up',
   listenHint: 'Listen, practise aloud, and check understanding', expressHint: 'Build from a sentence to a complete idea',
   understandHint: 'Use your material to practise words and meaning',
   currentEmpty: 'Choose a practice activity to get started.', historyEmpty: 'Earlier activities and student responses will appear here.',

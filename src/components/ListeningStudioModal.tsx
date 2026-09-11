@@ -57,6 +57,11 @@ const ACCENTS: Array<{ value: ListeningAccent; label: PresenterMessageKey }> = [
   { value: 'taiwanese', label: 'accentTaiwanese' },
 ]
 
+function nextAccent(current: ListeningAccent) {
+  const at = ACCENTS.findIndex((choice) => choice.value === current)
+  return ACCENTS[(at + 1) % ACCENTS.length].value
+}
+
 const VOICE_CHOICES: Array<{ value: Exclude<SpeakerGender, 'unknown'>; label: PresenterMessageKey }> = [
   { value: 'male', label: 'voiceMale' },
   { value: 'female', label: 'voiceFemale' },
@@ -384,11 +389,14 @@ export function ListeningStudioModal({
             ))}
             {teachingLanguage.startsWith('zh') && (
               <div className="ls-accent-set" aria-label={t('accentLabel')}>
-                {ACCENTS.map((choice) => (
-                  <button key={choice.value} className={accent === choice.value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => { setAccent(choice.value); setClip(null) }}>
-                    {t(choice.label)}
-                  </button>
-                ))}
+                <button
+                  className="ls-chip is-on ls-accent-cycle"
+                  type="button"
+                  aria-label={`${t('accentLabel')}：${t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}`}
+                  onClick={() => { setAccent(nextAccent(accent)); setClip(null) }}
+                >
+                  {t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}
+                </button>
               </div>
             )}
           </div>

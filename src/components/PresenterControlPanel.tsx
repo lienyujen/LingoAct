@@ -17,6 +17,7 @@ type Props = {
   onCaptureFlashcards?: () => void
   onCaptureWriting?: () => void
   onOpenPicture?: () => void
+  onOpenPictureWriting?: () => void
   onDrawLottery: () => void
   onStartBuzzer: () => void
   onOpenListeningStudio: () => void
@@ -45,6 +46,7 @@ export function PresenterControlPanel({
   onCaptureFlashcards,
   onCaptureWriting,
   onOpenPicture,
+  onOpenPictureWriting,
   onDrawLottery,
   onStartBuzzer,
   onOpenListeningStudio,
@@ -137,6 +139,7 @@ export function PresenterControlPanel({
             {t('sentenceWall')}
           </button>
           {onOpenPicture && <button className="control-action picture-control-action" type="button" onClick={onOpenPicture} disabled={busy}><span className="control-action-icon"><Image size={18} /></span>{t('pictureTalk')}</button>}
+          {onOpenPictureWriting && <button className="control-action picture-control-action" type="button" onClick={onOpenPictureWriting} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('storyOrdering')}</button>}
           {onCaptureWriting && <button className="control-action picture-control-action" type="button" onClick={onCaptureWriting} disabled={busy}><span className="control-action-icon"><PencilLine size={18} /></span>{t('writingCoach')}</button>}
           <button className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}>
             <span className="control-action-icon"><Camera size={18} /></span>

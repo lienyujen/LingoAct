@@ -126,6 +126,7 @@ export function PresenterPage() {
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
   const [listeningOpen, setListeningOpen] = useState(false)
   const [pictureOpen, setPictureOpen] = useState(false)
+  const [pictureInitialMode, setPictureInitialMode] = useState<'spoken' | 'ordering'>('spoken')
   const [sentenceWallOpen, setSentenceWallOpen] = useState(false)
   const [sentenceWallError, setSentenceWallError] = useState('')
   const [photoTaskOpen, setPhotoTaskOpen] = useState(false)
@@ -1855,7 +1856,8 @@ export function PresenterPage() {
           onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen() : undefined}
           onCaptureFlashcards={window.lingoActDesktop ? () => void captureWindowsScreen('flashcard') : undefined}
           onCaptureWriting={window.lingoActDesktop ? () => void captureWindowsScreen('writing') : undefined}
-          onOpenPicture={() => setPictureOpen(true)}
+          onOpenPicture={() => { setPictureInitialMode('spoken'); setPictureOpen(true) }}
+          onOpenPictureWriting={() => { setPictureInitialMode('ordering'); setPictureOpen(true) }}
           onGenerateExitTicket={generateExitTicket}
           onEndClass={() => setEndClassConfirmOpen(true)}
           onOpenFileTransfer={() => {
@@ -1999,7 +2001,7 @@ export function PresenterPage() {
         previewUrl={capturePreviewUrl}
         onCancel={cancelQuestionEditor}
         onCreate={createScreenshotQuestion}
-        onPictureTalk={() => { setEditorOpen(false); setPictureCapture(captureFile); setPictureOpen(true) }}
+        onPictureTalk={() => { setEditorOpen(false); setPictureInitialMode('spoken'); setPictureCapture(captureFile); setPictureOpen(true) }}
       />
       {fileTransferOpen && (
         <FileTransferModal
@@ -2043,6 +2045,7 @@ export function PresenterPage() {
         }}
       />
       <PictureStudioModal
+        initialMode={pictureInitialMode}
         capturedScreen={pictureCapture}
         open={pictureOpen}
         suspended={selectionMode}

@@ -7,6 +7,7 @@ import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
 import { ParticipantTeachingContext } from '../components/ParticipantTeachingContext'
+import { participantQuizPayload } from '../lib/participantQuizPayload'
 import { ParticipantFlashcards } from '../components/ParticipantFlashcards'
 import type { QuizSubmission } from '../components/ParticipantCustomQuiz'
 import { ParticipantInterpretationAudio } from '../components/ParticipantInterpretationAudio'
@@ -144,7 +145,7 @@ export function ParticipantPage() {
     for (const item of (allQuestions || []) as Question[]) {
       if (item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
     }
-    const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => answeredQuestionIds.has(item.id))
+    const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft' && answeredQuestionIds.has(item.id))
     setHistoryAnswers(participantAnswers)
     setHistoryQuestions(answeredQuestions)
 
@@ -229,8 +230,9 @@ export function ParticipantPage() {
           setQuizLoadError('')
         } else {
           loadedQuizQuestionId.current = nextQuestion.id
-          setQuizData((loadedQuiz as ParticipantQuizData | null) || null)
-          setQuizLoadError('')
+          const payload = participantQuizPayload(loadedQuiz, nextQuestion.id)
+          setQuizData(payload)
+          setQuizLoadError(payload ? '' : participantText(locale, 'quizLoadFailed'))
         }
       } else {
         loadedQuizQuestionId.current = ''
@@ -270,7 +272,7 @@ export function ParticipantPage() {
 
   const loadHistoryDetails = useCallback(async (historyQuestion: Question) => {
     if (!participantId || !participantToken || !['custom_quiz', 'pronunciation', 'oral_response'].includes(historyQuestion.type)) return
-    if (historyQuizData[historyQuestion.id] !== undefined || historyAudioResponses[historyQuestion.id] !== undefined) return
+    if (historyQuizData[historyQuestion.id] || historyAudioResponses[historyQuestion.id]) return
     setHistoryLoadingQuestionIds((current) => new Set(current).add(historyQuestion.id))
     try {
       const action = historyQuestion.type === 'custom_quiz' ? 'get_custom_quiz' : 'get_recording_result'
@@ -279,7 +281,7 @@ export function ParticipantPage() {
       })
       if (detailError) throw detailError
       if (historyQuestion.type === 'custom_quiz') {
-        setHistoryQuizData((current) => ({ ...current, [historyQuestion.id]: (data as ParticipantQuizData | null) || null }))
+        setHistoryQuizData((current) => ({ ...current, [historyQuestion.id]: participantQuizPayload(data, historyQuestion.id) }))
       } else {
         setHistoryAudioResponses((current) => ({ ...current, [historyQuestion.id]: (data?.response as AudioResponse | null) || null }))
       }
@@ -768,10 +770,10 @@ export function ParticipantPage() {
           locale={locale}
         />
       )}
-      {question?.teaching_mode === 'pair' ? null : question?.type === 'custom_quiz' ? (quizData ? (
+      {question?.teaching_mode === 'pair' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
-          : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
+          ? <ParticipantFlashcards key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          : <ParticipantCustomQuiz key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
           <h2>{participantText(locale, 'customQuiz')}</h2>

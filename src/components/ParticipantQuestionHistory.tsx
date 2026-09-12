@@ -7,6 +7,7 @@ import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Questio
 import { ParticipantFlashcards } from './ParticipantFlashcards'
 import { ListeningPlayer } from './ListeningPlayer'
 import { ParticipantTeachingContext } from './ParticipantTeachingContext'
+import { participantQuizPayload } from '../lib/participantQuizPayload'
 
 type Props = {
   teachingCredentials?: { sessionId: string; participantId: string; participantToken: string }
@@ -62,7 +63,7 @@ export function ParticipantQuestionHistory({
   screenshots,
   unlimitedListening = false,
 }: Props) {
-  const history = useMemo(() => questions.filter((item) => item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
+  const history = useMemo(() => questions.filter((item) => item.status !== 'draft' && item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
   const [sectionExpanded, setSectionExpanded] = useState(true)
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const requestedDetails = useRef(new Set<string>())
@@ -109,7 +110,7 @@ export function ParticipantQuestionHistory({
             const screenshot = question.screenshot_id ? screenshots[question.screenshot_id] : null
             const audio = audioResponses[question.id]
             const listeningClip = listeningClips[question.id]
-            const quiz = quizData[question.id]
+            const quiz = participantQuizPayload(quizData[question.id], question.id)
             const loading = loadingQuestionIds.has(question.id)
             return (
               <article className="participant-history-item" key={question.id}>
@@ -123,6 +124,9 @@ export function ParticipantQuestionHistory({
                     {question.teaching_mode && teachingCredentials && <ParticipantTeachingContext key={question.id} question={question} {...teachingCredentials} locale={locale} active={false} />}
                     {screenshot && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
                     {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}
+                    {question.type === 'custom_quiz' && !quiz && !loading && <button className="ghost-button" type="button" onClick={() => void onLoadDetails(question)}>
+                      {participantText(locale, 'tryAgain')}
+                    </button>}
                     {listeningClip && (
                       <ListeningPlayer
                         clip={listeningClip}

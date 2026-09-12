@@ -1,5 +1,7 @@
 import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { applyRegionalPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
+import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
 
 // Deciding how each character should be read, and saying so in a way the font
 // understands.
@@ -49,6 +51,9 @@ Deno.serve(async (req) => {
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const text = typeof input.text === 'string' ? input.text.trim() : ''
     const mode = input.mode === 'pinyin' ? 'pinyin' : 'zhuyin'
+    const accent: MandarinAccent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+      ? input.accent
+      : 'standard_guoyu'
     if (!sessionId || !presenterToken || !text) return jsonResponse({ message: '缺少標音所需資料。' }, 400)
     if (text.length > 4000) return jsonResponse({ message: '文字過長，請分段標音。' }, 400)
 
@@ -72,6 +77,7 @@ Deno.serve(async (req) => {
         [
           'Give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
           'Use tone marks (nǐ hǎo), not tone numbers. Choose the reading the character takes in THIS context.',
+          regionalPronunciationInstruction(text, accent),
           'For anything that is not a Han character — punctuation, spaces, Latin letters, digits, newlines — return an empty string in its slot.',
           'The array must contain exactly as many entries as the character count given.',
         ].join('\n'),
@@ -86,7 +92,11 @@ Deno.serve(async (req) => {
       const list = Array.isArray(syllables) ? syllables : []
       // A misaligned array would put every reading over the wrong character, so
       // it is padded or trimmed rather than trusted.
-      const aligned = characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : ''))
+      const aligned = applyRegionalPinyin(
+        text,
+        characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : '')),
+        accent,
+      )
       return jsonResponse({ mode, annotationText: JSON.stringify(aligned) })
     }
 
@@ -111,10 +121,12 @@ Deno.serve(async (req) => {
     if (ambiguous.length) {
       const result = await callAiJson(
         [
-          'This is a passage for a Chinese language class in Taiwan. Some characters have more than one reading.',
+          accent === 'putonghua'
+            ? 'This passage must use official Mainland China Putonghua readings.'
+            : 'This passage must use official Taiwan Ministry of Education Guoyu readings.',
           'For each position listed in "positions", choose which of its candidate readings is correct IN THAT SENTENCE.',
           'Answer with the candidate index, counting from 0. You may only choose an index that is listed — never invent a reading.',
-          'Judge from the word the character belongs to and the sense of the sentence, the way a Taiwanese teacher would read it aloud.',
+          regionalPronunciationInstruction(text, accent),
           'Return one entry per listed position, echoing its "at" value.',
         ].join('\n'),
         {
@@ -145,6 +157,18 @@ Deno.serve(async (req) => {
           })
           .map((choice) => [choice.at, choice.index]),
       )
+
+      // The model still resolves ordinary context, but known cross-strait
+      // contrasts are deterministic. This is what keeps the visible reading in
+      // lockstep with the accent-specific instruction sent to TTS.
+      const mandated = regionalPinyinOverrides(text, accent)
+      for (const item of ambiguous) {
+        const pinyin = mandated.get(item.at)
+        if (!pinyin) continue
+        const expected = pinyinToBopomofo(pinyin)
+        const index = item.candidates.findIndex((reading) => reading === expected)
+        if (index >= 0) chosen.set(item.at, index)
+      }
     }
 
     const annotated = characters

@@ -1,3 +1,5 @@
+import { regionalPronunciationInstruction } from './mandarin-pronunciation.ts'
+
 // Turning a passage into something a class can listen to.
 //
 // Gemini returns raw signed 16-bit PCM, not a container format, so nothing can
@@ -34,26 +36,6 @@ const FEMALE_VOICES = ['Kore', 'Aoede']
 const MALE_VOICES = ['Orus', 'Gacrux']
 const BOY_VOICES = ['Puck', 'Fenrir']
 const GIRL_VOICES = ['Leda', 'Zephyr']
-
-// The reading annotation and the recording are made at different times. The
-// former can ask a text model to settle every character, while native TTS must
-// be given a short explicit correction for words it is known to mispronounce.
-// Keep this list phrase-based: context is what makes a reading unambiguous, and
-// a bare-character override would break the character's other valid readings.
-const MANDARIN_PRONUNCIATIONS = [
-  {
-    phrase: '操行',
-    instruction: 'Pronounce 操行 as cāo xíng: 操 is first tone (cāo), never second tone.',
-  },
-]
-
-function pronunciationInstruction(text: string, language: string) {
-  if (!language.startsWith('zh')) return ''
-  const matches = MANDARIN_PRONUNCIATIONS
-    .filter(({ phrase }) => text.includes(phrase))
-    .map(({ instruction }) => instruction)
-  return matches.length ? `Pronunciation requirement: ${matches.join(' ')}` : ''
-}
 
 // Named so the model is told which variety to speak rather than left to guess
 // from the characters, which for Chinese it cannot do: the same sentence in the
@@ -101,7 +83,7 @@ export function buildVoicePlan(
   text = '',
 ): VoicePlan {
   const accent = accentFor(language, accentChoice)
-  const pronunciation = pronunciationInstruction(text, language)
+  const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accentChoice) : ''
   if (kind === 'dialogue' && speakers.length >= 2) {
     const used = { female: 0, male: 0, boy: 0, girl: 0 }
     const assignments = speakers.slice(0, 2).map((speaker, index) => {
@@ -415,7 +397,7 @@ export async function contentHash(
   speakerGenders: SpeakerGender[] = [],
 ) {
   const parts = [kind, language, accent || '', speakers.join('|'), speakerGenders.join('|'), text]
-  const pronunciation = pronunciationInstruction(text, language)
+  const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accent) : ''
   // Only recordings affected by a pronunciation rule get a new cache key. An
   // unrelated clip should remain reusable instead of costing another AI call.
   if (pronunciation) parts.push(pronunciation)

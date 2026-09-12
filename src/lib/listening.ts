@@ -146,6 +146,7 @@ export async function annotateReading(input: {
   presenterToken: string
   text: string
   mode: Exclude<AnnotationMode, 'none'>
+  accent?: ListeningAccent
 }) {
   const { data, error } = await requireSupabase().functions.invoke('annotate-reading', { body: input })
   if (error) throw error

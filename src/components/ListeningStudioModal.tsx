@@ -332,6 +332,7 @@ export function ListeningStudioModal({
             const marked = await annotateReading({
               sessionId, presenterToken, text: clip.transcript,
               mode: readingAnnotation as 'zhuyin' | 'pinyin',
+              accent,
             })
             await applyAnnotation({
               sessionId, presenterToken, clipId: clip.id,

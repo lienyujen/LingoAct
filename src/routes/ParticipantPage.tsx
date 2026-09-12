@@ -6,6 +6,7 @@ import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
+import { ParticipantTeachingContext } from '../components/ParticipantTeachingContext'
 import { ParticipantFlashcards } from '../components/ParticipantFlashcards'
 import type { QuizSubmission } from '../components/ParticipantCustomQuiz'
 import { ParticipantInterpretationAudio } from '../components/ParticipantInterpretationAudio'
@@ -141,7 +142,7 @@ export function ParticipantPage() {
     // listen-only and therefore produced no answer row. Keep every dispatched
     // clip in history so it survives the next activity and the end of class.
     for (const item of (allQuestions || []) as Question[]) {
-      if (item.listening_clip_id) answeredQuestionIds.add(item.id)
+      if (item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
     }
     const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => answeredQuestionIds.has(item.id))
     setHistoryAnswers(participantAnswers)
@@ -670,6 +671,7 @@ export function ParticipantPage() {
         {/* Files stay downloadable after class until the presenter deletes the session. */}
         <ParticipantSharedFiles locale={locale} sessionId={sessionId} />
         <ParticipantQuestionHistory
+          teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
           answers={historyAnswers}
           audioResponses={historyAudioResponses}
           defaultExpandAll
@@ -745,6 +747,9 @@ export function ParticipantPage() {
         </div>
       )}
       <SharedContentPanel contents={sharedContents} locale={locale} />
+      {question?.teaching_mode && participant && participantToken && <ParticipantTeachingContext key={question.id}
+        question={question} sessionId={sessionId} participantId={participant.id} participantToken={participantToken} locale={locale}
+        active={session?.status === 'active' && question.status === 'active'} />}
       {screenshot && question?.type !== 'file_upload' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
@@ -763,7 +768,7 @@ export function ParticipantPage() {
           locale={locale}
         />
       )}
-      {question?.type === 'custom_quiz' ? (quizData ? (
+      {question?.teaching_mode === 'pair' ? null : question?.type === 'custom_quiz' ? (quizData ? (
         quizData.quiz.requested_type === 'flashcard'
           ? <ParticipantFlashcards active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
@@ -784,6 +789,7 @@ export function ParticipantPage() {
         onSubmitAudio={submitAudio}
       />}
       <ParticipantQuestionHistory
+        teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
         activeQuestionId={question?.id}
         answers={historyAnswers}
         audioResponses={historyAudioResponses}

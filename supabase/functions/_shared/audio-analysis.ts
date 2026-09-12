@@ -61,6 +61,7 @@ const VARIATION_SELECTORS = /[\u{E0100}-\u{E01EF}︀-️]/gu
 export async function analyzeAudioResponse(input: {
   mode: 'pronunciation' | 'oral_response'
   promptText: string | null
+  learningFocus?: string | null
   // Absent for a read-aloud dispatched from 聽力播音室: the words are on the
   // question, and there is no slide behind them.
   screenshotUrl: string | null
@@ -100,7 +101,8 @@ export async function analyzeAudioResponse(input: {
       contents: [{
         role: 'user',
         parts: [
-          { text: JSON.stringify({ mode: input.mode, presenter_question: reference }) },
+          { text: JSON.stringify({ mode: input.mode, presenter_question: reference,
+            feedback_focus: input.learningFocus ? 'Give feedback specifically on this teaching focus; it is not part of the text to read: ' + input.learningFocus : null }) },
           ...(imagePart ? [imagePart] : []),
           { inlineData: { mimeType: input.audioMimeType, data: bytesToBase64(input.audioBytes) } },
         ],

@@ -6458,3 +6458,17 @@ h2 {
 .flashcard-card-row .card-reading {
   font-size: 11.5px; font-style: normal; color: var(--muted); letter-spacing: .02em;
 }
+.teaching-cycle-panel summary { cursor: pointer; font-weight: 700; }
+.teaching-cycle-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.teaching-cycle-actions button, .teaching-cycle-editor button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); cursor: pointer; }
+.teaching-cycle-actions button:hover:not(:disabled), .teaching-cycle-editor button:hover:not(:disabled) { background: var(--primary); color: white; }
+.teaching-cycle-panel button:disabled { opacity: .5; cursor: not-allowed; }
+.teaching-cycle-editor { display: grid; gap: 12px; margin-top: 14px; }
+.teaching-cycle-editor textarea, .participant-teaching-context textarea { display: block; width: 100%; min-height: 90px; margin-top: 8px; padding: 12px; box-sizing: border-box; font: inherit; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
+.teaching-sample { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
+.teaching-sample input[type=checkbox] { width: 20px !important; height: 20px !important; min-width: 20px; margin: 3px 0; flex: 0 0 20px; }
+.teaching-sample span { min-width: 0; }
+.teaching-cycle-panel p, .participant-teaching-context p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.teaching-sample img, .participant-teaching-context article img { width: 24%; object-fit: contain; }
+.participant-teaching-context audio { width: 100%; }
+.participant-teaching-context article { padding: 12px; margin: 10px 0; border: 1px solid var(--border); border-radius: 12px; }

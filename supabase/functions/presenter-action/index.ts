@@ -10,8 +10,10 @@ import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/own
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
 import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
+import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 
 type ParticipantRecord = { id: string; name: string }
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const questionTypes = new Set(['send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'file_upload'])
 // Types that can carry a clock, and the subset where preparing to speak is part
@@ -246,6 +248,10 @@ Deno.serve(async (req) => {
         .maybeSingle()).data
       : null
     if (!keyRecord && !owner) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+
+    if (['teaching_samples', 'teaching_repeat', 'teaching_discuss', 'teaching_diagnose', 'teaching_pair'].includes(action)) {
+      return await presenterTeachingCycle(supabase, sessionId, input)
+    }
 
     if (action === 'update_session') {
       const values: Record<string, boolean | number | string | string[] | null> = {}
@@ -816,7 +822,7 @@ Deno.serve(async (req) => {
     // included. Uploading them in reading order would leave the answer lying in
     // created_at for anyone who thought to sort by it.
     if (action === 'create_picture_writing') {
-      const rawPanels = Array.isArray(input.panels) ? input.panels : []
+      const rawPanels: unknown[] = Array.isArray(input.panels) ? input.panels : []
       if (rawPanels.length !== 4) return jsonResponse({ message: '圖片排序需要四格。' }, 400)
       const panels = rawPanels.map((raw) => {
         const panel = raw as { screenshotId?: unknown; storagePath?: unknown; order?: unknown }

@@ -19,6 +19,7 @@ import type { QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
 import { QuestionResult } from '../components/QuestionResult'
+import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
 import { CustomQuizResult } from '../components/CustomQuizResult'
 import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
@@ -1958,6 +1959,11 @@ export function PresenterPage() {
         />
         </div>
         <div className="presenter-results" hidden={workspaceView === 'activities' || (workspaceView === 'history' && selectedQuestionId === session.current_question_id)}>
+        {question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
+          presenterToken={getPresenterToken(sessionId) || ''} participants={[...participants].sort((a, b) => a.joined_at.localeCompare(b.joined_at))}
+          active={session.status === 'active'} onDispatched={(next) => {
+            setSelectedQuestionId(next.id); setWorkspaceView('current'); void loadAll()
+          }} />}
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
             anonymousEnabled={session.anonymous_enabled}

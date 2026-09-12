@@ -8,8 +8,9 @@ import { SentenceWallModal } from '../components/SentenceWallModal'
 import { PresenterNewPage } from '../routes/PresenterNewPage'
 import { ParticipantFlashcards } from '../components/ParticipantFlashcards'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
+import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
 import type { ParticipantQuizData } from '../types'
-import type { Session } from '../types'
+import type { Session, Question } from '../types'
 import '../index.css'
 
 // Component preview only. It never creates a class or submits student work.
@@ -31,6 +32,13 @@ const flashcard: ParticipantQuizData = {
   attempt: null, answers: [],
 }
 
+const practiceQuestion: Question = {
+  id: 'preview', session_id: 'preview', screenshot_id: null, listening_clip_id: null, replay_limit: null,
+  type: 'short_answer', status: 'active', title: '造句寫作牆', prompt_text: '說明自己的選擇。',
+  options: [], translations: {}, allow_multiple: false, correct_answer: null, correct_answers: [],
+  started_at: null, stopped_at: null, created_at: '',
+}
+
 export function Preview() {
   const [view, setView] = useState('開始活動')
   const [notice, setNotice] = useState('')
@@ -38,6 +46,11 @@ export function Preview() {
   const [prompt, setPrompt] = useState('')
   const [compact, setCompact] = useState(false)
   const action = () => setNotice('介面預覽：此操作在桌面版中使用。')
+  if (location.hash === '#teaching-cycle') return <main style={{ maxWidth: 420, margin: '20px auto' }}>
+    <TeachingCyclePanel question={practiceQuestion} sessionId="preview" presenterToken="preview" active participants={['小明', '莉莉', '小華', '美玲'].map((name, i) => ({
+      id: String(i), session_id: 'preview', name, device_id: String(i), joined_at: '', last_seen_at: '',
+    }))} onDispatched={action} />
+  </main>
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
   if (location.hash === '#flashcard-review') return <main className="participant-page"><ParticipantFlashcards active={false} data={{ ...flashcard, reviewAnswers: { word: '大家一起做的事情' } }} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>

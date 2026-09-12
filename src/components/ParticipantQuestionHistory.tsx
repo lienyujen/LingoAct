@@ -6,8 +6,10 @@ import { listSeparator, localizedFeedback, localizedFields } from '../lib/locali
 import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, Screenshot } from '../types'
 import { ParticipantFlashcards } from './ParticipantFlashcards'
 import { ListeningPlayer } from './ListeningPlayer'
+import { ParticipantTeachingContext } from './ParticipantTeachingContext'
 
 type Props = {
+  teachingCredentials?: { sessionId: string; participantId: string; participantToken: string }
   activeQuestionId?: string | null
   answers: Answer[]
   audioResponses: Record<string, AudioResponse | null>
@@ -46,6 +48,7 @@ function questionTitle(question: Question, locale: ParticipantLocale) {
 }
 
 export function ParticipantQuestionHistory({
+  teachingCredentials,
   activeQuestionId,
   answers,
   audioResponses,
@@ -117,6 +120,7 @@ export function ParticipantQuestionHistory({
                 </button>
                 {open && (
                   <div className="participant-history-body">
+                    {question.teaching_mode && teachingCredentials && <ParticipantTeachingContext key={question.id} question={question} {...teachingCredentials} locale={locale} active={false} />}
                     {screenshot && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
                     {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}
                     {listeningClip && (

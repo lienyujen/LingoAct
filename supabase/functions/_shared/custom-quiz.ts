@@ -41,7 +41,7 @@ export async function translateFlashcardItems(
       null,
       'realtime',
     )
-    if (result.status !== 'success') throw new Error(result.message || 'Flashcard translation failed.')
+    if (result.status !== 'success') throw new Error('Flashcard translation failed.')
     const batch = (result.output as { items?: Array<{ item_id?: string; prompt_text?: string; options?: string[] }> }).items || []
     for (const item of batch) if (typeof item.item_id === 'string') translated.set(item.item_id, item)
   }

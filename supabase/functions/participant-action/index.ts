@@ -5,6 +5,7 @@ import { getAdminClient, hashParticipantToken } from '../_shared/supabase.ts'
 import { askWritingCoach } from '../_shared/writing-coach.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
+import { participantTeachingCycle } from '../_shared/teaching-cycle.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
@@ -113,6 +114,11 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const participantId = typeof input.participantId === 'string' ? input.participantId : ''
     const participantToken = typeof input.participantToken === 'string' ? input.participantToken : ''
+    if (['teaching_context', 'teaching_pair_submit'].includes(action)) {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: '學員權限驗證失敗。' }, 403)
+      return await participantTeachingCycle(supabase, sessionId, participantId, input)
+    }
 
     // Keeps last_seen_at meaningful — it was written once at join and never
     // again, so it always equalled joined_at — and accumulates the time the
@@ -363,6 +369,7 @@ Deno.serve(async (req) => {
           if (attemptError) {
             const { data: raced } = await supabase.from('quiz_attempts')
               .select('id').eq('question_id', questionId).eq('participant_id', participantId).single()
+            if (!raced) throw new Error('找不到作答紀錄。')
             attemptId = raced.id
           }
           await supabase.from('answers').insert({
@@ -713,7 +720,7 @@ Deno.serve(async (req) => {
 
       const { data: question, error: questionError } = await supabase
         .from('questions')
-        .select('id, session_id, screenshot_id, type, status, prompt_text')
+        .select('id, session_id, screenshot_id, type, status, prompt_text, learning_focus')
         .eq('id', questionId)
         .eq('session_id', sessionId)
         .maybeSingle()
@@ -885,6 +892,7 @@ Deno.serve(async (req) => {
         const request = {
           mode: question.type as 'pronunciation' | 'oral_response',
           promptText: question.prompt_text,
+          learningFocus: question.learning_focus,
           screenshotUrl,
           audioBytes: new Uint8Array(await audioBlob.arrayBuffer()),
           audioMimeType: 'audio/wav',

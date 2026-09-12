@@ -38,8 +38,8 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
     setSamples(data.samples || []); setPairs(data.pairs || [])
   }
   async function dispatch() {
-    const data = await call(mode === 'repeat' ? 'teaching_repeat' : mode === 'pair' ? 'teaching_pair' : 'teaching_discuss', {
-      focus, sampleIds: selected, participantIds: roster, materialA, materialB,
+    const data = await call(mode === 'repeat' || mode === 'followup' ? 'teaching_repeat' : mode === 'pair' ? 'teaching_pair' : 'teaching_discuss', {
+      focus, responseType: mode === 'followup' ? 'short_answer' : undefined, sampleIds: selected, participantIds: roster, materialA, materialB,
     })
     onDispatched(data.question)
   }
@@ -74,7 +74,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
           <strong>{n.finding}</strong>
           {n.evidenceIds.map(id => <blockquote key={id}>{samples.find(s => s.id === id)?.text}</blockquote>)}
           <p>{n.nextPrompt}</p>
-          <button type="button" disabled={!active || !canRepeat} onClick={() => { setFocus(n.nextPrompt); setMode('repeat') }}>{zh ? '用這個重點再練' : 'Practise with this focus'}</button>
+          <button type="button" disabled={!active || !canRepeat} onClick={() => { setFocus(n.nextPrompt); setMode('followup') }}>{zh ? '用這個重點再練' : 'Practise with this focus'}</button>
         </article>)}
       </>}
       {mode === 'pair' && <>

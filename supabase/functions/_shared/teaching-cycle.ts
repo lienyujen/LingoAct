@@ -82,11 +82,14 @@ export async function presenterTeachingCycle(db: Db, sessionId: string, input: I
     source_question_id: source.id, learning_focus: focus || null, teaching_mode: 'practice',
   }
   const repeat = action === 'teaching_repeat'
-  if (!repeat) {
+  const followup = repeat && input.responseType === 'short_answer'
+  if (followup && !focus) return jsonResponse({ message: '請填寫這一輪的練習題目。' }, 400)
+  if (!repeat || followup) {
     Object.assign(question, { type: 'short_answer', screenshot_id: null, listening_clip_id: null, reading_font_url: null,
       reading_ruby: null, karaoke_cues: [], card_font_url: null, options: [], correct_answer: null, correct_answers: [],
       translations: {}, prepare_seconds: null, answer_seconds: null, discussion_samples: [] })
   }
+  if (followup) Object.assign(question, { title: '重點延伸練習', prompt_text: focus, teaching_mode: 'practice' })
   if (action === 'teaching_discuss') {
     const selected = Array.isArray(input.sampleIds) ? input.sampleIds : []
     const samples = (await samplesFor(db, source.id)).filter(s => selected.includes(s.id))
@@ -105,10 +108,10 @@ export async function presenterTeachingCycle(db: Db, sessionId: string, input: I
     Object.assign(question, { title: 'A / B 資訊差', teaching_mode: 'pair', prompt_text: focus })
   }
   if (repeat && (source.teaching_mode === 'pair' || !['short_answer', 'pronunciation', 'oral_response', 'custom_quiz'].includes(source.type))) return jsonResponse({ message: '此活動尚不支援再練一次。' }, 400)
-  if (repeat) question.title = source.title
+  if (repeat && !followup) question.title = source.title
   check((await db.from('questions').insert(question)).error)
   try {
-    if (repeat && source.type === 'custom_quiz') {
+    if (repeat && !followup && source.type === 'custom_quiz') {
       const quiz = await db.from('quizzes').select('*').eq('question_id', source.id).single()
       check(quiz.error)
       const quizId = crypto.randomUUID()

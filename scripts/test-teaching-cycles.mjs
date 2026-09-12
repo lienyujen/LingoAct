@@ -56,6 +56,12 @@ try {
   assert.equal(rows.length, 1)
   assert.notEqual(rows[0].id, item)
   assert.ok(rows[0].rubric.includes('Give one example.'))
+  const followup = await presenter({ action: 'teaching_repeat', questionId: quizQuestion, focus: 'Write a question using homework.', responseType: 'short_answer' })
+  assert.equal(followup.question.type, 'short_answer')
+  assert.equal(followup.question.prompt_text, 'Write a question using homework.')
+  assert.equal(followup.question.answer_seconds, null)
+  assert.equal(followup.question.status, 'active')
+  assert.equal((await sql(`select id from quizzes where question_id='${followup.question.id}'`)).length, 0)
 
   const paired = await presenter({ action: 'teaching_pair', questionId: original, focus: 'Agree on a time.', materialA: 'A secret: Monday', materialB: 'B secret: Tuesday', participantIds: students.slice(0, 2).map(s => s.id) })
   const pairId = paired.question.id

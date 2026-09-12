@@ -10,9 +10,14 @@ export type MandarinAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
 
 type RuleSpec = { terms: string[]; offsets: number[]; taiwan: string; mainland: string }
 type Rule = RuleSpec & { scope: 'character' | 'phrase' }
+type TaiwanRuleSpec = Omit<RuleSpec, 'mainland'>
 
 const rule = (terms: string, offsets: number | number[], taiwan: string, mainland: string): RuleSpec => ({
   terms: terms.split('|'), offsets: Array.isArray(offsets) ? offsets : [offsets], taiwan, mainland,
+})
+
+const taiwanRule = (terms: string, offsets: number | number[], taiwan: string): TaiwanRuleSpec => ({
+  terms: terms.split('|'), offsets: Array.isArray(offsets) ? offsets : [offsets], taiwan,
 })
 
 // Only entries whose two standards differ belong here. Rows in the source table
@@ -24,6 +29,45 @@ const PHRASE_RULES: RuleSpec[] = [
   // Same entries as the source list, occurring in the teacher's reported text.
   rule('暫時|暂时', 0, 'zhàn', 'zàn'),
   rule('危及', 0, 'wéi', 'wēi'),
+]
+
+// Correct readings from Wiktionary's Taiwan common-misreading appendix, whose
+// stated authority is the Ministry of Education Concised Mandarin Chinese
+// Dictionary. These apply only to standard Guoyu and the Taiwanese voice; a
+// Putonghua clip must continue to use the Mainland standard below.
+const TAIWAN_COMMON_MISREADING_RULES: TaiwanRuleSpec[] = [
+  taiwanRule('殯儀館|殡仪馆', 0, 'bìn'), taiwanRule('廣播|广播', 1, 'bò'),
+  taiwanRule('扳回', 0, 'bān'), taiwanRule('蝙蝠', 0, 'biān'),
+  taiwanRule('符合', 0, 'fú'), taiwanRule('法國|法国', 0, 'fǎ'),
+  taiwanRule('緋聞|绯闻', 0, 'fēi'), taiwanRule('諷刺|讽刺', 0, 'fèng'),
+  taiwanRule('篠原|筱原', 0, 'xiǎo'), taiwanRule('汀州', 0, 'tīng'),
+  taiwanRule('鯰魚|鲇鱼', 0, 'nián'), taiwanRule('克難|克难', 1, 'nán'),
+  taiwanRule('腳踝|脚踝', 1, 'huái'), taiwanRule('稜角|棱角', 0, 'léng'),
+  taiwanRule('顴骨|颧骨', 0, 'quán'), taiwanRule('菅原', 0, 'jiān'),
+  taiwanRule('桂冠', 1, 'guān'), taiwanRule('崗位|岗位', 0, 'gǎng'),
+  taiwanRule('坎坷', 1, 'kě'), taiwanRule('樺樹|桦树', 0, 'huà'),
+  taiwanRule('華陀|華佗|华陀|华佗', 0, 'huà'), taiwanRule('徘徊', 1, 'huái'),
+  taiwanRule('新垣', 1, 'yuán'), taiwanRule('邂逅', 1, 'hòu'),
+  taiwanRule('嫉妒', 0, 'jí'), taiwanRule('針灸|针灸', 1, 'jiǔ'),
+  taiwanRule('親戚|亲戚', 1, 'qī'), taiwanRule('企業|企业', 0, 'qì'),
+  taiwanRule('傾城|倾城', 0, 'qīng'), taiwanRule('校正', 0, 'jiào'),
+  taiwanRule('新潟', 1, 'xì'), taiwanRule('流血', 1, 'xiě'),
+  taiwanRule('頭皮屑|头皮屑', 2, 'xiè'), taiwanRule('朝鮮|朝鲜', 1, 'xiān'),
+  taiwanRule('玷污', 0, 'diàn'), taiwanRule('深圳', 1, 'zhèn'),
+  taiwanRule('處理|处理|處女|处女', 0, 'chǔ'), taiwanRule('連署|连署', 1, 'shù'),
+  taiwanRule('骰子', 0, 'tóu'), taiwanRule('張韶涵|张韶涵', 1, 'sháo'),
+  taiwanRule('侮辱', 1, 'rù'), taiwanRule('狙擊|狙击', 0, 'jū'),
+  taiwanRule('綜合|综合', 0, 'zòng'), taiwanRule('縱貫|纵贯|縱谷|纵谷', 0, 'zōng'),
+  taiwanRule('彩券', 1, 'quàn'), taiwanRule('骨髓', 1, 'suǐ'),
+  taiwanRule('骨頭|骨头', 0, 'gú'), taiwanRule('脊椎', 0, 'jǐ'),
+  taiwanRule('液體|液体', 0, 'yè'), taiwanRule('懸崖|悬崖', 1, 'yái'),
+  taiwanRule('天涯', 1, 'yá'), taiwanRule('夢魘|梦魇', 1, 'yǎn'),
+  taiwanRule('虛偽|虚伪', 1, 'wèi'), taiwanRule('呂不韋|吕不韦', 2, 'wéi'),
+  taiwanRule('枯萎', 1, 'wēi'), taiwanRule('紫微', 1, 'wéi'),
+  taiwanRule('薔薇|蔷薇', 1, 'wéi'), taiwanRule('昴宿', 0, 'mǎo'),
+  taiwanRule('王寶釧|王宝钏', 2, 'chuàn'), taiwanRule('苫小牧', 0, 'shān'),
+  taiwanRule('海岬', 1, 'jiǎ'), taiwanRule('東莞|东莞', 1, 'guǎn'),
+  taiwanRule('脂肪', 0, 'zhī'), taiwanRule('嫵媚|妩媚', 0, 'wǔ'),
 ]
 
 // These two source tables are organised by character, but the example word is
@@ -102,7 +146,6 @@ const POLYPHONE_RULES: RuleSpec[] = [
   rule('女巫', 1, 'wú', 'wū'), rule('海參崴|海参崴', 2, 'wēi', 'wǎi'),
   rule('崴腳|崴脚', 0, 'wēi', 'wǎi'), rule('古玩|珍玩', 1, 'wàn', 'wán'),
   rule('玩世不恭', 0, 'wàn', 'wán'),
-  rule('法國|法国|法蘭西|法兰西|法語|法语', 0, 'fà', 'fǎ'),
   rule('通緝|通缉', 1, 'qì', 'jī'),
   rule('緝麻|缉麻|緝拿歸案|缉拿归案', 0, 'qì', 'jī'),
   rule('戕害', 0, 'qiáng', 'qiāng'), rule('朝鮮|朝鲜', 1, 'xiān', 'xiǎn'),
@@ -128,8 +171,16 @@ export function regionalStandardInstruction(accent: MandarinAccent | null) {
     : 'Use the official Taiwan Ministry of Education Guoyu dictionary reading of every word, including region-specific initials, finals, tones and polyphonic-word choices. Do not substitute Mainland Putonghua readings.'
 }
 
-function matchingRules(text: string) {
-  return CROSS_STRAIT_RULES.flatMap((entry) => {
+function matchingRules(text: string, accent: MandarinAccent | null) {
+  const rules = usesMainlandStandard(accent)
+    ? CROSS_STRAIT_RULES
+    : [
+      ...CROSS_STRAIT_RULES,
+      ...TAIWAN_COMMON_MISREADING_RULES.map((entry) => ({
+        ...entry, mainland: entry.taiwan, scope: 'phrase' as const,
+      })),
+    ]
+  return rules.flatMap((entry) => {
     if (entry.scope === 'phrase') {
       return entry.terms.filter((term) => text.includes(term)).map((term) => ({ ...entry, term }))
     }
@@ -142,7 +193,7 @@ function matchingRules(text: string) {
 
 export function regionalPronunciationInstruction(text: string, accent: MandarinAccent | null) {
   const mainland = usesMainlandStandard(accent)
-  const details = matchingRules(text).flatMap((entry) => entry.offsets.map((offset) => {
+  const details = matchingRules(text, accent).flatMap((entry) => entry.offsets.map((offset) => {
     const reading = mainland ? entry.mainland : entry.taiwan
     return `In 「${entry.term}」, pronounce 「${[...entry.term][offset]}」 as ${reading}.`
   }))
@@ -153,7 +204,7 @@ export function regionalPronunciationInstruction(text: string, accent: MandarinA
 export function applyRegionalPinyin(text: string, syllables: string[], accent: MandarinAccent | null) {
   const output = [...syllables]
   const mainland = usesMainlandStandard(accent)
-  for (const entry of matchingRules(text)) {
+  for (const entry of matchingRules(text, accent)) {
     let from = 0
     while (from <= text.length) {
       const found = text.indexOf(entry.term, from)

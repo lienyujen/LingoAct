@@ -3,8 +3,8 @@
 // The contrast set is the differing entries in the cross-strait comparison at
 // https://zh.wikipedia.org/wiki/臺灣海峽兩岸現代標準漢語發音差異列表 (checked 2026-09-12). The
 // page is a contrast index, not a dictionary: matching is deliberately on its
-// example words so a reading is never forced onto an unrelated sense. 操行 is
-// added from Taiwan MOE's dictionary and Mainland China's Xiandai Hanyu Cidian.
+// example words so a reading is never forced onto an unrelated sense. 操行 and
+// 品行 are added from Taiwan MOE's dictionary and Mainland dictionaries.
 
 export type MandarinAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
 
@@ -26,6 +26,7 @@ const taiwanRule = (terms: string, offsets: number | number[], taiwan: string): 
 // their character positions are the same.
 const PHRASE_RULES: RuleSpec[] = [
   rule('操行', 1, 'xìng', 'xíng'),
+  rule('品行', 1, 'xìng', 'xíng'),
   // Same entries as the source list, occurring in the teacher's reported text.
   rule('暫時|暂时', 0, 'zhàn', 'zàn'),
   rule('危及', 0, 'wéi', 'wēi'),

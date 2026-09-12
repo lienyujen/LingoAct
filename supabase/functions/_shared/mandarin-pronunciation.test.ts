@@ -61,9 +61,11 @@ Deno.test('phrase rules do not leak into an unrelated polyphonic word', () => {
 Deno.test('TTS instructions and Bopomofo conversion use the same selected standard', () => {
   const taiwan = regionalPronunciationInstruction('操行', 'standard_guoyu')
   const mainland = regionalPronunciationInstruction('操行', 'putonghua')
+  const character = regionalPronunciationInstruction('品行端正', 'standard_guoyu')
   const france = regionalPronunciationInstruction('法國', 'standard_guoyu')
   if (!taiwan.includes('xìng') || taiwan.includes('xíng')) throw new Error(taiwan)
   if (!mainland.includes('xíng') || mainland.includes('xìng')) throw new Error(mainland)
+  if (!character.includes('In 「品行」, pronounce 「行」 as xìng.')) throw new Error(character)
   if (!france.includes('fǎ') || france.includes('fà')) throw new Error(france)
   assertEquals(pinyinToBopomofo('xìng'), 'ㄒㄧㄥˋ')
   assertEquals(pinyinToBopomofo('xíng'), 'ㄒㄧㄥˊ')

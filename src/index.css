@@ -928,6 +928,8 @@ h2 {
   display: flex;
   flex: none;
   gap: 2px;
+  position: absolute;
+  right: 0;
 }
 
 .qr-heading-label {
@@ -935,6 +937,10 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.qr-floating .qr-panel .panel-heading h2 {
+  max-width: calc(100% - 70px);
 }
 .qr-lingoact-icon {
   width: 22px; height: 22px; flex: 0 0 22px;
@@ -1848,16 +1854,17 @@ h2 {
    screenshot like everything else here, so they sit under the type grid: one
    leaves for the picture studio, the other picks a 自訂測驗 型式. */
 .type-shortcuts {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .type-shortcuts button {
   align-items: center;
   display: inline-flex;
-  flex: 1 1 0;
   gap: 7px;
   justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .selected-type {

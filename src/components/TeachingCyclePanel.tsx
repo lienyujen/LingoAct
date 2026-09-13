@@ -37,6 +37,13 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
     const data = await call('teaching_samples')
     setSamples(data.samples || []); setPairs(data.pairs || [])
   }
+  function openPair() {
+    setMode('pair'); setFocus(''); setMaterialA(''); setMaterialB('')
+    // Start with the largest complete set of pairs. The teacher can still
+    // remove or replace anyone, but a two-person class should not need four
+    // extra clicks before a shared task becomes available.
+    setRoster(participants.slice(0, participants.length - participants.length % 2).map(p => p.id))
+  }
   async function dispatch() {
     const data = await call(mode === 'repeat' || mode === 'followup' ? 'teaching_repeat' : mode === 'pair' ? 'teaching_pair' : 'teaching_discuss', {
       focus, responseType: mode === 'followup' ? 'short_answer' : undefined, sampleIds: selected, participantIds: roster, materialA, materialB,
@@ -50,11 +57,11 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
       {canRepeat && <button disabled={busy || !active} type="button" onClick={() => { setMode('repeat'); setFocus('') }}>{zh ? '再練一次' : 'Practise again'}</button>}
       <button disabled={busy} type="button" onClick={() => { setMode('discuss'); void run(loadSamples) }}>{zh ? '挑作品討論' : 'Discuss student work'}</button>
       <button disabled={busy} type="button" onClick={() => { setMode('diagnose'); void run(loadSamples) }}>{zh ? '看看全班卡在哪' : 'Review learning needs'}</button>
-      <button disabled={busy || !active} type="button" onClick={() => { setMode('pair'); setFocus(''); setRoster([]) }}>{zh ? 'A／B 資訊差' : 'A/B information gap'}</button>
+      <button disabled={busy || !active || participants.length < 2} type="button" onClick={openPair}>{zh ? '兩人共同任務' : 'Pair task'}</button>
       {question.teaching_mode === 'pair' && <button disabled={busy} type="button" onClick={() => void run(loadSamples)}>{zh ? '更新各組結果' : 'Refresh pair results'}</button>}
     </div>
     {mode && <div className="teaching-cycle-editor">
-      <label>{zh ? mode === 'repeat' ? '這一輪只練什麼？' : '共同任務／討論問題' : 'Focus / discussion prompt'}
+      <label>{zh ? mode === 'repeat' ? '這一輪只練什麼？' : mode === 'pair' ? '共同任務' : '討論問題' : mode === 'pair' ? 'Shared task' : 'Focus / discussion prompt'}
         <textarea maxLength={500} value={focus} onChange={e => setFocus(e.target.value)} placeholder={zh ? '例如：加上一句原因，讓讀者更容易理解。' : 'For example: add a reason to make your meaning clearer.'} />
       </label>
       {mode === 'repeat' && <p className="muted">{zh ? '沿用原教材，保留上一輪作答。派送後，全班開始新的一輪。' : 'Reuse the material and keep the previous responses. Dispatch starts a new round for the class.'}</p>}
@@ -78,8 +85,9 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
         </article>)}
       </>}
       {mode === 'pair' && <>
-        <label>A<textarea maxLength={4000} value={materialA} onChange={e => setMaterialA(e.target.value)} /></label>
-        <label>B<textarea maxLength={4000} value={materialB} onChange={e => setMaterialB(e.target.value)} /></label>
+        <p className="muted">{zh ? '每組兩人共同完成上面的任務；A、B 各自只會看到自己的資料。' : 'Pairs complete the task together. Each learner sees only their A or B material.'}</p>
+        <label>{zh ? 'A 的資料' : 'Material A'}<textarea maxLength={4000} value={materialA} onChange={e => setMaterialA(e.target.value)} /></label>
+        <label>{zh ? 'B 的資料' : 'Material B'}<textarea maxLength={4000} value={materialB} onChange={e => setMaterialB(e.target.value)} /></label>
         <p>{zh ? '勾選學生，依下方名單順序兩人一組。請選偶數位；每組一人送出共同結果。' : 'Select an even number of learners; adjacent selected names form a pair. Either partner submits the shared result.'}</p>
         {participants.map(p => <label className="teaching-sample" key={p.id}><input type="checkbox" checked={roster.includes(p.id)} onChange={e => setRoster(v => e.target.checked ? [...v, p.id] : v.filter(id => id !== p.id))} />{p.name}</label>)}
         <p>{participants.filter(p => roster.includes(p.id)).map((p, i) => `${Math.floor(i / 2) + 1}${i % 2 ? 'B' : 'A'}: ${p.name}`).join(' · ')}</p>

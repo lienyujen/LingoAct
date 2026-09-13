@@ -9,20 +9,21 @@ const check = (error: { message: string } | null) => { if (error) throw new Erro
 
 // Teacher-only collection. IDs identify evidence; names never enter the AI prompt.
 async function samplesFor(db: Db, questionId: string): Promise<Sample[]> {
-  const [written, quiz, spoken] = await Promise.all([
+  const [written, quiz, spoken, files] = await Promise.all([
     db.from('answers').select('id, answer_text').eq('question_id', questionId),
     db.from('quizzes').select('id').eq('question_id', questionId).maybeSingle(),
     db.from('audio_responses').select('id, transcript').eq('question_id', questionId),
+    db.from('file_responses').select('id, name, mime_type, storage_path, caption').eq('question_id', questionId),
   ])
-  check(written.error); check(quiz.error); check(spoken.error)
+  check(written.error); check(quiz.error); check(spoken.error); check(files.error)
   if (quiz.data) {
     const [attempts, items] = await Promise.all([
       db.from('quiz_attempts').select('id, composition').eq('question_id', questionId),
-      db.from('quiz_items').select('id, options, option_images').eq('quiz_id', quiz.data.id),
+      db.from('quiz_items').select('id, position, type, prompt_text, options, pair_prompts, option_images, sentence_mode').eq('quiz_id', quiz.data.id),
     ])
     check(attempts.error); check(items.error)
     if (!attempts.data?.length) return []
-    const responses = await db.from('quiz_item_answers').select('attempt_id, item_id, answer_text').in('attempt_id', attempts.data.map(a => a.id))
+    const responses = await db.from('quiz_item_answers').select('attempt_id, item_id, answer_text, answer_values').in('attempt_id', attempts.data.map(a => a.id))
     check(responses.error)
     return attempts.data.map(a => {
       const images: string[] = []
@@ -38,14 +39,37 @@ async function samplesFor(db: Db, questionId: string): Promise<Sample[]> {
             return segments.map(s => s.text).join('\n')
           }
         } catch { /* Ordinary writing is plain text. */ }
-        return r.answer_text || ''
+        if (r.answer_text) return `${item?.prompt_text || `第 ${item?.position || ''} 題`}：${r.answer_text}`
+        const values = Array.isArray(r.answer_values) ? r.answer_values : []
+        if (!values.length) return ''
+        if (item?.option_images?.length) {
+          for (const value of values) {
+            const image = item.option_images[item.options.indexOf(value)]
+            if (image) images.push(image)
+          }
+          return `${item.prompt_text}：圖片排列順序`
+        }
+        if (item?.type === 'matching') {
+          return `${item.prompt_text}\n${(item.pair_prompts || []).map((prompt: string, index: number) => `${prompt}－${values[index] || '—'}`).join('\n')}`
+        }
+        return `${item?.prompt_text || `第 ${item?.position || ''} 題`}：${values.join(item?.sentence_mode ? '' : ' → ')}`
       })
       return { id: a.id, text: a.composition || texts.filter(Boolean).join('\n'), images }
     }).filter(s => s.text.trim())
   }
+  const fileSamples = await Promise.all((files.data || []).map(async file => {
+    const images: string[] = []
+    if (file.mime_type?.startsWith('image/')) {
+      const signed = await db.storage.from('lingoact-files').createSignedUrl(file.storage_path, 3600)
+      check(signed.error)
+      if (signed.data?.signedUrl) images.push(signed.data.signedUrl)
+    }
+    return { id: file.id, text: file.caption || file.name, images }
+  }))
   return [
     ...(written.data || []).filter(a => a.answer_text && !a.answer_text.startsWith('[')).map(a => ({ id: a.id, text: a.answer_text, images: [] })),
     ...(spoken.data || []).filter(a => a.transcript).map(a => ({ id: a.id, text: a.transcript, images: [] })),
+    ...fileSamples,
   ]
 }
 

@@ -34,8 +34,17 @@ if (!fs.existsSync(unpacked)) throw new Error(`electron-builder produced no ${un
 
 // Replaced rather than merged: a stale file left behind from an older build is
 // the kind of thing that only shows up in front of a class.
-fs.rmSync(target, { recursive: true, force: true })
-fs.renameSync(unpacked, target)
+try {
+  fs.rmSync(target, { recursive: true, force: true })
+  fs.renameSync(unpacked, target)
+} catch (error) {
+  // Dropbox sometimes keeps the just-emptied directory handle alive. The old
+  // files are already gone at that point, so copying the completed build into
+  // that exact empty directory is equivalent to the rename. Never merge into a
+  // non-empty target: that would reintroduce the stale-file problem above.
+  if (error?.code !== 'EPERM' || !fs.existsSync(target) || fs.readdirSync(target).length) throw error
+  fs.cpSync(unpacked, target, { recursive: true })
+}
 fs.rmSync(staging, { recursive: true, force: true })
 
 console.log(`\nready: ${path.join(target, 'LingoAct.exe')}`)

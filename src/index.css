@@ -6479,6 +6479,7 @@ h2 {
 .teaching-sample img, .participant-teaching-context article img { width: 24%; object-fit: contain; }
 .participant-teaching-context audio { width: 100%; }
 .participant-teaching-context article { padding: 12px; margin: 10px 0; border: 1px solid var(--border); border-radius: 12px; }
+.participant-teaching-context-slot { display: contents; }
 .interaction-editor { display: grid; gap: 14px; }
 .interaction-editor textarea { width: 100%; }
 .interaction-check { display: flex; align-items: center; gap: 9px; color: var(--text); }

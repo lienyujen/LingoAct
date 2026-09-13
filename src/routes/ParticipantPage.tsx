@@ -749,9 +749,16 @@ export function ParticipantPage() {
         </div>
       )}
       <SharedContentPanel contents={sharedContents} locale={locale} />
-      {question?.teaching_mode && participant && participantToken && <ParticipantTeachingContext key={question.id}
-        question={question} sessionId={sessionId} participantId={participant.id} participantToken={participantToken} locale={locale}
-        active={session?.status === 'active' && question.status === 'active'} />}
+      {/* Keep one permanent reconciliation anchor for the current teaching
+          round. During the initial participant load, session, participant and
+          question arrive in separate updates; inserting this section directly
+          among the page's many optional siblings could leave an earlier copy
+          behind. The stable slot makes replacement happen inside one parent. */}
+      <div className="participant-teaching-context-slot" data-question-id={question?.id || undefined}>
+        {question?.teaching_mode && participant && participantToken && <ParticipantTeachingContext
+          question={question} sessionId={sessionId} participantId={participant.id} participantToken={participantToken} locale={locale}
+          active={session?.status === 'active' && question.status === 'active'} />}
+      </div>
       {screenshot && question?.type !== 'file_upload' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}

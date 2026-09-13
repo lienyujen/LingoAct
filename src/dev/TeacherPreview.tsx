@@ -9,6 +9,7 @@ import { PresenterNewPage } from '../routes/PresenterNewPage'
 import { ParticipantFlashcards } from '../components/ParticipantFlashcards'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
+import { DragAnswers } from '../components/DragAnswers'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
 import '../index.css'
@@ -46,6 +47,7 @@ export function Preview() {
   const [prompt, setPrompt] = useState('')
   const [compact, setCompact] = useState(false)
   const action = () => setNotice('介面預覽：此操作在桌面版中使用。')
+  if (location.hash === '#interactions') return <InteractionPreview />
   if (location.hash === '#teaching-cycle') return <main style={{ maxWidth: 420, margin: '20px auto' }}>
     <TeachingCyclePanel question={practiceQuestion} sessionId="preview" presenterToken="preview" active participants={['小明', '莉莉', '小華', '美玲'].map((name, i) => ({
       id: String(i), session_id: 'preview', name, device_id: String(i), joined_at: '', last_seen_at: '',
@@ -85,6 +87,20 @@ export function Preview() {
       <SentenceWallModal open={open} initialPrompt={prompt} busy={false} error="" onCancel={() => setOpen(false)} onOpen={() => { setOpen(false); setNotice('預覽完成，沒有派送題目。') }} />
     </main>
   </div>
+}
+
+function InteractionPreview() {
+  const [mode, setMode] = useState<'ordering' | 'sentence' | 'matching'>('matching')
+  const [values, setValues] = useState<string[]>([])
+  const [revision, setRevision] = useState(0)
+  const options = ['早上', '中午', '晚上']
+  return <main className="participant-page"><section className="panel">
+    <h2>排序與配對操作預覽</h2>
+    <nav>{(['matching', 'sentence', 'ordering'] as const).map(value => <button key={value} onClick={() => { setMode(value); setValues(value === 'ordering' ? options : []) }}>{value}</button>)}</nav>
+    <DragAnswers mode={mode} options={[...options]} prompts={['早餐', '午餐', '晚餐']} values={values} locale="zh-TW" onChange={setValues} />
+    <button onClick={() => setRevision(revision + 1)}>模擬其他學生更新 {revision}</button>
+    <output>{JSON.stringify(values)}</output>
+  </section></main>
 }
 
 if (import.meta.env.DEV) createRoot(document.getElementById('root')!).render(<Preview />)

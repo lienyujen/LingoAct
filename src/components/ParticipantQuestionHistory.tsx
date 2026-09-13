@@ -8,6 +8,7 @@ import { ParticipantFlashcards } from './ParticipantFlashcards'
 import { ListeningPlayer } from './ListeningPlayer'
 import { ParticipantTeachingContext } from './ParticipantTeachingContext'
 import { participantQuizPayload } from '../lib/participantQuizPayload'
+import { InteractionReadout } from './InteractionReadout'
 
 type Props = {
   teachingCredentials?: { sessionId: string; participantId: string; participantToken: string }
@@ -152,7 +153,7 @@ export function ParticipantQuestionHistory({
                       />
                     ) : question.type === 'custom_quiz' && quiz?.attempt ? (
                       <div className="participant-history-quiz">
-                        <p><CheckCircle size={17} />{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score}</p>
+                        <p><CheckCircle size={17} />{quiz.quiz.interaction_mode && !quiz.quiz.graded ? participantText(locale, 'submittedAnswer') : <>{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score}</>}</p>
                         {quiz.items.map((item, itemIndex) => {
                           const response = quiz.answers.find((entry) => entry.item_id === item.id)
                           const prompt = localizedFields(item.translations, locale)?.prompt_text || item.prompt_text
@@ -168,7 +169,7 @@ export function ParticipantQuestionHistory({
                             try { pictureWriting = JSON.parse(response?.answer_text || '[]') } catch { pictureWriting = [] }
                           }
                           return <div key={item.id}><strong>{itemIndex + 1}. {prompt}</strong>
-                            {pictureWriting.length
+                            {quiz.quiz.interaction_mode ? <InteractionReadout item={item} values={response?.answer_values || []} /> : pictureWriting.length
                               ? <div className="participant-picture-writing-review">{pictureWriting.map((segment, at) => <article key={segment.panelId}><div><b>{at + 1}</b><img alt="" src={item.option_images[item.options.indexOf(segment.panelId)]} /></div><p>{segment.text}</p></article>)}</div>
                               : pictures.length
                               ? <p className="participant-history-panels">{pictures.map((src, at) => <img alt="" key={`${src}-${at}`} src={src} />)}</p>

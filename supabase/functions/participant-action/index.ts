@@ -483,7 +483,7 @@ Deno.serve(async (req) => {
           // One choice per left-hand item, each of them an offered option.
           const values = submitted.answerValues || []
           const pairPrompts = (item.pair_prompts as string[]) || []
-          if (values.length !== pairPrompts.length || values.some((value) => !item.options.includes(value))) {
+          if (values.length !== pairPrompts.length || values.some((value) => !item.options.includes(value)) || (quiz.interaction_mode && new Set(values).size !== values.length)) {
             return jsonResponse({ message: `請完成第 ${item.position} 題的配對。` }, 400)
           }
         } else if (!submitted.answerText) {

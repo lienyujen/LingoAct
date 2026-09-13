@@ -367,6 +367,7 @@ export type SessionAnalysis = {
 }
 
 export type Quiz = {
+  interaction_mode?: boolean
   id: string
   session_id: string
   question_id: string
@@ -384,6 +385,7 @@ export type Quiz = {
 }
 
 export type QuizItem = {
+  sentence_mode?: boolean
   id: string
   quiz_id: string
   position: number

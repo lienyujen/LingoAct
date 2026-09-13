@@ -1126,6 +1126,10 @@ alter table public.quiz_attempts
 
 notify pgrst, 'reload schema';
 
+-- Screenshot ordering/matching uses the existing private quiz keys and attempts.
+alter table public.quizzes add column if not exists interaction_mode boolean not null default false;
+alter table public.quiz_items add column if not exists sentence_mode boolean not null default false;
+
 -- Keep every practice round as its own question, with an explicit parent.
 alter table public.questions add column if not exists source_question_id uuid references public.questions(id) on delete set null;
 alter table public.questions add column if not exists learning_focus text;

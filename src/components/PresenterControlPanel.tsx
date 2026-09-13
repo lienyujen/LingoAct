@@ -16,6 +16,8 @@ type Props = {
   onCaptureScreen?: () => void
   onCaptureFlashcards?: () => void
   onCaptureWriting?: () => void
+  onCaptureOrdering?: () => void
+  onCaptureMatching?: () => void
   onOpenPicture?: () => void
   onOpenPictureWriting?: () => void
   onDrawLottery: () => void
@@ -45,6 +47,8 @@ export function PresenterControlPanel({
   onCaptureScreen,
   onCaptureFlashcards,
   onCaptureWriting,
+  onCaptureOrdering,
+  onCaptureMatching,
   onOpenPicture,
   onOpenPictureWriting,
   onDrawLottery,
@@ -124,6 +128,8 @@ export function PresenterControlPanel({
             </button>
           )}
           {onCaptureFlashcards && <button className="control-action picture-control-action" type="button" onClick={onCaptureFlashcards} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('flashcards')}</button>}
+          {onCaptureOrdering && <button className="control-action picture-control-action" type="button" onClick={onCaptureOrdering} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeOrdering')}</button>}
+          {onCaptureMatching && <button className="control-action picture-control-action" type="button" onClick={onCaptureMatching} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeMatching')}</button>}
           </>}
           {category === 'listen' && <>
           <button className="control-action listening-control-action" type="button" onClick={onOpenListeningStudio} disabled={busy}>

@@ -20,6 +20,8 @@ import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
 import { QuestionResult } from '../components/QuestionResult'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
+import { fileDataUrl } from '../lib/screenshotInteraction'
+import type { InteractionGenerated } from '../lib/screenshotInteraction'
 import { CustomQuizResult } from '../components/CustomQuizResult'
 import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
@@ -886,6 +888,15 @@ export function PresenterPage() {
     setBusy(true)
     try {
       const supabase = requireSupabase()
+      if (draft.interaction) {
+        const { data, error } = await supabase.functions.invoke('presenter-action', { body: {
+          action: 'interaction_dispatch', sessionId, presenterToken, image: await fileDataUrl(file), direction: promptText, ...draft.interaction,
+        } })
+        if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
+        if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
+        setSelectedQuestionId(data.question.id)
+        return
+      }
       const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
         body: {
           action: 'prepare_screenshot_upload',
@@ -1097,6 +1108,7 @@ export function PresenterPage() {
     if (!captureFile) return
 
     setAnalysisError('')
+    setCaptureInitialDraft(draft)
     setEditorOpen(false)
     try {
       await uploadQuestionScreenshot(captureFile, draft)
@@ -1890,6 +1902,8 @@ export function PresenterPage() {
           onCaptureScreen={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen() } : undefined}
           onCaptureFlashcards={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('flashcard') } : undefined}
           onCaptureWriting={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('writing') } : undefined}
+          onCaptureOrdering={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('ordering') } : undefined}
+          onCaptureMatching={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('matching') } : undefined}
           onOpenPicture={() => { setPlannedActivity(null); setPictureInitialMode('spoken'); setPictureOpen(true) }}
           onOpenPictureWriting={() => { setPlannedActivity(null); setPictureInitialMode('ordering'); setPictureOpen(true) }}
           onGenerateExitTicket={() => void generateExitTicket()}
@@ -2062,6 +2076,11 @@ export function PresenterPage() {
         </div>
       )}
       <QuestionEditor
+        onGenerateInteraction={async (request) => {
+          if (!captureFile) throw new Error(t('captureSendFailed'))
+          const data = await callPresenter({ action: 'interaction_generate', sessionId, presenterToken: requirePresenterToken(), image: await fileDataUrl(captureFile), ...request }, t('quizCreateFailed'))
+          return data as InteractionGenerated
+        }}
         preset={capturePreset}
         initialDraft={captureInitialDraft}
         error={analysisError}

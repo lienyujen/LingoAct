@@ -5,6 +5,8 @@ import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { QuizOrderingInput } from './QuizOrderingInput'
 import { QuizMatchingInput } from './QuizMatchingInput'
+import { DragAnswers } from './DragAnswers'
+import { InteractionReadout } from './InteractionReadout'
 import { WritingCoachPanel } from './WritingCoachPanel'
 import { RevisedWriting } from './RevisedWriting'
 import { localizedFeedback, localizedFields } from '../lib/localizedContent'
@@ -39,9 +41,9 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
   // because it is not the answer to any one of them.
   const [composition, setComposition] = useState('')
   const pictureWriting = data.quiz.requested_type === 'picture_writing'
-  const writing = data.quiz.graded === false && !pictureWriting
+  const writing = data.quiz.graded === false && !pictureWriting && !data.quiz.interaction_mode
   const coaching = writing && data.quiz.coaching === true
-  const usesAiGrading = pictureWriting ? data.quiz.graded : !writing && data.items.some((item) => item.type !== 'multiple_choice')
+  const usesAiGrading = pictureWriting ? data.quiz.graded : !writing && data.items.some((item) => !['multiple_choice', 'ordering', 'matching'].includes(item.type))
   const composing = writing && data.items.length > 1
   // In field order, which is the order the article should run in.
   const paragraphs = data.items
@@ -59,7 +61,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
 
   const complete = useMemo(() => data.items.every((item) => {
     if (item.type === 'multiple_choice') return Boolean(choiceAnswers[item.id])
-    if (item.type === 'ordering') return (orderAnswers[item.id] || item.options).length === item.options.length && (!pictureWriting || item.options.every((value) => Boolean(panelTexts[`${item.id}:${value}`]?.trim())))
+    if (item.type === 'ordering') return (orderAnswers[item.id] || (item.sentence_mode ? [] : item.options)).length === item.options.length && (!pictureWriting || item.options.every((value) => Boolean(panelTexts[`${item.id}:${value}`]?.trim())))
     // Every left-hand item needs a choice; a half-finished 配對 is not an answer.
     if (item.type === 'matching') {
       const chosen = matchAnswers[item.id] || []
@@ -99,7 +101,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
           <div>
             <h2>{data.quiz.title}</h2>
             <p>{participantText(locale, submitted
-              ? 'writingSubmitted'
+              ? data.quiz.interaction_mode ? 'submittedAnswer' : 'writingSubmitted'
               : graded ? 'gradingCompleted' : failed ? 'gradingInterrupted' : usesAiGrading ? 'gradingInBackground' : 'calculatingScore')}</p>
           </div>
           {graded && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
@@ -149,6 +151,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
             <article className="quiz-graded-item" key={item.id}>
               <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong></div>
               <p className="quiz-written-back">{response?.answer_text}</p>
+              {data.quiz.interaction_mode && <InteractionReadout item={item} values={response?.answer_values || []} />}
               {/* Written back to them, not only to the teacher's panel: notes
                   the student never reads are notes nobody acts on. */}
               {response?.feedback && (
@@ -164,6 +167,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
             <article className="quiz-graded-item" key={item.id}>
               <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong><span>{response?.score ?? 0}/{item.points}</span></div>
               <p>{localizedFeedback(response?.feedback, locale)}</p>
+              {data.quiz.interaction_mode && <InteractionReadout item={item} values={response?.answer_values || []} />}
             </article>
           )
         })}
@@ -175,18 +179,18 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
   return (
     <section className="panel participant-question participant-custom-quiz">
       <h2>{data.quiz.title}</h2>
-      <p className="muted">{writing
+      {!data.quiz.interaction_mode && <p className="muted">{writing
         ? participantText(locale, coaching ? 'coachIntro' : 'writingHint')
         : usesAiGrading
           ? participantText(locale, 'quizHintAi')
-          : participantText(locale, 'quizHintKey')}</p>
+          : participantText(locale, 'quizHintKey')}</p>}
       <form className="custom-quiz-form" onSubmit={submit}>
         {data.items.map((item, index) => {
           const translation = localizedFields(item.translations, locale)
           const options = translation?.options?.length === item.options.length ? translation.options : item.options
           return (
             <fieldset className="custom-quiz-item" key={item.id}>
-              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}{!writing && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
+              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}{!writing && data.quiz.graded && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
               {item.type === 'multiple_choice' ? (
                 <div className="quiz-choice-list">
                   {item.options.map((option, optionIndex) => (
@@ -196,6 +200,10 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
                     </label>
                   ))}
                 </div>
+              ) : data.quiz.interaction_mode && ['ordering', 'matching'].includes(item.type) ? (
+                <DragAnswers mode={item.type === 'matching' ? 'matching' : item.sentence_mode ? 'sentence' : 'ordering'} options={item.options} labels={options} images={item.option_images} prompts={item.pair_prompts} locale={locale} disabled={busy}
+                  values={item.type === 'matching' ? matchAnswers[item.id] || [] : orderAnswers[item.id] || (item.sentence_mode ? [] : item.options)}
+                  onChange={next => item.type === 'matching' ? setMatchAnswers(v => ({ ...v, [item.id]: next })) : setOrderAnswers(v => ({ ...v, [item.id]: next }))} />
               ) : item.type === 'ordering' ? (
                 <QuizOrderingInput
                   images={item.option_images?.length === item.options.length

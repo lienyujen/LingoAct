@@ -5,6 +5,7 @@ import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 import { RevisedWriting } from './RevisedWriting'
 import { QuestionActivityStatus } from './QuestionActivityStatus'
+import { InteractionResults } from './InteractionResults'
 
 type Props = {
   anonymousEnabled: boolean
@@ -230,7 +231,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   }
   // 寫作教練 and a deck are both ungraded, but for different reasons and with
   // different things worth showing, so they are not one branch.
-  const writing = results.quiz.graded === false && !flashcard && !pictureWriting
+  const writing = results.quiz.graded === false && !flashcard && !pictureWriting && !results.quiz.interaction_mode
   const graded = results.attempts.filter((attempt) => attempt.status === 'graded')
   const grading = results.attempts.filter((attempt) => attempt.status === 'grading')
   const average = graded.length
@@ -332,6 +333,15 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     setExpanded(true)
   }
 
+  if (results.quiz.interaction_mode) return <section className="panel result-panel custom-quiz-result">
+    <div className="result-heading"><h2>{results.quiz.title}</h2><div>
+      {(stoppable || resumable) && <button type="button" disabled={toggling} onClick={() => void toggleAnswering()}>{resumable ? t('resumeAnswering') : t('stopAnswering')}</button>}
+      <button className="icon-button" type="button" aria-label={t('expandQuiz')} onClick={openExpandedReview}><ArrowsOut size={20} /></button>
+    </div></div>
+    <InteractionResults results={results} anonymousEnabled={anonymousEnabled} />
+    {expanded && createPortal(<div className="modal-backdrop"><div className="modal"><button type="button" onClick={() => setExpanded(false)}>{t('close')}</button><InteractionResults results={results} anonymousEnabled={anonymousEnabled} /></div></div>, document.body)}
+    {error && <p className="error">{error}</p>}
+  </section>
   return (
     <section className="panel result-panel custom-quiz-result">
       <div className="result-heading">

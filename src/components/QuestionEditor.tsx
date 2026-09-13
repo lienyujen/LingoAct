@@ -8,6 +8,8 @@ import type { PresenterMessageKey } from '../lib/presenterI18n'
 import { TimingRow } from './TimingRow'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { useWorkspaceText } from '../lib/workspaceText'
+import { InteractionEditor } from './InteractionEditor'
+import type { InteractionDraft, InteractionGenerated } from '../lib/screenshotInteraction'
 
 export type { CustomQuizSettings }
 
@@ -15,6 +17,7 @@ export type { CustomQuizSettings }
 // added, the non-quiz call would have had to pass undefined for quizSettings
 // just to reach the fields after it.
 export type QuestionDraft = {
+  interaction?: InteractionDraft
   type: QuestionType
   options: string[]
   allowMultiple: boolean
@@ -26,6 +29,7 @@ export type QuestionDraft = {
 }
 
 type Props = {
+  onGenerateInteraction?: (request: Record<string, unknown>) => Promise<InteractionGenerated>
   // 單字卡 has its own 課堂活動 button, which captures the screen and then opens
   // this editor already on the right setting.
   preset?: QuizRequestedType | null
@@ -58,7 +62,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
   { type: 'pronunciation', label: 'typePronunciation' },
 ]
 
-export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, onCancel, onCreate, onPictureTalk }: Props) {
+export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, onCancel, onCreate, onPictureTalk, onGenerateInteraction }: Props) {
   const t = usePresenterText()
   const w = useWorkspaceText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
@@ -71,6 +75,9 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [quizCoaching, setQuizCoaching] = useState(false)
   const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(null)
+  const [interaction, setInteraction] = useState<InteractionDraft>({ kind: 'ordering', items: [], tiles: [], sentenceMode: false, hasAnswer: true, shareScreenshot: false })
+  const [interactionBusy, setInteractionBusy] = useState(false)
+  const isInteraction = type === 'custom_quiz' && (quizType === 'ordering' || quizType === 'matching') && Boolean(onGenerateInteraction)
 
   useEffect(() => {
     if (!open) return
@@ -80,11 +87,12 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
     setAllowMultiple(initialDraft?.allowMultiple === true)
     setPromptText(initialDraft?.promptText || '')
     setQuizCount(quiz?.requestedCount == null ? 'auto' : String(quiz.requestedCount))
-    setQuizType(quiz?.requestedType || preset || 'random')
-    setQuizDirection(quiz?.direction || '')
+    setQuizType(initialDraft?.interaction?.kind || quiz?.requestedType || preset || 'random')
+    setQuizDirection(quiz?.direction || initialDraft?.promptText || '')
     setQuizCoaching(quiz?.coaching === true)
     setPrepareSeconds(initialDraft?.prepareSeconds ?? null)
     setAnswerSeconds(initialDraft?.answerSeconds ?? null)
+    setInteraction(initialDraft?.interaction || { kind: preset === 'matching' ? 'matching' : 'ordering', items: [], tiles: [], sentenceMode: false, hasAnswer: true, shareScreenshot: false })
   }, [initialDraft, open, preset])
 
   const editableOptions = type === 'multiple_choice' || type === 'poll'
@@ -103,8 +111,14 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
         className="modal question-modal"
         onSubmit={(event) => {
           event.preventDefault()
+          if (interactionBusy) return
           if (type === 'custom_quiz') {
             const direction = quizDirection.trim()
+            if (isInteraction) {
+              onCreate({ type, options: [], allowMultiple: false, promptText: direction, prepareSeconds: null, answerSeconds: null,
+                interaction: { ...interaction, kind: quizType as 'ordering' | 'matching' } })
+              return
+            }
             if (!direction) return
             onCreate({
               type,
@@ -145,6 +159,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
           ))}
         </div>
         <div className="type-shortcuts">
+          {onGenerateInteraction && (['ordering', 'matching'] as const).map(kind => <button key={kind} className={type === 'custom_quiz' && quizType === kind ? 'selected-type' : 'ghost-button'} type="button" onClick={() => { setType('custom_quiz'); setQuizType(kind); setInteraction(v => ({ ...v, kind })) }}>{t(kind === 'ordering' ? 'typeOrdering' : 'typeMatching')}</button>)}
           {onPictureTalk && (
             <button className="ghost-button" type="button" onClick={onPictureTalk}>
               <Image size={16} />{t('pictureTalk')}
@@ -202,7 +217,8 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             {t('uploadTypeHint')}
           </p>
         )}
-        {type === 'custom_quiz' && (
+        {isInteraction && onGenerateInteraction && <InteractionEditor key={`${open}-${quizType}`} value={{ ...interaction, kind: quizType as 'ordering' | 'matching' }} direction={quizDirection} previewUrl={previewUrl} onChange={setInteraction} onDirectionChange={setQuizDirection} onGenerate={onGenerateInteraction} onBusy={setInteractionBusy} />}
+        {type === 'custom_quiz' && !isInteraction && (
           <CustomQuizFields
             coaching={quizCoaching}
             count={quizCount}
@@ -253,7 +269,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
           <button className="ghost-button" type="button" onClick={onCancel}>
             <X size={17} />{t('cancel')}
           </button>
-          <button disabled={type === 'custom_quiz' && !quizDirection.trim()} type="submit">
+          <button disabled={interactionBusy || (isInteraction ? quizType === 'ordering' && Math.max(interaction.items.length, interaction.tiles.length) < 2 : type === 'custom_quiz' && !quizDirection.trim())} type="submit">
             {type === 'custom_quiz' ? <Sparkle size={17} /> : <PaperPlaneTilt size={17} />}
             {type === 'custom_quiz' ? t('generateAndSend') : t('send')}
           </button>

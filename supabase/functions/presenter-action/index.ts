@@ -11,6 +11,7 @@ import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts
 import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
+import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
 
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -252,6 +253,7 @@ Deno.serve(async (req) => {
     if (['teaching_samples', 'teaching_repeat', 'teaching_discuss', 'teaching_diagnose', 'teaching_pair'].includes(action)) {
       return await presenterTeachingCycle(supabase, sessionId, input)
     }
+    if (['interaction_generate', 'interaction_dispatch', 'interaction_key'].includes(action)) return await screenshotInteraction(supabase, sessionId, input)
 
     if (action === 'update_session') {
       const values: Record<string, boolean | number | string | string[] | null> = {}

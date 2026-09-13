@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Brain, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
 import { QuizAnswerEditor } from '../components/CustomQuizResult'
+import { InteractionResults } from '../components/InteractionResults'
 import type { QuizReviewProps } from '../components/CustomQuizResult'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { PresenterLocaleContext, presenterLookup, storedPresenterLocale } from '../lib/presenterI18n'
@@ -127,7 +128,7 @@ export function CustomQuizReviewPage() {
         <button aria-label={t('closeQuizWindow')} className="icon-button" title={t('close')} type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>
       </header>
       {error && <p className="error custom-quiz-native-error">{error}</p>}
-      {results && pictureWriting ? (
+      {results?.quiz.interaction_mode ? <InteractionResults results={results} anonymousEnabled /> : results && pictureWriting ? (
         <div className="picture-writing-expanded picture-writing-native">
           <aside>
             {results.attempts.map((attempt) => (

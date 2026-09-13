@@ -499,9 +499,13 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     // 寫作教練 hands the writing straight back to the teacher. Marking it would
     // be the most expensive call this app makes, and it is not what was asked
     // for — so the attempt is simply complete, with no score to report.
-    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type').eq('id', attempt.quiz_id).single()
+    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type, interaction_mode').eq('id', attempt.quiz_id).single()
     if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
     if (quiz.graded === false) {
+      if (quiz.interaction_mode) {
+        const cleared = await supabase.from('quiz_item_answers').update({ score: null, feedback: null }).eq('attempt_id', attemptId)
+        if (cleared.error) throw cleared.error
+      }
       if (quiz.requested_type === 'picture_writing') {
         const { data: items, error: itemError } = await supabase.from('quiz_items').select('id, points').eq('quiz_id', attempt.quiz_id)
         if (itemError || !items?.length) throw itemError || new Error('Quiz items are unavailable.')
@@ -526,11 +530,12 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       const { error: submitError } = await supabase.from('quiz_attempts').update({
         status: 'submitted',
         total_score: null,
+        feedback: null,
         error_message: null,
         graded_at: new Date().toISOString(),
       }).eq('id', attemptId)
       if (submitError) throw submitError
-      await supabase.from('answers').update({ answer_text: '[寫作已送出]' })
+      await supabase.from('answers').update({ answer_text: quiz.interaction_mode ? '[活動已送出]' : '[寫作已送出]' })
         .eq('question_id', attempt.question_id).eq('participant_id', attempt.participant_id)
       return
     }
@@ -625,8 +630,8 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         // so the wrong-order feedback says only that, and the teacher shows the
         // sequence as pictures.
         const pictures = Array.isArray(item.option_images) && item.option_images.length > 0
-        feedbackZhTw = correct ? '順序正確。' : pictures ? '順序不對。' : `順序不對，正確順序：${expected.join(' → ')}`
-        feedbackEn = correct ? 'Correct order.' : pictures ? 'Wrong order.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
+        feedbackZhTw = correct ? '順序正確。' : pictures || quiz.interaction_mode ? '順序不對，等老師公布正確答案。' : `順序不對，正確順序：${expected.join(' → ')}`
+        feedbackEn = correct ? 'Correct order.' : pictures || quiz.interaction_mode ? 'Not quite — wait for the teacher to reveal the answer.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
       } else if (item.type === 'multiple_choice') {
         const expected = [...new Set(key.accepted_answers || [])].sort()
         const submitted = [...new Set(answer.answer_values || [])].sort()

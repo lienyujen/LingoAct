@@ -292,8 +292,8 @@ const messages = {
     endClassFailed: '無法結束課程，程式尚未關閉。', suspendFailed: '暫時中止失敗，程式尚未關閉。',
     endClassConfirm: '下課並產生報告', endClassTitle: '確定要下課並產生報告？',
     endClassBody: '「{title}」會停止互動，學員將看到課程已結束；課堂資料、派送內容與分析都會保留。',
-    leaveTitle: '要如何離開「{title}」？', leaveConfirm: '結束課程並離開', leaveSecondary: '暫時中止',
-    leaveBody: '暫時中止只會關閉講師程式，場次與資料保持原狀，可從「管理場次」重新加入。選擇結束課程後，學員會看到課程已結束，資料保留但不產生 AI 課程總結。',
+    leaveTitle: '要離開「{title}」了嗎？', leaveConfirm: '我就是要下課！', leaveSecondary: '等會回來',
+    leaveBody: '如果只是暫時離開，選「等會回來」：場次和資料都會保持原樣，之後可從「管理場次」繼續上課。如果今天真的教夠了，選「我就是要下課！」：學生會看到課程已結束，資料仍會保留，但不會產生課程總結。如果需要課程總結，請從「下課並產生報告」結束這門課。',
 
     // 搶答與抽籤
     congrats: '恭喜！', winnerIs: '得獎的是', drawnIs: '抽中的是', drawingLots: '抽籤中',
@@ -678,8 +678,8 @@ const messages = {
     endClassFailed: 'The class could not be ended; the app is still open.', suspendFailed: 'Pausing failed; the app is still open.',
     endClassConfirm: 'End the class and make the report', endClassTitle: 'End the class and make the report?',
     endClassBody: '"{title}" stops taking part and the class sees that it has ended. Everything — the class data, what you sent, and the analysis — is kept.',
-    leaveTitle: 'How do you want to leave "{title}"?', leaveConfirm: 'End the class and leave', leaveSecondary: 'Pause',
-    leaveBody: 'Pausing just closes the teacher app; the class and its data stay as they are and you can rejoin from "Manage classes". Ending the class shows the students that it is over — the data is kept, but no AI summary is made.',
+    leaveTitle: 'Leave “{title}”?', leaveConfirm: 'I’m ending class!', leaveSecondary: 'I’ll be back',
+    leaveBody: 'If you are only stepping away, choose “I’ll be back”: the class and its data stay as they are, and you can continue later from “Manage classes”. If you really are done for today, choose “I’m ending class!”: students will see that class has ended and the data will remain, but no class summary will be created. If you need a class summary, end the class with “End class and create report”.',
 
     congrats: 'Well done!', winnerIs: 'It goes to', drawnIs: 'Drawn', drawingLots: 'Drawing',
     buzzerNowOpen: 'Buzz in now', waitForPresenter: 'Wait for your teacher to start',

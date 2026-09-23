@@ -1,14 +1,35 @@
-// APP_EDITION picks the Windows app to build. It only renames the artifact and
-// its product name; both editions ship the same code, and the caption controls
-// are gated at runtime by VITE_APP_EDITION (see src/lib/edition.ts).
-//   unset / standard -> LingoAct.exe
-//   plus             -> LingoActPlus.exe
-const productName = process.env.APP_EDITION === 'plus' ? 'LingoActPlus' : 'LingoAct'
+const fs = require('node:fs')
+const path = require('node:path')
+
+// Profile says which teaching room the build opens into; edition says which
+// paid feature set it carries. They are independent axes, not forks.
+const profiles = {
+  full: { executable: 'LingoAct', appId: 'tw.lingoact.presenter.desktop' },
+  huayu: { executable: 'LingoAct-Huayu', appId: 'tw.lingoact.huayu.desktop' },
+  english: { executable: 'LingoAct-English', appId: 'tw.lingoact.english.desktop' },
+  guoyu: { executable: 'LingoAct-Guoyu', appId: 'tw.lingoact.guoyu.desktop' },
+  ncacls: { executable: 'LingoAct-NCACLS', appId: 'org.ncacls.lingoact.desktop', icon: 'build/icon-ncacls.ico' },
+}
+const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
+const profile = profiles[profileId]
+// An edition may ship its own icon. Until that file exists the build falls
+// back to LingoAct's rather than failing, so a missing piece of artwork never
+// blocks a build — but the fallback is visible here rather than silent.
+const iconPath = profile.icon && fs.existsSync(path.join(__dirname, profile.icon))
+  ? profile.icon
+  : 'build/icon.ico'
+const productName = process.env.APP_EDITION === 'plus'
+  ? `${profile.executable}${profileId === 'full' ? 'Plus' : '-Plus'}`
+  : profile.executable
 
 module.exports = {
-  appId: 'tw.lingoact.presenter.desktop',
+  appId: profile.appId,
   productName,
   artifactName: `${productName}.\${ext}`,
+  extraMetadata: {
+    lingoactProfile: profileId,
+    productName,
+  },
   directories: {
     output: 'release',
   },
@@ -37,7 +58,7 @@ module.exports = {
   electronLanguages: ['en-US', 'zh-TW'],
   extraResources: [
     {
-      from: 'build/icon.ico',
+      from: iconPath,
       to: 'icon.ico',
     },
     // Fetched by scripts/fetch-bopomofo-font.mjs, not carried in git. Apache
@@ -49,7 +70,7 @@ module.exports = {
     },
   ],
   win: {
-    icon: 'build/icon.ico',
+    icon: iconPath,
     executableName: productName,
     requestedExecutionLevel: 'asInvoker',
     target: [
@@ -68,11 +89,11 @@ module.exports = {
   },
   nsis: {
     allowElevation: false,
-    installerIcon: 'build/icon.ico',
-    installerHeaderIcon: 'build/icon.ico',
+    installerIcon: iconPath,
+    installerHeaderIcon: iconPath,
     packElevateHelper: false,
     perMachine: false,
-    uninstallerIcon: 'build/icon.ico',
+    uninstallerIcon: iconPath,
   },
   portable: {
     requestExecutionLevel: 'user',

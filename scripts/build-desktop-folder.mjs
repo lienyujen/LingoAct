@@ -14,7 +14,15 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const target = path.join(root, 'LingoAct')
+const profiles = {
+  full: 'LingoAct',
+  huayu: 'LingoAct-Huayu',
+  english: 'LingoAct-English',
+  guoyu: 'LingoAct-Guoyu',
+}
+const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
+const productName = profiles[profileId]
+const target = path.join(root, productName)
 // Built outside the project, because the project is inside a synced Dropbox
 // folder. electron-builder extracts Electron to win-unpacked.tmp and renames
 // it, and Dropbox indexing those two hundred megabytes as they land holds the
@@ -22,12 +30,12 @@ const target = path.join(root, 'LingoAct')
 // volume, so moving the finished folder into place is still a rename.
 const staging = path.join(os.tmpdir(), 'lingoact-desktop-build')
 
-const run = (command, args) => execFileSync(command, args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' })
+const run = (command, args, env = process.env) => execFileSync(command, args, { cwd: root, env, stdio: 'inherit', shell: process.platform === 'win32' })
 
 fs.rmSync(staging, { recursive: true, force: true })
-run('pnpm', ['build'])
+run('pnpm', ['build'], { ...process.env, VITE_APP_PROFILE: profileId })
 // --dir stops at the unpacked folder: no portable exe, no zip, no installer.
-run('npx', ['electron-builder', '--win', '--x64', '--dir', '-c.directories.output', staging])
+run('npx', ['electron-builder', '--win', '--x64', '--dir', '-c.directories.output', staging], { ...process.env, APP_PROFILE: profileId })
 
 const unpacked = path.join(staging, 'win-unpacked')
 if (!fs.existsSync(unpacked)) throw new Error(`electron-builder produced no ${unpacked}`)
@@ -47,4 +55,4 @@ try {
 }
 fs.rmSync(staging, { recursive: true, force: true })
 
-console.log(`\nready: ${path.join(target, 'LingoAct.exe')}`)
+console.log(`\nready: ${path.join(target, `${productName}.exe`)}`)

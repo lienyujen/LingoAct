@@ -46,8 +46,15 @@ export const ACTIVITIES: Activity[] = [
   { id: 'drawing', label: 'typeDrawing', Icon: Pen, skills: { write: 'core', read: 'also' } },
 ]
 
-export function activitiesFor(tab: SkillTab) {
-  return ACTIVITIES
-    .filter((activity) => activity.skills[tab])
-    .sort((a, b) => (a.skills[tab] === b.skills[tab] ? 0 : a.skills[tab] === 'core' ? -1 : 1))
+// An edition may narrow and reorder a tab; most do not, and then the shared
+// table's own order stands — core before also, so a tab opens on what it is
+// actually for.
+export function activitiesFor(tab: SkillTab, order?: ActivityId[]) {
+  const inTab = ACTIVITIES.filter((activity) => activity.skills[tab])
+  if (order) {
+    return order
+      .map((id) => inTab.find((activity) => activity.id === id))
+      .filter((activity): activity is Activity => Boolean(activity))
+  }
+  return inTab.sort((a, b) => (a.skills[tab] === b.skills[tab] ? 0 : a.skills[tab] === 'core' ? -1 : 1))
 }

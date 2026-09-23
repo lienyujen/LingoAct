@@ -1,4 +1,5 @@
-import { DEFAULT_TRACK, resolveTrack } from './teachingTracks'
+import { APP_PROFILE, profileAllowsTrack } from './appProfiles'
+import { resolveTrack } from './teachingTracks'
 import { frameworkById } from './proficiency'
 import { GUIDANCE_LOCALES } from './participantI18n'
 
@@ -11,12 +12,20 @@ export type CoursePreset = {
   readingAnnotation: string
 }
 
-const KEY = 'lingoact_course_presets_v1'
+// Keep the existing key for the full build so upgrading never loses a
+// teacher's saved classes. Dedicated builds get their own shelf: the same
+// computer can run all four products without an English preset appearing in
+// the 國語文 app.
+const KEY = APP_PROFILE.id === 'full'
+  ? 'lingoact_course_presets_v1'
+  : `lingoact_${APP_PROFILE.id}_course_presets_v1`
+
+const defaultTrack = resolveTrack(APP_PROFILE.defaultTrack)
 
 export const defaultCourse: CoursePreset = {
-  title: '', teachingTrack: DEFAULT_TRACK, guidanceLanguage: 'zh-TW',
-  levelFramework: resolveTrack(DEFAULT_TRACK).frameworks[0], levelCode: '',
-  readingAnnotation: resolveTrack(DEFAULT_TRACK).annotation,
+  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: 'zh-TW',
+  levelFramework: defaultTrack.frameworks[0], levelCode: '',
+  readingAnnotation: defaultTrack.annotation,
 }
 
 export function readCoursePresets(): CoursePreset[] {
@@ -29,6 +38,7 @@ export function readCoursePresets(): CoursePreset[] {
       const track = resolveTrack(course.teachingTrack)
       const framework = frameworkById(course.levelFramework)
       return typeof course.title === 'string' && course.title.length <= 120
+        && profileAllowsTrack(course.teachingTrack)
         && track.id === course.teachingTrack
         && track.frameworks.some((id) => id === course.levelFramework)
         && (course.levelCode === '' || Boolean(framework?.levels.some((level) => level.code === course.levelCode)))

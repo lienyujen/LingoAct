@@ -13,12 +13,15 @@ import { DragAnswers } from '../components/DragAnswers'
 import { QuestionEditor } from '../components/QuestionEditor'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
+import { APP_PROFILE } from '../lib/appProfiles'
+import { resolveTrack } from '../lib/teachingTracks'
+import { PresenterLocaleContext, presenterLocaleFor } from '../lib/presenterI18n'
 import '../index.css'
 
 // Component preview only. It never creates a class or submits student work.
 const session: Session = {
   id: 'preview', title: '介面預覽', code: 'PREVIEW', status: 'active',
-  teaching_language: 'huayu', guidance_language: 'zh-TW', level_framework: 'tbcl', level_code: '2', reading_annotation: 'zhuyin',
+  teaching_language: APP_PROFILE.defaultTrack, guidance_language: 'zh-TW', level_framework: resolveTrack(APP_PROFILE.defaultTrack).frameworks[0], level_code: null, reading_annotation: resolveTrack(APP_PROFILE.defaultTrack).annotation,
   danmaku_enabled: false, anonymous_enabled: true, sentence_wall_enabled: false,
   current_question_id: null, short_join_url: null, exit_ticket_prompt: null, exit_ticket_prompt_en: null,
   exit_ticket_category: null, exit_ticket_response_type: null, recording_enabled: false, captions_enabled: false,
@@ -108,4 +111,8 @@ function InteractionPreview() {
   </section></main>
 }
 
-if (import.meta.env.DEV) createRoot(document.getElementById('root')!).render(<Preview />)
+if (import.meta.env.DEV) createRoot(document.getElementById('root')!).render(
+  <PresenterLocaleContext.Provider value={presenterLocaleFor(APP_PROFILE.defaultTrack)}>
+    <Preview />
+  </PresenterLocaleContext.Provider>,
+)

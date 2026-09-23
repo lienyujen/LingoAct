@@ -53,6 +53,19 @@ pnpm desktop:package
 
 `pnpm desktop:package` 會在 `release/` 產生 Windows x64 版本。新手可使用自動化腳本，完成後會把 `LingoAct.exe` 複製到專案根目錄：
 
+同一份程式碼也能建置三個專門教學版；原本的 `pnpm build` 與
+`pnpm desktop:package` 始終保留為功能完整的 LingoAct，不會被專門版取代：
+
+| 版本 | 建置指令 | 講師端重點 |
+|---|---|---|
+| 完整版 | `pnpm desktop:package` | 保留所有教學語言與活動 |
+| 華語教學版 | `pnpm desktop:package:huayu` | 固定華語文教學軌、TBCL／TOCFL 與注音／拼音設定 |
+| 英語教學版 | `pnpm desktop:package:english` | 固定英語教學軌，活動選單改為適合長英文的橫列版面 |
+| 國語文教學版 | `pnpm desktop:package:guoyu` | 固定國語文教學軌、108 課綱與注音 |
+
+四個版本使用不同的 Windows app id、執行檔名稱與使用者資料目錄，可以安裝在同一台電腦而不互相覆蓋。學生端仍共用同一份網頁與同一套活動資料格式。
+版本矩陣與本機資料夾建置方式見 [`docs/teaching-profiles.md`](docs/teaching-profiles.md)。
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\skills\lingoact-self-deploy\scripts\package-windows.ps1 -SupabaseUrl https://YOUR_PROJECT_REF.supabase.co -PublishableKey sb_publishable_YOUR_VALUE -PublicAppUrl https://YOUR_GITHUB_USER.github.io/LingoAct
 ```

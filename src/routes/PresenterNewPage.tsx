@@ -15,6 +15,7 @@ import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { courseSummary, defaultCourse, readCoursePresets, saveCoursePreset } from '../lib/coursePresets'
 import type { CoursePreset } from '../lib/coursePresets'
 import { LessonPlan } from '../components/LessonPlan'
+import { APP_PROFILE } from '../lib/appProfiles'
 
 async function getFunctionErrorMessage(error: unknown) {
   if (!(error instanceof Error)) return '建立場次失敗'
@@ -216,7 +217,7 @@ export function PresenterNewPage() {
       <form className="panel form-panel" onSubmit={createSession}>
         <span className="form-heading-icon"><Sparkle size={24} /></span>
         <h1>今天，讓學生開口表達</h1>
-        <p className="muted">選好課程，掃碼加入，就能開始練習。</p>
+        <p className="muted">{APP_PROFILE.id === 'full' ? '選好課程，掃碼加入，就能開始練習。' : `${APP_PROFILE.productName}・選好課程，掃碼加入，就能開始練習。`}</p>
         {courses.length > 0 && <label>最近的課程
           <select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
             const selected = courses.find((item) => item.title === event.target.value)

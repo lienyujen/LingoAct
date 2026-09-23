@@ -62,8 +62,17 @@ jobs:
           fi
           echo "No Supabase project embedded."
 
-      - name: Package Windows app
-        run: pnpm exec electron-builder --win portable zip --x64 --publish never
+      - name: Package all Windows teaching profiles
+        shell: pwsh
+        run: |
+          foreach ($profile in @('full', 'huayu', 'english', 'guoyu')) {
+            $env:VITE_APP_PROFILE = $profile
+            $env:APP_PROFILE = $profile
+            pnpm build
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            pnpm exec electron-builder --win portable zip --x64 --publish never
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Publish release
         env:
@@ -76,8 +85,12 @@ jobs:
 
           | 檔案 | 說明 |
           |---|---|
-          | `LingoAct.zip` | 解壓後直接執行資料夾內的 `LingoAct.exe`，開啟較快，**建議使用** |
-          | `LingoAct.exe` | 單一檔案免安裝版，每次啟動需自我解壓，較慢 |
+          | `LingoAct.zip` / `.exe` | 保留所有教學語言的完整版 |
+          | `LingoAct-Huayu.zip` / `.exe` | 華語教學版（TBCL／TOCFL、注音／拼音） |
+          | `LingoAct-English.zip` / `.exe` | 英語教學版（108課綱／全民英檢／多益） |
+          | `LingoAct-Guoyu.zip` / `.exe` | 國語文教學版（108課綱、固定注音） |
+
+          zip 解壓後執行較快，**建議使用**；單一 exe 每次啟動需先自我解壓。
 
           ## 首次使用
 
@@ -99,5 +112,5 @@ jobs:
           gh release create "$TAG" \
             --title "LingoAct $TAG" \
             --notes "$notes" \
-            release/LingoAct.exe \
-            release/LingoAct.zip
+            release/*.exe \
+            release/*.zip

@@ -1,6 +1,7 @@
 import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { useRef, useState } from 'react'
 import { activitiesFor, SKILL_TABS } from '../lib/activities'
+import { APP_PROFILE } from '../lib/appProfiles'
 import type { ActivityId, SkillTab } from '../lib/activities'
 import { useWorkspaceText } from '../lib/workspaceText'
 import { isPlusEdition } from '../lib/edition'
@@ -86,7 +87,7 @@ export function PresenterControlPanel({
 }: Props) {
   const t = usePresenterText()
   const w = useWorkspaceText()
-  const [category, setCategory] = useState<SkillTab>('speak')
+  const [category, setCategory] = useState<SkillTab>(APP_PROFILE.defaultSkill)
   const imageInput = useRef<HTMLInputElement>(null)
   // The descriptors are static; only the wiring is per-render.
   const handlers: Partial<Record<ActivityId, (() => void) | undefined>> = {
@@ -197,7 +198,7 @@ export function PresenterControlPanel({
         </div>
         <p className="muted">{w[`${category}Hint`]}</p>
         <div className="control-action-grid" data-category={category}>
-          {activitiesFor(category).map(({ id, label, Icon }) => {
+          {activitiesFor(category, APP_PROFILE.activityOrder?.[category]).map(({ id, label, Icon }) => {
             const onClick = handlers[id]
             if (!onClick) return null
             return (

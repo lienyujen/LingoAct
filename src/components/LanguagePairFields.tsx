@@ -1,4 +1,5 @@
 import { GUIDANCE_LOCALES } from '../lib/participantI18n'
+import { APP_PROFILE } from '../lib/appProfiles'
 import { TEACHING_TRACKS, resolveFramework, resolveTrack } from '../lib/teachingTracks'
 import { frameworkById } from '../lib/proficiency'
 import { usePresenterText } from '../lib/presenterI18n'
@@ -42,14 +43,15 @@ export function LanguagePairFields({
   const activeId = resolveFramework(teachingTrack, levelFramework)
   const framework = frameworkById(activeId)
   const choices = track.frameworks.map((id) => frameworkById(id)).filter(Boolean)
+  const availableTracks = TEACHING_TRACKS.filter((option) => APP_PROFILE.allowedTracks.includes(option.id))
 
   return (
     <div className="language-pair">
-      <div className="language-pair-field">
+      {availableTracks.length > 1 && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainTeachingLanguage')}</span>
         <p className="language-pair-hint">{t('mainTeachingHint')}</p>
         <div className="language-pair-options">
-          {TEACHING_TRACKS.map((option) => (
+          {availableTracks.map((option) => (
             <button
               aria-pressed={teachingTrack === option.id}
               className={teachingTrack === option.id ? 'language-chip selected' : 'language-chip'}
@@ -62,7 +64,7 @@ export function LanguagePairFields({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {choices.length > 1 && (
         <div className="language-pair-field">

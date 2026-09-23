@@ -2,6 +2,21 @@ const { app, BrowserWindow, desktopCapturer, ipcMain, screen, shell } = require(
 const path = require('node:path')
 const fs = require('node:fs')
 const { fitAndCentre, overlayBoundsFor } = require('./windowPlacement.cjs')
+const packageMetadata = require('../package.json')
+
+const APP_PROFILES = {
+  full: { appId: 'tw.lingoact.presenter.desktop', displayName: 'LingoAct' },
+  huayu: { appId: 'tw.lingoact.huayu.desktop', displayName: 'LingoAct 華語教學版' },
+  english: { appId: 'tw.lingoact.english.desktop', displayName: 'LingoAct English' },
+  guoyu: { appId: 'tw.lingoact.guoyu.desktop', displayName: 'LingoAct 國語文教學版' },
+  ncacls: { appId: 'org.ncacls.lingoact.desktop', displayName: 'LingoAct NCACLS' },
+}
+const APP_PROFILE_ID = Object.hasOwn(APP_PROFILES, process.env.APP_PROFILE)
+  ? process.env.APP_PROFILE
+  : Object.hasOwn(APP_PROFILES, packageMetadata.lingoactProfile)
+    ? packageMetadata.lingoactProfile
+    : 'full'
+const APP_PROFILE = APP_PROFILES[APP_PROFILE_ID]
 
 function logFatalError(scope, error) {
   const message = `[${new Date().toISOString()}] [${scope}] ${error?.stack || error}\n`
@@ -40,7 +55,7 @@ process.on('unhandledRejection', (reason) => logFatalError('unhandledRejection',
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 
 const isDesktopDev = process.env.LINGOACT_DESKTOP_DEV === '1'
-const APP_USER_MODEL_ID = 'tw.lingoact.presenter.desktop'
+const APP_USER_MODEL_ID = APP_PROFILE.appId
 const APP_WINDOW_ICON_PATH = isDesktopDev
   ? path.join(__dirname, '..', 'build', 'icon.ico')
   : path.join(process.resourcesPath, 'icon.ico')
@@ -122,7 +137,7 @@ function createWindow() {
     alwaysOnTop: false,
     skipTaskbar: false,
     show: false,
-    title: 'LingoAct Presenter',
+    title: `${APP_PROFILE.displayName} Presenter`,
     icon: APP_WINDOW_ICON_PATH,
     backgroundColor: '#00000000',
     webPreferences: {
@@ -140,7 +155,7 @@ function createWindow() {
     appIconPath: APP_RELAUNCH_ICON_PATH,
     appIconIndex: 0,
     relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
-    relaunchDisplayName: 'LingoAct',
+    relaunchDisplayName: APP_PROFILE.displayName,
   })
   configureWebContents(mainWindow)
 

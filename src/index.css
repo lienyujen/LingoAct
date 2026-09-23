@@ -6656,3 +6656,30 @@ h2 {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* The other two backdrops. Quiet, because capturing the screen is what a
+   teacher reaches for most and these should not compete with it. */
+.capture-alternatives {
+  align-items: baseline;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 4px 10px;
+  margin: -6px 0 14px;
+}
+
+.capture-alternatives button {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  font-size: 12px;
+  min-height: 0;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+
+.capture-alternatives button:disabled {
+  color: var(--muted);
+  text-decoration: none;
+}

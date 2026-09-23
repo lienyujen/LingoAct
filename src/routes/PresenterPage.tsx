@@ -941,13 +941,35 @@ export function PresenterPage() {
     void interpretationAudioContextRef.current?.close()
   }, [clearCaptionDisplayTimers])
 
-  async function uploadQuestionScreenshot(file: File, draft: QuestionDraft) {
+  async function uploadQuestionScreenshot(file: File | null, draft: QuestionDraft) {
     const { type, options, allowMultiple, promptText, quizSettings } = draft
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error(t('noRightsRejoin'))
     setBusy(true)
     try {
       const supabase = requireSupabase()
+      // No backdrop: there is nothing to upload, so the question is created
+      // straight away. 派送畫面, 自訂測驗 and the sliced interactions are not
+      // offered in this state, because each of them is made out of the image.
+      if (!file) {
+        const { data, error } = await supabase.functions.invoke('presenter-action', {
+          body: {
+            action: 'create_question',
+            sessionId,
+            presenterToken,
+            questionType: type,
+            options,
+            allowMultiple,
+            promptText,
+            prepareSeconds: draft.prepareSeconds,
+            answerSeconds: draft.answerSeconds,
+          },
+        })
+        if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
+        if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
+        setSelectedQuestionId(data.question.id)
+        return
+      }
       if (draft.interaction) {
         const { data, error } = await supabase.functions.invoke('presenter-action', { body: {
           action: 'interaction_dispatch', sessionId, presenterToken, image: await fileDataUrl(file), direction: promptText, ...draft.interaction,
@@ -1050,6 +1072,34 @@ export function PresenterPage() {
       setSelectionMode(false)
       await window.lingoActDesktop.finishCaptureSelection(false)
     }
+  }
+
+  // 派題 without capturing anything. The editor is the same one the capture
+  // path opens; only the backdrop is missing.
+  function openBlankQuestion() {
+    setPlannedActivity(null)
+    setCapturePreset(null)
+    setCaptureInitialDraft(null)
+    setCaptureTarget('question')
+    setCaptureFile(null)
+    setCapturePreviewUrl(null)
+    setAnalysisError('')
+    setControlsOpen(false)
+    setEditorOpen(true)
+  }
+
+  // 派題 over a picture the teacher already has, which travels the same upload
+  // path as a capture — it is a File either way.
+  function openImageQuestion(file: File) {
+    setPlannedActivity(null)
+    setCapturePreset(null)
+    setCaptureInitialDraft(null)
+    setCaptureTarget('question')
+    setCaptureFile(file)
+    setCapturePreviewUrl(URL.createObjectURL(file))
+    setAnalysisError('')
+    setControlsOpen(false)
+    setEditorOpen(true)
   }
 
   async function cropCapture(rect: { x: number; y: number; width: number; height: number }) {
@@ -1165,8 +1215,6 @@ export function PresenterPage() {
   }
 
   async function createScreenshotQuestion(draft: QuestionDraft) {
-    if (!captureFile) return
-
     setAnalysisError('')
     setCaptureInitialDraft(draft)
     setEditorOpen(false)
@@ -1967,6 +2015,8 @@ export function PresenterPage() {
           onCapturePronunciation={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'pronunciation' }) } : undefined}
           onCaptureOral={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'oral_response' }) } : undefined}
           onCaptureDrawing={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'drawing' }) } : undefined}
+          onDispatchBlank={openBlankQuestion}
+          onDispatchImage={openImageQuestion}
           onOpenPicture={() => { setPlannedActivity(null); setPictureInitialMode('spoken'); setPictureOpen(true) }}
           onOpenPictureWriting={() => { setPlannedActivity(null); setPictureInitialMode('ordering'); setPictureOpen(true) }}
           onGenerateExitTicket={() => void generateExitTicket()}

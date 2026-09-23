@@ -1,5 +1,5 @@
 import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { activitiesFor, SKILL_TABS } from '../lib/activities'
 import type { ActivityId, SkillTab } from '../lib/activities'
 import { useWorkspaceText } from '../lib/workspaceText'
@@ -26,6 +26,11 @@ type Props = {
   onCapturePronunciation?: () => void
   onCaptureOral?: () => void
   onCaptureDrawing?: () => void
+  // The same editor, reached without capturing the screen. A question that is
+  // not about anything on screen — 「你今天學到什麼？」, a quick poll — used to
+  // require screenshotting an irrelevant corner first.
+  onDispatchBlank?: () => void
+  onDispatchImage?: (file: File) => void
   onOpenPicture?: () => void
   onOpenPictureWriting?: () => void
   onDrawLottery: () => void
@@ -60,6 +65,8 @@ export function PresenterControlPanel({
   onCapturePronunciation,
   onCaptureOral,
   onCaptureDrawing,
+  onDispatchBlank,
+  onDispatchImage,
   onOpenPicture,
   onOpenPictureWriting,
   onDrawLottery,
@@ -80,6 +87,7 @@ export function PresenterControlPanel({
   const t = usePresenterText()
   const w = useWorkspaceText()
   const [category, setCategory] = useState<SkillTab>('speak')
+  const imageInput = useRef<HTMLInputElement>(null)
   // The descriptors are static; only the wiring is per-render.
   const handlers: Partial<Record<ActivityId, (() => void) | undefined>> = {
     listeningStudio: onOpenListeningStudio,
@@ -151,6 +159,34 @@ export function PresenterControlPanel({
             <small>{t('captureQuestionHint')}</small>
           </span>
         </button>
+      )}
+      {/* The screen capture stays one press, because it is what a teacher
+          reaches for most. These are the same editor with a different
+          backdrop, so they are one press too rather than a chooser in front
+          of everything. */}
+      {(onDispatchImage || onDispatchBlank) && (
+        <p className="capture-alternatives">
+          <span>{w.orDispatch}</span>
+          {onDispatchImage && (
+            <button type="button" disabled={busy} onClick={() => imageInput.current?.click()}>{w.fromImage}</button>
+          )}
+          {onDispatchBlank && (
+            <button type="button" disabled={busy} onClick={onDispatchBlank}>{w.noBackdrop}</button>
+          )}
+        </p>
+      )}
+      {onDispatchImage && (
+        <input
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+          ref={imageInput}
+          type="file"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (file) onDispatchImage(file)
+          }}
+        />
       )}
       <div className="control-section activity-library">
         <h2>{w.choose}</h2>

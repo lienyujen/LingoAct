@@ -79,6 +79,10 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [interaction, setInteraction] = useState<InteractionDraft>({ kind: 'ordering', items: [], tiles: [], sentenceMode: false, hasAnswer: true, shareScreenshot: false })
   const [interactionBusy, setInteractionBusy] = useState(false)
   const isInteraction = type === 'custom_quiz' && (quizType === 'ordering' || quizType === 'matching') && Boolean(onGenerateInteraction)
+  // 派送畫面 has nothing to send and 自訂測驗 has nothing to read when there is
+  // no backdrop — both are made out of the image rather than merely shown over
+  // it, so they are left out rather than offered and then refused.
+  const offeredTypes = previewUrl ? questionTypes : questionTypes.filter((item) => !['send_screen', 'custom_quiz'].includes(item.type))
 
   useEffect(() => {
     if (!open) return
@@ -148,7 +152,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
         {previewUrl && <img alt={t('capturePreviewAlt')} className="capture-preview" src={previewUrl} />}
         {error && <p className="error">{error}</p>}
         <div className="type-grid">
-          {questionTypes.map((item) => (
+          {offeredTypes.map((item) => (
             <button
               className={`${type === item.type ? 'selected-type' : 'ghost-button'}${item.type === 'send_screen' ? ' send-screen-type' : ''}`}
               key={item.type}

@@ -1823,12 +1823,26 @@ Deno.serve(async (req) => {
       const screenshotId = input.screenshotId
       const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
       const type = typeof input.questionType === 'string' ? input.questionType : ''
-      if (!validUuid(screenshotId) || !questionTypes.has(type)) {
+      // A backdrop is optional. Asking the class 「你今天學到什麼？」 used to mean
+      // screenshotting some irrelevant corner of the screen first, because this
+      // was the only way to create a question at all — 拍照描述 already inserts
+      // one with no screenshot, so the column has always allowed it.
+      const hasBackdrop = screenshotId !== undefined && screenshotId !== null
+      if (!questionTypes.has(type)) {
         return jsonResponse({ message: '題目資料格式不正確。' }, 400)
       }
-      if (storagePath !== `sessions/${sessionId}/screenshots/${screenshotId}.${storagePath.split('.').at(-1)}` ||
-          !/\.(png|jpg|webp)$/.test(storagePath)) {
-        return jsonResponse({ message: '截圖路徑不正確。' }, 400)
+      if (type === 'send_screen' && !hasBackdrop) {
+        // 派送畫面 with nothing to send is not a question, it is a blank screen.
+        return jsonResponse({ message: '派送畫面需要一張截圖。' }, 400)
+      }
+      if (hasBackdrop) {
+        if (!validUuid(screenshotId)) {
+          return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+        }
+        if (storagePath !== `sessions/${sessionId}/screenshots/${screenshotId}.${storagePath.split('.').at(-1)}` ||
+            !/\.(png|jpg|webp)$/.test(storagePath)) {
+          return jsonResponse({ message: '截圖路徑不正確。' }, 400)
+        }
       }
 
       const options = normalizedOptions(input.options)
@@ -1891,7 +1905,7 @@ Deno.serve(async (req) => {
         .from('questions')
         .insert({
           session_id: sessionId,
-          screenshot_id: screenshotId,
+          screenshot_id: hasBackdrop ? screenshotId : null,
           type,
           status: 'active',
           title: titles[type],

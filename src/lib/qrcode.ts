@@ -2,7 +2,10 @@ import { backendConfig } from './supabase'
 
 // Students load this shared page instead of one the presenter has to deploy, so
 // the link has to say which Supabase project the session lives in.
-const DEFAULT_PUBLIC_APP_URL = 'https://lienyujen.github.io/LingoAct'
+// The old address, https://lienyujen.github.io/LingoAct, is still published and
+// has to stay that way: it is compiled into every copy of LingoAct already
+// installed on someone's machine, and those copies cannot be updated remotely.
+const DEFAULT_PUBLIC_APP_URL = 'https://lingo.ehuayu.org'
 
 export function buildJoinUrl(sessionReference: string) {
   // A runtime setting wins over the value baked in at build time, so someone who

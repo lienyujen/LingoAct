@@ -80,6 +80,7 @@ export function Preview() {
         {view === '開始活動' ? <>
           <PresenterControlPanel session={session} onlineCount={25} busy={false} buzzerActive={false}
             onToggleDanmaku={action} onToggleAnonymous={action} onCaptureScreen={action} onCaptureFlashcards={action} onCaptureWriting={action} onOpenPicture={action} onOpenPictureWriting={action}
+            onCaptureOrdering={action} onCaptureMatching={action} onCapturePronunciation={action} onCaptureOral={action} onCaptureDrawing={action}
             onDrawLottery={action} onStartBuzzer={action} onOpenListeningStudio={action} onOpenSentenceWall={() => { setPrompt(''); setOpen(true) }} onOpenPhotoTask={action}
             onOpenTextDispatch={action} onOpenFileTransfer={action} onOpenRoster={action} onOpenWordCloud={action} onOpenSettings={action}
             onToggleRecording={action} onToggleCaptionVisibility={action} onGenerateExitTicket={action} onEndClass={action} />

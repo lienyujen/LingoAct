@@ -1,5 +1,7 @@
-import { CardsThree, Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Share, Sparkle, Users, Waveform, Image } from '@phosphor-icons/react'
+import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, BellRinging, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { useState } from 'react'
+import { activitiesFor, SKILL_TABS } from '../lib/activities'
+import type { ActivityId, SkillTab } from '../lib/activities'
 import { useWorkspaceText } from '../lib/workspaceText'
 import { isPlusEdition } from '../lib/edition'
 import { usePresenterText } from '../lib/presenterI18n'
@@ -18,6 +20,12 @@ type Props = {
   onCaptureWriting?: () => void
   onCaptureOrdering?: () => void
   onCaptureMatching?: () => void
+  // 朗讀發音, 口語表達 and 電寫題 are language activities that were only
+  // reachable by capturing a screen and then opening a dropdown inside the
+  // question editor, which is the same as not being on the menu at all.
+  onCapturePronunciation?: () => void
+  onCaptureOral?: () => void
+  onCaptureDrawing?: () => void
   onOpenPicture?: () => void
   onOpenPictureWriting?: () => void
   onDrawLottery: () => void
@@ -49,6 +57,9 @@ export function PresenterControlPanel({
   onCaptureWriting,
   onCaptureOrdering,
   onCaptureMatching,
+  onCapturePronunciation,
+  onCaptureOral,
+  onCaptureDrawing,
   onOpenPicture,
   onOpenPictureWriting,
   onDrawLottery,
@@ -68,7 +79,23 @@ export function PresenterControlPanel({
 }: Props) {
   const t = usePresenterText()
   const w = useWorkspaceText()
-  const [category, setCategory] = useState<'listen' | 'express' | 'understand'>('express')
+  const [category, setCategory] = useState<SkillTab>('speak')
+  // The descriptors are static; only the wiring is per-render.
+  const handlers: Partial<Record<ActivityId, (() => void) | undefined>> = {
+    listeningStudio: onOpenListeningStudio,
+    flashcards: onCaptureFlashcards,
+    pronunciation: onCapturePronunciation,
+    oralResponse: onCaptureOral,
+    pictureTalk: onOpenPicture,
+    photoTask: onOpenPhotoTask,
+    ordering: onCaptureOrdering,
+    matching: onCaptureMatching,
+    storyOrdering: onOpenPictureWriting,
+    sentenceWall: onOpenSentenceWall,
+    writingCoach: onCaptureWriting,
+    drawing: onCaptureDrawing,
+  }
+
   return (
     <section className="panel control-panel">
       <div className="metric-row">
@@ -113,45 +140,37 @@ export function PresenterControlPanel({
         </div>
       </div>
 
+      {/* 截圖派題 is not one of the activities — it is the door to every
+          question type, so it sat among its siblings claiming to be one of
+          them. It gets its own place above the tabs. */}
+      {onCaptureScreen && (
+        <button className="control-action capture-primary" type="button" onClick={onCaptureScreen} disabled={busy}>
+          <span className="control-action-icon"><MonitorArrowUp size={20} /></span>
+          <span className="capture-primary-text">
+            <b>{t('captureQuestion')}</b>
+            <small>{t('captureQuestionHint')}</small>
+          </span>
+        </button>
+      )}
       <div className="control-section activity-library">
         <h2>{w.choose}</h2>
         <div className="activity-categories" aria-label={w.choose}>
-          {(['listen', 'express', 'understand'] as const).map((item) => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)}>{w[item]}</button>)}
+          {SKILL_TABS.map((item) => (
+            <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)}>{w[item]}</button>
+          ))}
         </div>
         <p className="muted">{w[`${category}Hint`]}</p>
         <div className="control-action-grid" data-category={category}>
-          {category === 'understand' && <>
-          {onCaptureScreen && (
-            <button className="control-action share-action" type="button" onClick={onCaptureScreen} disabled={busy}>
-              <span className="control-action-icon"><MonitorArrowUp size={18} /></span>
-              {t('captureQuestion')}
-            </button>
-          )}
-          {onCaptureFlashcards && <button className="control-action picture-control-action" type="button" onClick={onCaptureFlashcards} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('flashcards')}</button>}
-          {onCaptureOrdering && <button className="control-action picture-control-action" type="button" onClick={onCaptureOrdering} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeOrdering')}</button>}
-          {onCaptureMatching && <button className="control-action picture-control-action" type="button" onClick={onCaptureMatching} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeMatching')}</button>}
-          </>}
-          {category === 'listen' && <>
-          <button className="control-action listening-control-action" type="button" onClick={onOpenListeningStudio} disabled={busy}>
-            <span className="control-action-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v4" /></svg>
-            </span>
-            {t('listeningStudio')}
-          </button>
-          </>}
-          {category === 'express' && <>
-          <button className="control-action picture-control-action" type="button" onClick={onOpenSentenceWall} disabled={busy}>
-            <span className="control-action-icon"><PencilLine size={18} /></span>
-            {t('sentenceWall')}
-          </button>
-          {onOpenPicture && <button className="control-action picture-control-action" type="button" onClick={onOpenPicture} disabled={busy}><span className="control-action-icon"><Image size={18} /></span>{t('pictureTalk')}</button>}
-          {onOpenPictureWriting && <button className="control-action picture-control-action" type="button" onClick={onOpenPictureWriting} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('storyOrdering')}</button>}
-          {onCaptureWriting && <button className="control-action picture-control-action" type="button" onClick={onCaptureWriting} disabled={busy}><span className="control-action-icon"><PencilLine size={18} /></span>{t('writingCoach')}</button>}
-          <button className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}>
-            <span className="control-action-icon"><Camera size={18} /></span>
-            {t('photoTask')}
-          </button>
-          </>}
+          {activitiesFor(category).map(({ id, label, Icon }) => {
+            const onClick = handlers[id]
+            if (!onClick) return null
+            return (
+              <button className="control-action picture-control-action" key={id} type="button" onClick={onClick} disabled={busy}>
+                <span className="control-action-icon"><Icon size={18} /></span>
+                {t(label)}
+              </button>
+            )
+          })}
         </div>
       </div>
       <details className="teacher-disclosure">

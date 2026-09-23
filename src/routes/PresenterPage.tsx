@@ -1964,6 +1964,9 @@ export function PresenterPage() {
           onCaptureWriting={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('writing') } : undefined}
           onCaptureOrdering={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('ordering') } : undefined}
           onCaptureMatching={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('matching') } : undefined}
+          onCapturePronunciation={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'pronunciation' }) } : undefined}
+          onCaptureOral={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'oral_response' }) } : undefined}
+          onCaptureDrawing={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'drawing' }) } : undefined}
           onOpenPicture={() => { setPlannedActivity(null); setPictureInitialMode('spoken'); setPictureOpen(true) }}
           onOpenPictureWriting={() => { setPlannedActivity(null); setPictureInitialMode('ordering'); setPictureOpen(true) }}
           onGenerateExitTicket={() => void generateExitTicket()}

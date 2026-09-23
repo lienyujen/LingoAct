@@ -605,7 +605,7 @@ h2 {
 
 .activity-categories {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -6622,4 +6622,37 @@ h2 {
 .board-drawing-text-input button {
   min-height: 0;
   padding: 6px 8px;
+}
+
+/* 截圖派題 is the way into every question type, so it sits above the four
+   skill tabs rather than pretending to be one activity among them. A row
+   rather than a tile: it is the only thing at this level, and a lone tile in
+   a grid of one reads as a mistake. */
+.capture-primary {
+  align-items: center;
+  border-color: var(--border-strong);
+  flex-direction: row;
+  gap: 12px;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+  min-height: 0;
+  padding: 12px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.capture-primary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.capture-primary-text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.capture-primary-text small {
+  color: var(--muted);
+  font-size: 12px;
 }

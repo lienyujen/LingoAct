@@ -86,7 +86,21 @@ export function ParticipantPage() {
   const loadedQuizQuestionId = useRef('')
   const navigate = useNavigate()
   const location = useLocation()
-  useSessionPresence(sessionId, session?.status === 'active' ? participant : null)
+  // Also tells the class whether anyone is at the front of the room.
+  const { presenterOnline } = useSessionPresence(sessionId, {
+    role: 'participant',
+    participant: session?.status === 'active' ? participant : null,
+  })
+
+  // The teacher's danmaku switch. Off means the field greys out rather than
+  // disappearing — a student who has just typed something should see why it
+  // will not send, which is not the same situation as 下課中, where there is
+  // nobody there at all and the field goes away.
+  const danmakuOpen = session?.danmaku_enabled !== false
+
+  // Only once it is known. Until then nothing is said, so a page that has just
+  // opened never flashes 下課中 at a class that is running.
+  const onBreak = presenterOnline === false
 
   // The class's 導引語 is what the page opens in, and it has to win when the
   // teacher changes it. See localeForDispatchedGuidance for why reading it out
@@ -317,18 +331,38 @@ export function ParticipantPage() {
     return () => window.clearInterval(timer)
   }, [loadAll, question?.type, quizData, quizLoadError])
 
+  // Dispatching one question writes a screenshot, a question and the session
+  // row, so every student page used to run its queries three times over. In a
+  // room of 145 that is thousands of queries for one press of 派送, all landing
+  // in the same instant — which is what made 派送 itself feel slow.
+  //
+  // They coalesce into one reload, and the jitter spreads the herd across a
+  // second rather than stacking it on one tick.
+  const reloadTimer = useRef<number | null>(null)
+  const scheduleLoad = useCallback(() => {
+    if (reloadTimer.current !== null) return
+    reloadTimer.current = window.setTimeout(() => {
+      reloadTimer.current = null
+      void loadAll()
+    }, 150 + Math.random() * 600)
+  }, [loadAll])
+
+  useEffect(() => () => {
+    if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current)
+  }, [])
+
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId || !participantId) return
     const supabase = requireSupabase()
     const channel = supabase
       .channel(`participant:${sessionId}:${participantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, loadAll)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, loadAll)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` }, (payload) => {
         const event = payload.new as SessionEvent
         if (event.event_type === 'buzzer') {
@@ -350,7 +384,7 @@ export function ParticipantPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loadAll, participantId, sessionId])
+  }, [loadAll, participantId, scheduleLoad, sessionId])
 
   useEffect(() => {
     if (session?.status !== 'ended') return
@@ -364,6 +398,7 @@ export function ParticipantPage() {
     event.preventDefault()
     const content = message.trim()
     if (!participant || session?.status !== 'active' || !content) return
+    if (onBreak || !danmakuOpen) return
     if (!messageFitsLimit(content)) {
       setError(participantText(locale, 'limit'))
       return
@@ -810,26 +845,31 @@ export function ParticipantPage() {
         screenshots={historyScreenshots}
         onLoadDetails={loadHistoryDetails}
       />
-      <form className="panel message-form" onSubmit={sendMessage}>
+      {/* The field goes away rather than being disabled. A disabled box still
+          invites a student to type a question into it that nobody will ever
+          read, and a class left alone with a live text field is how the message
+          table fills up with an hour of chatter aimed at an empty room. */}
+      {!onBreak && <form className={`panel message-form${danmakuOpen ? '' : ' is-closed'}`} onSubmit={sendMessage}>
         <label>
           {participantText(locale, 'sendFeedback')}
           <textarea
+            disabled={!danmakuOpen}
             value={message}
             maxLength={MESSAGE_MAX_RAW_CHARACTERS}
             onChange={(event) => {
               setMessage(event.target.value)
               if (error) setError('')
             }}
-            placeholder={participantText(locale, 'messagePlaceholder')}
+            placeholder={participantText(locale, danmakuOpen ? 'messagePlaceholder' : 'danmakuClosed')}
           />
         </label>
         <p className={`message-limit${message && !messageFitsLimit(message) ? ' over-limit' : ''}`}>
-          {participantText(locale, 'limit')}
-          {message && ` · ${participantText(locale, 'used')} ${Math.ceil(messageUsage(message).units)}/${MESSAGE_MAX_DENSE_CHARACTERS}`}
+          {danmakuOpen ? participantText(locale, 'limit') : participantText(locale, 'danmakuClosed')}
+          {danmakuOpen && message && ` · ${participantText(locale, 'used')} ${Math.ceil(messageUsage(message).units)}/${MESSAGE_MAX_DENSE_CHARACTERS}`}
         </p>
         {error && <p className="error">{error}</p>}
-        <button disabled={!message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
-      </form>
+        <button disabled={!danmakuOpen || !message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
+      </form>}
       <LotteryOverlay event={lotteryEvent} participantId={participant?.id} />
       <BuzzerOverlay
         busy={buzzerBusy}

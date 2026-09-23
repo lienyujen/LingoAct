@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Message, Session } from '../types'
 
 type Props = {
@@ -14,9 +15,22 @@ function stableMessageSeed(id: string) {
 }
 
 export function DanmakuLayer({ messages, session }: Props) {
-  if (!session.danmaku_enabled) return null
+  const enabled = session.danmaku_enabled
 
-  const visible = messages.slice(-24)
+  // Where the backlog ends, recorded during the render that first sees the
+  // switch come back on — not in an effect, which would run only after this
+  // render had already put the old round on screen and let the class watch it
+  // fly past a second time.
+  const [lastEnabled, setLastEnabled] = useState(enabled)
+  const [liveSince, setLiveSince] = useState('')
+  if (enabled !== lastEnabled) {
+    setLastEnabled(enabled)
+    if (enabled) setLiveSince(messages.length ? messages[messages.length - 1].created_at : '')
+  }
+
+  if (!enabled) return null
+
+  const visible = messages.filter((message) => !liveSince || message.created_at > liveSince).slice(-24)
 
   return (
     <div className="danmaku-layer" aria-live="polite">

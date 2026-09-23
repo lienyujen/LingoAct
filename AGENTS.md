@@ -23,10 +23,13 @@ Three pieces, deployed separately:
 - **Presenter app** — Electron desktop app for Windows. Screen capture, the
   floating control panel, the caption overlay, the roster window. Built with
   electron-builder into `LingoAct.exe` (portable) and `LingoAct.zip`.
-- **Student page** — the same React app served as a static site from GitHub
-  Pages at `lienyujen.github.io/LingoAct/`. Students reach it by scanning a QR
-  code; the join link carries the Supabase project reference and publishable
-  key, so the page never needs its own build per deployment.
+- **Student page** — the same React app served as a static site. Students reach
+  it at `lingo.ehuayu.org` (Cloudflare Pages, built from `main`) by scanning a
+  QR code; the join link carries the Supabase project reference and publishable
+  key, so the page never needs its own build per deployment. The older
+  `lienyujen.github.io/LingoAct/` copy is still published and must stay that
+  way — it is compiled into every already-installed copy of the desktop app,
+  and those cannot be updated remotely.
 - **Backend** — Supabase: Postgres + Realtime + Storage + Edge Functions. Every
   AI call goes through an Edge Function; API keys never reach the browser.
 
@@ -57,7 +60,8 @@ two never share a quota or an outage. Schema, four Storage buckets, thirteen
 Realtime publications and all twelve Edge Functions are deployed; `LINGOACT_OWNER_KEY`,
 `GEMINI_API_KEY`, `OPENAI_API_KEY` and `REURL_API_KEY` are all set and have been
 exercised against the live services, not merely configured. The student page is
-published at `lienyujen.github.io/LingoAct/` from the three GitHub Pages
+published at `lingo.ehuayu.org` from the Cloudflare Pages project `lingoact`,
+and in parallel at `lienyujen.github.io/LingoAct/` from the three GitHub Pages
 repository variables.
 
 Reurl refuses to shorten a URL that does not resolve, so the QR panel fails with

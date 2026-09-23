@@ -1,8 +1,10 @@
 import { CardsThree, Camera, Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, MonitorArrowUp, PaperPlaneTilt, PencilLine, BellRinging, Share, Sparkle, Users, Waveform, Image } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useWorkspaceText } from '../lib/workspaceText'
+import { APP_PROFILE } from '../lib/appProfiles'
+import type { ActivityId } from '../lib/appProfiles'
 import { isPlusEdition } from '../lib/edition'
-import { usePresenterText } from '../lib/presenterI18n'
+import { usePresenterLocale, usePresenterText } from '../lib/presenterI18n'
 import type { Session } from '../types'
 
 type Props = {
@@ -67,10 +69,42 @@ export function PresenterControlPanel({
   onEndClass,
 }: Props) {
   const t = usePresenterText()
+  const locale = usePresenterLocale()
   const w = useWorkspaceText()
-  const [category, setCategory] = useState<'listen' | 'express' | 'understand'>('express')
+  const [category, setCategory] = useState<'listen' | 'express' | 'understand'>(APP_PROFILE.defaultCategory)
+
+  function activityButton(id: ActivityId) {
+    switch (id) {
+      case 'captureQuestion':
+        return onCaptureScreen ? <button key={id} className="control-action share-action" type="button" onClick={onCaptureScreen} disabled={busy}>
+          <span className="control-action-icon"><MonitorArrowUp size={18} /></span>{t('captureQuestion')}
+        </button> : null
+      case 'flashcards':
+        return onCaptureFlashcards ? <button key={id} className="control-action picture-control-action" type="button" onClick={onCaptureFlashcards} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('flashcards')}</button> : null
+      case 'ordering':
+        return onCaptureOrdering ? <button key={id} className="control-action picture-control-action" type="button" onClick={onCaptureOrdering} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeOrdering')}</button> : null
+      case 'matching':
+        return onCaptureMatching ? <button key={id} className="control-action picture-control-action" type="button" onClick={onCaptureMatching} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeMatching')}</button> : null
+      case 'listeningStudio':
+        return <button key={id} className="control-action listening-control-action" type="button" onClick={onOpenListeningStudio} disabled={busy}>
+          <span className="control-action-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v4" /></svg></span>
+          {t('listeningStudio')}
+        </button>
+      case 'sentenceWall':
+        return <button key={id} className="control-action picture-control-action" type="button" onClick={onOpenSentenceWall} disabled={busy}><span className="control-action-icon"><PencilLine size={18} /></span>{t('sentenceWall')}</button>
+      case 'pictureTalk':
+        return onOpenPicture ? <button key={id} className="control-action picture-control-action" type="button" onClick={onOpenPicture} disabled={busy}><span className="control-action-icon"><Image size={18} /></span>{t('pictureTalk')}</button> : null
+      case 'storyOrdering':
+        return onOpenPictureWriting ? <button key={id} className="control-action picture-control-action" type="button" onClick={onOpenPictureWriting} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('storyOrdering')}</button> : null
+      case 'writingCoach':
+        return onCaptureWriting ? <button key={id} className="control-action picture-control-action" type="button" onClick={onCaptureWriting} disabled={busy}><span className="control-action-icon"><PencilLine size={18} /></span>{t('writingCoach')}</button> : null
+      case 'photoTask':
+        return <button key={id} className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}><span className="control-action-icon"><Camera size={18} /></span>{t('photoTask')}</button>
+    }
+  }
+
   return (
-    <section className="panel control-panel">
+    <section className={`panel control-panel profile-${APP_PROFILE.id} locale-${locale.toLowerCase()}`}>
       <div className="metric-row">
         <div className="metric">
           <span className="metric-icon"><Users size={18} /></span>
@@ -120,38 +154,7 @@ export function PresenterControlPanel({
         </div>
         <p className="muted">{w[`${category}Hint`]}</p>
         <div className="control-action-grid" data-category={category}>
-          {category === 'understand' && <>
-          {onCaptureScreen && (
-            <button className="control-action share-action" type="button" onClick={onCaptureScreen} disabled={busy}>
-              <span className="control-action-icon"><MonitorArrowUp size={18} /></span>
-              {t('captureQuestion')}
-            </button>
-          )}
-          {onCaptureFlashcards && <button className="control-action picture-control-action" type="button" onClick={onCaptureFlashcards} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('flashcards')}</button>}
-          {onCaptureOrdering && <button className="control-action picture-control-action" type="button" onClick={onCaptureOrdering} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeOrdering')}</button>}
-          {onCaptureMatching && <button className="control-action picture-control-action" type="button" onClick={onCaptureMatching} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('typeMatching')}</button>}
-          </>}
-          {category === 'listen' && <>
-          <button className="control-action listening-control-action" type="button" onClick={onOpenListeningStudio} disabled={busy}>
-            <span className="control-action-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v4" /></svg>
-            </span>
-            {t('listeningStudio')}
-          </button>
-          </>}
-          {category === 'express' && <>
-          <button className="control-action picture-control-action" type="button" onClick={onOpenSentenceWall} disabled={busy}>
-            <span className="control-action-icon"><PencilLine size={18} /></span>
-            {t('sentenceWall')}
-          </button>
-          {onOpenPicture && <button className="control-action picture-control-action" type="button" onClick={onOpenPicture} disabled={busy}><span className="control-action-icon"><Image size={18} /></span>{t('pictureTalk')}</button>}
-          {onOpenPictureWriting && <button className="control-action picture-control-action" type="button" onClick={onOpenPictureWriting} disabled={busy}><span className="control-action-icon"><CardsThree size={18} /></span>{t('storyOrdering')}</button>}
-          {onCaptureWriting && <button className="control-action picture-control-action" type="button" onClick={onCaptureWriting} disabled={busy}><span className="control-action-icon"><PencilLine size={18} /></span>{t('writingCoach')}</button>}
-          <button className="control-action picture-control-action" type="button" onClick={onOpenPhotoTask} disabled={busy}>
-            <span className="control-action-icon"><Camera size={18} /></span>
-            {t('photoTask')}
-          </button>
-          </>}
+          {APP_PROFILE.activityOrder[category].map(activityButton)}
         </div>
       </div>
       <details className="teacher-disclosure">

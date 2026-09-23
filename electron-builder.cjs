@@ -1,14 +1,25 @@
-// APP_EDITION picks the Windows app to build. It only renames the artifact and
-// its product name; both editions ship the same code, and the caption controls
-// are gated at runtime by VITE_APP_EDITION (see src/lib/edition.ts).
-//   unset / standard -> LingoAct.exe
-//   plus             -> LingoActPlus.exe
-const productName = process.env.APP_EDITION === 'plus' ? 'LingoActPlus' : 'LingoAct'
+// Profile says which teaching room the build opens into; edition says which
+// paid feature set it carries. They are independent axes, not forks.
+const profiles = {
+  full: { executable: 'LingoAct', appId: 'tw.lingoact.presenter.desktop' },
+  huayu: { executable: 'LingoAct-Huayu', appId: 'tw.lingoact.huayu.desktop' },
+  english: { executable: 'LingoAct-English', appId: 'tw.lingoact.english.desktop' },
+  guoyu: { executable: 'LingoAct-Guoyu', appId: 'tw.lingoact.guoyu.desktop' },
+}
+const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
+const profile = profiles[profileId]
+const productName = process.env.APP_EDITION === 'plus'
+  ? `${profile.executable}${profileId === 'full' ? 'Plus' : '-Plus'}`
+  : profile.executable
 
 module.exports = {
-  appId: 'tw.lingoact.presenter.desktop',
+  appId: profile.appId,
   productName,
   artifactName: `${productName}.\${ext}`,
+  extraMetadata: {
+    lingoactProfile: profileId,
+    productName,
+  },
   directories: {
     output: 'release',
   },

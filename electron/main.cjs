@@ -1,6 +1,7 @@
 const { app, BrowserWindow, desktopCapturer, ipcMain, screen, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
+const { fitAndCentre, overlayBoundsFor } = require('./windowPlacement.cjs')
 
 function logFatalError(scope, error) {
   const message = `[${new Date().toISOString()}] [${scope}] ${error?.stack || error}\n`
@@ -159,6 +160,7 @@ function createWindow() {
 
   mainWindow.on('move', () => {
     if (lastControlBounds) lastControlBounds = mainWindow.getBounds()
+    scheduleFollowControlDisplay()
   })
 
   mainWindow.on('will-resize', (event) => {
@@ -234,16 +236,39 @@ function startOverlayKeepAlive() {
 
     reinforcePresenterTopmost()
     if (overlayVisibilitySuppressed || !overlayWindow || overlayWindow.isDestroyed()) return
-    const targetDisplay = displayForBounds(safeBounds(mainWindow))
-    const bounds = overlayWindow.getBounds()
-    if (
-      bounds.x !== targetDisplay.bounds.x
-      || bounds.y !== targetDisplay.bounds.y
-      || bounds.width !== targetDisplay.bounds.width
-      || bounds.height !== targetDisplay.bounds.height
-    ) overlayWindow.setBounds(targetDisplay.bounds, false)
+    followControlDisplay(false)
     showOverlayInactive()
   }, 750)
+}
+
+// The danmaku overlay follows the screen the controls are on.
+//
+// It used to be positioned once, when the session started, and then only
+// re-checked inside the keep-alive tick — which returns early while the control
+// panel has focus, so during a lesson it never ran. Drag the controls to the
+// projector and the danmaku stayed on the laptop, flying for nobody. The
+// capture path has never had this bug because it works the target display out
+// afresh every time.
+//
+// Compares bounds rather than display ids, so a resolution change on the screen
+// it is already on moves it too.
+function followControlDisplay(animate = true) {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  const targetDisplay = displayForBounds(safeBounds(mainWindow))
+  if (!targetDisplay) return
+  const wanted = overlayBoundsFor(targetDisplay.bounds, safeBounds(overlayWindow))
+  if (wanted) overlayWindow.setBounds(wanted, animate)
+}
+
+// 'move' fires continuously while a window is dragged, and setBounds on another
+// window during that is both wasteful and visibly jittery. Settle first.
+let followTimer = null
+function scheduleFollowControlDisplay() {
+  if (followTimer) clearTimeout(followTimer)
+  followTimer = setTimeout(() => {
+    followTimer = null
+    followControlDisplay()
+  }, 150)
 }
 
 function closeOverlayWindow() {
@@ -312,9 +337,9 @@ function createReportWindow(sessionId, generate = false) {
   overlayVisibilitySuppressed = true
   overlayWindow?.hide()
 
+  const reportPlacement = fitAndCentre(displayForBounds(safeBounds(mainWindow)).workArea, 1120, 820, 12)
   reportWindow = new BrowserWindow({
-    width: 1120,
-    height: 820,
+    ...reportPlacement,
     minWidth: 840,
     minHeight: 620,
     frame: false,
@@ -441,11 +466,16 @@ function createWordCloudWindow(sessionId) {
   }
 
   const targetDisplay = displayForBounds(safeBounds(mainWindow))
-  const width = Math.min(1180, Math.max(860, targetDisplay.workArea.width - 120))
-  const height = Math.min(780, Math.max(600, targetDisplay.workArea.height - 120))
+  // Capped as it always was: a word cloud stretched across a 2560 wide
+  // projector is mostly whitespace.
+  const placement = fitAndCentre(
+    targetDisplay.workArea,
+    Math.min(1180, Math.max(860, targetDisplay.workArea.width - 120)),
+    Math.min(780, Math.max(600, targetDisplay.workArea.height - 120)),
+    12,
+  )
   wordCloudWindow = new BrowserWindow({
-    width,
-    height,
+    ...placement,
     minWidth: 760,
     minHeight: 520,
     frame: false,
@@ -830,7 +860,12 @@ app.whenReady().then(() => {
   createWindow()
 
   for (const eventName of ['display-added', 'display-removed', 'display-metrics-changed']) {
-    screen.on(eventName, () => showOverlayInactive())
+    screen.on(eventName, () => {
+      // A screen that has just appeared, gone, or changed resolution can leave
+      // the overlay sized for a layout that no longer exists.
+      followControlDisplay()
+      showOverlayInactive()
+    })
   }
 
   app.on('activate', () => {

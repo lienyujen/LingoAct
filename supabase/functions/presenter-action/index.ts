@@ -16,7 +16,7 @@ import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const questionTypes = new Set(['send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'file_upload'])
+const questionTypes = new Set(['send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'file_upload', 'drawing'])
 // Types that can carry a clock, and the subset where preparing to speak is part
 // of the exercise. A screen send has no answer, an upload takes as long as the
 // photo takes, and a custom quiz is answered through its own attempt flow.
@@ -1851,6 +1851,7 @@ Deno.serve(async (req) => {
         pronunciation: '朗讀發音',
         oral_response: '口語表達',
         file_upload: '上傳作答',
+        drawing: '電寫題',
       }
       let translations = {}
       try {

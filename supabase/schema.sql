@@ -82,7 +82,7 @@ create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.sessions(id) on delete cascade,
   screenshot_id uuid null references public.screenshots(id) on delete set null,
-  type text not null check (type in ('send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload')),
+  type text not null check (type in ('send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'drawing')),
   status text not null default 'active' check (status in ('draft', 'active', 'stopped', 'closed')),
   title text not null default '',
   prompt_text text null,
@@ -1019,7 +1019,8 @@ alter table public.questions
   add constraint questions_type_check
   check (type in (
     'send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer',
-    'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'listening'
+    'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'listening',
+    'drawing'
   ));
 
 do $$

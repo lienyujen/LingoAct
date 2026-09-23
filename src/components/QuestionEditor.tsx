@@ -57,6 +57,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
   { type: 'poll', label: 'typePoll' },
   { type: 'multiple_choice', label: 'typeMultipleChoice' },
   { type: 'file_upload', label: 'typeFileUpload' },
+  { type: 'drawing', label: 'typeDrawing' },
   { type: 'short_answer', label: 'typeShortAnswer' },
   { type: 'oral_response', label: 'typeOralResponse' },
   { type: 'pronunciation', label: 'typePronunciation' },
@@ -97,7 +98,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
 
   const editableOptions = type === 'multiple_choice' || type === 'poll'
   const finalOptions = useMemo(() => {
-    if (['short_answer', 'send_screen', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload'].includes(type)) return []
+    if (['short_answer', 'send_screen', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'drawing'].includes(type)) return []
     return options.map((option) => option.trim()).filter(Boolean)
   }, [options, type])
 
@@ -217,6 +218,11 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             {t('uploadTypeHint')}
           </p>
         )}
+        {type === 'drawing' && (
+          <p className="muted question-type-hint">
+            {t('drawingTypeHint')}
+          </p>
+        )}
         {isInteraction && onGenerateInteraction && <InteractionEditor key={`${open}-${quizType}`} value={{ ...interaction, kind: quizType as 'ordering' | 'matching' }} direction={quizDirection} previewUrl={previewUrl} onChange={setInteraction} onDirectionChange={setQuizDirection} onGenerate={onGenerateInteraction} onBusy={setInteractionBusy} />}
         {type === 'custom_quiz' && !isInteraction && (
           <CustomQuizFields
@@ -232,14 +238,16 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
         )}
         {type !== 'send_screen' && type !== 'custom_quiz' && (
           <label className="question-prompt-field">
-            {type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : t('promptLabel')}
+            {type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : type === 'drawing' ? t('drawingPromptLabel') : t('promptLabel')}
             <input
               value={promptText}
               placeholder={type === 'pronunciation'
                 ? t('readAloudPlaceholder')
                 : type === 'file_upload'
                   ? t('uploadPromptPlaceholder')
-                  : t('promptPlaceholder')}
+                  : type === 'drawing'
+                    ? t('drawingPromptPlaceholder')
+                    : t('promptPlaceholder')}
               onChange={(event) => setPromptText(event.target.value)}
             />
           </label>

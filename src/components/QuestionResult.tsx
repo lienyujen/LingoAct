@@ -132,7 +132,9 @@ function AiAnalysisPanel({
   const t = usePresenterText()
   if (!question || ['send_screen', 'pronunciation', 'oral_response'].includes(question.type)) return null
 
-  const isUpload = question.type === 'file_upload'
+  // 電寫題 hands in the same thing an upload does — one image per student,
+  // through the same rows — so it reads back through the same panel.
+  const isUpload = question.type === 'file_upload' || question.type === 'drawing'
   // Counted in students, because that is what a press costs: one call covers
   // every page one student sent.
   const unmarked = isUpload
@@ -435,7 +437,9 @@ export function QuestionResult(props: Props) {
     )
   }
 
-  if (question.type === 'file_upload') {
+  // 電寫題 hands in the same thing an upload does — one image per student,
+  // through the same rows — so it reads back through the same panel.
+  if (question.type === 'file_upload' || question.type === 'drawing') {
     return (
       <>
         <section className="panel result-panel upload-results-panel">

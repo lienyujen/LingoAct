@@ -36,6 +36,7 @@ const questionTypeLabels = {
   oral_response: '口語表達',
   custom_quiz: '自訂測驗',
   file_upload: '上傳作答',
+  drawing: '電寫題',
   listening: '聽力',
 }
 

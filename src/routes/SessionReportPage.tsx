@@ -28,6 +28,7 @@ const questionTypeLabels: Record<Question['type'], PresenterMessageKey> = {
   oral_response: 'typeOralResponse',
   custom_quiz: 'typeCustomQuiz',
   file_upload: 'typeFileUpload',
+  drawing: 'typeDrawing',
   listening: 'typeListening',
 }
 

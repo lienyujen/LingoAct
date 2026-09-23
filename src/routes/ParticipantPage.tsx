@@ -758,11 +758,17 @@ export function ParticipantPage() {
         />
       )}
       <ParticipantSharedFiles locale={locale} sessionId={sessionId} />
-      {question?.type === 'file_upload' && participant && participantToken && (
+      {(question?.type === 'file_upload' || question?.type === 'drawing') && participant && participantToken && (
         <ParticipantFileUpload
           active={question.status === 'active'}
           imageUrl={screenshot?.public_url || null}
+          // A new question is a new sheet of paper. This panel is the same
+          // component all lesson with only the question id changing, so without
+          // its own identity it kept the last question's state and opened on
+          // 你送出的作答 instead of a blank canvas.
+          key={question.id}
           locale={locale}
+          mode={question.type === 'drawing' ? 'drawing' : 'upload'}
           participantId={participant.id}
           participantToken={participantToken}
           promptText={question.prompt_text}
@@ -794,7 +800,7 @@ export function ParticipantPage() {
           question={question} sessionId={sessionId} participantId={participant.id} participantToken={participantToken} locale={locale}
           active={session?.status === 'active' && question.status === 'active'} />}
       </div>
-      {screenshot && question?.type !== 'file_upload' && (
+      {screenshot && question?.type !== 'file_upload' && question?.type !== 'drawing' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
       {listeningClip && question && (

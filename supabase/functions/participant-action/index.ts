@@ -629,7 +629,7 @@ Deno.serve(async (req) => {
       const { data: question, error: questionError } = await supabase.from('questions')
         .select('id, status, type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
       if (questionError) throw questionError
-      if (!question || question.type !== 'file_upload') return jsonResponse({ message: '找不到檔案上傳題。' }, 404)
+      if (!question || !['file_upload', 'drawing'].includes(question.type)) return jsonResponse({ message: '找不到檔案上傳題。' }, 404)
       if (question.status !== 'active') return jsonResponse({ message: '教師已停止收件。' }, 409)
 
       const fileName = typeof input.fileName === 'string' ? input.fileName.trim().slice(0, 200) : ''
@@ -654,6 +654,23 @@ Deno.serve(async (req) => {
       const mimeType = typeof input.mimeType === 'string' && input.mimeType.trim()
         ? input.mimeType.trim().slice(0, 150)
         : 'application/octet-stream'
+
+      // A 電寫題 is one page, and sending a second one means the student
+      // redrew it. Kept side by side they would be marked as two pages of one
+      // answer — the marker reads a multi-file submission as chapters of the
+      // same argument — so the first attempt would be graded alongside the
+      // correction that was meant to replace it. An upload is the opposite: a
+      // second photograph is page two, and both belong.
+      if (question.type === 'drawing') {
+        const { data: earlier } = await supabase.from('file_responses')
+          .select('id, storage_path')
+          .eq('question_id', questionId)
+          .eq('participant_id', participantId)
+        if (earlier?.length) {
+          await supabase.storage.from('lingoact-files').remove(earlier.map((row) => row.storage_path))
+          await supabase.from('file_responses').delete().in('id', earlier.map((row) => row.id))
+        }
+      }
 
       const { data: saved, error: insertError } = await supabase.from('file_responses').insert({
         session_id: sessionId,
@@ -703,7 +720,7 @@ Deno.serve(async (req) => {
       const { data: question, error: questionError } = await supabase.from('questions')
         .select('id, type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
       if (questionError) throw questionError
-      if (question?.type !== 'file_upload') return jsonResponse({ message: '找不到上傳題目。' }, 404)
+      if (!question || !['file_upload', 'drawing'].includes(question.type)) return jsonResponse({ message: '找不到上傳題目。' }, 404)
 
       const { data: rows, error } = await supabase.from('file_responses')
         .select('id, question_id, name, mime_type, file_size, caption, analysis_status, analysis_json, error_message, submitted_at, analyzed_at')

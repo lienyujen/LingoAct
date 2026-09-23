@@ -6517,3 +6517,109 @@ h2 {
 .interaction-results details { margin-top: 16px; }
 .interaction-results summary { cursor: pointer; font-weight: 700; }
 @media (any-pointer: coarse) { .interaction-tile button, .interaction-move button { min-height: 48px; } .interaction-slot { min-height: 72px; } }
+
+/* 電寫題 — the student writes straight onto the capture. Carried over from
+   InterAct with the board composer styles the canvas shares. */
+/* 電寫題: the canvas is the answer sheet, so it gets the width the panel has
+   rather than sitting inside the narrower prose column. */
+.participant-drawing-answer .board-drawing {
+  margin-top: 10px;
+}
+
+.participant-drawing-submitted {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 10px 0;
+  width: 100%;
+}
+
+.board-composer-body {
+  display: grid;
+  gap: 8px;
+}
+
+.board-composer-body textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.board-drawing {
+  gap: 10px;
+}
+
+.board-drawing-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.board-drawing-group {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.board-drawing-group button {
+  border-radius: 999px;
+  min-height: 0;
+  padding: 6px 12px;
+}
+
+.board-drawing-group .is-selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.board-drawing-surface {
+  position: relative;
+}
+
+/* touch-action is the whole reason a finger can draw here rather than
+   scrolling the page out from under the stroke. */
+.board-drawing-surface canvas {
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: crosshair;
+  display: block;
+  touch-action: none;
+  width: 100%;
+}
+
+.board-drawing-text-input {
+  position: absolute;
+  transform: translate(0, -4px);
+}
+
+.board-drawing-text-input input {
+  font-size: 16px;
+  min-width: 160px;
+}
+
+.board-drawing-hint {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* The text box needs its own buttons, because committing on blur is what
+   stopped it working with a mouse. */
+.board-drawing-text-input {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.board-drawing-text-input button {
+  min-height: 0;
+  padding: 6px 8px;
+}

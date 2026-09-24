@@ -19,6 +19,7 @@ const profiles = {
   huayu: 'LingoAct-Huayu',
   english: 'LingoAct-English',
   guoyu: 'LingoAct-Guoyu',
+  ncacls: 'LingoAct-NCACLS',
 }
 const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
 const productName = profiles[profileId]

@@ -30,12 +30,21 @@ function arg(name, fallback = null) {
 const source = arg('source')
 const profile = arg('profile')
 const crop = Number(arg('crop', '72'))
+// A logo saved as a rounded tile without an alpha channel has black corners,
+// not transparent ones, and Windows draws them: a black square around the
+// mark on every surface that is not itself black. Clipping to the same radius
+// throws them away. Percent of the side; 0 leaves the image square.
+const radius = Number(arg('radius', '0'))
 if (!source || !profile) {
   console.error('usage: --source <image> --profile <id> [--crop 72]')
   process.exit(1)
 }
 if (!Number.isFinite(crop) || crop <= 0 || crop > 100) {
   console.error('--crop must be a percentage between 1 and 100')
+  process.exit(1)
+}
+if (!Number.isFinite(radius) || radius < 0 || radius > 50) {
+  console.error('--radius must be a percentage between 0 and 50')
   process.exit(1)
 }
 const sourcePath = path.isAbsolute(source) ? source : path.join(root, source)
@@ -60,7 +69,7 @@ const { app, BrowserWindow } = require('electron')
 const fs = require('fs')
 const path = require('path')
 
-const [, , outDir, sizesJson, scale, dataUrlPath] = process.argv
+const [, , outDir, sizesJson, scale, dataUrlPath, radius] = process.argv
 // Read from a file rather than argv: a base64 logo is hundreds of kilobytes
 // and Windows refuses a command line that long (ENAMETOOLONG).
 const dataUrl = fs.readFileSync(dataUrlPath, 'utf8')
@@ -78,7 +87,8 @@ app.whenReady().then(async () => {
       + '.mark{width:' + size + 'px;height:' + size + 'px;'
       + 'background-image:url("' + dataUrl + '");'
       + 'background-repeat:no-repeat;background-position:center center;'
-      + 'background-size:' + scale + '% auto;image-rendering:auto}</style>'
+      + 'background-size:' + scale + '% auto;image-rendering:auto;'
+      + 'border-radius:' + radius + '%}</style>'
       + '<div class="mark"></div>'
     fs.writeFileSync(pagePath, page)
     win.setContentSize(size, size)
@@ -100,7 +110,7 @@ const electronPath = path.join(root, 'node_modules/electron/dist', electronBinar
 await new Promise((resolve, reject) => {
   const child = spawn(
     electronPath,
-    [electronMain, outDir, JSON.stringify(ICO_SIZES), String(scale), dataUrlPath],
+    [electronMain, outDir, JSON.stringify(ICO_SIZES), String(scale), dataUrlPath, String(radius)],
     { stdio: 'inherit', env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } },
   )
   child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`electron exited ${code}`))))
@@ -138,5 +148,5 @@ fs.writeFileSync(path.join(outDir, `icon-${profile}.ico`), buildIco(entries))
 fs.copyFileSync(path.join(outDir, '.profile-256.png'), path.join(outDir, `icon-${profile}-preview.png`))
 for (const { size } of entries) fs.unlinkSync(path.join(outDir, `.profile-${size}.png`))
 
-console.log(`build/icon-${profile}.ico written — ${ICO_SIZES.join(', ')} px, keeping the middle ${crop}%`)
+console.log(`build/icon-${profile}.ico written — ${ICO_SIZES.join(', ')} px, keeping the middle ${crop}%${radius ? `, corners clipped at ${radius}%` : ''}`)
 console.log(`build/icon-${profile}-preview.png written — look at this before shipping it`)

@@ -99,7 +99,6 @@ export function Preview() {
           <PresenterControlPanel session={session} onlineCount={25} raisedCount={2} busy={false} buzzerActive={false}
             onToggleDanmaku={action} onToggleAnonymous={action} onCaptureScreen={action} onCaptureFlashcards={action} onCaptureWriting={action} onOpenPicture={action} onOpenPictureWriting={action}
             onCaptureOrdering={action} onCaptureMatching={action} onCapturePronunciation={action} onCaptureOral={action} onCaptureDrawing={action}
-            onDispatchBlank={action} onDispatchImage={action}
             onDrawLottery={action} onStartBuzzer={action} onOpenListeningStudio={action} onOpenSentenceWall={() => { setPrompt(''); setOpen(true) }} onOpenPhotoTask={action}
             onOpenTextDispatch={action} onOpenFileTransfer={action} onOpenRoster={action} onOpenWordCloud={action} onOpenSettings={action}
             onToggleRecording={action} onToggleCaptionVisibility={action} onGenerateExitTicket={action} onLowerHands={action} onEndClass={action} />
@@ -148,7 +147,7 @@ function CloudPreview() {
         times={times}
         onChange={setSelection}
       />
-      <WordCloudCanvas messages={messages.filter((m) => {
+      <WordCloudCanvas customTerms={[]} messages={messages.filter((m) => {
         const at = new Date(m.created_at).getTime()
         return at >= selection.from && at <= selection.to
       })} />

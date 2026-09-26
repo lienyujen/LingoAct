@@ -1,4 +1,4 @@
-import { Confetti, Lightning } from '@phosphor-icons/react'
+import { Confetti, Lightning, X } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { isBuzzerAccepting } from '../lib/buzzer'
@@ -9,13 +9,15 @@ type Props = {
   event: BuzzerSessionEvent | null
   participantId?: string | null
   busy?: boolean
+  // Absent on the student side: only the teacher can call a round off.
+  onClose?: () => Promise<void> | void
   onStart?: () => Promise<void> | void
   onBuzz?: () => Promise<void> | void
 }
 
 const RESULT_DURATION_MS = 6000
 
-export function BuzzerOverlay({ event, participantId, busy = false, onStart, onBuzz }: Props) {
+export function BuzzerOverlay({ event, participantId, busy = false, onClose, onStart, onBuzz }: Props) {
   const t = usePresenterText()
   const [visible, setVisible] = useState(false)
   const [pressed, setPressed] = useState(false)
@@ -79,6 +81,21 @@ export function BuzzerOverlay({ event, participantId, busy = false, onStart, onB
 
   return (
     <div className={`buzzer-overlay${finalized ? ' revealed' : ' active'}`} aria-live="assertive">
+      {/* Top centre, not the top-right corner. The overlay fills the screen, and
+          on the desktop app the window's own close button sits in that corner —
+          a teacher reaching to dismiss the buzzer was reaching for the same few
+          pixels that quit the whole program. */}
+      {onClose && (
+        <button
+          aria-label={t('closeBuzzer')}
+          className="buzzer-close"
+          title={t('closeBuzzer')}
+          type="button"
+          onClick={() => void onClose()}
+        >
+          <X size={22} />
+        </button>
+      )}
       <div className="buzzer-rings" />
       <div className="buzzer-content">
         {finalized ? (

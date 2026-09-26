@@ -650,6 +650,13 @@ h2 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* The activity library is one column so a long activity name has room, but the
+   four tools above it are short and go two by two — which is the whole point
+   of putting them at the top where they can be hit without reading. */
+.teacher-workspace .tool-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .presenter-page {
   background: transparent;
   min-height: 100svh;
@@ -1127,6 +1134,39 @@ h2 {
 .control-toggle.is-active b {
   background: var(--surface);
   color: var(--primary);
+}
+
+/* The four tools at the top of the panel are one group — ways to put
+   something in front of the class — so they take one colour instead of the
+   teal-and-gold mix they inherited from the sections they used to live in.
+   Purple is the app’s own, which is the point: nothing here is a special
+   case worth a hue of its own. */
+.tool-action .control-action-icon {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.tool-action:hover:not(:disabled) {
+  background: var(--primary-soft);
+  border-color: rgb(123 45 94 / 28%);
+}
+
+/* A lone fourth cell stays a cell rather than stretching across the row: the
+   standard edition has three tools and the grid should not restyle itself
+   because of that. */
+.tool-grid {
+  margin-bottom: 14px;
+}
+
+.tool-grid > :last-child:nth-child(odd) {
+  flex-direction: column;
+  grid-column: auto;
+  min-height: 0;
+}
+
+/* The checkbox under the capture in the question editor. */
+.capture-keep {
+  margin-top: 2px;
 }
 
 .control-action-grid {
@@ -2590,19 +2630,30 @@ h2 {
   width: 30px;
 }
 
+/* A row, not a block. As a block the greeting took the whole width and the
+   score, rank and hand were pushed onto a line of their own however much room
+   was left beside them. Wrapping is kept, so they still drop to a second line
+   — but only when the name actually leaves no room for them. */
 .participant-header {
+  align-items: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 5px solid var(--primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
   padding: 16px 18px;
 }
 
 .participant-header h1 {
+  flex: 1 1 12ch;
   font-size: 24px;
   letter-spacing: 0;
   line-height: 1.45;
+  min-width: 0;
 }
 
 .participant-exit-ticket-priority .exit-ticket-panel {
@@ -3589,6 +3640,33 @@ h2 {
   overflow: hidden;
   position: fixed;
   z-index: 210;
+}
+
+/* Centred on the top edge rather than tucked into the corner, and sized for a
+   finger on a touch display. The corner is where the desktop window’s own
+   close button lives, and the overlay covers the whole screen — so the two
+   sat in the same place and a miss quit the program in front of the class. */
+.buzzer-close {
+  align-items: center;
+  background: rgb(255 255 255 / 12%);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  height: 46px;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 20px;
+  transform: translateX(-50%);
+  width: 46px;
+  z-index: 3;
+}
+
+.buzzer-close:hover,
+.buzzer-close:active {
+  background: rgb(255 255 255 / 24%);
 }
 
 .buzzer-content {
@@ -6980,67 +7058,45 @@ h2 {
    skill tabs rather than pretending to be one activity among them. A row
    rather than a tile: it is the only thing at this level, and a lone tile in
    a grid of one reads as a mistake. */
-.capture-primary {
-  align-items: center;
-  border-color: var(--border-strong);
-  flex-direction: row;
-  gap: 12px;
-  justify-content: flex-start;
-  margin-bottom: 14px;
-  min-height: 0;
-  padding: 12px 14px;
-  text-align: left;
-  width: 100%;
-}
-
-.capture-primary-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.capture-primary-text b {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.capture-primary-text small {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* The other two backdrops. Quiet, because capturing the screen is what a
-   teacher reaches for most and these should not compete with it. */
-.capture-alternatives {
-  align-items: baseline;
-  color: var(--muted);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 12px;
-  gap: 4px 10px;
-  margin: -6px 0 14px;
-}
-
-.capture-alternatives button {
-  background: none;
-  border: 0;
-  color: var(--primary);
-  font-size: 12px;
-  min-height: 0;
-  padding: 2px 0;
-  text-decoration: underline;
-}
-
-.capture-alternatives button:disabled {
-  color: var(--muted);
-  text-decoration: none;
-}
-
 /* 彈幕時間軸。The bars are how many messages arrived when, so the shape of the
    class is visible and an earlier wave can be grabbed without remembering the
    clock. Dragging either handle trims; dragging the middle slides the window. */
 /* The handles stand proud of the track by design, so the room above and below
    has to clear them or they sit on the clock labels. */
+/* 文字雲的自訂詞彙。Opened from the header, above the cloud rather than over it,
+   so the presenter can see the words they are trying to fix while they type. */
+.word-cloud-terms {
+  background: rgb(255 255 255 / 6%);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 24px;
+  padding: 14px 16px;
+}
+
+.word-cloud-terms p {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.word-cloud-terms textarea {
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.word-cloud-terms-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.word-cloud-terms-toggle {
+  white-space: nowrap;
+}
+
 .danmaku-timeline {
   display: flex;
   flex-direction: column;

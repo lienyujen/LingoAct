@@ -1132,20 +1132,6 @@ export function PresenterPage() {
     setEditorOpen(true)
   }
 
-  // 派題 over a picture the teacher already has, which travels the same upload
-  // path as a capture — it is a File either way.
-  function openImageQuestion(file: File) {
-    setPlannedActivity(null)
-    setCapturePreset(null)
-    setCaptureInitialDraft(null)
-    setCaptureTarget('question')
-    setCaptureFile(file)
-    setCapturePreviewUrl(URL.createObjectURL(file))
-    setAnalysisError('')
-    setControlsOpen(false)
-    setEditorOpen(true)
-  }
-
   async function cropCapture(rect: { x: number; y: number; width: number; height: number }) {
     if (!captureSource) return
 
@@ -1263,7 +1249,9 @@ export function PresenterPage() {
     setCaptureInitialDraft(draft)
     setEditorOpen(false)
     try {
-      await uploadQuestionScreenshot(captureFile, draft)
+      // Unticked means the question goes out on its own: the same dispatch
+      // with nothing attached, which is what the 不用背景 entry point used to do.
+      await uploadQuestionScreenshot(draft.sendScreenshot === false ? null : captureFile, draft)
       setCaptureFile(null)
       setCapturePreviewUrl(null)
       setCaptureInitialDraft(null)
@@ -1582,6 +1570,18 @@ export function PresenterPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  // Calling off a round nobody buzzed on, from the button in the middle of
+  // the overlay's top edge.
+  async function cancelBuzzer() {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error(t('noControlRights'))
+    const { error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'cancel_buzzer', sessionId, presenterToken },
+    })
+    if (error) throw error
+    setBuzzerEvent(null)
   }
 
   async function activateBuzzer(eventId: string) {
@@ -2063,7 +2063,7 @@ export function PresenterPage() {
           onStartBuzzer={startBuzzer}
           onToggleAnonymous={() => updateSession({ anonymous_enabled: !session.anonymous_enabled })}
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
-          onCaptureScreen={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen() } : undefined}
+          onCaptureScreen={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen() } : openBlankQuestion}
           onCaptureFlashcards={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('flashcard') } : undefined}
           onCaptureWriting={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('writing') } : undefined}
           onCaptureOrdering={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('ordering') } : undefined}
@@ -2071,8 +2071,6 @@ export function PresenterPage() {
           onCapturePronunciation={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'pronunciation' }) } : undefined}
           onCaptureOral={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'oral_response' }) } : undefined}
           onCaptureDrawing={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'drawing' }) } : undefined}
-          onDispatchBlank={openBlankQuestion}
-          onDispatchImage={openImageQuestion}
           onOpenPicture={() => { setPlannedActivity(null); setPictureInitialMode('spoken'); setPictureOpen(true) }}
           onOpenPictureWriting={() => { setPlannedActivity(null); setPictureInitialMode('ordering'); setPictureOpen(true) }}
           onGenerateExitTicket={() => void generateExitTicket()}
@@ -2391,6 +2389,7 @@ export function PresenterPage() {
       {!window.lingoActDesktop && (
         <BuzzerOverlay
           event={buzzerEvent}
+          onClose={cancelBuzzer}
           onStart={buzzerEvent ? () => activateBuzzer(buzzerEvent.id) : undefined}
         />
       )}

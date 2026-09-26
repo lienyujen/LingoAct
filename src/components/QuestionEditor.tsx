@@ -17,6 +17,11 @@ export type { CustomQuizSettings }
 // added, the non-quiz call would have had to pass undefined for quizSettings
 // just to reach the fields after it.
 export type QuestionDraft = {
+  // Whether the capture goes out with the question. Unticking it is how a
+  // teacher asks something that is not about the screen at all — 「你今天學到
+  // 什麼？」, a quick poll — without the 不用背景 link that used to live under
+  // 截圖派題. Absent means yes, so every existing caller is unchanged.
+  sendScreenshot?: boolean
   interaction?: InteractionDraft
   type: QuestionType
   options: string[]
@@ -104,6 +109,9 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(null)
   const [interaction, setInteraction] = useState<InteractionDraft>({ kind: 'ordering', items: [], tiles: [], sentenceMode: false, hasAnswer: true, shareScreenshot: false })
+  // Ticked by default: a screen question is usually about the screen. Unticking
+  // it sends the question on its own, which is what 不用背景 used to be for.
+  const [sendScreenshot, setSendScreenshot] = useState(true)
   const [interactionBusy, setInteractionBusy] = useState(false)
   const isInteraction = type === 'custom_quiz' && (quizType === 'ordering' || quizType === 'matching') && Boolean(onGenerateInteraction)
   // 派送畫面 has nothing to send and 自訂測驗 has nothing to read when there is
@@ -151,12 +159,12 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
           if (type === 'custom_quiz') {
             const direction = quizDirection.trim()
             if (isInteraction) {
-              onCreate({ type, options: [], allowMultiple: false, promptText: direction, prepareSeconds: null, answerSeconds: null,
+              onCreate({ sendScreenshot, type, options: [], allowMultiple: false, promptText: direction, prepareSeconds: null, answerSeconds: null,
                 interaction: { ...interaction, kind: quizType as 'ordering' | 'matching' } })
               return
             }
             if (!direction) return
-            onCreate({
+            onCreate({ sendScreenshot,
               type,
               options: [],
               allowMultiple: false,
@@ -167,7 +175,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             })
             return
           }
-          onCreate({
+          onCreate({ sendScreenshot,
             // Ticking a format is what makes it a board; nothing ticked stays the
             // plain dispatch it has always been.
             type: isBoard ? 'board' : type,
@@ -189,6 +197,12 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
       >
         <h2>{w.source}</h2>
         {previewUrl && <img alt={t('capturePreviewAlt')} className="capture-preview" src={previewUrl} />}
+        {previewUrl && (
+          <label className="interaction-check capture-keep">
+            <input type="checkbox" checked={sendScreenshot} onChange={(event) => setSendScreenshot(event.target.checked)} />
+            {t('keepScreenshot')}
+          </label>
+        )}
         {error && <p className="error">{error}</p>}
         <div className="type-grid">
           {offeredTypes.map((item) => (

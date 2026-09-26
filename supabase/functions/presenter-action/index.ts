@@ -2660,6 +2660,31 @@ Deno.serve(async (req) => {
       return jsonResponse({ event })
     }
 
+    // Calling off a round nobody buzzed on. Without this the only way past the
+    // overlay is to start another one, which is not a thing a teacher wants to
+    // do in front of a class that has moved on.
+    if (action === 'cancel_buzzer') {
+      const { data: liveEvents, error: liveError } = await supabase
+        .from('session_events')
+        .select('id, payload')
+        .eq('session_id', sessionId)
+        .eq('event_type', 'buzzer')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (liveError) throw liveError
+
+      const finalizedAt = new Date().toISOString()
+      await Promise.all(
+        (liveEvents || [])
+          .filter((event) => event.payload?.finalized !== true)
+          .map((event) => supabase
+            .from('session_events')
+            .update({ payload: { ...event.payload, accepting: false, finalized: true, cancelled: true, finalized_at: finalizedAt } })
+            .eq('id', event.id)),
+      )
+      return jsonResponse({ ok: true })
+    }
+
     if (action === 'activate_buzzer') {
       const eventId = typeof input.eventId === 'string' ? input.eventId : ''
       if (!eventId) return jsonResponse({ message: '找不到這次搶答。' }, 400)

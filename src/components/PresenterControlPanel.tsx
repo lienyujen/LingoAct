@@ -1,5 +1,5 @@
 import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Hand, MonitorArrowUp, PaperPlaneTilt, BellRinging, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { activitiesFor, SKILL_TABS } from '../lib/activities'
 import { APP_PROFILE } from '../lib/appProfiles'
 import type { ActivityId, SkillTab } from '../lib/activities'
@@ -33,8 +33,6 @@ type Props = {
   // The same editor, reached without capturing the screen. A question that is
   // not about anything on screen — 「你今天學到什麼？」, a quick poll — used to
   // require screenshotting an irrelevant corner first.
-  onDispatchBlank?: () => void
-  onDispatchImage?: (file: File) => void
   onOpenPicture?: () => void
   onOpenPictureWriting?: () => void
   onDrawLottery: () => void
@@ -71,8 +69,6 @@ export function PresenterControlPanel({
   onCapturePronunciation,
   onCaptureOral,
   onCaptureDrawing,
-  onDispatchBlank,
-  onDispatchImage,
   onOpenPicture,
   onOpenPictureWriting,
   onDrawLottery,
@@ -94,7 +90,6 @@ export function PresenterControlPanel({
   const t = usePresenterText()
   const w = useWorkspaceText()
   const [category, setCategory] = useState<SkillTab>(APP_PROFILE.defaultSkill)
-  const imageInput = useRef<HTMLInputElement>(null)
   // The descriptors are static; only the wiring is per-render.
   const handlers: Partial<Record<ActivityId, (() => void) | undefined>> = {
     listeningStudio: onOpenListeningStudio,
@@ -168,46 +163,39 @@ export function PresenterControlPanel({
         </div>
       </div>
 
-      {/* 截圖派題 is not one of the activities — it is the door to every
-          question type, so it sat among its siblings claiming to be one of
-          them. It gets its own place above the tabs. */}
-      {onCaptureScreen && (
-        <button className="control-action capture-primary" type="button" onClick={onCaptureScreen} disabled={busy}>
-          <span className="control-action-icon"><MonitorArrowUp size={20} /></span>
-          <span className="capture-primary-text">
-            <b>{t('captureQuestion')}</b>
-            <small>{t('captureQuestionHint')}</small>
-          </span>
+      {/* The four a teacher reaches for during a class, two by two at the top
+          where they can be hit without reading. 課堂工具 used to be folded away
+          under the activity library, which put the most-used things furthest
+          down the panel. They share one colour because they are one group:
+          ways to put something in front of the class. */}
+      <div className="control-action-grid tool-grid">
+        {onCaptureScreen && (
+          <button
+            className="control-action tool-action"
+            type="button"
+            title={t('captureQuestionHint')}
+            onClick={onCaptureScreen}
+            disabled={busy}
+          >
+            <span className="control-action-icon"><MonitorArrowUp size={18} /></span>
+            {t('captureQuestion')}
+          </button>
+        )}
+        <button className="control-action tool-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
+          <span className="control-action-icon"><PaperPlaneTilt size={18} /></span>
+          {t('textDispatch')}
         </button>
-      )}
-      {/* The screen capture stays one press, because it is what a teacher
-          reaches for most. These are the same editor with a different
-          backdrop, so they are one press too rather than a chooser in front
-          of everything. */}
-      {(onDispatchImage || onDispatchBlank) && (
-        <p className="capture-alternatives">
-          <span>{w.orDispatch}</span>
-          {onDispatchImage && (
-            <button type="button" disabled={busy} onClick={() => imageInput.current?.click()}>{w.fromImage}</button>
-          )}
-          {onDispatchBlank && (
-            <button type="button" disabled={busy} onClick={onDispatchBlank}>{w.noBackdrop}</button>
-          )}
-        </p>
-      )}
-      {onDispatchImage && (
-        <input
-          accept="image/png,image/jpeg,image/webp"
-          hidden
-          ref={imageInput}
-          type="file"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            event.target.value = ''
-            if (file) onDispatchImage(file)
-          }}
-        />
-      )}
+        <button className="control-action tool-action" type="button" onClick={onOpenWordCloud} disabled={busy}>
+          <span className="control-action-icon"><Cloud size={18} /></span>
+          {t('wordCloud')}
+        </button>
+        {isPlusEdition && (
+          <button className="control-action tool-action" type="button" onClick={onOpenFileTransfer} disabled={busy}>
+            <span className="control-action-icon"><Share size={18} /></span>
+            {t('fileTransfer')}
+          </button>
+        )}
+      </div>
       <div className="control-section activity-library">
         <h2>{w.choose}</h2>
         <div className="activity-categories" aria-label={w.choose}>
@@ -229,28 +217,6 @@ export function PresenterControlPanel({
           })}
         </div>
       </div>
-      <details className="teacher-disclosure">
-        <summary>{w.tools}</summary>
-        <div className="control-action-grid">
-          <button className="control-action share-action" type="button" onClick={onOpenTextDispatch} disabled={busy}>
-            <span className="control-action-icon"><PaperPlaneTilt size={18} /></span>
-            {t('textDispatch')}
-          </button>
-          <button className="control-action energy-control-action" type="button" onClick={onOpenWordCloud} disabled={busy}>
-            <span className="control-action-icon"><Cloud size={18} /></span>
-            {t('wordCloud')}
-          </button>
-          {isPlusEdition && (
-            <>
-              <button className="control-action share-action" type="button" onClick={onOpenFileTransfer} disabled={busy}>
-                <span className="control-action-icon"><Share size={18} /></span>
-                {t('fileTransfer')}
-              </button>
-            </>
-          )}
-        </div>
-      </details>
-
       <details className="teacher-disclosure">
         <summary>{w.wrap}</summary>
         <p className="control-section-label"><Sparkle size={15} />{t('classWrapUp')}</p>

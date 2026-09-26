@@ -219,6 +219,15 @@ export function BackendSetup({ onCancel }: Props) {
           LingoAct 使用你自己的 Supabase 專案存放課堂資料，資料不會經過其他人。
           填入專案資訊後即可開始使用。
         </p>
+        {/* The way out for someone who has no project at all. Until now the only
+            link to Supabase sat inside the collapsed 自動部署 section further
+            down, which is closed on arrival — so this screen asked for a
+            Project ID and said nothing about where one comes from. */}
+        <p className="muted">
+          還沒有 Supabase 專案？到 <a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
+            Supabase <ArrowSquareOut size={12} />
+          </a> 註冊並免費建立一個，再回來填入下面兩欄。
+        </p>
 
         <label>
           專案識別碼或網址
@@ -229,7 +238,11 @@ export function BackendSetup({ onCancel }: Props) {
             onChange={(event) => { setRef(event.target.value); setTested(false) }}
           />
         </label>
-        <p className="field-hint">Supabase 後台 → Project Settings → General → Project ID</p>
+        <p className="field-hint">
+          <a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
+            Supabase 後台 <ArrowSquareOut size={11} />
+          </a> → Project Settings → General → Project ID
+        </p>
 
         <label>
           Publishable key
@@ -240,7 +253,9 @@ export function BackendSetup({ onCancel }: Props) {
           />
         </label>
         <p className="field-hint">
-          Supabase 後台 → Project Settings → API Keys。這把金鑰設計上就是公開的，由資料庫權限規則保護；
+          <a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
+            Supabase 後台 <ArrowSquareOut size={11} />
+          </a> → Project Settings → API Keys。這把金鑰設計上就是公開的，由資料庫權限規則保護；
           <strong>請不要填 service_role 或 secret key</strong>。
         </p>
 

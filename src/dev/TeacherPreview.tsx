@@ -12,6 +12,7 @@ import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
 import { DragAnswers } from '../components/DragAnswers'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { RosterManager } from '../components/RosterManager'
+import { BackendSetup } from '../components/BackendSetup'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
 import { APP_PROFILE } from '../lib/appProfiles'
@@ -63,6 +64,9 @@ export function Preview() {
   </main>
   // 學員名單 only ever talks to this computer's localStorage, so the whole
   // dialog previews without a class, a token or a database behind it.
+  // The first screen a new deployer ever sees, and the one place the app has
+  // to explain where a Supabase project comes from.
+  if (location.hash === '#setup') return <BackendSetup />
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>

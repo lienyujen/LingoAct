@@ -1260,7 +1260,7 @@ alter table public.questions
   check (type in (
     'send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer',
     'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'listening',
-    'drawing', 'hotspot', 'board'
+    'drawing', 'hotspot', 'board', 'reading'
   ));
 
 -- Which board the class is on, which outlives the current question: a board
@@ -1562,3 +1562,67 @@ alter table public.quiz_attempts
 -- writes the column — a board with no screenshot_id shows nothing regardless.
 alter table public.questions
   add column if not exists share_screenshot boolean not null default true;
+
+-- ============================ 閱讀與測驗 ============================
+--
+-- A passage written for the class's own level, with the words and grammar in
+-- it that the class has not met yet marked up, and optionally a quiz over it.
+-- The quiz half is an ordinary custom_quiz, so grading, 課堂紀錄 and 下一步教學
+-- all work without knowing this feature exists.
+
+alter table public.questions
+  -- Whether the teacher asked to stretch the class: 0 stays inside the level,
+  -- 1 and 2 are i+1 and i+2. It is stored because the annotations depend on it
+  -- — which words counted as "not met yet" is a property of this dispatch.
+  add column if not exists level_stretch integer not null default 0
+  check (level_stretch between 0 and 2);
+
+create table if not exists public.reading_passages (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  title text null,
+  body text not null,
+  -- Where the passage came from, so the teacher can tell a generated passage
+  -- from one they pasted in.
+  source text not null default 'ai' check (source in ('ai', 'pasted', 'screenshot')),
+  -- [{ start, end, word, level, pos, gloss: { en, es, ... } }] — the words above
+  -- the class's ceiling, with the span they occupy in body so the student page
+  -- can colour them without searching the text and mismatching a repeat.
+  vocabulary jsonb not null default '[]'::jsonb,
+  -- [{ start, end, point, level, example, note: { en, es, ... } }] — TBCL
+  -- grammar points, named from the published list rather than invented.
+  grammar jsonb not null default '[]'::jsonb,
+  -- Set when the teacher also had it read aloud; the clip lives in
+  -- listening_clips like every other piece of speech in the app.
+  listening_clip_id uuid null references public.listening_clips(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists reading_passages_question_idx
+  on public.reading_passages (question_id);
+
+alter table public.reading_passages enable row level security;
+
+-- A passage is the lesson itself, so the class reads it as soon as it is
+-- dispatched — the same rule the screenshot follows.
+drop policy if exists "read dispatched passages" on public.reading_passages;
+create policy "read dispatched passages" on public.reading_passages for select to anon, authenticated using (
+  exists (
+    select 1 from public.questions
+    where questions.id = reading_passages.question_id
+      and questions.status in ('active', 'stopped', 'closed')
+  )
+);
+
+grant select on public.reading_passages to anon, authenticated;
+grant all on public.reading_passages to service_role;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'reading_passages'
+  ) then
+    alter publication supabase_realtime add table public.reading_passages;
+  end if;
+end $$;

@@ -7,6 +7,8 @@ import { ListeningPlayer } from '../components/ListeningPlayer'
 import { Hand } from '@phosphor-icons/react'
 import { useMyStanding } from '../lib/standings'
 import { ParticipantBoard } from '../components/ParticipantBoard'
+import { ReadingPassageView } from '../components/ReadingPassageView'
+import type { ReadingPassage as ReadingPassageRow } from '../types'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
 import { ParticipantTeachingContext } from '../components/ParticipantTeachingContext'
@@ -88,6 +90,8 @@ export function ParticipantPage() {
   const [handBusy, setHandBusy] = useState(false)
   // Keyed by question id, so it survives every reload and every new question.
   const [questionAnalyses, setQuestionAnalyses] = useState<Record<string, QuestionAnalysis>>({})
+  // The passage for whatever the class is on, when that question has one.
+  const [passage, setPassage] = useState<ReadingPassageRow | null>(null)
   const [boardQuestion, setBoardQuestion] = useState<Question | null>(null)
   const [boardImageUrl, setBoardImageUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -337,6 +341,19 @@ export function ParticipantPage() {
     } else {
       setBoardQuestion(null)
       setBoardImageUrl(null)
+    }
+
+    // A reading is the current question rather than something alongside it, so
+    // it is looked up from whatever the class is on — including when that
+    // question is a custom_quiz, because a reading with questions over it is
+    // still a reading and the passage has to be there to answer them from.
+    if (nextSession?.current_question_id) {
+      const { data: passageData } = await supabase
+        .from('reading_passages').select('*')
+        .eq('question_id', nextSession.current_question_id).maybeSingle()
+      setPassage((passageData || null) as ReadingPassageRow | null)
+    } else {
+      setPassage(null)
     }
   }, [locale, participantId, participantToken, sessionId])
 
@@ -954,6 +971,9 @@ export function ParticipantPage() {
       {/* Sits between the current question and the danmaku field: the board is
           somewhere the class goes back to, not something they are being asked
           right now, so it stays put while questions come and go above it. */}
+      {/* Above the question, because the question is about it. */}
+      {passage && <ReadingPassageView locale={locale} passage={passage} />}
+
       {boardQuestion && participant && participantToken && session && (
         <ParticipantBoard
           imageUrl={boardImageUrl}

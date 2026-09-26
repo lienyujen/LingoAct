@@ -10,6 +10,7 @@ import { QRCodePanel } from '../components/QRCodePanel'
 import { ExitTicketResult } from '../components/ExitTicketResult'
 import { LotteryOverlay } from '../components/LotteryOverlay'
 import { QuestionEditor } from '../components/QuestionEditor'
+import { ReadingModal } from '../components/ReadingModal'
 import { resolveTrack } from '../lib/teachingTracks'
 import { workspaceText } from '../lib/workspaceText'
 import { LessonPlan } from '../components/LessonPlan'
@@ -174,6 +175,7 @@ export function PresenterPage() {
   const [textDispatchOpen, setTextDispatchOpen] = useState(false)
   const [listeningOpen, setListeningOpen] = useState(false)
   const [pictureOpen, setPictureOpen] = useState(false)
+  const [readingOpen, setReadingOpen] = useState(false)
   const [pictureInitialMode, setPictureInitialMode] = useState<'spoken' | 'written' | 'ordering'>('spoken')
   const [sentenceWallOpen, setSentenceWallOpen] = useState(false)
   const [sentenceWallError, setSentenceWallError] = useState('')
@@ -2090,6 +2092,7 @@ export function PresenterPage() {
             setTextDispatchOpen(true)
           }}
           onOpenSettings={openPresenterSettings}
+          onOpenReading={() => { setPlannedActivity(null); setControlsOpen(false); setReadingOpen(true) }}
           onOpenRoster={() => void window.lingoActDesktop?.openRoster(sessionId)}
           onOpenWordCloud={openWordCloud}
           onToggleRecording={toggleCourseRecording}
@@ -2243,6 +2246,14 @@ export function PresenterPage() {
           )}
         </div>
       )}
+      <ReadingModal
+        open={readingOpen}
+        presenterToken={getPresenterToken(sessionId) || ''}
+        sessionId={sessionId}
+        onClose={() => setReadingOpen(false)}
+        onDispatched={() => { setReadingOpen(false); void loadAll() }}
+      />
+
       <QuestionEditor
         onGenerateInteraction={async (request) => {
           if (!captureFile) throw new Error(t('captureSendFailed'))

@@ -8139,3 +8139,50 @@ h2 {
   right: 8px;
   top: 8px;
 }
+
+/* 閱讀與測驗 的派送面板 */
+.reading-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 92vh;
+  overflow-y: auto;
+  width: min(560px, 94vw);
+}
+
+.reading-modal-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.reading-modal-head h2 {
+  flex: 1 1 auto;
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.reading-field {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 6px;
+}
+
+.reading-field textarea {
+  font-family: inherit;
+  resize: vertical;
+  width: 100%;
+}
+
+/* The accents only appear once the voice is asked for, so they sit indented
+   under it rather than floating beside the other rows. */
+.reading-accents {
+  margin-left: 28px;
+}
+
+.reading-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

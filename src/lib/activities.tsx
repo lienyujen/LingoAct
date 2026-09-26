@@ -1,5 +1,5 @@
 import {
-  ArrowsLeftRight, Camera, Cards, ChatCircleText, Headphones, Image,
+  ArrowsLeftRight, BookOpen, Camera, Cards, ChatCircleText, Headphones, Image,
   ListNumbers, Microphone, Notepad, Pen, PencilLine, SortAscending,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
@@ -14,7 +14,7 @@ export const SKILL_TABS: SkillTab[] = ['listen', 'speak', 'read', 'write']
 
 export type ActivityId =
   | 'listeningStudio' | 'flashcards' | 'pronunciation' | 'oralResponse'
-  | 'pictureTalk' | 'photoTask' | 'ordering' | 'matching'
+  | 'pictureTalk' | 'photoTask' | 'ordering' | 'matching' | 'reading'
   | 'storyOrdering' | 'sentenceWall' | 'writingCoach' | 'drawing'
 
 // An activity appears under a skill only when a teacher who came looking for
@@ -32,6 +32,10 @@ export type Activity = {
 }
 
 export const ACTIVITIES: Activity[] = [
+  // First under 讀, because a passage written for the class's own level is the
+  // thing a reading lesson is; also under 聽, because the same passage read
+  // aloud is a listening lesson without being a second activity.
+  { id: 'reading', label: 'readingActivity', Icon: BookOpen, skills: { read: 'core', listen: 'also' } },
   { id: 'listeningStudio', label: 'listeningStudio', Icon: Headphones, skills: { listen: 'core', speak: 'also' } },
   { id: 'flashcards', label: 'flashcards', Icon: Cards, skills: { listen: 'core', read: 'also' } },
   { id: 'pronunciation', label: 'typePronunciation', Icon: Microphone, skills: { speak: 'core', listen: 'also' } },

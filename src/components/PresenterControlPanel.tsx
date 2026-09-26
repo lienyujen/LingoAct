@@ -42,6 +42,7 @@ type Props = {
   onOpenPhotoTask: () => void
   onOpenTextDispatch: () => void
   onOpenFileTransfer: () => void
+  onOpenReading: () => void
   onOpenRoster: () => void
   onOpenWordCloud: () => void
   onOpenSettings: () => void
@@ -78,6 +79,7 @@ export function PresenterControlPanel({
   onOpenPhotoTask,
   onOpenTextDispatch,
   onOpenFileTransfer,
+  onOpenReading,
   onOpenRoster,
   onOpenWordCloud,
   onOpenSettings,
@@ -104,6 +106,7 @@ export function PresenterControlPanel({
     sentenceWall: onOpenSentenceWall,
     writingCoach: onCaptureWriting,
     drawing: onCaptureDrawing,
+    reading: onOpenReading,
   }
 
   return (

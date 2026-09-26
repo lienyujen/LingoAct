@@ -15,6 +15,7 @@ import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ReadingPassageView } from '../components/ReadingPassageView'
+import { ReadingModal } from '../components/ReadingModal'
 import { DanmakuTimeline } from '../components/DanmakuTimeline'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
@@ -72,6 +73,7 @@ export function Preview() {
   // The word cloud window's own layout, header and timeline and all: the page
   // is a column whose last child has to stretch, and the cloud draws nothing at
   // all if it does not.
+  if (location.hash === '#reading-send') return <ReadingModal open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView locale="en" passage={readingSample} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
@@ -102,7 +104,7 @@ export function Preview() {
             onToggleDanmaku={action} onToggleAnonymous={action} onCaptureScreen={action} onCaptureFlashcards={action} onCaptureWriting={action} onOpenPicture={action} onOpenPictureWriting={action}
             onCaptureOrdering={action} onCaptureMatching={action} onCapturePronunciation={action} onCaptureOral={action} onCaptureDrawing={action}
             onDrawLottery={action} onStartBuzzer={action} onOpenListeningStudio={action} onOpenSentenceWall={() => { setPrompt(''); setOpen(true) }} onOpenPhotoTask={action}
-            onOpenTextDispatch={action} onOpenFileTransfer={action} onOpenRoster={action} onOpenWordCloud={action} onOpenSettings={action}
+            onOpenTextDispatch={action} onOpenFileTransfer={action} onOpenReading={action} onOpenRoster={action} onOpenWordCloud={action} onOpenSettings={action}
             onToggleRecording={action} onToggleCaptionVisibility={action} onGenerateExitTicket={action} onLowerHands={action} onEndClass={action} />
           <div className="panel"><LessonPlan courseName="介面預覽" onStart={(item) => { if (item.kind === 'sentence') { setPrompt(item.prompt); setOpen(true) } else action() }} /></div>
         </> : <p className="panel muted">{view === '目前活動' ? '還沒有活動。選一個練習，讓學生開始。' : '完成的活動會留在這裡，方便回看學生的表達。'}</p>}

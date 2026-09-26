@@ -2664,6 +2664,25 @@ Deno.serve(async (req) => {
     // Calling off a round nobody buzzed on. Without this the only way past the
     // overlay is to start another one, which is not a thing a teacher wants to
     // do in front of a class that has moved on.
+    // The clip can only be made once the passage exists, so it is linked
+    // afterwards rather than passed in: the class hears the text they were
+    // actually given, not the source it was written from.
+    if (action === 'attach_reading_audio') {
+      const questionId = typeof input.questionId === 'string' ? input.questionId : ''
+      const clipId = typeof input.clipId === 'string' ? input.clipId : ''
+      if (!validUuid(questionId) || !validUuid(clipId)) return jsonResponse({ message: '資料格式不正確。' }, 400)
+
+      const { error: passageError } = await supabase.from('reading_passages')
+        .update({ listening_clip_id: clipId }).eq('question_id', questionId).eq('session_id', sessionId)
+      if (passageError) throw passageError
+
+      const { error: questionError } = await supabase.from('questions')
+        .update({ listening_clip_id: clipId }).eq('id', questionId).eq('session_id', sessionId)
+      if (questionError) throw questionError
+
+      return jsonResponse({ ok: true })
+    }
+
     // 閱讀與測驗. The passage is written first and returned, because a teacher
     // wants to read it before the class does; the quiz over it, if asked for,
     // is built in the background the way every other generated quiz is.

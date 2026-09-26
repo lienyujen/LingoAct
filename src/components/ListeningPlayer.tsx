@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Gauge, Headphones, Play } from '@phosphor-icons/react'
+import { Gauge, Headphones, Pause, Play } from '@phosphor-icons/react'
 import { participantText } from '../lib/participantI18n'
 import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -37,6 +37,9 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
   const [showTranscript, setShowTranscript] = useState(false)
   const [plainText, setPlainText] = useState(false)
   const [activeCue, setActiveCue] = useState(-1)
+  // Stopped part-way rather than finished. Kept apart from 'not playing' so the
+  // highlight stays where the voice left off instead of snapping back.
+  const [held, setHeld] = useState(false)
 
   // A different question means a different allowance, and the component is
   // reused in place when the teacher moves on.
@@ -47,6 +50,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
     setShowTranscript(false)
     setPlainText(false)
     setActiveCue(-1)
+    setHeld(false)
   }, [questionId])
 
   useEffect(() => {
@@ -66,7 +70,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
     return () => cancelAnimationFrame(frame)
   }, [karaokeCues, playing])
 
-  useEffect(() => { onActiveCue?.(playing ? activeCue : -1) }, [activeCue, onActiveCue, playing])
+  useEffect(() => { onActiveCue?.(playing || held ? activeCue : -1) }, [activeCue, held, onActiveCue, playing])
 
   const exhausted = replayLimit !== null && used >= replayLimit
   const remaining = replayLimit === null ? null : Math.max(replayLimit - used, 0)
@@ -80,8 +84,36 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
     audio.playbackRate = slow ? SLOW_RATE : 1
     void audio.play().then(() => {
       setPlaying(true)
+      setHeld(false)
       setUsed(recordPlay(questionId))
     }).catch(() => setFailed(true))
+  }
+
+  // Stopping and carrying on is only safe where there is nothing to spend. With
+  // an allowance, a play that can be held is an unlimited one — stop before
+  // each sentence and the count never moves — which is why start() always goes
+  // back to the beginning. A passage has no allowance, so it can behave like a
+  // piece of audio rather than like a test.
+  const canHold = replayLimit === null
+
+  function toggle() {
+    const audio = audioRef.current
+    if (!audio || failed || exhausted) return
+    if (!canHold) { start(); return }
+    if (playing) {
+      audio.pause()
+      setPlaying(false)
+      setHeld(true)
+      return
+    }
+    if (held) {
+      audio.playbackRate = slow ? SLOW_RATE : 1
+      // Not counted: carrying on is the same play, and recording it again would
+      // make a student who paused look like one who listened twice.
+      void audio.play().then(() => { setPlaying(true); setHeld(false) }).catch(() => setFailed(true))
+      return
+    }
+    start()
   }
 
   // Every hook has run by here, so the early return is safe. What it drops is
@@ -93,24 +125,26 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
         ref={audioRef}
         preload="auto"
         src={clip.public_url}
-        onEnded={() => { setPlaying(false); setActiveCue(-1) }}
+        onEnded={() => { setPlaying(false); setHeld(false); setActiveCue(-1) }}
         onError={() => setFailed(true)}
       />
       <button
         className={`reading-toggle${failed || exhausted ? '' : ' is-on'}`}
-        disabled={exhausted || playing || failed}
+        disabled={exhausted || failed || (playing && !canHold)}
         title={failed ? participantText(locale, 'listeningFailed') : undefined}
         type="button"
-        onClick={start}
+        onClick={toggle}
       >
-        <Play size={15} />
+        {playing && canHold ? <Pause size={15} /> : <Play size={15} />}
         {participantText(locale, failed
           ? 'listeningAudioBroken'
           : exhausted
             ? 'listeningNoPlaysLeft'
             : playing
-              ? 'listeningPlaying'
-              : used > 0 ? 'listeningReplay' : 'listeningPlay')}
+              ? canHold ? 'listeningPause' : 'listeningPlaying'
+              : held
+                ? 'listeningResume'
+                : used > 0 ? 'listeningReplay' : 'listeningPlay')}
       </button>
       <button
         aria-pressed={slow}

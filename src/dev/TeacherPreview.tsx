@@ -77,9 +77,7 @@ export function Preview() {
   if (location.hash === '#reading-send') return <ReadingModal open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   // The same panel reached by capturing rather than pasting.
   if (location.hash === '#reading-shot') return <ReadingModal capture={sampleCapture()} open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
-  // The voice part-way through the second phrase, which runs straight into a
-  // marked word — the case where the highlight and the 生詞 colour meet.
-  if (location.hash === '#reading-ktv') return <main className="participant-page"><ReadingPassageView activeCue={1} cues={previewCues} locale="zh-TW" passage={readingSample} player={previewPlayer()} /></main>
+  if (location.hash === '#reading-ktv') return <ReadingKaraokePreview />
   if (location.hash === '#reading-locked') return <main className="participant-page"><ReadingPassageView locale="zh-TW" locked passage={readingSample} /></main>
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
@@ -149,12 +147,31 @@ const readingSample = {
 
 // The audio half of the passage row. Nothing is actually played; what is being
 // looked at is whether two buttons sit in line with the switches.
+const previewClip = {
+  id: 'c', session_id: 'preview', kind: 'passage' as const, language: 'zh-tw',
+  duration_ms: 4000, public_url: '', created_at: '',
+}
+
 function previewPlayer() {
-  const clip = {
-    id: 'c', session_id: 'preview', kind: 'passage' as const, language: 'zh-tw',
-    duration_ms: 1000, public_url: '', created_at: '',
-  }
-  return <ListeningPlayer clip={clip} locale="zh-TW" questionId="q" replayLimit={null} variant="inline" />
+  return <ListeningPlayer clip={previewClip} locale="zh-TW" questionId="q" replayLimit={null} variant="inline" />
+}
+
+// The student page holds the cue between the two of them, so the preview has to
+// as well — otherwise what gets looked at is a hard-coded highlight rather than
+// the player driving the passage.
+function ReadingKaraokePreview() {
+  const [cue, setCue] = useState(-1)
+  return (
+    <main className="participant-page">
+      <ReadingPassageView
+        activeCue={cue}
+        cues={previewCues}
+        locale="zh-TW"
+        passage={readingSample}
+        player={<ListeningPlayer clip={previewClip} locale="zh-TW" questionId="q" replayLimit={null} variant="inline" karaokeCues={previewCues} onActiveCue={setCue} />}
+      />
+    </main>
+  )
 }
 
 const previewCues = [

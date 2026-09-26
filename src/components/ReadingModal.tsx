@@ -22,6 +22,45 @@ type Props = {
 
 type Accent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
 
+// What the teacher chose last time. A reading dispatch has seven switches on it
+// and a teacher uses the same six of them every lesson; making them tick the
+// same boxes each time is the cost of offering the choice at all. Kept on this
+// computer beside the class lists, not in the session: it is how this teacher
+// works, not a property of one afternoon.
+//
+// The source material is deliberately not remembered — that is the one thing
+// that is different every time.
+const SETTINGS_KEY = 'lingoact:reading-settings'
+
+type Remembered = {
+  stretch: number
+  withQuiz: boolean
+  quizCount: number
+  focus: string[]
+  withAudio: boolean
+  accent: Accent
+  useImage: boolean
+  shareShot: boolean
+  verbatim: boolean
+}
+
+function readSettings(): Partial<Remembered> {
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY)
+    return raw ? JSON.parse(raw) as Partial<Remembered> : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeSettings(settings: Remembered) {
+  try {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+  } catch {
+    // Choosing again next time is a small price; failing to dispatch is not.
+  }
+}
+
 // The four reading abilities, in the order they get harder.
 const FOCUS = [
   ['retrieve', 'readingRetrieve'],
@@ -64,16 +103,18 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
   useEffect(() => {
     if (!open) return
+    const saved = readSettings()
     setSourceText('')
     setDirection('')
-    setStretch(0)
-    setWithQuiz(true)
-    setQuizCount(5)
-    setFocus(FOCUS.map(([key]) => key))
-    setWithAudio(false)
-    setShareShot(false)
-    setUseImage(true)
-    setVerbatim(false)
+    setStretch(saved.stretch ?? 0)
+    setWithQuiz(saved.withQuiz ?? true)
+    setQuizCount(saved.quizCount ?? 5)
+    setFocus(saved.focus?.length ? saved.focus : FOCUS.map(([key]) => key))
+    setWithAudio(saved.withAudio ?? false)
+    setAccent(saved.accent ?? 'standard_guoyu')
+    setShareShot(saved.shareShot ?? false)
+    setUseImage(saved.useImage ?? true)
+    setVerbatim(saved.verbatim ?? false)
     setError('')
     setPassage(null)
   }, [open])
@@ -174,6 +215,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           })
         }
       }
+      writeSettings({ stretch, withQuiz, quizCount, focus, withAudio, accent, useImage, shareShot, verbatim })
       onDispatched()
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : t('readingFailed'))

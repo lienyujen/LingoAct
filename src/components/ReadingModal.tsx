@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, SpeakerHigh, X } from '@phosphor-icons/react'
 import { requireSupabase } from '../lib/supabase'
+import { annotateReading, applyReadingAnnotation } from '../lib/listening'
+import type { AnnotationMode } from '../lib/listening'
 import { edgeFunctionErrorMessage } from '../lib/edgeError'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { ReadingPassage } from '../types'
@@ -16,6 +18,9 @@ type Props = {
   // pasting. Its text is read off the image by the same call that writes the
   // passage, so nothing is transcribed twice.
   screenshotId?: string | null
+  // 注音 or 拼音, from the class settings. Which system a class reads in is a
+  // property of the class, not of one activity, so it is not asked again here.
+  annotation?: AnnotationMode
   onClose: () => void
   onDispatched: () => void
 }
@@ -69,7 +74,7 @@ const FOCUS = [
   ['evaluate', 'readingEvaluate'],
 ] as const
 
-export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, onClose, onDispatched }: Props) {
+export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', onClose, onDispatched }: Props) {
   const t = usePresenterText()
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
@@ -221,6 +226,25 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
         })
         if (attachError) throw new Error(await edgeFunctionErrorMessage(attachError, t('readingAudioFailed')))
       }
+      // 標音 last, because it is the one step the passage can do without: a
+      // reading with no readings above it is still the lesson, so this reports
+      // what went wrong and leaves the activity standing.
+      if (written?.body && (annotation === 'zhuyin' || annotation === 'pinyin')) {
+        setStatus(t('readingAnnotating'))
+        try {
+          const marked = await annotateReading({ sessionId, presenterToken, text: written.body, mode: annotation, accent })
+          await applyReadingAnnotation({
+            sessionId,
+            presenterToken,
+            questionId: written.question_id,
+            mode: annotation,
+            annotationText: marked.annotationText,
+          }, t)
+        } catch (caught) {
+          setError(caught instanceof Error && caught.message ? t('readingAnnotateFailedWith', { message: caught.message }) : t('readingAnnotateFailed'))
+        }
+      }
+
       writeSettings({ stretch, withQuiz, quizCount, focus, withAudio, accent, useImage, shareShot, verbatim })
       onDispatched()
     } catch (caught) {

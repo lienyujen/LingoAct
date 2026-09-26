@@ -2723,6 +2723,52 @@ Deno.serve(async (req) => {
     // The clip can only be made once the passage exists, so it is linked
     // afterwards rather than passed in: the class hears the text they were
     // actually given, not the source it was written from.
+    // The readings over a passage. Same two shapes as a listening clip's, and
+    // put on afterwards for the same reason: the passage has to exist before
+    // there is anything to annotate, and a failed annotation must not take the
+    // reading down with it.
+    if (action === 'set_reading_annotation') {
+      const questionId = typeof input.questionId === 'string' ? input.questionId : ''
+      const annotation = ['none', 'zhuyin', 'pinyin'].includes(input.annotation) ? input.annotation : 'none'
+      const annotationText = typeof input.annotationText === 'string' ? input.annotationText : ''
+      const fontBase64 = typeof input.fontBase64 === 'string' ? input.fontBase64 : ''
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料不正確。' }, 400)
+      if (annotation === 'zhuyin' && !fontBase64) {
+        return jsonResponse({ message: '注音標記需要一併提供字型子集。' }, 400)
+      }
+
+      const { data: passageRow } = await supabase.from('reading_passages')
+        .select('id').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (!passageRow) return jsonResponse({ message: '找不到這篇文章。' }, 404)
+
+      let fontUrl: string | null = null
+      if (annotation === 'zhuyin') {
+        const bytes = Uint8Array.from(atob(fontBase64), (character) => character.charCodeAt(0))
+        if (bytes.length > 2 * 1024 * 1024) {
+          return jsonResponse({ message: '字型子集過大，請縮短文章。' }, 413)
+        }
+        const fontPath = `${sessionId}/reading-${questionId}.woff2`
+        const { error: uploadError } = await supabase.storage
+          .from('lingoact-listening')
+          .upload(fontPath, bytes, { contentType: 'font/woff2', upsert: true })
+        if (uploadError) throw uploadError
+        const { data: publicUrl } = supabase.storage.from('lingoact-listening').getPublicUrl(fontPath)
+        fontUrl = publicUrl.publicUrl
+      }
+
+      const { data: updated, error: updateError } = await supabase.from('reading_passages')
+        .update({
+          annotation,
+          annotation_text: annotation === 'none' ? null : annotationText,
+          font_url: fontUrl,
+        })
+        .eq('id', passageRow.id)
+        .select('*')
+        .single()
+      if (updateError) throw updateError
+      return jsonResponse({ passage: updated })
+    }
+
     if (action === 'attach_reading_audio') {
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
       const clipId = typeof input.clipId === 'string' ? input.clipId : ''

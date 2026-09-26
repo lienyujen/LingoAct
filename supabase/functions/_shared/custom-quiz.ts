@@ -676,15 +676,24 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         // so the wrong-order feedback says only that, and the teacher shows the
         // sequence as pictures.
         const pictures = Array.isArray(item.option_images) && item.option_images.length > 0
-        feedbackZhTw = correct ? '順序正確。' : pictures || quiz.interaction_mode ? '順序不對，等老師公布正確答案。' : `順序不對，正確順序：${expected.join(' → ')}`
-        feedbackEn = correct ? 'Correct order.' : pictures || quiz.interaction_mode ? 'Not quite — wait for the teacher to reveal the answer.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
+        const hideKey = pictures || quiz.interaction_mode
+        feedbackZhTw = correct
+          ? (hideKey ? '順序正確。' : `順序正確：${expected.join(' → ')}`)
+          : hideKey ? '順序不對，等老師公布正確答案。' : `順序不對，正確順序：${expected.join(' → ')}`
+        feedbackEn = correct
+          ? (hideKey ? 'Correct order.' : `Correct order: ${expected.join(' → ')}`)
+          : hideKey ? 'Not quite — wait for the teacher to reveal the answer.' : `Wrong order. Correct sequence: ${expected.join(' → ')}`
       } else if (item.type === 'multiple_choice') {
         const expected = [...new Set(key.accepted_answers || [])].sort()
         const submitted = [...new Set(answer.answer_values || [])].sort()
         const correct = expected.length === submitted.length && expected.every((value, index) => value === submitted[index])
         score = correct ? item.points : 0
-        feedbackZhTw = correct ? '回答正確。' : `回答錯誤，正確答案：${expected.join('、')}`
-        feedbackEn = correct ? 'Correct.' : `Incorrect. Correct answer: ${expected.join(', ')}`
+        feedbackZhTw = correct
+          ? `回答正確。正確答案：${expected.join('、')}`
+          : `回答錯誤，正確答案：${expected.join('、')}`
+        feedbackEn = correct
+          ? `Correct. Answer: ${expected.join(', ')}`
+          : `Incorrect. Correct answer: ${expected.join(', ')}`
       } else {
         if (!evaluation) throw new Error('AI grading result is incomplete.')
         score = Math.max(0, Math.min(item.points, Number(evaluation.score) || 0))

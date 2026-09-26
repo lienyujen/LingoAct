@@ -452,6 +452,9 @@ export function ParticipantPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      // The readings and the audio are put on the passage a few seconds after
+      // it is dispatched, so a student already looking at it has to be told.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reading_passages', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
@@ -951,12 +954,40 @@ export function ParticipantPage() {
       {/* The passage and its picture come before the questions, because the
           questions are about them — and a student scrolling past the questions
           to find the text is being asked to answer from memory. */}
-      {passage && <ReadingPassageView imageUrl={passageImageUrl} locale={locale} passage={passage} />}
+      {passage && (
+        <ReadingPassageView
+          imageUrl={passageImageUrl}
+          locale={locale}
+          // Under an unfinished quiz the glosses are the answer key, so they
+          // wait. 'submitted' and 'failed' are both ends of the line — nothing
+          // more is coming — and a stopped question is over for everyone.
+          locked={question?.type === 'custom_quiz'
+            && question.status === 'active'
+            && quizData?.attempt?.status !== 'graded'
+            && quizData?.attempt?.status !== 'submitted'
+            && quizData?.attempt?.status !== 'failed'}
+          passage={passage}
+          // The same passage, read aloud. It belongs in the reader rather than
+          // above it, beside the switches that also act on this one text.
+          player={listeningClip && question ? (
+            <ListeningPlayer
+              clip={listeningClip}
+              karaokeCues={question.karaoke_cues}
+              locale={locale}
+              questionId={question.id}
+              readingFontUrl={question.reading_font_url}
+              readingRuby={question.reading_ruby}
+              replayLimit={question.replay_limit}
+              variant="model"
+            />
+          ) : null}
+        />
+      )}
 
       {screenshot && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
-      {listeningClip && question && (
+      {listeningClip && question && !passage && (
         <ListeningPlayer
           clip={listeningClip}
           questionId={question.id}

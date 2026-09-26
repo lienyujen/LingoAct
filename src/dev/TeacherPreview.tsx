@@ -76,7 +76,8 @@ export function Preview() {
   if (location.hash === '#reading-send') return <ReadingModal open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   // The same panel reached by capturing rather than pasting.
   if (location.hash === '#reading-shot') return <ReadingModal capture={sampleCapture()} open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
-  if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView locale="en" passage={readingSample} /></main>
+  if (location.hash === '#reading-locked') return <main className="participant-page"><ReadingPassageView locale="zh-TW" locked passage={readingSample} /></main>
+  if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
@@ -122,6 +123,10 @@ export function Preview() {
 const readingSample = {
   id: 'p', session_id: 'preview', question_id: 'q', created_at: '',
   source: 'ai' as const, listening_clip_id: null,
+  // 拼音, so the 標音 switch has something to show. 注音 cannot be previewed:
+  // its readings live in a font subset cut on the teacher's machine.
+  annotation: 'pinyin' as const,
+  annotation_text: "[\"xīng\",\"qí\",\"liù\",\"zǎo\",\"shàng\",\"\",\"wǒ\",\"gēn\",\"xiǎo\",\"míng\",\"qù\",\"le\",\"xué\",\"xiào\",\"fù\",\"jìn\",\"de\",\"shì\",\"chǎng\",\"\",\"\",\"\",\"shì\",\"chǎng\",\"lǐ\",\"yǒu\",\"hěn\",\"duō\",\"rén\",\"\",\"suī\",\"rán\",\"rén\",\"hěn\",\"duō\",\"\",\"dàn\",\"shì\",\"dà\",\"jiā\",\"dōu\",\"hěn\",\"yǒu\",\"lǐ\",\"mào\",\"\",\"wǒ\",\"men\",\"mǎi\",\"le\",\"shuǐ\",\"guǒ\",\"hàn\",\"qīng\",\"cài\",\"\",\"yě\",\"hē\",\"le\",\"yì\",\"bēi\",\"dòu\",\"jiāng\",\"\",\"\",\"\",\"lǎo\",\"bǎn\",\"shuō\",\"\",\"zhè\",\"ge\",\"shì\",\"chǎng\",\"yǐ\",\"jīng\",\"kāi\",\"le\",\"sān\",\"shí\",\"nián\",\"le\",\"\",\"yīn\",\"wèi\",\"dōng\",\"xī\",\"xīn\",\"xiān\",\"\",\"suǒ\",\"yǐ\",\"fù\",\"jìn\",\"de\",\"rén\",\"dōu\",\"lái\",\"zhè\",\"lǐ\",\"mǎi\",\"cài\",\"\"]",
   title: '週末的市場',
   body: "星期六早上，我跟小明去了學校附近的市場。\n\n市場裡有很多人。雖然人很多，但是大家都很有禮貌。我們買了水果和青菜，也喝了一杯豆漿。\n\n老闆說，這個市場已經開了三十年了。因為東西新鮮，所以附近的人都來這裡買菜。",
   vocabulary: [

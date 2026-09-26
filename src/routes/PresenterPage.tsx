@@ -39,6 +39,7 @@ import { composeSentenceWall, dispatchTextFor, openSentenceWall } from '../lib/s
 import type { SentenceWallComposition } from '../lib/sentenceWall'
 import { FileTransferModal } from '../components/FileTransferModal'
 import { finalizeLottery } from '../lib/lottery'
+import { classAnnotation } from '../lib/listening'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { endManagedSession } from '../lib/presenterSessions'
 import { isBuzzerPending } from '../lib/buzzer'
@@ -2240,6 +2241,7 @@ export function PresenterPage() {
         </div>
       )}
       <ReadingModal
+        annotation={classAnnotation(session)}
         capture={readingCapture}
         open={readingOpen}
         presenterToken={getPresenterToken(sessionId) || ''}

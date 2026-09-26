@@ -1,3 +1,4 @@
+import { resolveTrack } from './teachingTracks'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
@@ -138,6 +139,18 @@ export async function dispatchListeningQuiz(input: {
 
 export type AnnotationMode = 'none' | 'zhuyin' | 'pinyin'
 
+// Which reading system this class uses, if any. A track that is not Chinese has
+// no 注音 or 拼音 to put over anything, whatever the stored setting says.
+export function classAnnotation(
+  session: { reading_annotation?: string | null; teaching_language?: string | null } | null | undefined,
+): AnnotationMode {
+  if (!session) return 'none'
+  if (!resolveTrack(session.teaching_language).language.startsWith('zh')) return 'none'
+  return session.reading_annotation === 'zhuyin' || session.reading_annotation === 'pinyin'
+    ? session.reading_annotation
+    : 'none'
+}
+
 // Works out how each character should be read. For zhuyin the answer comes back
 // as the transcript with variation selectors woven in; for pinyin, as a JSON
 // array of syllables aligned one-to-one with the characters.
@@ -185,6 +198,40 @@ export async function applyAnnotation(input: {
   })
   if (error) throw error
   return (data as { clip: PresenterListeningClip }).clip
+}
+
+// The same two steps for a reading passage. It is not a clip — a passage
+// exists whether or not anyone had it read aloud — so it has its own row to
+// write to, but the shapes and the font subsetting are identical.
+export async function applyReadingAnnotation(input: {
+  sessionId: string
+  presenterToken: string
+  questionId: string
+  mode: Exclude<AnnotationMode, 'none'>
+  annotationText: string
+}, t: PresenterT = presenterLookup('zh-TW')) {
+  let fontBase64 = ''
+  if (input.mode === 'zhuyin') {
+    const subset = window.lingoActDesktop?.subsetBopomofoFont
+    if (!subset) throw new Error(t('desktopOnlySubset'))
+    const result = await subset(input.annotationText)
+    if (!result.ok) throw new Error(result.message)
+    fontBase64 = result.woff2
+  }
+
+  const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+    body: {
+      action: 'set_reading_annotation',
+      sessionId: input.sessionId,
+      presenterToken: input.presenterToken,
+      questionId: input.questionId,
+      annotation: input.mode,
+      annotationText: input.annotationText,
+      fontBase64,
+    },
+  })
+  if (error) throw error
+  return data
 }
 
 export async function fetchListeningClip(clipId: string) {

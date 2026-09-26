@@ -230,7 +230,11 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "timeUp": "時間切れ",
     "answerTimeLeft": "残り時間",
     "answerClosed": "回答を締め切りました",
-    "recordAgain": "もう一度録音"
+    "recordAgain": "もう一度録音",
+    "readingWords": "新出単語",
+    "readingGrammar": "文法",
+    "readingRuby": "ふりがな",
+    "readingLocked": "問題を解き終えると、単語と文法が見られます。"
   },
   "ko": {
     "language": "언어",
@@ -457,7 +461,11 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "timeUp": "시간 종료",
     "answerTimeLeft": "남은 시간",
     "answerClosed": "응답이 마감되었습니다",
-    "recordAgain": "다시 녹음"
+    "recordAgain": "다시 녹음",
+    "readingWords": "새 단어",
+    "readingGrammar": "문법",
+    "readingRuby": "발음 표기",
+    "readingLocked": "문제를 다 풀면 새 단어와 문법을 볼 수 있어요."
   },
   "es": {
     "language": "Idioma",
@@ -755,9 +763,11 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "flashcardPrevious": "Tarjeta anterior",
     "flashcardCardCount": "Tarjeta {current} de {total}",
     "readingTitle": "Lectura",
-    "readingGrammarOn": "Notas de gramática: sí",
-    "readingGrammarOff": "Notas de gramática: no",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "readingWords": "Palabras nuevas",
+    "readingGrammar": "Gramática",
+    "readingRuby": "Pronunciación",
+    "readingLocked": "Las palabras nuevas y la gramática se activan al terminar las preguntas."
   },
   "fr": {
     "language": "Langue",
@@ -984,7 +994,11 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "timeUp": "Temps écoulé",
     "answerTimeLeft": "Temps restant",
     "answerClosed": "Réponses closes",
-    "recordAgain": "Réenregistrer"
+    "recordAgain": "Réenregistrer",
+    "readingWords": "Mots nouveaux",
+    "readingGrammar": "Grammaire",
+    "readingRuby": "Prononciation",
+    "readingLocked": "Les mots nouveaux et la grammaire s’affichent une fois les questions terminées."
   },
   "de": {
     "language": "Sprache",
@@ -1211,7 +1225,11 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "timeUp": "Zeit ist um",
     "answerTimeLeft": "Verbleibende Zeit",
     "answerClosed": "Antwortzeit abgelaufen",
-    "recordAgain": "Erneut aufnehmen"
+    "recordAgain": "Erneut aufnehmen",
+    "readingWords": "Neue Wörter",
+    "readingGrammar": "Grammatik",
+    "readingRuby": "Aussprache",
+    "readingLocked": "Neue Wörter und Grammatik erscheinen, sobald du die Fragen beendet hast."
   },
   "vi": {
     "language": "Ngôn ngữ",
@@ -1438,6 +1456,10 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "timeUp": "Hết giờ",
     "answerTimeLeft": "Thời gian còn lại",
     "answerClosed": "Đã kết thúc nhận câu trả lời",
-    "recordAgain": "Ghi âm lại"
+    "recordAgain": "Ghi âm lại",
+    "readingWords": "Từ mới",
+    "readingGrammar": "Ngữ pháp",
+    "readingRuby": "Phiên âm",
+    "readingLocked": "Làm xong các câu hỏi rồi mới xem được từ mới và ngữ pháp."
   }
 }

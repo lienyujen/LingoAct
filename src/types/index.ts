@@ -707,5 +707,11 @@ export type ReadingPassage = {
   vocabulary: ReadingVocabulary[]
   grammar: ReadingGrammar[]
   listening_clip_id: string | null
+  // 注音 / 拼音 over this passage, in whichever system the class is set to.
+  // zhuyin is the body with the readings set into the glyphs and needs
+  // font_url; pinyin is a JSON array of syllables, one per character.
+  annotation?: 'none' | 'zhuyin' | 'pinyin'
+  annotation_text?: string | null
+  font_url?: string | null
   created_at: string
 }

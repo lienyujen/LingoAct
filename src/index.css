@@ -8033,21 +8033,6 @@ h2 {
   margin: 0;
 }
 
-.reading-grammar-toggle {
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 13px;
-  padding: 5px 12px;
-}
-
-.reading-grammar-toggle.is-on {
-  background: var(--share-soft);
-  border-color: rgb(31 107 116 / 28%);
-  color: var(--share-dark);
-}
-
 .reading-passage-body {
   font-size: 19px;
   line-height: 2.1;
@@ -8261,4 +8246,72 @@ h2 {
   color: var(--text);
   padding: 0 2px;
   text-decoration-color: #2f6b52;
+}
+
+/* One row of switches for the passage, with the player on the end. Wraps on a
+   phone rather than squeezing, because these are finger targets. */
+.reading-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reading-toggle {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+.reading-toggle.is-on {
+  background: var(--primary-soft);
+  border-color: rgb(123 45 94 / 28%);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* The player is a guest in this row: it brings its own card styling for the
+   listening page, which would make the row twice as tall here. */
+.reading-tools .listening-player {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Waiting on the quiz. Still a switch, still in its place, so a student can see
+   that these come back — the note beneath says when. */
+.reading-toggle:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.reading-locked-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+/* 拼音 sits above the line, so the passage needs the room for it. How the
+   syllables look is set once, by .reading-ruby, which this carries; what
+   changes here is the room they get. A passage is set smaller than the single
+   sentence that rule was written for, so .42em of it comes out at eight pixels
+   — too small to read at the point in the lesson where it matters most. */
+.reading-passage-body.is-ruby {
+  line-height: 2.7;
+}
+
+.reading-passage-body.is-ruby rt {
+  font-size: .56em;
+}
+
+/* 注音 is cut into the glyphs, which are drawn with the reading to the right of
+   the character. They need the width. */
+.reading-passage-body.is-annotated {
+  letter-spacing: 0.06em;
+  line-height: 2.3;
 }

@@ -1,6 +1,7 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
-import { levelCeiling, stemLength, stemLengthComplaint } from './proficiency.ts'
+import { levelCeiling, stemLength, stemLengthComplaint, tbclLevelOf } from './proficiency.ts'
+import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
 
 type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing' | 'flashcard'
 type ItemType = Exclude<RequestedType, 'random' | 'writing' | 'flashcard'>
@@ -255,6 +256,9 @@ export async function generateCustomQuiz(input: {
   // the call site, where the session row is.
   levelFramework?: string | null
   levelCode?: string | null
+  // i+1 / i+2. The teacher's decision to stretch the class on purpose, which is
+  // not the same as the generator drifting above them by accident.
+  levelStretch?: number
 }) {
   if (!input.sourceUrl && !input.sourceText) throw new Error('No quiz source was supplied.')
   const apiKey = Deno.env.get('GEMINI_API_KEY')
@@ -389,15 +393,48 @@ ${input.sourceText}` }] : []),
       .filter((entry): entry is { index: number; length: number } => entry !== null)
   }
 
+  // Every word the class will actually read, gathered so the benchmark can be
+  // applied to the whole item and not only to the stem: an option or an answer
+  // above the level is just as unreadable as a stem above it.
+  const allText = (candidate: { items?: unknown }) => {
+    if (!Array.isArray(candidate.items)) return ''
+    return candidate.items.flatMap((raw) => {
+      const item = raw as Record<string, unknown>
+      const parts: unknown[] = [item.prompt_text]
+      for (const key of ['options', 'accepted_answers']) {
+        const list = item[key]
+        if (Array.isArray(list)) parts.push(...list)
+      }
+      return parts.filter((part): part is string => typeof part === 'string')
+    }).join('\n')
+  }
+
+  // 0 for a class on a ladder 國教院’s tables do not govern: an English or
+  // Japanese course is not checked against a Chinese word list.
+  const tbcl = tbclLevelOf(input.levelFramework ?? null, input.levelCode ?? null)
+  const vocabularyCeiling = tbcl ? ceilingFor(tbcl, input.levelStretch ?? 0) : 0
+
+  const overLevel = (candidate: { items?: unknown }) => (
+    vocabularyCeiling ? overLevelWords(allText(candidate), vocabularyCeiling) : []
+  )
+
   let output = await generate()
   const offenders = overLength(output)
-  if (offenders.length) {
-    console.warn(`Quiz stems over the ${ceiling?.label} limit on the first attempt: ${offenders.map((o) => `#${o.index + 1}=${o.length}`).join(' ')}`)
+  const above = overLevel(output)
+  if (offenders.length || above.length) {
+    if (offenders.length) console.warn(`Quiz stems over the ${ceiling?.label} limit on the first attempt: ${offenders.map((o) => `#${o.index + 1}=${o.length}`).join(' ')}`)
+    if (above.length) console.warn(`Words above ${ceiling?.label}: ${above.slice(0, 12).map((entry) => entry.word).join(' ')}`)
     try {
-      const retried = await generate(stemLengthComplaint(input.levelFramework ?? null, input.levelCode ?? null, offenders))
-      // Kept only if it is actually better. A second attempt that comes back
-      // worse is a worse quiz, not a fresher one.
-      if (overLength(retried).length < offenders.length) output = retried
+      const complaint = [
+        offenders.length ? stemLengthComplaint(input.levelFramework ?? null, input.levelCode ?? null, offenders) : '',
+        above.length ? overLevelComplaint(above, ceiling?.label || `TBCL ${vocabularyCeiling}`, vocabularyCeiling) : '',
+      ].filter(Boolean).join('\n\n')
+      const retried = await generate(complaint)
+      // Kept only if it is actually better on both counts together. A second
+      // attempt that fixes the length by reaching for harder words is not an
+      // improvement, and neither is the reverse.
+      const before = offenders.length + above.length
+      if (overLength(retried).length + overLevel(retried).length < before) output = retried
     } catch (error) {
       // The first attempt is a usable quiz; losing it over a length limit would
       // leave the class with nothing at all.

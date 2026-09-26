@@ -28,6 +28,12 @@ export type Level = {
   // character-based frameworks, words for the rest. A ceiling in prose is a
   // request; this is checked after generation and sent back if it is broken.
   maxStem: number
+  // Which TBCL level this is, for the frameworks 國教院's word and character
+  // tables actually govern. Present for TBCL itself and for TOCFL, which is
+  // aligned with it level for level; absent everywhere else, because there is
+  // no published Chinese word list behind 多益 or JLPT and pretending otherwise
+  // would check English against a Chinese benchmark.
+  tbcl?: number
 }
 
 // 素養導向: what the 108 curriculum asks an item to BE, not merely how hard it
@@ -193,31 +199,31 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
     unit: 'char',
     levels: [
       {
-        code: '1', label: 'TBCL 第1級（基礎）', band: 0, maxStem: 12,
+        code: '1', tbcl: 1, label: 'TBCL 第1級（基礎）', band: 0, maxStem: 12,
         ceiling: 'The first weeks of Chinese, a few hundred words. Topics: greetings, one\'s own name and country, numbers, family, food and drink, classroom objects, days and times, prices. Sentences of about five to ten characters, one clause, no subordination. Verbs limited to 是, 有, 在, 叫, 姓, 去, 來, 吃, 喝, 看, 買 and the like. Questions with 嗎, 什麼, 誰, 幾, 哪裡. No 把 or 被, no 雖然…但是, no 因為…所以, no abstract nouns at all — nothing ending in 化, 性, 度, 主義, and no two-character compounds a beginner would not have met (經濟, 環境, 政策, 社會, 效應, 發展 are all far above this level).',
       },
       {
-        code: '2', label: 'TBCL 第2級（基礎）', band: 0, maxStem: 18,
+        code: '2', tbcl: 2, label: 'TBCL 第2級（基礎）', band: 0, maxStem: 18,
         ceiling: 'Still below CEFR A1. Topics: shopping, transport, weather, the day\'s routine, asking the way, ordering food, simple feelings (累, 高興, 忙). Sentences of about ten to eighteen characters, at most two clauses joined by 和, 也, 然後, 可是. 了 and 過 for completed actions, 要 and 會 for the future, 比 for simple comparison. Still no abstract nouns and no academic register.',
       },
       {
-        code: '3', label: 'TBCL 第3級（基礎）', band: 1, maxStem: 24,
+        code: '3', tbcl: 3, label: 'TBCL 第3級（基礎）', band: 1, maxStem: 24,
         ceiling: 'Roughly CEFR A1. Familiar, concrete topics: school and work life, health, travel, a short story about something that happened. Up to about twenty-four characters. 因為…所以, 雖然…但是, 如果…就 are available so long as what they join is concrete. One abstract idea per item at most, and only an everyday one (時間, 問題, 意思, 辦法).',
       },
       {
-        code: '4', label: 'TBCL 第4級（進階）', band: 2, maxStem: 32,
+        code: '4', tbcl: 4, label: 'TBCL 第4級（進階）', band: 2, maxStem: 32,
         ceiling: 'Roughly CEFR A2. The learner can follow a short article on a familiar subject and give a reason for a preference. Up to about thirty-two characters. Common abstract vocabulary of daily life is fair (環境, 習慣, 影響, 經驗, 文化); specialised or academic terminology is not.',
       },
       {
-        code: '5', label: 'TBCL 第5級（進階）', band: 3, maxStem: 40,
+        code: '5', tbcl: 5, label: 'TBCL 第5級（進階）', band: 3, maxStem: 40,
         ceiling: 'Roughly CEFR B1. Abstract topics begin: comparing views, explaining a cause, summarising an argument on a subject of general interest. Up to about forty characters. Newspaper vocabulary on everyday public affairs is fair; technical jargon still is not.',
       },
       {
-        code: '6', label: 'TBCL 第6級（精熟）', band: 4, maxStem: 52,
+        code: '6', tbcl: 6, label: 'TBCL 第6級（精熟）', band: 4, maxStem: 52,
         ceiling: 'Roughly CEFR B2. The learner reads argument and commentary and can weigh positions. Written and academic register is fair, including 化/性/度 abstractions and multi-clause sentences. Ask for inference, comparison and judgement rather than retrieval.',
       },
       {
-        code: '7', label: 'TBCL 第7級（精熟）', band: 5, maxStem: 70,
+        code: '7', tbcl: 7, label: 'TBCL 第7級（精熟）', band: 5, maxStem: 70,
         ceiling: 'Roughly CEFR C1. Specialised and academic Chinese, implication and register, ideas held across a whole text. Nothing in the vocabulary is off limits. An item that can be answered by finding one sentence is below this level.',
       },
     ],
@@ -228,35 +234,35 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
     unit: 'char',
     levels: [
       {
-        code: 'novice1', label: 'TOCFL 準備級一級（低於 CEFR A1）', band: 0, maxStem: 12,
+        code: 'novice1', tbcl: 1, label: 'TOCFL 準備級一級（低於 CEFR A1）', band: 0, maxStem: 12,
         ceiling: 'The published 準備級一級 word list is about three hundred words. Topics: greetings, name, country, numbers, family, food, classroom, time, price. Sentences of five to ten characters, one clause. No abstract nouns whatsoever and no compound a beginner has not met.',
       },
       {
-        code: 'novice2', label: 'TOCFL 準備級二級（低於 CEFR A1）', band: 0, maxStem: 18,
+        code: 'novice2', tbcl: 2, label: 'TOCFL 準備級二級（低於 CEFR A1）', band: 0, maxStem: 18,
         ceiling: 'Still below CEFR A1, roughly the first five hundred words. Shopping, transport, weather, the day\'s routine, feelings named in one word. Ten to eighteen characters, at most two clauses. No abstract or academic vocabulary.',
       },
       {
-        code: 'level1', label: 'TOCFL 入門級（CEFR A1，約 500 詞）', band: 1, maxStem: 24,
+        code: 'level1', tbcl: 3, label: 'TOCFL 入門級（CEFR A1，約 500 詞）', band: 1, maxStem: 24,
         ceiling: 'About five hundred words. Familiar concrete topics and short narratives. Up to about twenty-four characters. Keep to the 入門級 word list: a word outside it makes the item untestable however simple the idea behind it.',
       },
       {
-        code: 'level2', label: 'TOCFL 基礎級（CEFR A2，約 1,270 詞）', band: 2, maxStem: 32,
+        code: 'level2', tbcl: 4, label: 'TOCFL 基礎級（CEFR A2，約 1,270 詞）', band: 2, maxStem: 32,
         ceiling: 'About 1,270 words. Familiar subjects, reasons for a preference, a short article on daily life. Up to about thirty-two characters. Everyday abstractions are fair; specialised terminology is not.',
       },
       {
-        code: 'level3', label: 'TOCFL 進階級（CEFR B1，約 3,245 詞）', band: 3, maxStem: 40,
+        code: 'level3', tbcl: 5, label: 'TOCFL 進階級（CEFR B1，約 3,245 詞）', band: 3, maxStem: 40,
         ceiling: 'About 3,245 words. Public affairs and general-interest writing, cause and comparison. Up to about forty characters. Newspaper vocabulary is fair; technical jargon is not.',
       },
       {
-        code: 'level4', label: 'TOCFL 高階級（CEFR B2，約 4,316 詞）', band: 4, maxStem: 52,
+        code: 'level4', tbcl: 6, label: 'TOCFL 高階級（CEFR B2，約 4,316 詞）', band: 4, maxStem: 52,
         ceiling: 'About 4,316 words. Argument and commentary, weighing positions, written register. Ask for inference and judgement rather than retrieval.',
       },
       {
-        code: 'level5', label: 'TOCFL 流利級（CEFR C1，約 5,456 詞）', band: 5, maxStem: 70,
+        code: 'level5', tbcl: 7, label: 'TOCFL 流利級（CEFR C1，約 5,456 詞）', band: 5, maxStem: 70,
         ceiling: 'About 5,456 words. Specialised and academic Chinese, implication, register, ideas carried across a whole text. An item answerable from one sentence is below this level.',
       },
       {
-        code: 'level6', label: 'TOCFL 精通級（CEFR C2，約 11,092 詞）', band: 6, maxStem: 90,
+        code: 'level6', tbcl: 7, label: 'TOCFL 精通級（CEFR C2，約 11,092 詞）', band: 6, maxStem: 90,
         ceiling: 'About 11,092 words. Near-native reading: idiom, irony, rhetorical structure, 成語 and literary register. Nothing is off limits, and the item should turn on something a fluent reader could still miss.',
       },
     ],
@@ -442,6 +448,12 @@ export function answerLeakRule(band: number) {
 // What the generator is told, and what it is checked against afterwards. The
 // stem limit is returned rather than only described because a limit stated in
 // prose is a request: see stemLengthComplaint below.
+// The TBCL level to hold generated Chinese to, or 0 when this class is not on
+// a ladder the benchmark covers.
+export function tbclLevelOf(framework: string | null, code: string | null) {
+  return resolveLevel(framework, code)?.level.tbcl ?? 0
+}
+
 export function levelCeiling(framework: string | null, code: string | null) {
   const resolved = resolveLevel(framework, code)
   if (!resolved) return null

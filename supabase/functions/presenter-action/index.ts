@@ -90,6 +90,17 @@ function normalizedUrl(value: unknown) {
   return parsed.toString().slice(0, 2048)
 }
 
+// Chunked because String.fromCharCode(...bytes) blows the argument limit on a
+// screenshot-sized array.
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+  return btoa(binary)
+}
+
 function validUuid(value: unknown) {
   return typeof value === 'string' && uuidPattern.test(value)
 }
@@ -2689,7 +2700,13 @@ Deno.serve(async (req) => {
     if (action === 'dispatch_reading') {
       const sourceText = typeof input.sourceText === 'string' ? input.sourceText.trim().slice(0, 8000) : ''
       const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 2000) : ''
-      if (!sourceText && !direction) return jsonResponse({ message: '請先貼上內容，或寫下這篇要講什麼。' }, 400)
+      const shareScreenshot = input.shareScreenshot === true
+
+      // A capture is material on its own, so it satisfies this the way pasted
+      // text does.
+      if (!sourceText && !direction && !input.screenshotId) {
+        return jsonResponse({ message: '請先貼上內容、截圖，或寫下這篇要講什麼。' }, 400)
+      }
 
       const stretch = Number(input.levelStretch)
       const levelStretch = Number.isInteger(stretch) && stretch >= 0 && stretch <= 2 ? stretch : 0
@@ -2704,6 +2721,30 @@ Deno.serve(async (req) => {
         ? input.screenshotId
         : null
 
+      // The capture, downloaded so the model can read it. A passage written
+      // from a textbook page is the point of the screenshot path, and without
+      // this the id travelled all the way to the generator and was ignored.
+      let image: { mimeType: string; base64: string } | null = null
+      if (screenshotId) {
+        const { data: shot } = await supabase.from('screenshots')
+          .select('public_url').eq('id', screenshotId).eq('session_id', sessionId).maybeSingle()
+        const url = (shot as { public_url?: string } | null)?.public_url
+        if (url) {
+          try {
+            const response = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+            if (response.ok) {
+              image = {
+                mimeType: response.headers.get('content-type') || 'image/png',
+                base64: bytesToBase64(new Uint8Array(await response.arrayBuffer())),
+              }
+            }
+          } catch (error) {
+            // A passage from the teacher's own words is still worth having.
+            console.warn('reading capture could not be downloaded', error instanceof Error ? error.message : error)
+          }
+        }
+      }
+
       const { data: classRow } = await supabase.from('sessions')
         .select('teaching_language, guidance_language, level_framework, level_code')
         .eq('id', sessionId).maybeSingle()
@@ -2714,6 +2755,7 @@ Deno.serve(async (req) => {
 
       const passage = await generateReadingPassage({
         source: sourceText,
+        image,
         direction,
         teachingLanguage: classRow?.teaching_language ?? null,
         levelFramework: classRow?.level_framework ?? null,
@@ -2776,6 +2818,10 @@ Deno.serve(async (req) => {
         // A reading with a quiz is still a reading: the passage is the thing
         // the class is given, and the quiz hangs off it.
         type: withQuiz ? 'custom_quiz' : 'reading',
+        // Whether the class sees the capture the passage was written from. A
+        // photograph usually should go out; a textbook page usually should not,
+        // because the passage is the readable version of it.
+        share_screenshot: shareScreenshot,
         status: 'active',
         title: passage.title || '閱讀',
         prompt_text: withQuiz ? '讀完後回答下面的問題。' : '',

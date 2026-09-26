@@ -8,6 +8,9 @@ type Props = {
   open: boolean
   sessionId: string
   presenterToken: string
+  // The capture the teacher just took, when they came in that way. Uploaded on
+  // dispatch rather than on open, so backing out of the panel costs nothing.
+  capture?: File | null
   // The capture, when the teacher came here from 截圖派題 rather than by
   // pasting. Its text is read off the image by the same call that writes the
   // passage, so nothing is transcribed twice.
@@ -26,7 +29,7 @@ const FOCUS = [
   ['evaluate', 'readingEvaluate'],
 ] as const
 
-export function ReadingModal({ open, sessionId, presenterToken, screenshotId, onClose, onDispatched }: Props) {
+export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, onClose, onDispatched }: Props) {
   const t = usePresenterText()
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
@@ -37,10 +40,22 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
   // silently not doing when nothing said otherwise.
   const [focus, setFocus] = useState<string[]>(FOCUS.map(([key]) => key))
   const [withAudio, setWithAudio] = useState(false)
+  // A photograph is usually worth showing the class; a page of text usually is
+  // not, because the passage is the version they can read.
+  const [shareShot, setShareShot] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [accent, setAccent] = useState<Accent>('standard_guoyu')
   const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [passage, setPassage] = useState<ReadingPassage | null>(null)
+
+  useEffect(() => {
+    if (!capture) { setPreviewUrl(null); return }
+    const url = URL.createObjectURL(capture)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [capture])
 
   useEffect(() => {
     if (!open) return
@@ -51,6 +66,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
     setQuizCount(5)
     setFocus(FOCUS.map(([key]) => key))
     setWithAudio(false)
+    setShareShot(false)
     setError('')
     setPassage(null)
   }, [open])
@@ -59,18 +75,43 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
 
   async function dispatch() {
     if (busy) return
-    if (!sourceText.trim() && !direction.trim() && !screenshotId) {
+    if (!sourceText.trim() && !direction.trim() && !screenshotId && !capture) {
       setError(t('readingNeedsSomething'))
       return
     }
     setBusy(true)
     setError('')
+    setStatus('')
     try {
       // The clip is made first when it was asked for, so the passage row can
       // point at it: the class gets the text and the voice together rather than
       // the text now and the voice a moment later.
       let clipId: string | null = null
       const supabase = requireSupabase()
+
+      // The capture goes to storage first and travels as an id, the same way
+      // every other screenshot in the app does — a megabyte of base64 in the
+      // request body is how you find the edge function's size limit.
+      let shotId = screenshotId || null
+      if (capture && !shotId) {
+        setStatus(t('readingUploading'))
+        const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
+          body: { action: 'prepare_screenshot_upload', sessionId, presenterToken, fileName: capture.name },
+        })
+        if (prepareError) throw prepareError
+        if (!prepared?.screenshotId || !prepared?.storagePath || !prepared?.uploadToken) {
+          throw new Error(prepared?.message || t('readingFailed'))
+        }
+        const { error: uploadError } = await supabase.storage
+          .from('lingoact-screenshots')
+          .uploadToSignedUrl(prepared.storagePath, prepared.uploadToken, capture, {
+            contentType: capture.type || 'image/png',
+            upsert: false,
+          })
+        if (uploadError) throw uploadError
+        shotId = prepared.screenshotId as string
+      }
+      setStatus(t('readingWorking'))
 
       const { data, error: dispatchError } = await supabase.functions.invoke('presenter-action', {
         body: {
@@ -83,7 +124,8 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
           withQuiz,
           quizCount,
           comprehension: focus,
-          screenshotId: screenshotId || null,
+          screenshotId: shotId,
+          shareScreenshot: shareShot,
           clipId,
         },
       })
@@ -117,6 +159,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
       setError(caught instanceof Error && caught.message ? caught.message : t('readingFailed'))
     } finally {
       setBusy(false)
+      setStatus('')
     }
   }
 
@@ -131,8 +174,18 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
           </button>
         </header>
 
-        {screenshotId
-          ? <p className="muted">{t('readingFromCapture')}</p>
+        {capture || screenshotId
+          ? (
+            <div className="reading-capture">
+              {previewUrl && <img alt="" className="capture-preview" src={previewUrl} />}
+              <p className="muted">{t('readingFromCapture')}</p>
+              <label className="interaction-check reading-check">
+                <input checked={shareShot} type="checkbox" onChange={(event) => setShareShot(event.target.checked)} />
+                {t('readingShareShot')}
+              </label>
+              <small className="muted">{t('readingShareShotHint')}</small>
+            </div>
+          )
           : (
             <label className="reading-field">
               {t('readingSource')}
@@ -258,7 +311,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
 
         <div className="reading-modal-actions">
           <button disabled={busy} type="button" onClick={() => void dispatch()}>
-            {busy ? t('readingWorking') : t('readingSend')}
+            {busy ? (status || t('readingWorking')) : t('readingSend')}
           </button>
           <button className="ghost-button" type="button" onClick={onClose}>{t('close')}</button>
         </div>

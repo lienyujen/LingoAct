@@ -74,6 +74,8 @@ export function Preview() {
   // is a column whose last child has to stretch, and the cloud draws nothing at
   // all if it does not.
   if (location.hash === '#reading-send') return <ReadingModal open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
+  // The same panel reached by capturing rather than pasting.
+  if (location.hash === '#reading-shot') return <ReadingModal capture={sampleCapture()} open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView locale="en" passage={readingSample} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
@@ -133,6 +135,15 @@ const readingSample = {
     { point: '因為…所以', level: 3, span: '因為東西新鮮，所以附近的人都來這裡買菜', example: '因為天氣好，所以我們去公園。',
       note: { en: 'Reason first, result second.', zh_tw: '先講原因，再講結果。', es: 'Primero la razón, después el resultado.' } },
   ],
+}
+
+// A tiny PNG standing in for a screen grab, so the capture half of the reading
+// panel can be looked at without a screen to grab.
+function sampleCapture() {
+  const png = atob('iVBORw0KGgoAAAANSUhEUgAAAGQAAAA8CAYAAAA1jsstAAAAQklEQVR4nO3PMQEAAAjAILV/Z2vAxwMJ0CVJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkv5wAeAAAdqLh4sAAAAASUVORK5CYII=')
+  const bytes = new Uint8Array(png.length)
+  for (let i = 0; i < png.length; i += 1) bytes[i] = png.charCodeAt(i)
+  return new File([bytes], 'capture.png', { type: 'image/png' })
 }
 
 function CloudPreview() {

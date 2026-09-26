@@ -43,6 +43,8 @@ type Props = {
   onOpenTextDispatch: () => void
   onOpenFileTransfer: () => void
   onOpenReading: () => void
+  // Only on the desktop app, where there is a screen to capture.
+  onCaptureReading?: () => void
   onOpenRoster: () => void
   onOpenWordCloud: () => void
   onOpenSettings: () => void
@@ -80,6 +82,7 @@ export function PresenterControlPanel({
   onOpenTextDispatch,
   onOpenFileTransfer,
   onOpenReading,
+  onCaptureReading,
   onOpenRoster,
   onOpenWordCloud,
   onOpenSettings,
@@ -106,7 +109,9 @@ export function PresenterControlPanel({
     sentenceWall: onOpenSentenceWall,
     writingCoach: onCaptureWriting,
     drawing: onCaptureDrawing,
-    reading: onOpenReading,
+    // 截圖 is the door a teacher reaches for with a textbook page already on
+    // screen, which is most of the time; pasting is the other door.
+    reading: onCaptureReading || onOpenReading,
   }
 
   return (

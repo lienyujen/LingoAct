@@ -8219,3 +8219,24 @@ h2 {
   color: var(--primary);
   font-weight: 600;
 }
+
+/* The capture the passage was written from, when the teacher chose to show it.
+   Above the text, because it is what the text is about. */
+.reading-image {
+  border-radius: var(--radius-md);
+  max-height: 40svh;
+  object-fit: contain;
+  width: 100%;
+}
+
+/* The same capture in the teacher's panel, where it is a confirmation of what
+   they just grabbed rather than something to read. */
+.reading-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reading-capture .capture-preview {
+  max-height: 180px;
+}

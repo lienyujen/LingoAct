@@ -191,8 +191,13 @@ const passageSchema = (locales: string[]) => ({
 })
 
 export type ReadingInput = {
-  // Either the teacher's own text, or what was read off a screenshot.
+  // The teacher's own text, when they pasted one.
   source: string
+  // A capture for the model to read for itself. Text on a slide becomes the
+  // material; a photograph becomes what the passage is about. The model is told
+  // which of those it is looking at rather than left to guess, because a
+  // textbook page and a picture of a night market want different passages.
+  image?: { mimeType: string; base64: string } | null
   direction: string
   teachingLanguage: string | null
   levelFramework: string | null
@@ -224,6 +229,9 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     stretchNote,
     `Length: between ${length.min} and ${length.max} characters. This is the range 華語文能力基準應用參考指引 and TOCFL use for reading at ${label}.`,
     'The passage must read as a whole piece — a notice, a message, a short account, a description — not a list of sentences that happen to use the target words.',
+    input.image
+      ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
+      : '',
     'vocabulary: every word in the passage that a learner at this level has NOT met, with its part of speech in Chinese (名詞、動詞、形容詞、副詞、量詞、連接詞…) and a short gloss in each requested language. A word the class already knows does not belong here; padding this list makes the colouring useless.',
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
@@ -235,7 +243,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
       complaint ? `${instruction}\n\n${complaint}` : instruction,
       { source: input.source, direction: input.direction, languages: locales },
       passageSchema(locales),
-      null,
+      input.image || null,
       // A passage is longer and has to hold together, which is what the deeper
       // profile is for; a quiz item is a sentence and uses the realtime one.
       'deep',

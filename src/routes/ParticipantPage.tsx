@@ -92,6 +92,7 @@ export function ParticipantPage() {
   const [questionAnalyses, setQuestionAnalyses] = useState<Record<string, QuestionAnalysis>>({})
   // The passage for whatever the class is on, when that question has one.
   const [passage, setPassage] = useState<ReadingPassageRow | null>(null)
+  const [passageImageUrl, setPassageImageUrl] = useState<string | null>(null)
   const [boardQuestion, setBoardQuestion] = useState<Question | null>(null)
   const [boardImageUrl, setBoardImageUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -351,9 +352,27 @@ export function ParticipantPage() {
       const { data: passageData } = await supabase
         .from('reading_passages').select('*')
         .eq('question_id', nextSession.current_question_id).maybeSingle()
-      setPassage((passageData || null) as ReadingPassageRow | null)
+      const nextPassage = (passageData || null) as ReadingPassageRow | null
+      setPassage(nextPassage)
+      // Only when the teacher said so: share_screenshot is their decision about
+      // whether the class should see the material or only the passage.
+      if (nextPassage) {
+        const { data: readingQuestion } = await supabase.from('questions')
+          .select('screenshot_id, share_screenshot').eq('id', nextSession.current_question_id).maybeSingle()
+        const current = readingQuestion as { screenshot_id: string | null; share_screenshot: boolean } | null
+        if (current?.screenshot_id && current.share_screenshot) {
+          const { data: shot } = await supabase
+            .from('screenshots').select('public_url').eq('id', current.screenshot_id).maybeSingle()
+          setPassageImageUrl((shot as { public_url: string } | null)?.public_url || null)
+        } else {
+          setPassageImageUrl(null)
+        }
+      } else {
+        setPassageImageUrl(null)
+      }
     } else {
       setPassage(null)
+      setPassageImageUrl(null)
     }
   }, [locale, participantId, participantToken, sessionId])
 
@@ -972,7 +991,7 @@ export function ParticipantPage() {
           somewhere the class goes back to, not something they are being asked
           right now, so it stays put while questions come and go above it. */}
       {/* Above the question, because the question is about it. */}
-      {passage && <ReadingPassageView locale={locale} passage={passage} />}
+      {passage && <ReadingPassageView imageUrl={passageImageUrl} locale={locale} passage={passage} />}
 
       {boardQuestion && participant && participantToken && session && (
         <ParticipantBoard

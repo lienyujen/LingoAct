@@ -7,6 +7,10 @@ import type { ReadingPassage, ReadingGrammar, ReadingVocabulary } from '../types
 type Props = {
   passage: ReadingPassage
   locale: ParticipantLocale
+  // The capture the passage was written from, when the teacher chose to show
+  // it. A photograph belongs with the text; a page of source material does not,
+  // and that is the teacher’s call rather than ours.
+  imageUrl?: string | null
 }
 
 type Mark =
@@ -94,7 +98,7 @@ function glossFor(gloss: Record<string, string> | undefined, locale: Participant
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
 }
 
-export function ReadingPassageView({ passage, locale }: Props) {
+export function ReadingPassageView({ passage, locale, imageUrl }: Props) {
   // The student's own switch, separate from the teacher's. A teacher who turned
   // the grammar on wants it available; a reader who finds it busy can put it
   // away without losing the vocabulary colouring, which is the part that stops
@@ -120,6 +124,8 @@ export function ReadingPassageView({ passage, locale }: Props) {
           </button>
         )}
       </header>
+
+      {imageUrl && <img alt="" className="reading-image" src={imageUrl} />}
 
       {/* Whitespace is preserved because the model writes paragraphs and a
           reading exercise that arrives as one block is harder than the language

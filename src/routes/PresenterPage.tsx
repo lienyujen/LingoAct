@@ -176,6 +176,7 @@ export function PresenterPage() {
   const [listeningOpen, setListeningOpen] = useState(false)
   const [pictureOpen, setPictureOpen] = useState(false)
   const [readingOpen, setReadingOpen] = useState(false)
+  const [readingCapture, setReadingCapture] = useState<File | null>(null)
   const [pictureInitialMode, setPictureInitialMode] = useState<'spoken' | 'written' | 'ordering'>('spoken')
   const [sentenceWallOpen, setSentenceWallOpen] = useState(false)
   const [sentenceWallError, setSentenceWallError] = useState('')
@@ -213,7 +214,7 @@ export function PresenterPage() {
   // as 截圖派題 — a teacher with a textbook page on screen should not have to
   // save it as a file first — so the selection has to know which of the two
   // asked for it before it opens anything.
-  const [captureTarget, setCaptureTarget] = useState<'question' | 'listening' | 'picture'>('question')
+  const [captureTarget, setCaptureTarget] = useState<'question' | 'listening' | 'picture' | 'reading'>('question')
   const [listeningCapture, setListeningCapture] = useState<File | null>(null)
   const [pictureCapture, setPictureCapture] = useState<File | null>(null)
   const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -1094,7 +1095,7 @@ export function PresenterPage() {
 
   async function captureWindowsScreen(
     preset: QuizRequestedType | null = null,
-    target: 'question' | 'listening' | 'picture' = 'question',
+    target: 'question' | 'listening' | 'picture' | 'reading' = 'question',
     initialDraft: Partial<QuestionDraft> | null = null,
   ) {
     if (!window.lingoActDesktop) return
@@ -1172,6 +1173,9 @@ export function PresenterPage() {
     activeSelectionPointerId.current = null
     if (captureTarget === 'listening') {
       setListeningCapture(file)
+    } else if (captureTarget === 'reading') {
+      setReadingCapture(file)
+      setReadingOpen(true)
     } else if (captureTarget === 'picture') {
       setPictureCapture(file)
     } else {
@@ -2092,7 +2096,8 @@ export function PresenterPage() {
             setTextDispatchOpen(true)
           }}
           onOpenSettings={openPresenterSettings}
-          onOpenReading={() => { setPlannedActivity(null); setControlsOpen(false); setReadingOpen(true) }}
+          onOpenReading={() => { setPlannedActivity(null); setControlsOpen(false); setReadingCapture(null); setReadingOpen(true) }}
+          onCaptureReading={window.lingoActDesktop ? () => { setPlannedActivity(null); setReadingCapture(null); void captureWindowsScreen(null, 'reading') } : undefined}
           onOpenRoster={() => void window.lingoActDesktop?.openRoster(sessionId)}
           onOpenWordCloud={openWordCloud}
           onToggleRecording={toggleCourseRecording}
@@ -2247,11 +2252,12 @@ export function PresenterPage() {
         </div>
       )}
       <ReadingModal
+        capture={readingCapture}
         open={readingOpen}
         presenterToken={getPresenterToken(sessionId) || ''}
         sessionId={sessionId}
-        onClose={() => setReadingOpen(false)}
-        onDispatched={() => { setReadingOpen(false); void loadAll() }}
+        onClose={() => { setReadingOpen(false); setReadingCapture(null) }}
+        onDispatched={() => { setReadingOpen(false); setReadingCapture(null); void loadAll() }}
       />
 
       <QuestionEditor

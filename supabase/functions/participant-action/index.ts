@@ -622,6 +622,20 @@ Deno.serve(async (req) => {
       return jsonResponse({ response: updated })
     }
 
+    // Asking to be called on. A toggle rather than a one-way set, because a
+    // student who puts a hand up and thinks better of it should be able to take
+    // it down without waiting for the presenter to notice.
+    if (action === 'set_hand') {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: '學員權限失效。' }, 403)
+      const raised = input.raised !== false
+      const { error } = await supabase.from('participants')
+        .update({ hand_raised_at: raised ? new Date().toISOString() : null })
+        .eq('id', participantId)
+        .eq('session_id', sessionId)
+      if (error) throw error
+      return jsonResponse({ ok: true })
+    }
     if (['prepare_board_upload', 'get_my_board_posts', 'withdraw_board_post', 'edit_board_post', 'toggle_board_reaction'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限驗證失敗，請重新掃描 QR Code 加入。' }, 403)

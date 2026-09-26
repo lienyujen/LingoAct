@@ -1,6 +1,6 @@
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
-import type { Answer, FileResponse, Message, Participant, Question, QuizAttempt } from '../types'
+import type { Answer, BoardPost, FileResponse, Message, Participant, Question, QuizAttempt } from '../types'
 
 // One definition of "how involved was this student", shared by the live roster
 // and the exported report so the two can never disagree.
@@ -53,6 +53,11 @@ type Input = {
   // Marked uploads. Only rows the presenter actually paid to mark carry a
   // score, so an unmarked class simply scores as it did before.
   uploadMarks?: FileResponse[]
+  // Cards on a 討論板. They are answers — a student who put three things on the
+  // wall has taken part in that question — but they live in their own table, so
+  // without them the roster reported everyone as 未作答 no matter how much they
+  // had written.
+  boardPosts?: BoardPost[]
 }
 
 // Questions a student could actually have answered. A screen that was only
@@ -122,6 +127,24 @@ export function participationRows(input: Input, t: PresenterT = presenterLookup(
     for (const attempt of input.quizAttempts) {
       if (attempt.participant_id === participant.id) answeredQuestionIds.add(attempt.question_id)
     }
+    // A card on the wall counts as having taken part, and one they deleted does
+    // not — the same rule the posting limit uses, so what the roster says and
+    // what the student's own page says about their allowance always agree.
+    // Replies are excluded for the same reason they do not count against the
+    // limit: answering someone else is not answering the question.
+    for (const post of input.boardPosts || []) {
+      if (post.participant_id !== participant.id) continue
+      if (post.deleted_at || post.reply_to) continue
+      answeredQuestionIds.add(post.question_id)
+    }
+    // Answering the question is one thing; answering a classmate is another,
+    // and it is the half of a discussion that does not happen on its own. Worth
+    // points of its own, therefore, rather than being folded into the card
+    // count above — which deliberately ignores replies, because a reply is not
+    // a contribution to the topic.
+    const replyCount = (input.boardPosts || []).filter((post) => (
+      post.participant_id === participant.id && post.reply_to && !post.deleted_at
+    )).length
     const gradedCount = own.filter((answer) => answer.is_correct !== null).length
     const correctCount = own.filter((answer) => answer.is_correct === true).length
     const messageCount = messageCounts.get(participant.id) || 0
@@ -142,6 +165,10 @@ export function participationRows(input: Input, t: PresenterT = presenterLookup(
     score += quickCount * 5
     score += buzzerWins * 5
     score += Math.min(messageCount * 2, 20)
+    // Capped for the same reason danmaku is: without a ceiling the quickest way
+    // to the top of the list is thirty one-word replies, which is the opposite
+    // of what paying for replies is meant to encourage.
+    score += Math.min(replyCount * 2, 30)
     if (quiz && quiz.max > 0) score += Math.round((quiz.score / quiz.max) * 20)
     // A marked upload is worth what a quiz is worth, on the same 20-point
     // scale, so a class assessed on paper is not scored lower than one

@@ -3,7 +3,7 @@ import { CaretDown, CaretUp, CheckCircle, Clock, ClockCounterClockwise, Micropho
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
-import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, Screenshot } from '../types'
+import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, QuestionAnalysis, Screenshot } from '../types'
 import { ParticipantFlashcards } from './ParticipantFlashcards'
 import { ListeningPlayer } from './ListeningPlayer'
 import { ParticipantTeachingContext } from './ParticipantTeachingContext'
@@ -11,6 +11,9 @@ import { participantQuizPayload } from '../lib/participantQuizPayload'
 import { InteractionReadout } from './InteractionReadout'
 
 type Props = {
+  // What the AI read the question as, and what it thought the answer was.
+  // Kept per question so it stays with the answer it belongs to.
+  analyses: Record<string, QuestionAnalysis>
   teachingCredentials?: { sessionId: string; participantId: string; participantToken: string }
   activeQuestionId?: string | null
   answers: Answer[]
@@ -49,7 +52,7 @@ function questionTitle(question: Question, locale: ParticipantLocale) {
   return translation?.prompt_text || translation?.title || question.prompt_text || translation?.title || question.title
 }
 
-export function ParticipantQuestionHistory({
+export function ParticipantQuestionHistory({ analyses,
   teachingCredentials,
   activeQuestionId,
   answers,
@@ -187,6 +190,27 @@ export function ParticipantQuestionHistory({
                     ) : answer ? (
                       <p className="participant-history-answer"><CheckCircle size={17} />{participantText(locale, 'yourAnswerLabel')}<strong>{answerText(question, answer, locale)}</strong></p>
                     ) : null}
+                    {/* Sits below what the student handed in, never instead of
+                        it: this is what the AI made of the question, and it is
+                        worth reading precisely because their own answer is
+                        still there above it to compare against. */}
+                    {(() => {
+                      const analysis = analyses[question.id]?.question_understanding
+                      if (!analysis || (!analysis.detected_question && !analysis.suggested_correct_answer)) return null
+                      return (
+                        <div className="participant-ai-answer">
+                          <p className="eyebrow">{participantText(locale, 'aiReadingOfQuestion')}</p>
+                          {analysis.detected_question && <p>{analysis.detected_question}</p>}
+                          {analysis.suggested_correct_answer && (
+                            <p className="participant-ai-suggested">
+                              <span className="participant-review-label">{participantText(locale, 'aiSuggestedAnswer')}</span>
+                              <strong>{analysis.suggested_correct_answer}</strong>
+                            </p>
+                          )}
+                          {analysis.reasoning && <small>{analysis.reasoning}</small>}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </article>

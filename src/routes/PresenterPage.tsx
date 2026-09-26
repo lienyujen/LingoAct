@@ -48,6 +48,7 @@ import { logDiagnostic } from '../lib/diagnostics'
 import { createCaptionTextNormalizer } from '../lib/traditionalChinese'
 import { SOURCE_CAPTION_LANGUAGE, resolvedCaptionLanguage } from '../lib/captionLanguages'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
+import { useStandingsBroadcast } from '../lib/standings'
 import { useSessionPresence } from '../lib/useSessionPresence'
 import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, FileResponse, SharedFile, LotterySessionEvent, Participant, PresenterQuizResults, Question, QuestionAnalysis, Session, SessionEvent } from '../types'
 import { useParams } from 'react-router-dom'
@@ -233,6 +234,9 @@ export function PresenterPage() {
   )
   const [joinUrl, setJoinUrl] = useState(fallbackJoinUrl)
   const { onlineParticipantIds } = useSessionPresence(sessionId, { role: 'presenter' })
+  // Worked out here rather than in the roster window, which is only open when
+  // the teacher opens it, and sent to each student as their own line.
+  useStandingsBroadcast(sessionId, `${participants.length}:${onlineParticipantIds.join('|')}`)
   const onlineParticipants = useMemo(
     () => participants.filter((participant) => onlineParticipantIds.includes(participant.id)),
     [onlineParticipantIds, participants],

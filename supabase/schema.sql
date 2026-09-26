@@ -1484,3 +1484,50 @@ do $$ begin
     alter publication supabase_realtime add table public.board_reactions;
   end if;
 end $$;
+
+-- ============================ 學生名單 ============================
+
+alter table public.participants
+  -- Removed from the list so they can rejoin under the right name. A student
+  -- who typed something other than what is on the class list cannot fix it
+  -- themselves: joining is keyed to the device, so every later attempt hands
+  -- them back the first name they used.
+  add column if not exists removed_at timestamptz null,
+  -- Set when the student asks to be called on, cleared when the presenter
+  -- acknowledges it. A timestamp rather than a flag so the class list can put
+  -- the longest-waiting hand first.
+  add column if not exists hand_raised_at timestamptz null;
+
+-- Points the presenter gave out by hand, one row per award rather than a
+-- running total on the participant: undoing a stray tap then removes the last
+-- award instead of recording a negative one, so the total goes back to what it
+-- was rather than reading as a punishment.
+create table if not exists public.participant_points (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  participant_id uuid not null references public.participants(id) on delete cascade,
+  points integer not null default 1 check (points between 1 and 10),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists participant_points_session_idx
+  on public.participant_points (session_id, participant_id);
+
+alter table public.participant_points enable row level security;
+
+drop policy if exists "mvp read participant points" on public.participant_points;
+create policy "mvp read participant points" on public.participant_points for select using (true);
+
+-- Awarding and revoking go through presenter-action on the service role, so
+-- the class can read the tally and nothing else.
+grant select on public.participant_points to anon, authenticated;
+grant all on public.participant_points to service_role;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'participant_points'
+  ) then
+    alter publication supabase_realtime add table public.participant_points;
+  end if;
+end $$;

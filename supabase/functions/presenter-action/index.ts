@@ -1827,6 +1827,104 @@ Deno.serve(async (req) => {
     // role, so the wall is whole here even before it is revealed to the class
     // and even for cards a student has taken back down — the presenter is the
     // one person who should never be looking at a partial board.
+    // Acknowledging a raised hand — one student, or the whole class at once
+    // when the presenter has finished taking questions and does not want to
+    // clear a dozen of them one at a time.
+    if (action === 'lower_hands') {
+      const participantId = typeof input.participantId === 'string' ? input.participantId : ''
+      let query = supabase.from('participants')
+        .update({ hand_raised_at: null })
+        .eq('session_id', sessionId)
+        .not('hand_raised_at', 'is', null)
+      if (participantId) {
+        if (!validUuid(participantId)) return jsonResponse({ message: '學員資料格式不正確。' }, 400)
+        query = query.eq('id', participantId)
+      }
+      const { error } = await query
+      if (error) throw error
+      return jsonResponse({ ok: true })
+    }
+
+    if (action === 'award_participant_point') {
+      const participantId = input.participantId
+      if (!validUuid(participantId)) return jsonResponse({ message: '學員資料格式不正確。' }, 400)
+      const points = Number.isInteger(input.points) ? Number(input.points) : 1
+      if (points < 1 || points > 10) return jsonResponse({ message: '加分範圍不正確。' }, 400)
+
+      // Scoped to this session: a participant id lifted from another class must
+      // not be creditable with a token that only covers this one.
+      const { data: participant, error: participantError } = await supabase
+        .from('participants')
+        .select('id, removed_at')
+        .eq('id', participantId).eq('session_id', sessionId).maybeSingle()
+      if (participantError) throw participantError
+      if (!participant) return jsonResponse({ message: '找不到這位學員。' }, 404)
+      if (participant.removed_at) return jsonResponse({ message: '這位學員已被移出名單。' }, 409)
+
+      const { data: awarded, error: insertError } = await supabase
+        .from('participant_points')
+        .insert({ session_id: sessionId, participant_id: participantId, points })
+        .select('*').maybeSingle()
+      if (insertError) throw insertError
+      return jsonResponse({ point: awarded })
+    }
+
+    // Undoing a stray tap, which is not the same thing as deducting a point: it
+    // removes the last award rather than recording a negative one, so the total
+    // goes back to what it was instead of reading as a punishment.
+    if (action === 'revoke_participant_point') {
+      const participantId = input.participantId
+      if (!validUuid(participantId)) return jsonResponse({ message: '學員資料格式不正確。' }, 400)
+      const { data: latest, error: latestError } = await supabase
+        .from('participant_points')
+        .select('id')
+        .eq('session_id', sessionId).eq('participant_id', participantId)
+        .order('created_at', { ascending: false })
+        .limit(1).maybeSingle()
+      if (latestError) throw latestError
+      if (!latest) return jsonResponse({ message: '這位學員目前沒有加分紀錄。' }, 404)
+      const { error: deleteError } = await supabase.from('participant_points').delete().eq('id', latest.id)
+      if (deleteError) throw deleteError
+      return jsonResponse({ ok: true })
+    }
+
+    // Removing someone so they can rejoin under the right name. A student who
+    // typed something other than what is on the class list cannot fix it
+    // themselves: joining is keyed to the device, so every later attempt hands
+    // them back the first name they used.
+    if (action === 'remove_participant') {
+      const participantId = input.participantId
+      if (!validUuid(participantId)) return jsonResponse({ message: '學員資料格式不正確。' }, 400)
+      const { data: participant, error: findError } = await supabase
+        .from('participants')
+        .select('id, device_id, removed_at')
+        .eq('id', participantId).eq('session_id', sessionId).maybeSingle()
+      if (findError) throw findError
+      if (!participant) return jsonResponse({ message: '找不到這位學員。' }, 404)
+      if (participant.removed_at) return jsonResponse({ ok: true, alreadyRemoved: true })
+
+      // The row is kept. Every answer, message, recording and upload they made
+      // hangs off it by a cascading key, so deleting it would take this lesson's
+      // evidence with it. Rewriting the device id is what actually frees them:
+      // unique (session_id, device_id) would otherwise hand that phone back this
+      // very row — under the name being corrected — the moment it rejoined.
+      const { data: updated, error: updateError } = await supabase
+        .from('participants')
+        .update({
+          removed_at: new Date().toISOString(),
+          device_id: `removed:${Date.now()}:${participant.device_id}`.slice(0, 200),
+        })
+        .eq('id', participantId)
+        .select('*').maybeSingle()
+      if (updateError) throw updateError
+
+      // Their token stops working immediately, so anything already in flight is
+      // refused rather than landing under the name that is being replaced.
+      const { error: keyError } = await supabase
+        .from('participant_session_keys').delete().eq('participant_id', participantId)
+      if (keyError) throw keyError
+      return jsonResponse({ ok: true, participant: updated })
+    }
     if (action === 'get_board') {
       const questionId = input.questionId
       if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)

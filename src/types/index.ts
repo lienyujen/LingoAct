@@ -72,6 +72,21 @@ export type Participant = {
   last_seen_at: string
   unfocused_ms?: number
   focus_streak_ms?: number
+  // Set when the presenter removed them. The row and everything hanging off it
+  // stays; it simply drops out of the live roster and lets that device rejoin.
+  removed_at?: string | null
+  // When they asked to be called on. Null once the presenter acknowledges it.
+  hand_raised_at?: string | null
+}
+
+// Points the presenter gave out by hand. One row per award, so undoing a stray
+// tap removes the last one rather than recording a negative.
+export type ParticipantPoint = {
+  id: string
+  session_id: string
+  participant_id: string
+  points: number
+  created_at: string
 }
 
 export type Message = {

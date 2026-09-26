@@ -4,6 +4,8 @@ import { BookOpen, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-ic
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { ListeningPlayer } from '../components/ListeningPlayer'
+import { Hand } from '@phosphor-icons/react'
+import { useMyStanding } from '../lib/standings'
 import { ParticipantBoard } from '../components/ParticipantBoard'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
@@ -35,7 +37,7 @@ import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
 import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantLocale } from '../lib/participantI18n'
-import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent, WritingCoachTurn } from '../types'
+import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, QuestionAnalysis, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent, WritingCoachTurn } from '../types'
 
 async function participantFunctionMessage(error: unknown, fallback: string) {
   const context = (error as { context?: Response } | null)?.context
@@ -80,6 +82,12 @@ export function ParticipantPage() {
   const [buzzerBusy, setBuzzerBusy] = useState(false)
   const [exitTicketBusy, setExitTicketBusy] = useState(false)
   const [message, setMessage] = useState('')
+  // One line, sent by the presenter's window. No queries from the class — see
+  // the note in lib/standings.
+  const standing = useMyStanding(sessionId, participant?.id || null)
+  const [handBusy, setHandBusy] = useState(false)
+  // Keyed by question id, so it survives every reload and every new question.
+  const [questionAnalyses, setQuestionAnalyses] = useState<Record<string, QuestionAnalysis>>({})
   const [boardQuestion, setBoardQuestion] = useState<Question | null>(null)
   const [boardImageUrl, setBoardImageUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -143,6 +151,30 @@ export function ParticipantPage() {
     if (requestId !== loadSequence.current) return
     const nextSession = sessionData as Session | null
     setSession(nextSession)
+
+    // What the AI made of each question, kept the way the student's own answers
+    // are kept: a newly dispatched question does not take the last one's
+    // explanation away, and neither does the end of the class. Read here rather
+    // than per question so opening an old one costs nothing.
+    //
+    // This arrives the moment the teacher presses 批改 rather than at the next
+    // dispatch: the row is inserted already marked success, and this page is
+    // subscribed to inserts on ai_summaries, so the analysis triggers its own
+    // refresh. Ordered oldest first on purpose — a re-analysis writes a new row,
+    // and the last one written is the one that should win.
+    const { data: analysisData } = await supabase
+      .from('ai_summaries')
+      .select('question_id, output_json')
+      .eq('session_id', sessionId)
+      .eq('type', 'question_analysis')
+      .eq('status', 'success')
+      .order('created_at', { ascending: true })
+      .limit(500)
+    setQuestionAnalyses(Object.fromEntries(
+      ((analysisData || []) as Array<{ question_id: string | null; output_json: unknown }>)
+        .filter((row) => row.question_id)
+        .map((row) => [row.question_id as string, row.output_json as QuestionAnalysis]),
+    ))
     setSessionChecked(true)
     setParticipant(participantData as Participant | null)
     setExitTicket((exitTicketData as ExitTicket | null) || null)
@@ -417,6 +449,29 @@ export function ParticipantPage() {
     setLotteryEvent(null)
     setBuzzerEvent(null)
   }, [session?.status])
+
+  async function toggleHand() {
+    if (!participant || !participantToken || handBusy) return
+    const raised = !participant.hand_raised_at
+    setHandBusy(true)
+    // Moved before the round trip: putting a hand up is the one thing in this
+    // page that has to feel instant, and the presenter's list is what actually
+    // decides it anyway.
+    setParticipant((current) => (
+      current ? { ...current, hand_raised_at: raised ? new Date().toISOString() : null } : current
+    ))
+    try {
+      await requireSupabase().functions.invoke('participant-action', {
+        body: { action: 'set_hand', sessionId, participantId: participant.id, participantToken, raised },
+      })
+    } catch {
+      setParticipant((current) => (
+        current ? { ...current, hand_raised_at: raised ? null : new Date().toISOString() } : current
+      ))
+    } finally {
+      setHandBusy(false)
+    }
+  }
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault()
@@ -732,6 +787,7 @@ export function ParticipantPage() {
         {/* Files stay downloadable after class until the presenter deletes the session. */}
         <ParticipantSharedFiles locale={locale} sessionId={sessionId} />
         <ParticipantQuestionHistory
+          analyses={questionAnalyses}
           teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
           answers={historyAnswers}
           audioResponses={historyAudioResponses}
@@ -772,6 +828,38 @@ export function ParticipantPage() {
         <h1>
           <strong>{participant?.name || participantText(locale, 'attendee')}</strong>{participantText(locale, 'welcomeToSession', { title: session?.title || participantText(locale, 'session') })}
         </h1>
+        {participant && participantToken && (
+          <div className="participant-header-side">
+            {standing && (
+              <div className="participant-standing">
+                <span className="participant-score" title={participantText(locale, 'standingScore')}>
+                  {standing.score} {participantText(locale, 'standingPoints')}
+                </span>
+                <span className="participant-rank">
+                  {participantText(locale, 'standingRank')} {standing.rank}/{standing.classSize}
+                </span>
+                {standing.badges.length > 0 && (
+                  <span
+                    className="participant-badges"
+                    title={standing.badges.map((badge) => `${badge.label}：${badge.detail}`).join('\n')}
+                  >
+                    {standing.badges.map((badge) => <span key={badge.key}>{badge.icon}</span>)}
+                  </span>
+                )}
+              </div>
+            )}
+            <button
+              aria-pressed={Boolean(participant.hand_raised_at)}
+              className={`participant-hand${participant.hand_raised_at ? ' is-raised' : ''}`}
+              disabled={handBusy}
+              type="button"
+              onClick={() => void toggleHand()}
+            >
+              <Hand size={18} />
+              {participantText(locale, participant.hand_raised_at ? 'handLower' : 'handRaise')}
+            </button>
+          </div>
+        )}
       </header>
       {session && (
         <ParticipantInterpretationAudio
@@ -878,6 +966,7 @@ export function ParticipantPage() {
         />
       )}
       <ParticipantQuestionHistory
+          analyses={questionAnalyses}
         teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
         activeQuestionId={question?.id}
         answers={historyAnswers}

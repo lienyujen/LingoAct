@@ -7529,3 +7529,88 @@ h2 {
   white-space: pre-wrap;
 }
 
+
+/* 學生自己的分數、名次、徽章、舉手，以及 AI 對該題的判讀。照抄自 InterAct。 */
+.participant-header-side {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* A raised hand has to be obvious across a classroom on the student's own
+   screen as well as on the teacher's, so it changes colour rather than
+   only its label. */
+.participant-hand {
+  align-items: center;
+  background: var(--surface-muted, #eef1f6);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.participant-hand.is-raised {
+  background: #ffb020;
+  border-color: #ffb020;
+  color: #23262f;
+}
+
+/* The same figures as the teacher's list, read the same way round: the score
+   first because it is the one that moves, then where it places. */
+.participant-standing {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.participant-score {
+  background: #e8492f;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+.participant-rank {
+  color: var(--text-muted, #687386);
+  font-variant-numeric: tabular-nums;
+}
+
+.participant-badges {
+  display: flex;
+  gap: 2px;
+}
+
+.participant-review-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* What the AI made of a question, shown to the student under their own answer.
+   Quiet on purpose: it is a second opinion sitting beside what they wrote, not
+   a correction stamped over it. */
+.participant-ai-answer {
+  border-left: 3px solid var(--primary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding-left: 12px;
+}
+
+.participant-ai-answer small {
+  color: var(--text-muted, #687386);
+}
+
+.participant-ai-suggested {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

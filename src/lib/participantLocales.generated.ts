@@ -233,8 +233,9 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "もう一度録音",
     "readingWords": "新出単語",
     "readingGrammar": "文法",
-    "readingRuby": "ふりがな",
-    "readingLocked": "問題を解き終えると、単語と文法が見られます。"
+    "readingLocked": "問題を解き終えると、単語と文法が見られます。",
+    "readingZhuyin": "注音符号",
+    "readingPinyin": "ピンイン"
   },
   "ko": {
     "language": "언어",
@@ -464,8 +465,9 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "다시 녹음",
     "readingWords": "새 단어",
     "readingGrammar": "문법",
-    "readingRuby": "발음 표기",
-    "readingLocked": "문제를 다 풀면 새 단어와 문법을 볼 수 있어요."
+    "readingLocked": "문제를 다 풀면 새 단어와 문법을 볼 수 있어요.",
+    "readingZhuyin": "주음부호",
+    "readingPinyin": "병음"
   },
   "es": {
     "language": "Idioma",
@@ -766,8 +768,9 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "close": "Cerrar",
     "readingWords": "Palabras nuevas",
     "readingGrammar": "Gramática",
-    "readingRuby": "Pronunciación",
-    "readingLocked": "Las palabras nuevas y la gramática se activan al terminar las preguntas."
+    "readingLocked": "Las palabras nuevas y la gramática se activan al terminar las preguntas.",
+    "readingZhuyin": "Zhuyin",
+    "readingPinyin": "Pinyin"
   },
   "fr": {
     "language": "Langue",
@@ -997,8 +1000,9 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "Réenregistrer",
     "readingWords": "Mots nouveaux",
     "readingGrammar": "Grammaire",
-    "readingRuby": "Prononciation",
-    "readingLocked": "Les mots nouveaux et la grammaire s’affichent une fois les questions terminées."
+    "readingLocked": "Les mots nouveaux et la grammaire s’affichent une fois les questions terminées.",
+    "readingZhuyin": "Zhuyin",
+    "readingPinyin": "Pinyin"
   },
   "de": {
     "language": "Sprache",
@@ -1228,8 +1232,9 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "Erneut aufnehmen",
     "readingWords": "Neue Wörter",
     "readingGrammar": "Grammatik",
-    "readingRuby": "Aussprache",
-    "readingLocked": "Neue Wörter und Grammatik erscheinen, sobald du die Fragen beendet hast."
+    "readingLocked": "Neue Wörter und Grammatik erscheinen, sobald du die Fragen beendet hast.",
+    "readingZhuyin": "Zhuyin",
+    "readingPinyin": "Pinyin"
   },
   "vi": {
     "language": "Ngôn ngữ",
@@ -1459,7 +1464,8 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "Ghi âm lại",
     "readingWords": "Từ mới",
     "readingGrammar": "Ngữ pháp",
-    "readingRuby": "Phiên âm",
-    "readingLocked": "Làm xong các câu hỏi rồi mới xem được từ mới và ngữ pháp."
+    "readingLocked": "Làm xong các câu hỏi rồi mới xem được từ mới và ngữ pháp.",
+    "readingZhuyin": "Chú âm",
+    "readingPinyin": "Bính âm"
   }
 }

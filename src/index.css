@@ -8154,6 +8154,18 @@ h2 {
   gap: 6px;
 }
 
+/* The paste box is one of the panel's three real choices, so its label is a
+   heading rather than a caption over a text area. */
+.reading-field-major {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.reading-field-major textarea {
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
 .reading-field textarea {
   font-family: inherit;
   resize: vertical;
@@ -8248,21 +8260,41 @@ h2 {
   text-decoration-color: #2f6b52;
 }
 
-/* One row of switches for the passage, with the player on the end. Wraps on a
-   phone rather than squeezing, because these are finger targets. */
+/* One row of switches for the passage, with the player's two buttons on the
+   end. It asks for a basis wide enough to hold them: without one, a flex item
+   beside the title is squeezed to its minimum and every switch lands on a line
+   of its own. Below that it takes a line to itself instead. */
 .reading-tools {
   align-items: center;
   display: flex;
+  flex: 1 1 300px;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Carries the audio but never draws it — there is deliberately no seek bar. */
+.reading-tools audio {
+  display: none;
+}
+
+/* On a phone the title takes the line to itself, so the switches start where
+   the eye already is rather than hugging the far edge. */
+@media (max-width: 560px) {
+  .reading-tools {
+    justify-content: flex-start;
+  }
 }
 
 .reading-toggle {
+  align-items: center;
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted);
+  display: inline-flex;
   font-size: 13px;
+  gap: 5px;
   padding: 5px 12px;
 }
 
@@ -8273,15 +8305,7 @@ h2 {
   font-weight: 600;
 }
 
-/* The player is a guest in this row: it brings its own card styling for the
-   listening page, which would make the row twice as tall here. */
-.reading-tools .listening-player {
-  background: none;
-  border: 0;
-  box-shadow: none;
-  margin: 0;
-  padding: 0;
-}
+
 
 /* Waiting on the quiz. Still a switch, still in its place, so a student can see
    that these come back — the note beneath says when. */

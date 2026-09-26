@@ -296,7 +296,7 @@ export function ParticipantPage() {
           : '')
       }
 
-      if (nextQuestion?.screenshot_id) {
+      if (nextQuestion?.screenshot_id && nextQuestion.share_screenshot !== false) {
         const { data } = await supabase.from('screenshots').select('*').eq('id', nextQuestion.screenshot_id).single()
         if (requestId !== loadSequence.current) return
         setScreenshot(data as Screenshot | null)
@@ -978,7 +978,7 @@ export function ParticipantPage() {
               readingFontUrl={question.reading_font_url}
               readingRuby={question.reading_ruby}
               replayLimit={question.replay_limit}
-              variant="model"
+              variant="inline"
             />
           ) : null}
         />

@@ -298,11 +298,10 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
               <input checked={shareShot} type="checkbox" onChange={(event) => setShareShot(event.target.checked)} />
               {t('readingShareShot')}
             </label>
-            <small className="muted">{t('readingShareShotHint')}</small>
           </div>
         )}
 
-        <label className="reading-field">
+        <label className="reading-field reading-field-major">
           {t('readingSource')}
           <textarea
             autoFocus={!capture}
@@ -398,7 +397,6 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
                   )
                 })}
               </div>
-              <small className="muted">{t('readingFocusHint')}</small>
             </div>
           </div>
         )}

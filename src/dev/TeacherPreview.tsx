@@ -14,6 +14,7 @@ import { QuestionEditor } from '../components/QuestionEditor'
 import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
+import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ReadingPassageView } from '../components/ReadingPassageView'
 import { ReadingModal } from '../components/ReadingModal'
 import { DanmakuTimeline } from '../components/DanmakuTimeline'
@@ -77,7 +78,7 @@ export function Preview() {
   // The same panel reached by capturing rather than pasting.
   if (location.hash === '#reading-shot') return <ReadingModal capture={sampleCapture()} open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   if (location.hash === '#reading-locked') return <main className="participant-page"><ReadingPassageView locale="zh-TW" locked passage={readingSample} /></main>
-  if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} /></main>
+  if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
@@ -141,6 +142,16 @@ const readingSample = {
     { point: '因為…所以', level: 3, span: '因為東西新鮮，所以附近的人都來這裡買菜', example: '因為天氣好，所以我們去公園。',
       note: { en: 'Reason first, result second.', zh_tw: '先講原因，再講結果。', es: 'Primero la razón, después el resultado.' } },
   ],
+}
+
+// The audio half of the passage row. Nothing is actually played; what is being
+// looked at is whether two buttons sit in line with the switches.
+function previewPlayer() {
+  const clip = {
+    id: 'c', session_id: 'preview', kind: 'passage' as const, language: 'zh-tw',
+    duration_ms: 1000, public_url: '', created_at: '',
+  }
+  return <ListeningPlayer clip={clip} locale="zh-TW" questionId="q" replayLimit={null} variant="inline" />
 }
 
 // A tiny PNG standing in for a screen grab, so the capture half of the reading

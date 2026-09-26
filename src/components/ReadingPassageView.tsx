@@ -266,7 +266,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
               type="button"
               onClick={() => setShowRuby((current) => !current)}
             >
-              {participantText(locale, 'readingRuby')}
+              {participantText(locale, readings.glyphs ? 'readingZhuyin' : 'readingPinyin')}
             </button>
           )}
           {player}
@@ -282,7 +282,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
 
       <p
         className={`reading-passage-body${showGlyphs ? ' is-annotated' : ''}${showRubyText ? ' reading-ruby is-ruby' : ''}`}
-        style={showGlyphs && family ? { fontFamily: `${family}, inherit` } : undefined}
+        style={showGlyphs && family ? { fontFamily: family } : undefined}
       >
         {runs.map((run) => {
           const words = run.words.map((word, at) => (word.entry ? (

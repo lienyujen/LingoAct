@@ -14,7 +14,9 @@ type Props = {
   readingFontUrl?: string | null
   readingRuby?: string[] | null
   karaokeCues?: KaraokeCue[] | null
-  variant?: 'listening' | 'model'
+  // 'inline' is the passage reader's row, where the player is two buttons
+  // beside the annotation switches rather than a panel of its own.
+  variant?: 'listening' | 'model' | 'inline'
   locale: ParticipantLocale
 }
 
@@ -22,6 +24,7 @@ const SLOW_RATE = 0.75
 
 export function ListeningPlayer({ clip, questionId, replayLimit, prompt, readingFontUrl, readingRuby, karaokeCues, variant = 'listening', locale }: Props) {
   const isModel = variant === 'model'
+  const isInline = variant === 'inline'
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const readingFamily = useReadingFont(readingFontUrl)
   const [used, setUsed] = useState(() => playsUsed(questionId))
@@ -75,6 +78,41 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
       setUsed(recordPlay(questionId))
     }).catch(() => setFailed(true))
   }
+
+  // Every hook has run by here, so the early return is safe. What it drops is
+  // all the framing: the heading, the hint and the replay count belong to a
+  // page about listening, and this is a page about a passage.
+  if (isInline) return (
+    <>
+      <audio
+        ref={audioRef}
+        preload="auto"
+        src={clip.public_url}
+        onEnded={() => { setPlaying(false); setActiveCue(-1) }}
+        onError={() => setFailed(true)}
+      />
+      <button
+        className="reading-toggle"
+        disabled={exhausted || playing || failed}
+        type="button"
+        onClick={start}
+      >
+        <Play size={15} />
+        {participantText(locale, playing
+          ? 'listeningPlaying'
+          : used > 0 ? 'listeningReplay' : 'listeningPlay')}
+      </button>
+      <button
+        aria-pressed={slow}
+        className={`reading-toggle${slow ? ' is-on' : ''}`}
+        type="button"
+        onClick={() => setSlow((current) => !current)}
+      >
+        <Gauge size={15} />
+        {participantText(locale, slow ? 'listeningNormal' : 'listeningSlow')}
+      </button>
+    </>
+  )
 
   return (
     <section className="panel listening-panel">

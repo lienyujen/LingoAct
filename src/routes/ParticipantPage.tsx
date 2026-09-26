@@ -4,6 +4,7 @@ import { BookOpen, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-ic
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { ListeningPlayer } from '../components/ListeningPlayer'
+import { ParticipantBoard } from '../components/ParticipantBoard'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantCustomQuiz } from '../components/ParticipantCustomQuiz'
 import { ParticipantTeachingContext } from '../components/ParticipantTeachingContext'
@@ -79,6 +80,8 @@ export function ParticipantPage() {
   const [buzzerBusy, setBuzzerBusy] = useState(false)
   const [exitTicketBusy, setExitTicketBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [boardQuestion, setBoardQuestion] = useState<Question | null>(null)
+  const [boardImageUrl, setBoardImageUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [sessionChecked, setSessionChecked] = useState(false)
   const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
@@ -281,6 +284,27 @@ export function ParticipantPage() {
       setQuizData(null)
       setQuizLoadError('')
       setScreenshot(null)
+    }
+
+    // The board is loaded separately from the current question because it is
+    // not one: the presenter opens it for a topic and carries on dispatching
+    // other questions, and the class has to be able to go back to it the whole
+    // time. It sits on the page alongside whatever they are being asked now.
+    if (nextSession?.board_question_id) {
+      const { data: boardData } = await supabase
+        .from('questions').select('*').eq('id', nextSession.board_question_id).maybeSingle()
+      const nextBoard = boardData as Question | null
+      setBoardQuestion(nextBoard)
+      if (nextBoard?.screenshot_id && nextBoard.share_screenshot) {
+        const { data } = await supabase
+          .from('screenshots').select('public_url').eq('id', nextBoard.screenshot_id).maybeSingle()
+        setBoardImageUrl((data as { public_url: string } | null)?.public_url || null)
+      } else {
+        setBoardImageUrl(null)
+      }
+    } else {
+      setBoardQuestion(null)
+      setBoardImageUrl(null)
     }
   }, [locale, participantId, participantToken, sessionId])
 
@@ -839,6 +863,20 @@ export function ParticipantPage() {
         onDiscardAudio={discardAudio}
         onSubmitAudio={submitAudio}
       />}
+      {/* Sits between the current question and the danmaku field: the board is
+          somewhere the class goes back to, not something they are being asked
+          right now, so it stays put while questions come and go above it. */}
+      {boardQuestion && participant && participantToken && session && (
+        <ParticipantBoard
+          imageUrl={boardImageUrl}
+          locale={locale}
+          locked={onBreak}
+          participant={participant}
+          participantToken={participantToken}
+          question={boardQuestion}
+          session={session}
+        />
+      )}
       <ParticipantQuestionHistory
         teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
         activeQuestionId={question?.id}

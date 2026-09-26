@@ -30,6 +30,7 @@ const questionTypeLabels: Record<Question['type'], PresenterMessageKey> = {
   file_upload: 'typeFileUpload',
   drawing: 'typeDrawing',
   hotspot: 'typeHotspot',
+  board: 'typeBoard',
   listening: 'typeListening',
 }
 

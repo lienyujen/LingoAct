@@ -1218,3 +1218,269 @@ $$;
 revoke all on function public.submit_teaching_pair(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.submit_teaching_pair(uuid, uuid, text) to service_role;
 notify pgrst, 'reload schema';
+
+-- ============================ 討論板 ============================
+--
+-- The same dispatch 派送畫面 has always been, with replies switched on: the
+-- class puts cards on a wall instead of answering into a box, and can answer
+-- each other. Everything below sits at the end of the file because the whole
+-- file is one transaction — a statement above its own table empties a new
+-- project rather than failing on its own.
+
+alter table public.questions
+  -- Which kinds of card the class may put on the board: any of 'text', 'link',
+  -- 'image', 'file', 'audio', 'drawing'. Empty means the screen was dispatched
+  -- with nothing to answer, which is the plain 派送畫面 it has always been.
+  add column if not exists board_formats text[] not null default '{}'::text[],
+  -- How many cards one student may put up. Null is the infinity option, and is
+  -- the reason this is nullable rather than a large number: the presenter picks
+  -- 1, 2, 3, 5 or ∞, and ∞ has to mean it.
+  add column if not exists board_max_posts integer null,
+  -- When the class could see each other's cards. Normally set the moment the
+  -- board is dispatched, because a wall everyone can see is what a wall is for.
+  -- Null means the presenter asked for 自行作答: each student sees only their
+  -- own until the board is opened. Reversible in both directions — a presenter
+  -- may want the class to think alone first and then look, or to share from the
+  -- start and then close it again to settle everyone down.
+  add column if not exists board_revealed_at timestamptz null;
+
+alter table public.questions drop constraint if exists questions_board_max_posts_check;
+alter table public.questions
+  add constraint questions_board_max_posts_check
+  check (board_max_posts is null or board_max_posts between 1 and 50);
+
+alter table public.questions drop constraint if exists questions_type_check;
+alter table public.questions
+  add constraint questions_type_check
+  check (type in (
+    'send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer',
+    'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'listening',
+    'drawing', 'hotspot', 'board'
+  ));
+
+-- Which board the class is on, which outlives the current question: a board
+-- stays open while the lesson moves on to something else.
+alter table public.sessions
+  add column if not exists board_question_id uuid null;
+alter table public.sessions
+  drop constraint if exists sessions_board_question_id_fkey;
+alter table public.sessions
+  add constraint sessions_board_question_id_fkey
+  foreign key (board_question_id) references public.questions(id)
+  on delete set null;
+
+-- Cards on a 討論板. One row is one thing a student put on the wall.
+create table if not exists public.board_posts (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  participant_id uuid not null references public.participants(id) on delete cascade,
+  participant_name text not null,
+  kind text not null check (kind in ('text', 'link', 'image', 'file', 'audio', 'drawing')),
+  -- The words on the card: the note itself, or the caption under a photograph.
+  body text null,
+  url text null,
+  storage_path text null,
+  mime_type text null,
+  file_size bigint null check (file_size is null or file_size between 1 and 209715200),
+  duration_ms integer null check (duration_ms is null or duration_ms between 250 and 300000),
+  -- A reply to another card. Replies do not count against the per-student
+  -- limit: that limit is how many contributions to the topic one student may
+  -- make, and a class where answering someone costs you your own card is not a
+  -- discussion. Replies are only possible after the board is revealed, because
+  -- before that there is nothing to reply to.
+  reply_to uuid null references public.board_posts(id) on delete cascade,
+  -- Whether the class saw a name on this card, decided when it was written.
+  -- Kept per row rather than read from the session, so turning anonymity off
+  -- later cannot retroactively put names on cards written under it.
+  anonymous_at_display boolean not null default true,
+  -- The student took their own card back down. Kept rather than deleted so the
+  -- report still shows it was written, and so the per-student count cannot be
+  -- reset by deleting and reposting.
+  deleted_at timestamptz null,
+  -- The student corrected their own card. Recorded so the wall can say a card
+  -- was changed after the class read it, rather than quietly showing different
+  -- words to whoever looks next.
+  edited_at timestamptz null,
+  -- The presenter took it down for everyone.
+  hidden_at timestamptz null,
+  -- The presenter pushed it to the front of the wall.
+  pinned_at timestamptz null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists board_posts_question_idx on public.board_posts (question_id, created_at);
+create index if not exists board_posts_participant_idx on public.board_posts (question_id, participant_id);
+create index if not exists board_posts_reply_idx on public.board_posts (reply_to);
+
+-- Who liked what. One row per student per card per emoji, so the primary key
+-- does the de-duplication and a second tap is an ordinary delete.
+create table if not exists public.board_reactions (
+  post_id uuid not null references public.board_posts(id) on delete cascade,
+  participant_id uuid not null references public.participants(id) on delete cascade,
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 8),
+  created_at timestamptz not null default now(),
+  primary key (post_id, participant_id, emoji)
+);
+
+create index if not exists board_reactions_session_idx on public.board_reactions (session_id);
+
+alter table public.board_posts enable row level security;
+alter table public.board_reactions enable row level security;
+
+-- A board card is readable by the class only once the presenter has revealed
+-- the board. Enforced here rather than in the page, because 先遮後揭 stops
+-- being worth anything the moment it is only a decision the client makes: a
+-- student who reloads, or who looks at the network tab, would have the whole
+-- wall. Before the reveal a student's own cards come back through
+-- participant-action, which can prove who is asking; the presenter reads
+-- everything through presenter-action on the service role, so the wall is
+-- never hidden from the person running the class.
+drop policy if exists "read a revealed board" on public.board_posts;
+create policy "read a revealed board" on public.board_posts for select
+to anon, authenticated
+using (
+  exists (
+    select 1 from public.questions
+    where questions.id = board_posts.question_id
+      and questions.board_revealed_at is not null
+  )
+);
+
+-- Both of these exist because a policy on board_posts cannot ask questions
+-- about board_posts: the inner select is itself subject to the policy being
+-- evaluated, and Postgres stops with "infinite recursion detected". A security
+-- definer function runs as the owner and so is not re-checked. Neither returns
+-- any content — one returns a count, the other a yes or no about whether a
+-- card exists — so running them with the owner's rights gives nothing away.
+create or replace function public.board_card_count(target_question uuid, target_participant uuid)
+returns integer
+language sql
+security definer
+stable
+set search_path = public
+as $board$
+  select count(*)::int from public.board_posts
+  where question_id = target_question
+    and participant_id = target_participant
+    and reply_to is null
+    -- Deleting gives the card back. Counting deleted cards would stop nobody
+    -- deleting their way past the limit but punishes the ordinary case: a
+    -- student who posts, thinks better of it, and wants to say it properly.
+    -- The limit is there to stop one person filling the wall, and a card that
+    -- is not on the wall is not filling it.
+    and deleted_at is null
+$board$;
+
+create or replace function public.board_parent_exists(target_question uuid, target_parent uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $board$
+  select exists (
+    select 1 from public.board_posts
+    where id = target_parent
+      and question_id = target_question
+      and reply_to is null
+  )
+$board$;
+
+grant execute on function public.board_card_count(uuid, uuid) to anon, authenticated;
+grant execute on function public.board_parent_exists(uuid, uuid) to anon, authenticated;
+
+drop policy if exists "post to an open board" on public.board_posts;
+create policy "post to an open board" on public.board_posts for insert
+to anon, authenticated
+with check (
+  exists (
+    select 1 from public.questions q
+    join public.sessions s on s.id = q.session_id
+    where q.id = board_posts.question_id
+      and q.session_id = board_posts.session_id
+      and q.type = 'board'
+      and q.status = 'active'
+      and s.status = 'active'
+      -- Only the kinds of card this board was opened for — and only for cards.
+      -- The format list says how a student may ANSWER the topic; answering a
+      -- classmate is a different act and is always words. Applying it to both
+      -- meant that on a board opened for 電寫 alone, every reply was refused:
+      -- a reply is text, text was not on the list, and the class was told
+      -- 貼文失敗 with nothing to do about it.
+      and (
+        board_posts.reply_to is not null
+        or board_posts.kind = any (q.board_formats)
+      )
+      -- A reply is text, on a card on this same board, and only once the board
+      -- has been revealed — there is nothing to answer before that.
+      and (
+        board_posts.reply_to is null
+        or (
+          board_posts.kind = 'text'
+          and q.board_revealed_at is not null
+          and public.board_parent_exists(board_posts.question_id, board_posts.reply_to)
+        )
+      )
+      -- The per-student limit, counted here rather than trusted from the page.
+      -- Deleting frees a slot; see board_card_count. Replies are not counted,
+      -- because a class where answering someone costs you your own card is not
+      -- a discussion.
+      and (
+        board_posts.reply_to is not null
+        or q.board_max_posts is null
+        or public.board_card_count(board_posts.question_id, board_posts.participant_id) < q.board_max_posts
+      )
+  )
+  and exists (
+    select 1 from public.participants
+    where participants.id = board_posts.participant_id
+      and participants.session_id = board_posts.session_id
+      and participants.name = board_posts.participant_name
+  )
+  -- A card has to be something. Which field carries it depends on the kind.
+  and (
+    case board_posts.kind
+      when 'text' then char_length(btrim(coalesce(board_posts.body, ''))) between 1 and 1000
+      when 'link' then char_length(btrim(coalesce(board_posts.url, ''))) between 4 and 2000
+      else char_length(coalesce(board_posts.storage_path, '')) > 0
+    end
+  )
+);
+
+drop policy if exists "read reactions on a revealed board" on public.board_reactions;
+create policy "read reactions on a revealed board" on public.board_reactions for select
+to anon, authenticated
+using (
+  exists (
+    select 1 from public.board_posts p
+    join public.questions q on q.id = p.question_id
+    where p.id = board_reactions.post_id and q.board_revealed_at is not null
+  )
+);
+
+-- Editing, withdrawing, hiding, pinning and reacting all go through the edge
+-- functions on the service role: each of them has to prove who is asking, and
+-- a policy cannot. The class holds select and insert and nothing else.
+grant select, insert on public.board_posts to anon, authenticated;
+grant select on public.board_reactions to anon, authenticated;
+grant all on public.board_posts, public.board_reactions to service_role;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'board_posts'
+  ) then
+    alter publication supabase_realtime add table public.board_posts;
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'board_reactions'
+  ) then
+    alter publication supabase_realtime add table public.board_reactions;
+  end if;
+end $$;

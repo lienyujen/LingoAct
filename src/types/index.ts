@@ -15,6 +15,10 @@ export type Session = {
   // sentences for the current question.
   sentence_wall_enabled: boolean
   current_question_id: string | null
+  // Which 討論板 is open. Kept on the session rather than read from the
+  // current question, because a board outlives the question the class has
+  // moved on to — that is the whole point of it.
+  board_question_id?: string | null
   short_join_url: string | null
   // The language being taught, the language it is explained in, and how far
   // along the class is. Independent of one another: a beginners Japanese class
@@ -91,7 +95,45 @@ export type Screenshot = {
   created_at: string
 }
 
-export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'drawing' | 'hotspot' | 'listening'
+export type BoardPostKind = 'text' | 'link' | 'image' | 'file' | 'audio' | 'drawing'
+
+export type BoardPost = {
+  id: string
+  session_id: string
+  question_id: string
+  participant_id: string
+  participant_name: string
+  kind: BoardPostKind
+  body: string | null
+  url: string | null
+  storage_path: string | null
+  mime_type: string | null
+  file_size: number | null
+  duration_ms: number | null
+  // Set on a reply; null on a card of its own.
+  reply_to: string | null
+  anonymous_at_display: boolean
+  // The student corrected it after posting.
+  edited_at?: string | null
+  // The student took it back down.
+  deleted_at: string | null
+  // The presenter took it down for everyone.
+  hidden_at: string | null
+  pinned_at: string | null
+  created_at: string
+  // Filled in by whoever loaded the card rather than stored: a playable or
+  // viewable address for the uploaded file, and who reacted to it.
+  public_url?: string | null
+  reactions?: BoardReaction[]
+}
+
+export type BoardReaction = {
+  post_id: string
+  participant_id: string
+  emoji: string
+}
+
+export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'drawing' | 'hotspot' | 'board' | 'listening'
 
 export type ListeningKind = 'passage' | 'dialogue' | 'scene'
 
@@ -222,6 +264,14 @@ export type Question = {
   answer_seconds?: number | null
   // 圖上點選: how many points one student may drop. Null on every other type.
   max_pins?: number | null
+  // 討論板. Which kinds of card the class may put up; empty is the plain
+  // 派送畫面 this type grew out of. Null max means the ∞ option, which has to
+  // mean it. revealed_at is when the class could see each other's cards.
+  board_formats: BoardPostKind[]
+  board_max_posts: number | null
+  board_revealed_at: string | null
+  // Whether the dispatched capture is shown to the class alongside the board.
+  share_screenshot: boolean
   // 拍照描述: whether an upload wants a description paired with it. False on a
   // plain 上傳作答, where a caption box would be clutter.
   wants_caption?: boolean

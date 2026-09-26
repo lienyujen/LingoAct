@@ -39,6 +39,7 @@ const flashcard: ParticipantQuizData = {
 
 const practiceQuestion: Question = {
   id: 'preview', session_id: 'preview', screenshot_id: null, listening_clip_id: null, replay_limit: null,
+  board_formats: [], board_max_posts: null, board_revealed_at: null, share_screenshot: true,
   type: 'short_answer', status: 'active', title: '造句寫作牆', prompt_text: '說明自己的選擇。',
   options: [], translations: {}, allow_multiple: false, correct_answer: null, correct_answers: [],
   started_at: null, stopped_at: null, created_at: '',

@@ -955,6 +955,7 @@ export function PresenterPage() {
 
   async function uploadQuestionScreenshot(file: File | null, draft: QuestionDraft) {
     const { type, options, allowMultiple, promptText, quizSettings, maxPins } = draft
+    const { boardFormats, boardMaxPosts, boardSelfPaced } = draft
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error(t('noRightsRejoin'))
     setBusy(true)
@@ -976,6 +977,9 @@ export function PresenterPage() {
             prepareSeconds: draft.prepareSeconds,
             answerSeconds: draft.answerSeconds,
             maxPins,
+            boardFormats,
+            boardMaxPosts,
+            boardSelfPaced,
           },
         })
         if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
@@ -1037,6 +1041,9 @@ export function PresenterPage() {
           prepareSeconds: draft.prepareSeconds,
           answerSeconds: draft.answerSeconds,
           maxPins,
+          boardFormats,
+          boardMaxPosts,
+          boardSelfPaced,
         },
       })
       if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))

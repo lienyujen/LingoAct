@@ -1,4 +1,6 @@
 import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
+import { attachBoardUrls, BOARD_KINDS } from '../_shared/board.ts'
+const boardKinds = new Set<string>(BOARD_KINDS)
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
 import { levelInstruction } from '../_shared/proficiency.ts'
 import { describePictureSource, drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
@@ -16,7 +18,7 @@ import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const questionTypes = new Set(['send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'file_upload', 'drawing', 'hotspot'])
+const questionTypes = new Set(['send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'file_upload', 'drawing', 'hotspot', 'board'])
 // Types that can carry a clock, and the subset where preparing to speak is part
 // of the exercise. A screen send has no answer, an upload takes as long as the
 // photo takes, and a custom quiz is answered through its own attempt flow.
@@ -1821,6 +1823,156 @@ Deno.serve(async (req) => {
 
     // Everything the enlarged 圖上點選 window needs. Read on the service role so
     // the picture is whole for the presenter even while the class is answering.
+    // Everything a 討論板 needs on the presenter's side. Read on the service
+    // role, so the wall is whole here even before it is revealed to the class
+    // and even for cards a student has taken back down — the presenter is the
+    // one person who should never be looking at a partial board.
+    if (action === 'get_board') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+      const { data: question, error: questionError } = await supabase
+        .from('questions')
+        .select('id, type, title, prompt_text, board_formats, board_max_posts, board_revealed_at, status, share_screenshot, screenshot_id')
+        .eq('id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (questionError) throw questionError
+      if (!question || question.type !== 'board') return jsonResponse({ message: '這一題不是討論板。' }, 404)
+
+      const [{ data: posts, error: postError }, { data: shot }] = await Promise.all([
+        supabase.from('board_posts')
+          .select('*')
+          .eq('question_id', questionId).eq('session_id', sessionId)
+          .order('created_at'),
+        question.screenshot_id
+          ? supabase.from('screenshots').select('public_url').eq('id', question.screenshot_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      if (postError) throw postError
+
+      const withUrls = await attachBoardUrls(supabase, posts || [])
+      const ids = withUrls.map((post) => post.id)
+      const { data: reactions, error: reactionError } = ids.length
+        ? await supabase.from('board_reactions').select('post_id, participant_id, emoji').in('post_id', ids)
+        : { data: [], error: null }
+      if (reactionError) throw reactionError
+
+      return jsonResponse({
+        question,
+        posts: withUrls,
+        reactions: reactions || [],
+        imageUrl: shot?.public_url || null,
+      })
+    }
+
+    // Every card in the session, for the report. One call rather than one per
+    // board: a long class can have several, and the report wants them all.
+    if (action === 'get_session_board_posts') {
+      const { data, error } = await supabase.from('board_posts')
+        .select('*').eq('session_id', sessionId).order('created_at')
+      if (error) throw error
+      return jsonResponse({ posts: attachBoardUrls(supabase, data || []) })
+    }
+
+    // Whether the class can see each other's cards, in both directions. A
+    // presenter may want everyone to think alone and then look together, or to
+    // share from the start and then close the wall again to settle the room.
+    if (action === 'set_board_visibility') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+      const shared = Boolean(input.shared)
+      const { data, error } = await supabase.from('questions')
+        .update({ board_revealed_at: shared ? new Date().toISOString() : null })
+        .eq('id', questionId).eq('session_id', sessionId).eq('type', 'board')
+        .select('id, board_revealed_at').maybeSingle()
+      if (error) throw error
+      if (!data) return jsonResponse({ message: '找不到這個討論板。' }, 404)
+      return jsonResponse({ revealedAt: data.board_revealed_at })
+    }
+
+    // Closing and reopening. The cards stay and stay readable either way; what
+    // stops and starts is posting. Reopening also makes it the session's board
+    // again, so it comes back to the class's page.
+    if (action === 'set_board_open') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+      const open = Boolean(input.open)
+      const { data, error } = await supabase.from('questions')
+        .update(open
+          ? { status: 'active', stopped_at: null }
+          : { status: 'stopped', stopped_at: new Date().toISOString() })
+        .eq('id', questionId).eq('session_id', sessionId).eq('type', 'board')
+        .select('id, status').maybeSingle()
+      if (error) throw error
+      if (!data) return jsonResponse({ message: '找不到這個討論板。' }, 404)
+
+      if (open) {
+        // Reopening one board puts away whichever other one was out, for the
+        // same reason opening one does: two walls at once is a filing problem
+        // the class should not be handed mid-lesson.
+        const { data: previous } = await supabase
+          .from('sessions').select('board_question_id').eq('id', sessionId).maybeSingle()
+        const previousBoardId = previous?.board_question_id as string | null | undefined
+        if (previousBoardId && previousBoardId !== questionId) {
+          await supabase.from('questions')
+            .update({ status: 'stopped', stopped_at: new Date().toISOString() })
+            .eq('id', previousBoardId).eq('session_id', sessionId)
+        }
+        const { error: sessionError } = await supabase.from('sessions')
+          .update({ board_question_id: questionId }).eq('id', sessionId)
+        if (sessionError) throw sessionError
+      }
+      // Closing deliberately does NOT clear board_question_id. The wall stays
+      // on the class's page with everything on it; what stops is writing to
+      // it. Clearing it took the whole discussion off their screens, which is
+      // the opposite of what closing a discussion should do — the reading is
+      // the part worth keeping.
+      return jsonResponse({ status: data.status })
+    }
+
+    // Changing what the board accepts while it is running. A discussion that
+    // has started is exactly when a presenter finds out that words were not
+    // enough, or that one card each was too few.
+    if (action === 'update_board_settings') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
+      const patch: Record<string, unknown> = {}
+      if (Array.isArray(input.boardFormats)) {
+        const formats = [...new Set(
+          input.boardFormats.filter((kind: unknown): kind is string => typeof kind === 'string' && boardKinds.has(kind)),
+        )]
+        if (!formats.length) return jsonResponse({ message: '討論板至少要開放一種答題方式。' }, 400)
+        patch.board_formats = formats
+      }
+      if ('boardMaxPosts' in input) {
+        patch.board_max_posts = input.boardMaxPosts === null || input.boardMaxPosts === undefined
+          ? null
+          : Math.min(50, Math.max(1, Number(input.boardMaxPosts) || 1))
+      }
+      if (!Object.keys(patch).length) return jsonResponse({ message: '沒有要變更的設定。' }, 400)
+      const { data, error } = await supabase.from('questions')
+        .update(patch).eq('id', questionId).eq('session_id', sessionId).eq('type', 'board')
+        .select('id, board_formats, board_max_posts').maybeSingle()
+      if (error) throw error
+      if (!data) return jsonResponse({ message: '找不到這個討論板。' }, 404)
+      return jsonResponse({ question: data })
+    }
+
+    // Moderation. Hiding is reversible and keeps the card in the report;
+    // pinning moves it to the front of the wall for everyone.
+    if (action === 'set_board_post_state') {
+      const postId = input.postId
+      if (!validUuid(postId)) return jsonResponse({ message: '貼文資料格式不正確。' }, 400)
+      const patch: Record<string, string | null> = {}
+      if ('hidden' in input) patch.hidden_at = input.hidden ? new Date().toISOString() : null
+      if ('pinned' in input) patch.pinned_at = input.pinned ? new Date().toISOString() : null
+      if (!Object.keys(patch).length) return jsonResponse({ message: '沒有要變更的狀態。' }, 400)
+      const { data, error } = await supabase.from('board_posts')
+        .update(patch).eq('id', postId).eq('session_id', sessionId)
+        .select('id, hidden_at, pinned_at').maybeSingle()
+      if (error) throw error
+      if (!data) return jsonResponse({ message: '找不到這則貼文。' }, 404)
+      return jsonResponse({ post: data })
+    }
+
     if (action === 'get_hotspot_result') {
       const questionId = input.questionId
       if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)
@@ -1878,6 +2030,31 @@ Deno.serve(async (req) => {
       // How many points one student may drop. Only 圖上點選 reads it, so every
       // other type stores null rather than a number nothing will ever honour.
       const maxPins = type === 'hotspot' ? Math.min(10, Math.max(1, Number(input.maxPins) || 1)) : null
+      // A 討論板 is the dispatch screen with replies switched on, so it is the
+      // only type that reads these. An empty format list would be a board
+      // nobody can post to, which is just a dispatched screen — the editor
+      // sends type 'send_screen' in that case and never gets here.
+      const boardFormats = type === 'board'
+        ? [...new Set(
+            (Array.isArray(input.boardFormats) ? input.boardFormats : [])
+              .filter((kind: unknown): kind is string => typeof kind === 'string' && boardKinds.has(kind)),
+          )]
+        : []
+      if (type === 'board' && !boardFormats.length) {
+        return jsonResponse({ message: '討論板至少要開放一種回覆方式。' }, 400)
+      }
+      // Null is the ∞ option and has to survive as null; anything else is
+      // clamped to the range the column allows.
+      const rawMaxPosts = input.boardMaxPosts
+      const boardMaxPosts = type === 'board' && rawMaxPosts !== null && rawMaxPosts !== undefined
+        ? Math.min(50, Math.max(1, Number(rawMaxPosts) || 1))
+        : null
+      // Shared from the start, because a wall the class cannot see is not a
+      // wall. 自行作答 is the exception the presenter asks for when they want
+      // everyone to think alone before looking.
+      const boardRevealedAt = type === 'board' && !input.boardSelfPaced
+        ? new Date().toISOString()
+        : null
       if (prepareSeconds === undefined || answerSeconds === undefined) {
         return jsonResponse({ message: '時間設定不正確。' }, 400)
       }
@@ -1893,6 +2070,7 @@ Deno.serve(async (req) => {
         file_upload: '上傳作答',
         drawing: '電寫題',
         hotspot: '圖上點選',
+        board: '討論板',
       }
       let translations = {}
       try {
@@ -1943,10 +2121,34 @@ Deno.serve(async (req) => {
           prepare_seconds: prepareSeconds,
           answer_seconds: answerSeconds,
           max_pins: maxPins,
+          board_formats: boardFormats,
+          board_max_posts: boardMaxPosts,
+          board_revealed_at: boardRevealedAt,
         })
         .select('*')
         .single()
       if (questionError) throw questionError
+
+      // Opening a second board closes the first: two walls at once is a filing
+      // problem the class should not be handed mid-lesson. Which board is open
+      // is remembered on the session rather than read from the current
+      // question, because a board outlives the question the class moved on to.
+      if (type === 'board') {
+        const { data: previous } = await supabase
+          .from('sessions').select('board_question_id').eq('id', sessionId).maybeSingle()
+        const previousBoardId = previous?.board_question_id as string | null | undefined
+        if (previousBoardId && previousBoardId !== question.id) {
+          const { error: closeError } = await supabase
+            .from('questions')
+            .update({ status: 'stopped', stopped_at: new Date().toISOString() })
+            .eq('id', previousBoardId)
+            .eq('session_id', sessionId)
+          if (closeError) throw closeError
+        }
+        const { error: boardError } = await supabase
+          .from('sessions').update({ board_question_id: question.id }).eq('id', sessionId)
+        if (boardError) throw boardError
+      }
 
       const { error: sessionError } = await supabase
         .from('sessions')

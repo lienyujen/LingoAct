@@ -1,8 +1,13 @@
-import { ArrowsOut, CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Play, Sparkle, Square, Waveform, X } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowsOut, CheckCircle, CircleNotch, DiceFive, DownloadSimple, Eye, EyeSlash, Faders, FileArrowUp, Play, Sparkle, Square, Waveform, X, XSquare } from '@phosphor-icons/react'
 import { createPortal } from 'react-dom'
+import { BoardWall } from './BoardWall'
+import { TimingRow } from './TimingRow'
+import { boardAction, loadBoard } from '../lib/boardData'
+import type { BoardSnapshot } from '../lib/boardData'
+import type { BoardPostKind } from '../types'
 import { HotspotImage } from './HotspotImage'
 import { parsePins, pinColor, pinLabel } from '../lib/hotspot'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
@@ -457,6 +462,153 @@ function HotspotResults(props: Props & { question: Question }) {
   )
 }
 
+const BOARD_FORMAT_LABELS: Array<[BoardPostKind, PresenterMessageKey]> = [
+  ['text', 'boardFormatText'], ['link', 'boardFormatLink'], ['image', 'boardFormatImage'],
+  ['file', 'boardFormatFile'], ['audio', 'boardFormatAudio'], ['drawing', 'boardFormatDrawing'],
+]
+
+// The wall as the presenter sees it, beside the class list.
+function BoardResults(props: Props & { question: Question }) {
+  const { question } = props
+  const t = usePresenterText()
+  const [snapshot, setSnapshot] = useState<BoardSnapshot | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [editing, setEditing] = useState(false)
+
+  // Polled rather than subscribed: the presenter's copy comes through the edge
+  // function on the service role, because before the reveal the table is closed
+  // even to them through the ordinary client, and realtime obeys the same
+  // policy. Ten seconds is well inside the pace a teacher reads a wall at.
+  useEffect(() => {
+    let live = true
+    const read = async () => {
+      try {
+        const next = await loadBoard(question.session_id, question.id)
+        if (live) { setSnapshot(next); setError('') }
+      } catch (caught) {
+        if (live) setError(caught instanceof Error ? caught.message : t('boardLoadFailed'))
+      }
+    }
+    void read()
+    const timer = window.setInterval(() => void read(), 10_000)
+    return () => { live = false; window.clearInterval(timer) }
+  }, [question.id, question.session_id, t])
+
+  const live = snapshot?.question
+  const revealed = Boolean(live?.board_revealed_at ?? question.board_revealed_at)
+  const open = (live?.status ?? question.status) === 'active'
+  const formats = (live?.board_formats ?? question.board_formats ?? []) as BoardPostKind[]
+  const maxPosts = live?.board_max_posts ?? question.board_max_posts
+  const cards = (snapshot?.posts || []).filter((post) => !post.reply_to)
+  const contributors = new Set(cards.filter((post) => !post.deleted_at).map((post) => post.participant_id)).size
+
+  async function run(body: Record<string, unknown>) {
+    setBusy(true)
+    setError('')
+    try {
+      await boardAction(question.session_id, body)
+      setSnapshot(await loadBoard(question.session_id, question.id))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t('boardActionFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function enlarge() {
+    if (!window.lingoActDesktop?.openBoardReview) return
+    window.lingoActDesktop.openBoardReview(question.session_id, question.id)
+      .catch((caught: unknown) => {
+        setError(t('boardEnlargeFailed', { message: caught instanceof Error ? caught.message : '' }))
+      })
+  }
+
+  return (
+    <section className="panel result-panel board-results-panel">
+      <div className="panel-heading">
+        <h2>{question.title}</h2>
+        <span className="hotspot-heading-actions">
+          {window.lingoActDesktop?.openBoardReview && (
+            <button aria-label={t('boardEnlarge')} className="icon-button" title={t('boardEnlarge')} type="button" onClick={enlarge}>
+              <ArrowsOut size={20} />
+            </button>
+          )}
+        </span>
+      </div>
+      {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
+      <p className="muted">
+        {t('boardTally', { cards: cards.filter((post) => !post.deleted_at).length, people: contributors })}
+        {maxPosts === null ? t('boardCapNone') : t('boardCapSome', { n: maxPosts })}
+      </p>
+      {error && <p className="error">{error}</p>}
+
+      <div className="board-results-actions">
+        {/* Both ways. A presenter may want the class to think alone and then
+            look together, or to share from the start and then close the wall
+            again to settle the room. */}
+        <button className="ghost-button" disabled={busy} type="button"
+          onClick={() => void run({ action: 'set_board_visibility', questionId: question.id, shared: !revealed })}>
+          {revealed ? <><EyeSlash size={16} />{t('boardMakeSelfPaced')}</> : <><Eye size={16} />{t('boardReveal')}</>}
+        </button>
+        <button className="ghost-button" disabled={busy} type="button"
+          onClick={() => void run({ action: 'set_board_open', questionId: question.id, open: !open })}>
+          {open ? <><XSquare size={16} />{t('boardClose')}</> : <><ArrowCounterClockwise size={16} />{t('boardReopen')}</>}
+        </button>
+        <button className="ghost-button" disabled={busy} type="button" onClick={() => setEditing((current) => !current)}>
+          <Faders size={16} />{t('boardAdjust')}
+        </button>
+      </div>
+      {editing && (
+        <div className="board-settings">
+          {/* A discussion that has started is exactly when a presenter finds
+              out that words were not enough, or that one card each was too
+              few. Changing either does not disturb what is already up. */}
+          <div className="board-format-grid">
+            {BOARD_FORMAT_LABELS.map(([kind, label]) => {
+              const on = formats.includes(kind)
+              return (
+                <button
+                  aria-pressed={on}
+                  className={`board-format-chip${on ? ' is-selected' : ''}`}
+                  disabled={busy}
+                  key={kind}
+                  type="button"
+                  onClick={() => {
+                    const next = on ? formats.filter((item) => item !== kind) : [...formats, kind]
+                    if (!next.length) return
+                    void run({ action: 'update_board_settings', questionId: question.id, boardFormats: next })
+                  }}
+                >
+                  <strong>{t(label)}</strong>
+                </button>
+              )
+            })}
+          </div>
+          <TimingRow
+            formatValue={(value: number) => t('boardPostCount', { n: value })}
+            label={t('boardPerStudent')}
+            offLabel={t('boardUnlimitedShort')}
+            presets={[1, 2, 3, 5, null]}
+            value={maxPosts}
+            onChange={(value: number | null) => void run({ action: 'update_board_settings', questionId: question.id, boardMaxPosts: value })}
+          />
+        </div>
+      )}
+      {!revealed && <p className="muted">{t('boardOnlyOwn')}</p>}
+      {!open && <p className="muted">{t('boardEnded')}</p>}
+
+      <BoardWall
+        anonymous={Boolean(snapshot?.posts.some((post) => post.anonymous_at_display))}
+        busy={busy}
+        posts={snapshot?.posts || []}
+        reactions={snapshot?.reactions || []}
+        onSetState={(postId, patch) => void run({ action: 'set_board_post_state', postId, ...patch })}
+      />
+    </section>
+  )
+}
+
 export function QuestionResult(props: Props) {
   const t = usePresenterText()
   const { anonymousEnabled, question, answers, audioResponses, analysis, onSetCorrectAnswer } = props
@@ -510,6 +662,8 @@ export function QuestionResult(props: Props) {
   // through the same rows — so it reads back through the same panel.
   // 圖上點選 hands back coordinates rather than answers, so it reads nothing
   // like the other panels and gets its own.
+  if (question.type === 'board') return <BoardResults {...props} question={question} />
+
   if (question.type === 'hotspot') return <HotspotResults {...props} question={question} />
 
   if (question.type === 'file_upload' || question.type === 'drawing') {

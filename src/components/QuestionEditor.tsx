@@ -1,6 +1,6 @@
 import { Image, NotePencil, PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
-import type { QuestionType, QuizRequestedType } from '../types'
+import type { BoardPostKind, QuestionType, QuizRequestedType } from '../types'
 import { CustomQuizFields } from './CustomQuizFields'
 import { quizSettingsFrom } from '../lib/customQuiz'
 import { usePresenterText } from '../lib/presenterI18n'
@@ -26,6 +26,12 @@ export type QuestionDraft = {
   // Null on both means untimed, which stays the default.
   prepareSeconds: number | null
   answerSeconds: number | null
+  // 討論板. Ticking any format turns a 派送畫面 into a board, which is why
+  // there is no separate type to choose on the way in — the board is that same
+  // dispatch with replies switched on.
+  boardFormats?: BoardPostKind[]
+  boardMaxPosts?: number | null
+  boardSelfPaced?: boolean
   // 圖上點選 only: how many taps one student gets.
   maxPins?: number | null
 }
@@ -53,6 +59,15 @@ const SPOKEN_TYPES: QuestionType[] = ['pronunciation', 'oral_response']
 const ANSWER_PRESETS: Array<number | null> = [null, 30, 60, 90, 180]
 const PREPARE_PRESETS: Array<number | null> = [null, 10, 20, 30]
 
+const boardFormatChoices: Array<{ kind: BoardPostKind; label: PresenterMessageKey; hint: PresenterMessageKey }> = [
+  { kind: 'text', label: 'boardFormatText', hint: 'boardFormatTextHint' },
+  { kind: 'link', label: 'boardFormatLink', hint: 'boardFormatLinkHint' },
+  { kind: 'image', label: 'boardFormatImage', hint: 'boardFormatImageHint' },
+  { kind: 'file', label: 'boardFormatFile', hint: 'boardFormatFileHint' },
+  { kind: 'audio', label: 'boardFormatAudio', hint: 'boardFormatAudioHint' },
+  { kind: 'drawing', label: 'boardFormatDrawing', hint: 'boardFormatDrawingHint' },
+]
+
 const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> = [
   { type: 'send_screen', label: 'typeSendScreen' },
   { type: 'custom_quiz', label: 'typeCustomQuiz' },
@@ -74,6 +89,14 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [allowMultiple, setAllowMultiple] = useState(false)
   const [promptText, setPromptText] = useState('')
   const [maxPins, setMaxPins] = useState(1)
+  const [boardFormats, setBoardFormats] = useState<BoardPostKind[]>([])
+  const [boardMaxPosts, setBoardMaxPosts] = useState<number | null>(1)
+  // Whether the class thinks alone before seeing each other. Off by default,
+  // because a wall nobody can see is not a wall; the presenter can turn it on
+  // and off from the board itself once the class is going.
+  const [boardSelfPaced, setBoardSelfPaced] = useState(false)
+  // Ticking any format is what makes this a board rather than a plain dispatch.
+  const isBoard = type === 'send_screen' && boardFormats.length > 0
   const [quizCount, setQuizCount] = useState('auto')
   const [quizType, setQuizType] = useState<QuizRequestedType>('random')
   const [quizDirection, setQuizDirection] = useState('')
@@ -100,6 +123,9 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
     setQuizDirection(quiz?.direction || initialDraft?.promptText || '')
     setQuizCoaching(quiz?.coaching === true)
     setMaxPins(initialDraft?.maxPins ?? 1)
+    setBoardFormats(initialDraft?.boardFormats || [])
+    setBoardMaxPosts(initialDraft?.boardMaxPosts ?? 1)
+    setBoardSelfPaced(initialDraft?.boardSelfPaced === true)
     setPrepareSeconds(initialDraft?.prepareSeconds ?? null)
     setAnswerSeconds(initialDraft?.answerSeconds ?? null)
     setInteraction(initialDraft?.interaction || { kind: preset === 'matching' ? 'matching' : 'ordering', items: [], tiles: [], sentenceMode: false, hasAnswer: true, shareScreenshot: false })
@@ -142,10 +168,17 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             return
           }
           onCreate({
-            type,
+            // Ticking a format is what makes it a board; nothing ticked stays the
+            // plain dispatch it has always been.
+            type: isBoard ? 'board' : type,
             options: finalOptions,
             allowMultiple: editableOptions && allowMultiple,
-            promptText: type === 'send_screen' ? '' : promptText.trim(),
+            // A board is a topic, so its prompt is the topic rather than
+            // nothing — that is the one thing a plain dispatch does not have.
+            promptText: type === 'send_screen' && !isBoard ? '' : promptText.trim(),
+            boardFormats: isBoard ? boardFormats : [],
+            boardMaxPosts: isBoard ? boardMaxPosts : null,
+            boardSelfPaced: isBoard && boardSelfPaced,
             // Timing a type that cannot be timed would store a limit nothing
             // reads, so the fields are dropped rather than merely hidden.
             prepareSeconds: timed && SPOKEN_TYPES.includes(type) ? prepareSeconds : null,
@@ -261,7 +294,66 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             onTypeChange={setQuizType}
           />
         )}
-        {type !== 'send_screen' && type !== 'custom_quiz' && (
+        {type === 'send_screen' && (
+          <div className="board-setup">
+            {/* Ticking any of these turns the dispatch into a board. Nothing
+                ticked is the plain 派送畫面 it has always been, which is why
+                there is no separate type to choose on the way in. */}
+            <fieldset className="board-formats">
+              <legend>{t('boardFormatsLegend')}</legend>
+              <div className="board-format-grid">
+                {boardFormatChoices.map((choice) => {
+                  const on = boardFormats.includes(choice.kind)
+                  return (
+                    <button
+                      aria-pressed={on}
+                      className={`board-format-chip${on ? ' is-selected' : ''}`}
+                      key={choice.kind}
+                      type="button"
+                      onClick={() => setBoardFormats((current) => (
+                        current.includes(choice.kind)
+                          ? current.filter((kind) => kind !== choice.kind)
+                          : [...current, choice.kind]
+                      ))}
+                    >
+                      <strong>{t(choice.label)}</strong>
+                      <span>{t(choice.hint)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </fieldset>
+            {isBoard && (
+              <div className="question-timing">
+                <TimingRow
+                  formatValue={(value) => t('boardPostCount', { n: value })}
+                  label={t('boardPerStudent')}
+                  offLabel={t('boardUnlimitedShort')}
+                  presets={[1, 2, 3, 5, null]}
+                  value={boardMaxPosts}
+                  onChange={setBoardMaxPosts}
+                />
+              </div>
+            )}
+            {isBoard && (
+              <label className="multi-select-setting">
+                <input
+                  checked={boardSelfPaced}
+                  type="checkbox"
+                  onChange={(event) => setBoardSelfPaced(event.target.checked)}
+                />
+                {t('boardSelfPacedLabel')}
+              </label>
+            )}
+            {isBoard && (
+              <p className="muted question-type-hint">
+                {boardSelfPaced ? t('boardSelfPacedHint') : t('boardSharedHint')}
+                {t('boardStaysOpen')}
+              </p>
+            )}
+          </div>
+        )}
+        {(type !== 'send_screen' || isBoard) && type !== 'custom_quiz' && (
           <label className="question-prompt-field">
             {type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : type === 'drawing' ? t('drawingPromptLabel') : t('promptLabel')}
             <input

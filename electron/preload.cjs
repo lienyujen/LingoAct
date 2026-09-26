@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('lingoActDesktop', {
   openRoster: (sessionId) => ipcRenderer.invoke('window:open-roster', sessionId),
   openCustomQuizReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-custom-quiz-review', sessionId, questionId),
   openHotspotReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-hotspot-review', sessionId, questionId),
+  openBoardReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-board-review', sessionId, questionId),
   subsetBopomofoFont: (text) => ipcRenderer.invoke('bopomofo:subset', text),
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),

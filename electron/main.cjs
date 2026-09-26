@@ -831,6 +831,11 @@ ipcMain.handle('window:open-hotspot-review', (_event, sessionId, questionId) => 
   requireUuid(questionId, 'question')
   createCustomQuizReviewWindow(sessionId, questionId, 'hotspot-review')
 })
+ipcMain.handle('window:open-board-review', (_event, sessionId, questionId) => {
+  requireUuid(sessionId)
+  requireUuid(questionId, 'question')
+  createCustomQuizReviewWindow(sessionId, questionId, 'board-review')
+})
 
 ipcMain.handle('capture:list', listCaptureSources)
 

@@ -38,6 +38,7 @@ const questionTypeLabels = {
   file_upload: '上傳作答',
   drawing: '電寫題',
   hotspot: '圖上點選',
+  board: '討論板',
   listening: '聽力',
 }
 

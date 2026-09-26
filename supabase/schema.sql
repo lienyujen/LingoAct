@@ -82,7 +82,7 @@ create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.sessions(id) on delete cascade,
   screenshot_id uuid null references public.screenshots(id) on delete set null,
-  type text not null check (type in ('send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'drawing')),
+  type text not null check (type in ('send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'drawing', 'hotspot')),
   status text not null default 'active' check (status in ('draft', 'active', 'stopped', 'closed')),
   title text not null default '',
   prompt_text text null,
@@ -1014,13 +1014,28 @@ alter table public.questions
 alter table public.questions
   add column if not exists replay_limit integer null check (replay_limit is null or replay_limit between 1 and 10);
 
+-- How many points one student may drop on a 圖上點選 image. Null everywhere else.
+alter table public.questions
+  add column if not exists max_pins integer null;
+do $
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.questions'::regclass and conname = 'questions_max_pins_check'
+  ) then
+    alter table public.questions
+      add constraint questions_max_pins_check
+      check (max_pins is null or max_pins between 1 and 10);
+  end if;
+end $;
+
 alter table public.questions drop constraint if exists questions_type_check;
 alter table public.questions
   add constraint questions_type_check
   check (type in (
     'send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer',
     'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'listening',
-    'drawing'
+    'drawing', 'hotspot'
   ));
 
 do $$

@@ -1,4 +1,7 @@
-import { CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Play, Sparkle, Square, Waveform } from '@phosphor-icons/react'
+import { ArrowsOut, CheckCircle, CircleNotch, DiceFive, DownloadSimple, FileArrowUp, Play, Sparkle, Square, Waveform, X } from '@phosphor-icons/react'
+import { createPortal } from 'react-dom'
+import { HotspotImage } from './HotspotImage'
+import { parsePins, pinColor, pinLabel } from '../lib/hotspot'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
@@ -12,6 +15,8 @@ import { QuestionActivityStatus } from './QuestionActivityStatus'
 type Props = {
   anonymousEnabled: boolean
   question: Question | null
+  // The capture a 圖上點選 question was answered on. Null for every other type.
+  screenshotUrl?: string | null
   answers: Answer[]
   audioResponses: AudioResponse[]
   fileResponses: FileResponse[]
@@ -388,6 +393,70 @@ function UploadResults({
   )
 }
 
+// Every tap the class made, back on the picture they were looking at. What a
+// teacher wants here is not how many were wrong but where they all went —
+// eighteen pins in one place is the next thing to explain.
+function HotspotResults(props: Props & { question: Question }) {
+  const { anonymousEnabled, answers, question, screenshotUrl } = props
+  const t = usePresenterText()
+  const [expanded, setExpanded] = useState(false)
+
+  const pins = answers.flatMap((entry, index) => parsePins(entry.answer_values).map((point) => ({
+    ...point,
+    label: pinLabel(entry.participant_name, anonymousEnabled, index),
+    color: pinColor(entry.participant_id),
+  })))
+
+  // The panel is a column beside the class list, so the picture in it is a
+  // thumbnail. Same gesture as 自訂測驗: a real window in the desktop app, a
+  // full-screen overlay everywhere else.
+  function enlarge() {
+    if (window.lingoActDesktop) {
+      void window.lingoActDesktop.openHotspotReview(question.session_id, question.id)
+      return
+    }
+    setExpanded(true)
+  }
+
+  return (
+    <section className="panel result-panel hotspot-results-panel">
+      <div className="panel-heading">
+        <h2>{question.title}</h2>
+        {screenshotUrl && (
+          <span className="hotspot-heading-actions">
+            <button aria-label={t('hotspotEnlarge')} className="icon-button" title={t('hotspotEnlarge')} type="button" onClick={enlarge}>
+              <ArrowsOut size={20} />
+            </button>
+          </span>
+        )}
+      </div>
+      {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
+      <p className="muted">{t('hotspotTally', { people: answers.length, pins: pins.length })}</p>
+      {screenshotUrl
+        ? (
+          <button className="hotspot-thumb-button" title={t('hotspotEnlarge')} type="button" onClick={enlarge}>
+            <HotspotImage alt={t('hotspotEnlarge')} imageUrl={screenshotUrl} pins={pins} />
+          </button>
+        )
+        : <p className="muted">{t('hotspotNobody')}</p>}
+      {expanded && screenshotUrl && createPortal(
+        <div className="custom-quiz-review-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpanded(false) }}>
+          <section aria-label={t('hotspotEnlarge')} aria-modal="true" className="hotspot-review-modal" role="dialog">
+            <header>
+              <h2>{question.prompt_text || question.title}</h2>
+              <button aria-label={t('close')} className="icon-button" title={t('close')} type="button" onClick={() => setExpanded(false)}><X size={22} /></button>
+            </header>
+            <div className="hotspot-review-stage">
+              <HotspotImage alt={t('hotspotEnlarge')} imageUrl={screenshotUrl} pins={pins} />
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
+    </section>
+  )
+}
+
 export function QuestionResult(props: Props) {
   const t = usePresenterText()
   const { anonymousEnabled, question, answers, audioResponses, analysis, onSetCorrectAnswer } = props
@@ -439,6 +508,10 @@ export function QuestionResult(props: Props) {
 
   // 電寫題 hands in the same thing an upload does — one image per student,
   // through the same rows — so it reads back through the same panel.
+  // 圖上點選 hands back coordinates rather than answers, so it reads nothing
+  // like the other panels and gets its own.
+  if (question.type === 'hotspot') return <HotspotResults {...props} question={question} />
+
   if (question.type === 'file_upload' || question.type === 'drawing') {
     return (
       <>

@@ -8,12 +8,14 @@ type Props = {
   offLabel: string
   presets: Array<number | null>
   value: number | null
+  // Seconds by default; 圖上點選 counts taps through the same row.
+  formatValue?: (value: number) => string
   onChange: (seconds: number | null) => void
 }
 
 // Chips rather than a number field. The teacher sets this mid-class, and a row
 // of taps beats typing into a spinner while thirty students wait.
-export function TimingRow({ label, offLabel, presets, value, onChange }: Props) {
+export function TimingRow({ label, offLabel, presets, value, formatValue, onChange }: Props) {
   const locale = usePresenterLocale()
   return (
     <div className="timing-row">
@@ -27,7 +29,7 @@ export function TimingRow({ label, offLabel, presets, value, onChange }: Props) 
             type="button"
             onClick={() => onChange(preset)}
           >
-            {preset === null ? offLabel : formatSeconds(preset, locale)}
+            {preset === null ? offLabel : (formatValue ? formatValue(preset) : formatSeconds(preset, locale))}
           </button>
         ))}
       </div>

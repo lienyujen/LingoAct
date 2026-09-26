@@ -800,7 +800,7 @@ export function ParticipantPage() {
           question={question} sessionId={sessionId} participantId={participant.id} participantToken={participantToken} locale={locale}
           active={session?.status === 'active' && question.status === 'active'} />}
       </div>
-      {screenshot && question?.type !== 'file_upload' && question?.type !== 'drawing' && (
+      {screenshot && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
       {listeningClip && question && (
@@ -830,6 +830,7 @@ export function ParticipantPage() {
         </section>
       )) : <ParticipantQuestionView
         answer={answer}
+        imageUrl={screenshot?.public_url || null}
         audioBusy={audioBusy}
         audioResponse={audioResponse}
         question={question}

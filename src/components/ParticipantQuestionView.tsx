@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PaperPlaneTilt } from '@phosphor-icons/react'
 import { AudioRecorder } from './AudioRecorder'
+import { HotspotImage } from './HotspotImage'
+import { parsePins, serialisePins } from '../lib/hotspot'
 import { RubyText } from './RubyText'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale, ParticipantMessageKey } from '../lib/participantI18n'
@@ -13,6 +15,8 @@ import type { Answer, AudioResponse, Question } from '../types'
 type Props = {
   question: Question | null
   answer: Answer | null
+  // The dispatched capture, which a 圖上點選 question is answered on.
+  imageUrl?: string | null
   audioBusy: boolean
   audioResponse: AudioResponse | null
   onSubmit: (value: string | string[]) => void
@@ -21,7 +25,8 @@ type Props = {
   locale?: ParticipantLocale
 }
 
-export function ParticipantQuestionView({ question, answer, audioBusy, audioResponse, onSubmit, onSubmitAudio, onDiscardAudio, locale = 'zh-TW' }: Props) {
+export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy, audioResponse, onSubmit, onSubmitAudio, onDiscardAudio, locale = 'zh-TW' }: Props) {
+  const [pins, setPins] = useState<Array<{ x: number; y: number }>>([])
   const [textAnswer, setTextAnswer] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
 
@@ -89,7 +94,44 @@ export function ParticipantQuestionView({ question, answer, audioBusy, audioResp
       {isAudioQuestion && (
         <AudioRecorder busy={audioBusy} locale={locale} question={question} response={audioResponse} onDiscard={onDiscardAudio} onSubmit={onSubmitAudio} />
       )}
-      {answer && !isAudioQuestion && <p className="success">{participantText(locale, 'submittedAnswer')}{answer.answer_values?.map(displayAnswer).join(listSeparator(locale)) || (answer.answer_value ? displayAnswer(answer.answer_value) : answer.answer_text)}</p>}
+      {answer && question.type === 'hotspot' && <p className="success">{participantText(locale, 'answerSent')}</p>}
+      {answer && !isAudioQuestion && question.type !== 'hotspot' && <p className="success">{participantText(locale, 'submittedAnswer')}{answer.answer_values?.map(displayAnswer).join(listSeparator(locale)) || (answer.answer_value ? displayAnswer(answer.answer_value) : answer.answer_text)}</p>}
+      {question.type === 'hotspot' && imageUrl && (
+        <div className="participant-hotspot">
+          <HotspotImage
+            alt={participantText(locale, 'imageAlt')}
+            imageUrl={imageUrl}
+            pins={(answer ? parsePins(answer.answer_values) : pins).map((pin, index) => ({ ...pin, label: String(index + 1), own: true }))}
+            onPlace={!answer && acceptingAnswers
+              ? (point) => setPins((current) => (
+                // Full is full. Silently dropping the oldest to make room reads as
+                // "my first mark jumped to where I tapped", because a pin sits above
+                // the spot it marks — so a student aiming at their own mark hits the
+                // picture instead and loses one they meant to keep.
+                current.length >= (question.max_pins || 1) ? current : [...current, point]
+              ))
+              : undefined}
+            onRemove={!answer && acceptingAnswers
+              ? (index) => setPins((current) => current.filter((_, at) => at !== index))
+              : undefined}
+          />
+          {!answer && acceptingAnswers && (
+            <div className="participant-hotspot-actions">
+              {/* What is left, not what is used: the student is deciding whether
+                  to spend another tap, and 還可以點 1 次 answers that where 2 / 3
+                  does not. */}
+              <span className="muted">
+                {pins.length < (question.max_pins || 1)
+                  ? participantText(locale, 'pinsLeft').replace('{n}', String((question.max_pins || 1) - pins.length))
+                  : participantText(locale, 'pinsUsed')}
+              </span>
+              <button disabled={!pins.length} type="button" onClick={() => onSubmit(serialisePins(pins))}>
+                <PaperPlaneTilt size={18} />{participantText(locale, 'submitAnswer')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {!answer && acceptingAnswers && question.type === 'short_answer' && (
         <form className="short-answer-form" onSubmit={submitShortAnswer}>
           <textarea

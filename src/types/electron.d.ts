@@ -28,6 +28,7 @@ declare global {
       openWordCloud: (sessionId: string) => Promise<void>
       openRoster: (sessionId: string) => Promise<void>
       openCustomQuizReview: (sessionId: string, questionId: string) => Promise<void>
+      openHotspotReview: (sessionId: string, questionId: string) => Promise<void>
       // Cuts the Bopomofo font down to the characters of one clip. Only the
       // desktop app can do this: the 17 MB source face ships with it.
       subsetBopomofoFont?: (text: string) => Promise<

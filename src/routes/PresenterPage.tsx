@@ -143,6 +143,9 @@ export function PresenterPage() {
   const [exitTickets, setExitTickets] = useState<ExitTicket[]>([])
   const [analysis, setAnalysis] = useState<QuestionAnalysis | null>(null)
   const [quizResults, setQuizResults] = useState<PresenterQuizResults | null>(null)
+  // 圖上點選 answers are coordinates on the dispatched capture, and the panel
+  // never loads that capture for any other type, so it is fetched alongside.
+  const [hotspotImageUrl, setHotspotImageUrl] = useState<string | null>(null)
   const [analysisBusy, setAnalysisBusy] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [endClassConfirmOpen, setEndClassConfirmOpen] = useState(false)
@@ -377,7 +380,16 @@ export function PresenterPage() {
       setAnalysis(((summaryData as AiSummary | null)?.output_json as QuestionAnalysis | undefined) || null)
       setWallComposition(((wallData as AiSummary | null)?.output_json as SentenceWallComposition | undefined) || null)
       const loadedQuestion = questionData as Question | null
-      if (loadedQuestion?.type === 'custom_quiz') {
+      if (loadedQuestion?.type === 'hotspot') {
+        const presenterToken = getPresenterToken(sessionId)
+        if (presenterToken) {
+          const { data: hotspotData } = await supabase.functions.invoke('presenter-action', {
+            body: { action: 'get_hotspot_result', sessionId, presenterToken, questionId: targetQuestionId },
+          })
+          setHotspotImageUrl((hotspotData as { imageUrl?: string | null } | null)?.imageUrl || null)
+        }
+        setAudioResponses([])
+      } else if (loadedQuestion?.type === 'custom_quiz') {
         const presenterToken = getPresenterToken(sessionId)
         if (presenterToken) {
           const { data: quizData } = await supabase.functions.invoke('presenter-action', {
@@ -942,7 +954,7 @@ export function PresenterPage() {
   }, [clearCaptionDisplayTimers])
 
   async function uploadQuestionScreenshot(file: File | null, draft: QuestionDraft) {
-    const { type, options, allowMultiple, promptText, quizSettings } = draft
+    const { type, options, allowMultiple, promptText, quizSettings, maxPins } = draft
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error(t('noRightsRejoin'))
     setBusy(true)
@@ -963,6 +975,7 @@ export function PresenterPage() {
             promptText,
             prepareSeconds: draft.prepareSeconds,
             answerSeconds: draft.answerSeconds,
+            maxPins,
           },
         })
         if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
@@ -1023,6 +1036,7 @@ export function PresenterPage() {
           promptText,
           prepareSeconds: draft.prepareSeconds,
           answerSeconds: draft.answerSeconds,
+          maxPins,
         },
       })
       if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
@@ -2107,6 +2121,7 @@ export function PresenterPage() {
           />
         ) : <QuestionResult
           anonymousEnabled={session.anonymous_enabled}
+          screenshotUrl={hotspotImageUrl}
           analysis={analysis}
           analysisBusy={analysisBusy}
           analysisError={analysisError}

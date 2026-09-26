@@ -6807,3 +6807,271 @@ h2 {
   color: #dbe6ff;
   font-weight: 600;
 }
+
+/* 圖上點選 —— 三段原樣照抄自 InterAct，含粗指標的 media query。 */
+/* 圖上點選: the picture is the answer sheet, so it fills the width and the pins
+   are positioned as percentages — the class answers on phones and the presenter
+   reads it on a projector, and a pixel means nothing across those two. */
+.hotspot-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: block;
+  line-height: 0;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.hotspot-frame.is-answerable {
+  cursor: crosshair;
+}
+
+.hotspot-image {
+  display: block;
+  width: 100%;
+}
+
+/* A round head with a point below it, both upright.
+   It used to be a square with one sharp corner, rotated -45deg to bring that
+   corner downwards — but rotation happens about the element's centre, so it
+   carried the corner 5.4px past the spot the student actually tapped. Every
+   mark in every class was low by that much, and on a diagram where the answer
+   is a millimetre wide that is the difference between right and wrong.
+
+   The element is the whole pin, head and point together, so its bottom edge IS
+   the point. translate(-50%, -100%) puts that edge on the tap and there is no
+   offset to get wrong — an earlier attempt kept the element as just the head and
+   subtracted the point's height, which left the tip two pixels low because the
+   border and the padding box do not agree about where 100% starts. */
+.hotspot-pin {
+  background: none;
+  border: 0;
+  height: 35px;
+  min-height: 0;
+  padding: 0;
+  position: absolute;
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+  width: 26px;
+}
+
+/* The head. */
+.hotspot-pin > span {
+  align-items: center;
+  background: var(--pin-color, var(--primary, #5b5ce2));
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+  color: #fff;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  height: 26px;
+  justify-content: center;
+  line-height: 1;
+  /* Translucent, so that a crowd on one spot reads as a crowd: pins stacked
+     three deep are visibly darker than one. This used to muddy everything into
+     a single violet because every pin was the same colour; with a colour per
+     student the overlap now says how many, not just that there were some. */
+  opacity: 0.82;
+  width: 26px;
+}
+
+/* The point, ending exactly on the element's bottom edge. */
+.hotspot-pin::after {
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid var(--pin-color, var(--primary, #5b5ce2));
+  bottom: 0;
+  content: '';
+  left: 50%;
+  opacity: 0.82;
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+/* The student's own marks on their own phone, where every pin belongs to them
+   and a colour per student would say nothing. */
+.hotspot-pin.is-own > span {
+  background: var(--danger, #c62828);
+}
+
+.hotspot-pin.is-own::after {
+  border-top-color: var(--danger, #c62828);
+}
+
+/* The global button:active rule sets transform: translateY(1px), and it beats
+   .hotspot-pin on specificity — so pressing a pin REPLACED the transform that
+   positions it. The pin slid out from under the finger (animated, because
+   transform is transitioned), the release landed on the picture instead, and no
+   click ever reached the handler: the mark could not be taken back. Press
+   feedback has to compose with the positioning, not replace it. */
+.hotspot-pin:active {
+  transform: translate(-50%, -100%) scale(0.9);
+}
+
+.hotspot-frame.is-answerable .hotspot-pin {
+  cursor: pointer;
+}
+
+.participant-hotspot-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.hotspot-results-panel .hotspot-frame {
+  margin-top: 10px;
+}
+
+/* The key editor pairs by tapping, so each prompt owns a row of its choices
+   rather than a dropdown. Wraps, because six answers do not fit on one line. */
+/* 圖上點選放大檢視. The picture is the whole result, so the enlarged view is the
+   picture and nothing else — it fills the window and the pins scale with it. */
+.hotspot-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The thumbnail is a button so the whole picture is the target, not just the
+   small icon in the heading. */
+.hotspot-thumb-button {
+  background: none;
+  border: 0;
+  cursor: zoom-in;
+  display: block;
+  padding: 0;
+  width: 100%;
+}
+
+.hotspot-review-modal {
+  background: var(--surface);
+  border: 1px solid rgb(255 255 255 / 65%);
+  border-radius: 22px;
+  box-shadow: 0 28px 90px rgb(24 34 58 / 35%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 88vh;
+  overflow: hidden;
+  width: 88vw;
+}
+
+.hotspot-review-modal > header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+
+.hotspot-review-modal > header h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* Centres the image and caps it at the space available, so a tall screenshot
+   is bounded by the height and a wide one by the width. */
+.hotspot-review-stage {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+/* Both bounds, not just the height. These rules replace the base width: 100%
+   with width: auto so a tall screenshot is not stretched — but with only a
+   max-height, a wide one kept its natural width, overflowed the centred flex
+   line, and lost its right edge off the side of the window. The panel behind it
+   showed the same picture correctly, which made it look like the enlarged view
+   was cropping on purpose.
+   min-width: 0 because a flex item will not shrink below its content otherwise,
+   and the content here is an image that wants to be 2560px wide. */
+.hotspot-review-stage .hotspot-frame {
+  max-height: 100%;
+  max-width: 100%;
+  min-width: 0;
+  width: auto;
+}
+
+/* No object-fit: with both axes capped and neither dimension forced, the aspect
+   ratio is already preserved and object-fit would never engage. Leaving it in
+   read as if it were what did the fitting.
+   The height cap is the modal minus its header and padding rather than a round
+   number of vh: 78vh was a few pixels taller than the space it had to fit in, so
+   a tall screenshot was clipped along the bottom by the frame's overflow. */
+.hotspot-review-stage .hotspot-image {
+  max-height: calc(88vh - 116px);
+  max-width: 100%;
+  width: auto;
+}
+
+/* The standalone desktop window: same stage, but it is the whole window. */
+.hotspot-review-window {
+  background: var(--surface);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.hotspot-review-window > header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 14px 20px;
+  -webkit-app-region: drag;
+}
+
+.hotspot-review-window > header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.hotspot-review-window > header .show-answers-toggle,
+.hotspot-review-window > header .icon-button {
+  -webkit-app-region: no-drag;
+}
+
+.hotspot-review-window > .muted,
+.hotspot-review-window > .error {
+  margin: 10px 20px 0;
+}
+
+/* The standalone window is the full viewport and carries a second line above the
+   picture, so it subtracts more than the modal does. */
+.hotspot-review-window .hotspot-review-stage .hotspot-image {
+  max-height: calc(100vh - 160px);
+}
+
+/* A bigger circle on a touch display. The blanket min-height for touch targets
+   was stretching the head into an ellipse — it did this to the old rotated shape
+   too, which is part of why that one looked askew — so the pin sets its own size
+   and gets a target larger than the rule it opts out of. Only the student taps a
+   pin, to take their own mark back; on the presenter's copy they are disabled. */
+@media (any-pointer: coarse) {
+  .hotspot-pin {
+    height: 46px;
+    width: 34px;
+  }
+
+  .hotspot-pin > span {
+    font-size: 14px;
+    height: 34px;
+    width: 34px;
+  }
+
+  .hotspot-pin::after {
+    border-left-width: 7px;
+    border-right-width: 7px;
+    border-top-width: 13px;
+  }
+}

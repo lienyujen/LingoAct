@@ -26,6 +26,8 @@ export type QuestionDraft = {
   // Null on both means untimed, which stays the default.
   prepareSeconds: number | null
   answerSeconds: number | null
+  // 圖上點選 only: how many taps one student gets.
+  maxPins?: number | null
 }
 
 type Props = {
@@ -58,6 +60,7 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
   { type: 'multiple_choice', label: 'typeMultipleChoice' },
   { type: 'file_upload', label: 'typeFileUpload' },
   { type: 'drawing', label: 'typeDrawing' },
+  { type: 'hotspot', label: 'typeHotspot' },
   { type: 'short_answer', label: 'typeShortAnswer' },
   { type: 'oral_response', label: 'typeOralResponse' },
   { type: 'pronunciation', label: 'typePronunciation' },
@@ -70,6 +73,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
   const [allowMultiple, setAllowMultiple] = useState(false)
   const [promptText, setPromptText] = useState('')
+  const [maxPins, setMaxPins] = useState(1)
   const [quizCount, setQuizCount] = useState('auto')
   const [quizType, setQuizType] = useState<QuizRequestedType>('random')
   const [quizDirection, setQuizDirection] = useState('')
@@ -95,6 +99,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
     setQuizType(initialDraft?.interaction?.kind || quiz?.requestedType || preset || 'random')
     setQuizDirection(quiz?.direction || initialDraft?.promptText || '')
     setQuizCoaching(quiz?.coaching === true)
+    setMaxPins(initialDraft?.maxPins ?? 1)
     setPrepareSeconds(initialDraft?.prepareSeconds ?? null)
     setAnswerSeconds(initialDraft?.answerSeconds ?? null)
     setInteraction(initialDraft?.interaction || { kind: preset === 'matching' ? 'matching' : 'ordering', items: [], tiles: [], sentenceMode: false, hasAnswer: true, shareScreenshot: false })
@@ -102,7 +107,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
 
   const editableOptions = type === 'multiple_choice' || type === 'poll'
   const finalOptions = useMemo(() => {
-    if (['short_answer', 'send_screen', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'drawing'].includes(type)) return []
+    if (['short_answer', 'send_screen', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'drawing', 'hotspot'].includes(type)) return []
     return options.map((option) => option.trim()).filter(Boolean)
   }, [options, type])
 
@@ -145,6 +150,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             // reads, so the fields are dropped rather than merely hidden.
             prepareSeconds: timed && SPOKEN_TYPES.includes(type) ? prepareSeconds : null,
             answerSeconds: timed ? answerSeconds : null,
+            maxPins: type === 'hotspot' ? maxPins : null,
           })
         }}
       >
@@ -227,6 +233,21 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             {t('drawingTypeHint')}
           </p>
         )}
+        {type === 'hotspot' && (
+          <>
+            <p className="muted question-type-hint">{t('hotspotTypeHint')}</p>
+            <div className="question-timing">
+              <TimingRow
+                formatValue={(value) => t('hotspotPinsCount', { n: value })}
+                label={t('hotspotPinsLabel')}
+                offLabel={t('hotspotPinsCount', { n: 1 })}
+                presets={[1, 2, 3, 5]}
+                value={maxPins}
+                onChange={(value) => setMaxPins(value ?? 1)}
+              />
+            </div>
+          </>
+        )}
         {isInteraction && onGenerateInteraction && <InteractionEditor key={`${open}-${quizType}`} value={{ ...interaction, kind: quizType as 'ordering' | 'matching' }} direction={quizDirection} previewUrl={previewUrl} onChange={setInteraction} onDirectionChange={setQuizDirection} onGenerate={onGenerateInteraction} onBusy={setInteractionBusy} />}
         {type === 'custom_quiz' && !isInteraction && (
           <CustomQuizFields
@@ -251,6 +272,8 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
                   ? t('uploadPromptPlaceholder')
                   : type === 'drawing'
                     ? t('drawingPromptPlaceholder')
+                    : type === 'hotspot'
+                      ? t('hotspotPromptPlaceholder')
                     : t('promptPlaceholder')}
               onChange={(event) => setPromptText(event.target.value)}
             />

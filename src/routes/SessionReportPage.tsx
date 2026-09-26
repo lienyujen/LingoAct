@@ -29,6 +29,7 @@ const questionTypeLabels: Record<Question['type'], PresenterMessageKey> = {
   custom_quiz: 'typeCustomQuiz',
   file_upload: 'typeFileUpload',
   drawing: 'typeDrawing',
+  hotspot: 'typeHotspot',
   listening: 'typeListening',
 }
 

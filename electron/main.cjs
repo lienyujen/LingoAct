@@ -535,9 +535,9 @@ function createWordCloudWindow(sessionId) {
   })
 }
 
-function createCustomQuizReviewWindow(sessionId, questionId) {
+function createCustomQuizReviewWindow(sessionId, questionId, route = 'custom-quiz-review') {
   if (quizReviewWindow && !quizReviewWindow.isDestroyed()) {
-    loadAppRoute(quizReviewWindow, `/custom-quiz-review/${sessionId}/${questionId}`)
+    loadAppRoute(quizReviewWindow, `/${route}/${sessionId}/${questionId}`)
     if (quizReviewWindow.isMinimized()) quizReviewWindow.restore()
     quizReviewWindow.show()
     quizReviewWindow.moveTop()
@@ -588,7 +588,7 @@ function createCustomQuizReviewWindow(sessionId, questionId) {
   })
   configureWebContents(nextQuizReviewWindow)
   nextQuizReviewWindow.setAlwaysOnTop(true, TOPMOST_LEVEL, QUIZ_REVIEW_RELATIVE_LEVEL)
-  loadAppRoute(nextQuizReviewWindow, `/custom-quiz-review/${sessionId}/${questionId}`)
+  loadAppRoute(nextQuizReviewWindow, `/${route}/${sessionId}/${questionId}`)
   nextQuizReviewWindow.once('ready-to-show', () => {
     nextQuizReviewWindow.show()
     nextQuizReviewWindow.moveTop()
@@ -825,6 +825,11 @@ ipcMain.handle('window:open-custom-quiz-review', (_event, sessionId, questionId)
   requireUuid(sessionId)
   requireUuid(questionId, 'question')
   createCustomQuizReviewWindow(sessionId, questionId)
+})
+ipcMain.handle('window:open-hotspot-review', (_event, sessionId, questionId) => {
+  requireUuid(sessionId)
+  requireUuid(questionId, 'question')
+  createCustomQuizReviewWindow(sessionId, questionId, 'hotspot-review')
 })
 
 ipcMain.handle('capture:list', listCaptureSources)

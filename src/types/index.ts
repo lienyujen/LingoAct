@@ -91,7 +91,7 @@ export type Screenshot = {
   created_at: string
 }
 
-export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'drawing' | 'listening'
+export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'drawing' | 'hotspot' | 'listening'
 
 export type ListeningKind = 'passage' | 'dialogue' | 'scene'
 
@@ -220,6 +220,8 @@ export type Question = {
   // a spoken challenge, and absent entirely from a vocabulary race.
   prepare_seconds?: number | null
   answer_seconds?: number | null
+  // 圖上點選: how many points one student may drop. Null on every other type.
+  max_pins?: number | null
   // 拍照描述: whether an upload wants a description paired with it. False on a
   // plain 上傳作答, where a caption box would be clutter.
   wants_caption?: boolean

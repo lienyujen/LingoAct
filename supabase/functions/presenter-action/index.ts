@@ -2946,7 +2946,7 @@ Deno.serve(async (req) => {
       }).select('*').single()
       if (questionError) throw questionError
 
-      const { error: passageError } = await supabase.from('reading_passages').insert({
+      const { data: passageRow, error: passageError } = await supabase.from('reading_passages').insert({
         session_id: sessionId,
         question_id: questionId,
         title: passage.title || null,
@@ -2955,7 +2955,7 @@ Deno.serve(async (req) => {
         vocabulary: passage.vocabulary,
         grammar: passage.grammar,
         listening_clip_id: clipId,
-      })
+      }).select('*').single()
       if (passageError) throw passageError
 
       const { error: sessionError } = await supabase.from('sessions')
@@ -3029,10 +3029,10 @@ Deno.serve(async (req) => {
           }
         }
         EdgeRuntime.waitUntil(readingQuiz())
-        return jsonResponse({ question, passage, quizId, generating: true }, 202)
+        return jsonResponse({ question, passage: passageRow, quizId, generating: true }, 202)
       }
 
-      return jsonResponse({ question, passage })
+      return jsonResponse({ question, passage: passageRow })
     }
 
     if (action === 'cancel_buzzer') {

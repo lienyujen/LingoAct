@@ -199,36 +199,46 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
       if (data?.message && !data?.passage) throw new Error(data.message)
       const written = (data?.passage || null) as ReadingPassage | null
       setPassage(written)
+      // Everything after this is about the passage that was just stored, so it
+      // is addressed by the question it hangs off rather than by anything the
+      // generator returned.
+      const writtenQuestionId = written?.question_id || (data?.question as { id?: string } | undefined)?.id || ''
+      if (written && !writtenQuestionId) throw new Error(t('readingFailed'))
+
+      // The passage is out. What follows puts the audio and the readings on
+      // top of it, and neither can take it back down — so a failure in one is
+      // reported and the other is still attempted. They used to throw, which
+      // meant a failed clip also cost the class their 注音.
+      const warnings: string[] = []
 
       if (withAudio && written?.body) {
         // Read aloud after the fact rather than before: the passage the class
         // hears has to be the passage they were given, and until it is written
         // there is nothing to read.
         setStatus(t('readingSpeaking'))
-        // Both of these used to swallow their errors, so a failed clip looked
-        // exactly like a passage with no audio asked for: nothing on the
-        // student's screen and nothing said about it.
-        const { data: clip, error: clipError } = await supabase.functions.invoke('synthesize-listening', {
-          body: {
-            sessionId,
-            presenterToken,
-            transcript: written.body,
-            kind: 'passage',
-            accent,
-          },
-        })
-        if (clipError) throw new Error(await edgeFunctionErrorMessage(clipError, t('readingAudioFailed')))
-        clipId = clip?.clip?.id || null
-        if (!clipId) throw new Error(clip?.message || t('readingAudioFailed'))
+        try {
+          const { data: clip, error: clipError } = await supabase.functions.invoke('synthesize-listening', {
+            body: {
+              sessionId,
+              presenterToken,
+              transcript: written.body,
+              kind: 'passage',
+              accent,
+            },
+          })
+          if (clipError) throw new Error(await edgeFunctionErrorMessage(clipError, t('readingAudioFailed')))
+          clipId = clip?.clip?.id || null
+          if (!clipId) throw new Error(clip?.message || t('readingAudioFailed'))
 
-        const { error: attachError } = await supabase.functions.invoke('presenter-action', {
-          body: { action: 'attach_reading_audio', sessionId, presenterToken, questionId: written.question_id, clipId },
-        })
-        if (attachError) throw new Error(await edgeFunctionErrorMessage(attachError, t('readingAudioFailed')))
+          const { error: attachError } = await supabase.functions.invoke('presenter-action', {
+            body: { action: 'attach_reading_audio', sessionId, presenterToken, questionId: writtenQuestionId, clipId },
+          })
+          if (attachError) throw new Error(await edgeFunctionErrorMessage(attachError, t('readingAudioFailed')))
+        } catch (caught) {
+          warnings.push(caught instanceof Error && caught.message ? caught.message : t('readingAudioFailed'))
+        }
       }
-      // 標音 last, because it is the one step the passage can do without: a
-      // reading with no readings above it is still the lesson, so this reports
-      // what went wrong and leaves the activity standing.
+
       if (written?.body && (annotation === 'zhuyin' || annotation === 'pinyin')) {
         setStatus(t('readingAnnotating'))
         try {
@@ -236,16 +246,17 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           await applyReadingAnnotation({
             sessionId,
             presenterToken,
-            questionId: written.question_id,
+            questionId: writtenQuestionId,
             mode: annotation,
             annotationText: marked.annotationText,
           }, t)
         } catch (caught) {
-          setError(caught instanceof Error && caught.message ? t('readingAnnotateFailedWith', { message: caught.message }) : t('readingAnnotateFailed'))
+          warnings.push(caught instanceof Error && caught.message ? t('readingAnnotateFailedWith', { message: caught.message }) : t('readingAnnotateFailed'))
         }
       }
 
       writeSettings({ stretch, withQuiz, quizCount, focus, withAudio, accent, useImage, shareShot, verbatim })
+      if (warnings.length) { setError(warnings.join(' ')); return }
       onDispatched()
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : t('readingFailed'))

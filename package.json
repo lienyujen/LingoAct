@@ -28,7 +28,7 @@
     "build:guoyu": "tsc -b && cross-env VITE_APP_PROFILE=guoyu vite build",
     "build:ncacls": "tsc -b && cross-env VITE_APP_PROFILE=ncacls vite build",
     "build:plus": "tsc -b && cross-env VITE_APP_EDITION=plus vite build",
-    "lint": "oxlint && node scripts/check-css-tokens.mjs && node scripts/check-schema-order.mjs && node scripts/check-schema-usage.mjs",
+    "lint": "oxlint && node scripts/check-css-tokens.mjs && node scripts/check-schema-order.mjs && node scripts/check-schema-usage.mjs && node scripts/check-schema-columns.mjs && node scripts/check-edge-functions.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

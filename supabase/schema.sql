@@ -1537,3 +1537,29 @@ do $$ begin
     alter publication supabase_realtime add table public.participant_points;
   end if;
 end $$;
+
+-- ================= 程式碼在用、schema 卻沒有的欄位 =================
+--
+-- Each of these is read or written by an edge function and existed in no
+-- create table anywhere, so PostgREST answered the request with an error and
+-- the student saw "Edge Function returned a non-2xx status code". Found by
+-- scripts/check-schema-columns.mjs, which now runs in lint and CI so the next
+-- one is caught before it reaches a class rather than during one.
+
+-- 寫作教練: the finished article, as opposed to the per-section working-out
+-- that lives in quiz_item_answers. participant-action writes it on submit and
+-- the teaching cycle reads it to carry a student's own writing into the next
+-- round.
+alter table public.quiz_attempts
+  add column if not exists composition text null;
+
+-- The corrected article the AI hands back, which the student's page diffs
+-- against what they wrote. { zh_tw, notes }.
+alter table public.quiz_attempts
+  add column if not exists revision jsonb null;
+
+-- Whether a 討論板 shows the capture it was made from. Default true because a
+-- board dispatched from a screenshot is about that screenshot, and nothing
+-- writes the column — a board with no screenshot_id shows nothing regardless.
+alter table public.questions
+  add column if not exists share_screenshot boolean not null default true;

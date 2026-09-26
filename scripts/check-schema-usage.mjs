@@ -33,7 +33,12 @@ const note = (table, column, line) => {
 
 const CREATE = /^create table if not exists public\.([a-z_]+)\s*\(/
 const ALTER = /^alter table (?:only )?public\.([a-z_]+)/
-const ADD_COLUMN = /^\s*(?:,\s*)?add column if not exists ([a-z_]+)/
+// Not anchored at line start: a migration is written either as an indented
+// block or all on one line — `alter table public.questions add column if not
+// exists learning_focus text;` — and matching only the block form reported
+// three columns as missing that had been there all along.
+const ADD_COLUMN = /add column if not exists ([a-z_]+)/
+const ADD_COLUMN_ALL = /add column if not exists ([a-z_]+)/g
 const COLUMN_DEF = /^ {2}([a-z_]+)\s+[a-z]/
 const FUNCTION = /^create or replace function public\.([a-z_]+)/
 // Table-level constraints start with a keyword where a column name would be.
@@ -57,8 +62,7 @@ lines.forEach((line, index) => {
   const altered = line.match(ALTER)
   if (altered) inAlter = altered[1]
   if (inAlter) {
-    const added = line.match(ADD_COLUMN)
-    if (added) note(inAlter, added[1], at)
+    for (const added of line.matchAll(ADD_COLUMN_ALL)) note(inAlter, added[1], at)
     if (/;\s*$/.test(line)) inAlter = null
   }
 })

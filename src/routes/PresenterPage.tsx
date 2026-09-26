@@ -114,6 +114,21 @@ async function edgeFunctionErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
+// joined_at is not guaranteed to be there. The realtime handler below already
+// knows this — it logs participant_without_joined_at when a row arrives
+// without one — and the sort that used to sit inline at the call site read the
+// field straight off every row, so one such row took the entire presenter
+// screen down mid-lesson with "Cannot read properties of undefined". Missing
+// values sort last and the comparison is made on strings that always exist.
+function sortedByJoinedAt(participants: Participant[]) {
+  return [...participants].sort((left, right) => {
+    const a = left.joined_at || ""
+    const b = right.joined_at || ""
+    if (!a !== !b) return a ? -1 : 1
+    return a.localeCompare(b)
+  })
+}
+
 export function PresenterPage() {
   const { sessionId = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
@@ -2128,7 +2143,7 @@ export function PresenterPage() {
         </div>
         <div className="presenter-results" hidden={workspaceView === 'activities' || (workspaceView === 'history' && selectedQuestionId === session.current_question_id)}>
         {question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
-          presenterToken={getPresenterToken(sessionId) || ''} participants={[...participants].sort((a, b) => a.joined_at.localeCompare(b.joined_at))}
+          presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
           active={session.status === 'active'} onDispatched={(next) => {
             setSelectedQuestionId(next.id); setWorkspaceView('current'); void loadAll()
           }} />}

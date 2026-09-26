@@ -154,6 +154,40 @@ export async function verifyPublicAccess(ref: string, key: string) {
   if (!result.ok) {
     throw new Error(`資料表建好了，但用 publishable key 讀不到：${result.message}`)
   }
+  await verifyClassCanRead(ref, key)
+}
+
+// Tables the class reads directly rather than through an edge function. Each
+// one needs its own grant, and a missing grant answers 404 — indistinguishable
+// from a missing table unless the name is in the message.
+const classReadableTables = [
+  'participants',
+  'questions',
+  'answers',
+  'messages',
+  'ai_summaries',
+  'participant_points',
+  'board_posts',
+  'board_reactions',
+]
+
+async function verifyClassCanRead(ref: string, key: string) {
+  const missing: string[] = []
+  for (const table of classReadableTables) {
+    const response = await fetch(
+      `https://${ref}.supabase.co/rest/v1/${table}?select=*&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    )
+    // 200 is readable and so, for this purpose, is an empty table. Only a 404
+    // — PostgREST's answer for a relation the key cannot see — is a failure.
+    if (response.status === 404) missing.push(table)
+  }
+  if (missing.length) {
+    throw new Error(
+      `資料表建好了，但學生端讀不到：${missing.join('、')}。` +
+      '這通常是 grant 沒跟上，再按一次自動部署即可補齊。',
+    )
+  }
 }
 
 export async function verifyBackend(ref: string, token: string) {
@@ -162,7 +196,14 @@ export async function verifyBackend(ref: string, token: string) {
     token,
     `select
        (select count(*) from information_schema.tables
-          where table_schema = 'public' and table_name in ('sessions','questions','participants','shared_files')) as tables,
+          where table_schema = 'public' and table_name in (
+            'sessions','questions','participants','shared_files',
+            -- The newest tables. A project built by an older release has
+            -- everything above and none of these, and until they are counted
+            -- here the deployment reported success and the features were
+            -- simply missing.
+            'participant_points','board_posts','board_reactions'
+          )) as tables,
        (select count(*) from storage.buckets
           where id in ('lingoact-screenshots','lingoact-recordings','lingoact-files')) as buckets,
        (select count(*) from information_schema.columns
@@ -172,7 +213,10 @@ export async function verifyBackend(ref: string, token: string) {
               ('questions','allow_multiple'),
               ('sessions','exit_ticket_prompt_en'),
               ('sessions','interpretation_languages'),
-              ('sessions','caption_position')
+              ('sessions','caption_position'),
+              ('participants','removed_at'),
+              ('participants','hand_raised_at'),
+              ('questions','max_pins')
             )) as columns`,
     '檢查部署結果失敗',
   )
@@ -190,9 +234,9 @@ export async function verifyBackend(ref: string, token: string) {
   })()
 
   if (!first) throw new Error('無法讀取部署結果，請到 Supabase 後台確認資料表與 Storage 是否建立。')
-  if (Number(first.tables) < 4) throw new Error(`資料表未建立完整（找到 ${first.tables ?? 0}/4），請重新執行部署。`)
-  if (Number(first.columns) < 5) {
-    throw new Error(`資料表缺少必要欄位（找到 ${first.columns ?? 0}/5）。這通常表示專案是用舊版建立的 —— 再按一次自動部署即可補齊。`)
+  if (Number(first.tables) < 7) throw new Error(`資料表未建立完整（找到 ${first.tables ?? 0}/7），請重新執行部署。`)
+  if (Number(first.columns) < 8) {
+    throw new Error(`資料表缺少必要欄位（找到 ${first.columns ?? 0}/8）。這通常表示專案是用舊版建立的 —— 再按一次自動部署即可補齊。`)
   }
   if (Number(first.buckets) < 3) {
     throw new Error(`Storage bucket 未建立完整（找到 ${first.buckets ?? 0}/3）。請到 Supabase 後台 → Storage 手動建立 lingoact-screenshots（公開）、lingoact-files（公開）與 lingoact-recordings（非公開）。`)

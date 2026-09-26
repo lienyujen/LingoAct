@@ -681,3 +681,31 @@ export interface FileResponse {
   analyzed_at: string | null
   file_url?: string
 }
+
+export type ReadingVocabulary = {
+  word: string
+  level: number
+  pos: string
+  gloss: Record<string, string>
+}
+
+export type ReadingGrammar = {
+  point: string
+  level: number
+  example: string
+  span: string
+  note: Record<string, string>
+}
+
+export type ReadingPassage = {
+  id: string
+  session_id: string
+  question_id: string
+  title: string | null
+  body: string
+  source: 'ai' | 'pasted' | 'screenshot'
+  vocabulary: ReadingVocabulary[]
+  grammar: ReadingGrammar[]
+  listening_clip_id: string | null
+  created_at: string
+}

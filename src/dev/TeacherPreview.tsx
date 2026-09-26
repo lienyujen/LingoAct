@@ -14,6 +14,7 @@ import { QuestionEditor } from '../components/QuestionEditor'
 import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
+import { ReadingPassageView } from '../components/ReadingPassageView'
 import { DanmakuTimeline } from '../components/DanmakuTimeline'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
@@ -71,6 +72,7 @@ export function Preview() {
   // The word cloud window's own layout, header and timeline and all: the page
   // is a column whose last child has to stretch, and the cloud draws nothing at
   // all if it does not.
+  if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView locale="en" passage={readingSample} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
@@ -109,6 +111,26 @@ export function Preview() {
       <SentenceWallModal open={open} initialPrompt={prompt} busy={false} error="" onCancel={() => setOpen(false)} onOpen={() => { setOpen(false); setNotice('預覽完成，沒有派送題目。') }} />
     </main>
   </div>
+}
+
+// A passage of the shape the generator returns, so the marking, the overlap
+// rule and the note can be looked at without a class running.
+const readingSample = {
+  id: 'p', session_id: 'preview', question_id: 'q', created_at: '',
+  source: 'ai' as const, listening_clip_id: null,
+  title: '週末的市場',
+  body: "星期六早上，我跟朋友去了學校附近的市場。\n\n市場裡有很多人。雖然人很多，但是大家都很有禮貌。我們買了水果和青菜，也喝了一杯豆漿。\n\n老闆說，這個市場已經開了三十年了。因為東西新鮮，所以附近的人都來這裡買菜。",
+  vocabulary: [
+    { word: '禮貌', level: 4, pos: '名詞', gloss: { en: 'manners; politeness', zh_tw: '待人的態度很好', es: 'modales; cortesía' } },
+    { word: '豆漿', level: 5, pos: '名詞', gloss: { en: 'soy milk', zh_tw: '黃豆做的飲料', es: 'leche de soja' } },
+    { word: '新鮮', level: 4, pos: '形容詞', gloss: { en: 'fresh', zh_tw: '剛採收、還沒放久', es: 'fresco' } },
+  ],
+  grammar: [
+    { point: '雖然…但是', level: 3, span: '雖然人很多，但是大家都很有禮貌', example: '雖然下雨，但是我還是去了。',
+      note: { en: 'Sets up a contrast: the first part is true, and the second part happens anyway.', zh_tw: '前面說一件事，後面說相反的結果。', es: 'Marca un contraste: lo primero es cierto y aun así ocurre lo segundo.' } },
+    { point: '因為…所以', level: 3, span: '因為東西新鮮，所以附近的人都來這裡買菜', example: '因為天氣好，所以我們去公園。',
+      note: { en: 'Reason first, result second.', zh_tw: '先講原因，再講結果。', es: 'Primero la razón, después el resultado.' } },
+  ],
 }
 
 function CloudPreview() {

@@ -753,7 +753,11 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "flashcardFront": "Palabra",
     "flashcardBack": "Significado",
     "flashcardPrevious": "Tarjeta anterior",
-    "flashcardCardCount": "Tarjeta {current} de {total}"
+    "flashcardCardCount": "Tarjeta {current} de {total}",
+    "readingTitle": "Lectura",
+    "readingGrammarOn": "Notas de gramática: sí",
+    "readingGrammarOff": "Notas de gramática: no",
+    "close": "Cerrar"
   },
   "fr": {
     "language": "Langue",

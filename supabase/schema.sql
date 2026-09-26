@@ -1586,12 +1586,14 @@ create table if not exists public.reading_passages (
   -- Where the passage came from, so the teacher can tell a generated passage
   -- from one they pasted in.
   source text not null default 'ai' check (source in ('ai', 'pasted', 'screenshot')),
-  -- [{ start, end, word, level, pos, gloss: { en, es, ... } }] — the words above
-  -- the class's ceiling, with the span they occupy in body so the student page
-  -- can colour them without searching the text and mismatching a repeat.
+  -- [{ word, level, pos, gloss: { en, es, ... } }] — the words above the class’s
+  -- ceiling. Marked by the word rather than by offset: a word that appears three
+  -- times is new all three times, and offsets would have to be rebuilt every
+  -- time the passage was edited.
   vocabulary jsonb not null default '[]'::jsonb,
-  -- [{ start, end, point, level, example, note: { en, es, ... } }] — TBCL
-  -- grammar points, named from the published list rather than invented.
+  -- [{ point, level, example, span, note: { en, es, ... } }] — TBCL grammar
+  -- points, named from the published list rather than invented, each carrying
+  -- the exact stretch of the passage it applies to.
   grammar jsonb not null default '[]'::jsonb,
   -- Set when the teacher also had it read aloud; the clip lives in
   -- listening_clips like every other piece of speech in the app.

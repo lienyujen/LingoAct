@@ -36,11 +36,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # schema.sql is one transaction, so a statement above its own create
-      # table rolls back every table before it and leaves a new project empty
-      # after a deployment that reported success.
+      # schema.sql is one transaction, so anything used above the line that
+      # creates it rolls back every table before it and leaves a new project
+      # empty after a deployment that reported success. Tables, columns and
+      # functions have each done it.
       - name: Verify schema statement order
-        run: node scripts/check-schema-order.mjs
+        run: node scripts/check-schema-order.mjs && node scripts/check-schema-usage.mjs
 
       - name: Verify deployment configuration
         env:

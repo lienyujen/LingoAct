@@ -901,6 +901,15 @@ create table if not exists public.listening_clips (
   created_at timestamptz not null default now()
 );
 
+-- The link from a question to the clip it dispatched. It lives here, beside
+-- the table it points at, rather than three hundred lines down with the other
+-- questions columns: the policy immediately below reads it, and a column used
+-- above its own add column fails the whole transaction exactly as a missing
+-- table does — ERROR 42703 instead of 42P01, same empty project afterwards.
+alter table public.questions
+  add column if not exists listening_clip_id uuid null references public.listening_clips(id) on delete set null;
+
+
 -- Security for the table above, which used to sit four hundred lines higher
 -- with the other grants. The whole file runs as one transaction, so touching
 -- a table before it exists does not fail one statement — it rolls back every
@@ -1009,9 +1018,6 @@ alter table public.questions
 alter table public.questions
   add column if not exists answer_seconds integer null
   check (answer_seconds is null or answer_seconds between 5 and 600);
-
-alter table public.questions
-  add column if not exists listening_clip_id uuid null references public.listening_clips(id) on delete set null;
 
 -- Null means unlimited, which is right for practice and wrong for a test: a
 -- listening assessment a student can replay until they have transcribed it is

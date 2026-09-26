@@ -11,6 +11,7 @@ import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
 import { DragAnswers } from '../components/DragAnswers'
 import { QuestionEditor } from '../components/QuestionEditor'
+import { RosterManager } from '../components/RosterManager'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
 import { APP_PROFILE } from '../lib/appProfiles'
@@ -60,6 +61,9 @@ export function Preview() {
       id: String(i), session_id: 'preview', name, device_id: String(i), joined_at: '', last_seen_at: '',
     }))} onDispatched={action} />
   </main>
+  // 學員名單 only ever talks to this computer's localStorage, so the whole
+  // dialog previews without a class, a token or a database behind it.
+  if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
   if (location.hash === '#flashcard-review') return <main className="participant-page"><ParticipantFlashcards active={false} data={{ ...flashcard, reviewAnswers: { word: '大家一起做的事情' } }} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
@@ -82,13 +86,13 @@ export function Preview() {
       {compact && <aside className="presenter-controls-overlay teacher-workspace">
         <nav className="workspace-navigation">{['開始活動', '目前活動', '課堂紀錄'].map((label) => <button key={label} type="button" aria-current={view === label ? 'page' : undefined} onClick={() => setView(label)}>{label}</button>)}</nav>
         {view === '開始活動' ? <>
-          <PresenterControlPanel session={session} onlineCount={25} busy={false} buzzerActive={false}
+          <PresenterControlPanel session={session} onlineCount={25} raisedCount={2} busy={false} buzzerActive={false}
             onToggleDanmaku={action} onToggleAnonymous={action} onCaptureScreen={action} onCaptureFlashcards={action} onCaptureWriting={action} onOpenPicture={action} onOpenPictureWriting={action}
             onCaptureOrdering={action} onCaptureMatching={action} onCapturePronunciation={action} onCaptureOral={action} onCaptureDrawing={action}
             onDispatchBlank={action} onDispatchImage={action}
             onDrawLottery={action} onStartBuzzer={action} onOpenListeningStudio={action} onOpenSentenceWall={() => { setPrompt(''); setOpen(true) }} onOpenPhotoTask={action}
             onOpenTextDispatch={action} onOpenFileTransfer={action} onOpenRoster={action} onOpenWordCloud={action} onOpenSettings={action}
-            onToggleRecording={action} onToggleCaptionVisibility={action} onGenerateExitTicket={action} onEndClass={action} />
+            onToggleRecording={action} onToggleCaptionVisibility={action} onGenerateExitTicket={action} onLowerHands={action} onEndClass={action} />
           <div className="panel"><LessonPlan courseName="介面預覽" onStart={(item) => { if (item.kind === 'sentence') { setPrompt(item.prompt); setOpen(true) } else action() }} /></div>
         </> : <p className="panel muted">{view === '目前活動' ? '還沒有活動。選一個練習，讓學生開始。' : '完成的活動會留在這裡，方便回看學生的表達。'}</p>}
         {notice && <p role="status">{notice}</p>}

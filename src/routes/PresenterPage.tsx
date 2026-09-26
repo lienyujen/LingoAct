@@ -237,6 +237,10 @@ export function PresenterPage() {
   // Worked out here rather than in the roster window, which is only open when
   // the teacher opens it, and sent to each student as their own line.
   useStandingsBroadcast(sessionId, `${participants.length}:${onlineParticipantIds.join('|')}`)
+  const raisedCount = useMemo(
+    () => participants.filter((participant) => participant.hand_raised_at && !participant.removed_at).length,
+    [participants],
+  )
   const onlineParticipants = useMemo(
     () => participants.filter((participant) => onlineParticipantIds.includes(participant.id)),
     [onlineParticipantIds, participants],
@@ -1516,6 +1520,16 @@ export function PresenterPage() {
     window.open(cloudUrl, `lingoact-word-cloud-${sessionId}`, 'popup,width=1100,height=720')
   }
 
+  // Clearing every raised hand at once, from the count in the panel. Lowering
+  // them one at a time lives in the roster, beside the name being answered.
+  async function lowerHands() {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) return
+    await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'lower_hands', sessionId, presenterToken },
+    })
+  }
+
   async function drawLottery() {
     await runLottery(onlineParticipants.map((participant) => participant.id), t('noStudentsOnlineMsg'))
   }
@@ -2027,6 +2041,8 @@ export function PresenterPage() {
           buzzerActive={isBuzzerPending(buzzerEvent)}
           captionError={captionError}
           onlineCount={onlineParticipants.length}
+          raisedCount={raisedCount}
+          onLowerHands={() => void lowerHands()}
           session={session}
           onDrawLottery={drawLottery}
           onStartBuzzer={startBuzzer}

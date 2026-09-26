@@ -4871,6 +4871,317 @@ h2 {
   opacity: 0.3;
 }
 
+/* Two small buttons where the call button used to be. 380px is the whole
+   window, so they only carry an icon and lean on their titles. */
+.roster-award,
+.roster-remove {
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 4px;
+}
+
+.roster-award:hover:not(:disabled) {
+  background: var(--success);
+  color: #fff;
+}
+
+.roster-remove:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.roster-award:disabled,
+.roster-remove:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+/* The teacher's own points, kept apart from the participation score beside it:
+   that one is arithmetic over what the class did, this one is a judgement. */
+.roster-bonus {
+  background: var(--success-soft);
+  border: 0;
+  border-radius: 999px;
+  color: var(--success);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  padding: 2px 7px;
+}
+
+/* Pressing it takes the last point back, so hovering it turns it into the
+   colour of undoing rather than the colour of giving. */
+.roster-bonus:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger-dark);
+}
+
+/* Present on the class list. The one thing a teacher taking attendance is
+   scanning for, so it reads at a glance rather than as another grey tag. */
+.roster-present {
+  color: var(--success);
+  flex: 0 0 auto;
+}
+
+/* On the list, never turned up. Grey all through rather than struck out: they
+   may still walk in. */
+.roster-row.is-absent {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.roster-tag.is-absent {
+  background: var(--surface-subtle);
+  color: var(--muted);
+}
+
+/* Joined under a name the list does not have. Not a fault, so it gets the
+   quiet teal rather than the amber that means something needs doing. */
+.roster-tag.is-unlisted {
+  background: var(--share-soft);
+  color: var(--share-dark);
+}
+
+.roster-tag.is-quiet {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 0;
+}
+
+.roster-heading-actions {
+  align-items: center;
+  display: flex;
+  gap: 2px;
+}
+
+/* Takes the dot's place on a line where a hand is up, and is also the control
+   that puts it down again — so the thing the presenter is looking at is the
+   thing they press. Dark text on the amber, because this one carries a count
+   and has to be read rather than merely noticed. */
+.roster-hand {
+  align-items: center;
+  background: #d99a2b;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  height: 26px;
+  justify-content: center;
+  margin: -9px 0 -9px -9px;
+  padding: 0 9px;
+}
+
+/* The same hand, counting them, where the class is summarised. */
+.roster-hand.is-clear {
+  border-radius: 999px;
+  font-weight: 600;
+  gap: 4px;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  width: auto;
+}
+
+.roster-hand:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* 學員名單匯入與編輯. Opened from the roster window, which is 380px wide — the
+   dialog is deliberately wider than its parent and scrolls, because editing
+   sixty rows in a 380px column would be miserable. */
+.roster-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 92vh;
+  max-width: min(680px, 94vw);
+  overflow-y: auto;
+  width: min(680px, 94vw);
+}
+
+.roster-manager-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.roster-manager-head h2 {
+  flex: 1 1 auto;
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.roster-manager-hint {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.roster-manager-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.roster-manager-footer {
+  border-top: 1px solid var(--border);
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+.roster-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.roster-manager-list li {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
+.roster-manager-item {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.roster-manager-item-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.roster-manager-applied {
+  background: var(--success-soft);
+  border-radius: 999px;
+  color: var(--success);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+}
+
+.roster-manager-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.82rem;
+  gap: 4px;
+}
+
+.roster-manager-paste textarea {
+  font-family: inherit;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.roster-manager-mapping {
+  background: var(--surface-subtle);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.roster-manager-columns {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.roster-manager-columns label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  gap: 4px;
+}
+
+.roster-manager-warning {
+  background: var(--energy-soft);
+  border-radius: var(--radius-lg);
+  color: var(--energy-dark);
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.roster-manager-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.roster-manager-entries li {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  /* The last track is auto, not 30px: on a touch display every .icon-button is
+     held to a 48px target, and a fixed column narrower than that pushed the
+     whole list sideways. */
+  grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.roster-manager-entries li.is-duplicate input:first-of-type {
+  border-color: var(--energy);
+}
+
+.roster-manager-index {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.roster-manager-entries input {
+  font-size: 0.85rem;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+/* LingoAct's .icon-button is a filled 40px control. Five of them down a
+   list of names would be the loudest thing in the dialog, and each is wider
+   than the 30px column it sits in — which is what made the list scroll
+   sideways. Inside the list they go quiet and shrink to their track. */
+.roster-manager-entries .icon-button,
+.roster-manager-item-actions .icon-button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  min-height: 0;
+  padding: 4px;
+}
+
+.roster-manager-entries .icon-button:hover,
+.roster-manager-item-actions .icon-button:hover {
+  background: var(--danger-soft);
+  color: var(--danger-dark);
+}
+
 .roster-dot {
   background: #cfccd6;
   border-radius: 50%;

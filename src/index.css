@@ -8186,3 +8186,36 @@ h2 {
   gap: 8px;
   justify-content: flex-end;
 }
+
+.reading-quiz-options {
+  border-left: 3px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-left: 10px;
+  padding-left: 14px;
+}
+
+/* Chips rather than a segmented control: these are several-of-four, and a
+   segmented control says one-of-four. */
+.reading-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reading-focus button {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+.reading-focus button.selected {
+  background: var(--primary-soft);
+  border-color: rgb(123 45 94 / 28%);
+  color: var(--primary);
+  font-weight: 600;
+}

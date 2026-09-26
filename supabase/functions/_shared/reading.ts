@@ -59,6 +59,48 @@ const PASSAGE_LENGTH: Record<number, { min: number; max: number }> = {
   7: { min: 700, max: 1200 },
 }
 
+// The four things a reading question can actually ask for, in the terms
+// Taiwanese reading assessment already uses. Named individually because
+// "five questions about this passage" produced five of the first one: find the
+// sentence, copy it back. That is the cheapest question to write and the least
+// worth asking.
+export const COMPREHENSION = {
+  retrieve: {
+    label: '擷取訊息',
+    instruction: '擷取訊息：答案明明白白寫在文章裡，學生要能找到它。問時間、地點、人物、數量、順序、誰做了什麼。',
+  },
+  understand: {
+    label: '理解文意',
+    instruction: '理解文意：答案要跨句子合起來才看得出來，或需要從上下文推出一個詞、一個代名詞指的是什麼。不能只靠抄一句話回答。',
+  },
+  infer: {
+    label: '邏輯推論',
+    instruction: '邏輯推論：文章沒有直說，但從已寫的內容推得出來——原因、結果、動機、接下來可能發生什麼、作者為什麼這樣安排。答案必須有文章裡的根據，不能靠常識猜。',
+  },
+  evaluate: {
+    label: '分析評鑑',
+    instruction: '分析評鑑：請學生評估或判斷——這樣寫有什麼效果、哪個說法比較有道理、作者的立場是什麼、這段話適合放在哪裡、你同不同意為什麼。答案可以不只一種，但要說得出理由。',
+  },
+} as const
+
+export type ComprehensionKey = keyof typeof COMPREHENSION
+
+export function comprehensionInstruction(keys: string[], count: number) {
+  const chosen = (keys.length ? keys : Object.keys(COMPREHENSION))
+    .filter((key): key is ComprehensionKey => key in COMPREHENSION)
+  if (!chosen.length) return ''
+  const lines = chosen.map((key) => `- ${COMPREHENSION[key].instruction}`)
+  const spread = chosen.length > 1
+    ? `Spread the ${count} questions across these ${chosen.length} kinds rather than writing ${count} of the easiest one. If they do not divide evenly, put the extra on the harder kinds.`
+    : `All ${count} questions are of this one kind.`
+  return [
+    '這一份閱讀測驗要測的是下列能力，每一題都要標定其中一種：',
+    ...lines,
+    spread,
+    '不要出可以不看文章、光靠常識就答得出來的題目。',
+  ].join('\n')
+}
+
 export function passageLength(tbcl: number) {
   return PASSAGE_LENGTH[tbcl] || PASSAGE_LENGTH[4]
 }

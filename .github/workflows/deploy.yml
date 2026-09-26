@@ -41,7 +41,7 @@ jobs:
       # empty after a deployment that reported success. Tables, columns and
       # functions have each done it.
       - name: Verify schema statement order
-        run: node scripts/check-schema-order.mjs && node scripts/check-schema-usage.mjs && node scripts/check-schema-columns.mjs && node scripts/check-schema-constraints.mjs && node scripts/check-edge-functions.mjs && node scripts/check-presenter-modals.mjs
+        run: node scripts/check-schema-order.mjs && node scripts/check-schema-usage.mjs && node scripts/check-schema-columns.mjs && node scripts/check-schema-constraints.mjs && node scripts/check-edge-functions.mjs && node scripts/check-edge-types.mjs && node scripts/check-presenter-modals.mjs
 
       - name: Verify deployment configuration
         env:

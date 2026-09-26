@@ -14,7 +14,7 @@ import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } fr
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
-import { generateReadingPassage, writeMissingGrammarNotes } from '../_shared/reading.ts'
+import { comprehensionInstruction, generateReadingPassage, writeMissingGrammarNotes } from '../_shared/reading.ts'
 
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -2687,13 +2687,18 @@ Deno.serve(async (req) => {
     // wants to read it before the class does; the quiz over it, if asked for,
     // is built in the background the way every other generated quiz is.
     if (action === 'dispatch_reading') {
-      const sourceText = clean(input.sourceText, 8000)
-      const direction = clean(input.direction, 2000)
+      const sourceText = typeof input.sourceText === 'string' ? input.sourceText.trim().slice(0, 8000) : ''
+      const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 2000) : ''
       if (!sourceText && !direction) return jsonResponse({ message: '請先貼上內容，或寫下這篇要講什麼。' }, 400)
 
       const stretch = Number(input.levelStretch)
       const levelStretch = Number.isInteger(stretch) && stretch >= 0 && stretch <= 2 ? stretch : 0
       const withQuiz = input.withQuiz === true
+      const askedCount = Number(input.quizCount)
+      const quizCount = Number.isInteger(askedCount) && askedCount >= 1 && askedCount <= 10 ? askedCount : 5
+      const comprehension = Array.isArray(input.comprehension)
+        ? input.comprehension.filter((value: unknown): value is string => typeof value === 'string')
+        : []
       const clipId = typeof input.clipId === 'string' && validUuid(input.clipId) ? input.clipId : null
       const screenshotId = typeof input.screenshotId === 'string' && validUuid(input.screenshotId)
         ? input.screenshotId
@@ -2807,14 +2812,15 @@ Deno.serve(async (req) => {
               extraInstruction: [
                 'The source text IS the passage the class has just been given, written for their level. Ask about it and nothing else.',
                 'Do not ask about a word the passage does not contain, and do not reach for background knowledge the passage does not supply.',
-              ].join('\n'),
+                comprehensionInstruction(comprehension, quizCount),
+              ].filter(Boolean).join('\n'),
               teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
               guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
               levelFramework: classRow?.level_framework ?? null,
               levelCode: classRow?.level_code ?? null,
               levelStretch,
               direction: direction || '閱讀理解',
-              requestedCount: 5,
+              requestedCount: quizCount,
               requestedType: 'random',
             })
 
@@ -2824,7 +2830,7 @@ Deno.serve(async (req) => {
               question_id: questionId,
               title: generated.title,
               direction: direction || '閱讀理解',
-              requested_count: 5,
+              requested_count: quizCount,
               requested_type: 'random',
               graded: true,
             })

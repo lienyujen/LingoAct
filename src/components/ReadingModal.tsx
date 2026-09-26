@@ -18,12 +18,24 @@ type Props = {
 
 type Accent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
 
+// The four reading abilities, in the order they get harder.
+const FOCUS = [
+  ['retrieve', 'readingRetrieve'],
+  ['understand', 'readingUnderstand'],
+  ['infer', 'readingInfer'],
+  ['evaluate', 'readingEvaluate'],
+] as const
+
 export function ReadingModal({ open, sessionId, presenterToken, screenshotId, onClose, onDispatched }: Props) {
   const t = usePresenterText()
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
   const [stretch, setStretch] = useState(0)
   const [withQuiz, setWithQuiz] = useState(true)
+  const [quizCount, setQuizCount] = useState(5)
+  // All four by default, which is what 綜合 means — and what the generator was
+  // silently not doing when nothing said otherwise.
+  const [focus, setFocus] = useState<string[]>(FOCUS.map(([key]) => key))
   const [withAudio, setWithAudio] = useState(false)
   const [accent, setAccent] = useState<Accent>('standard_guoyu')
   const [busy, setBusy] = useState(false)
@@ -36,6 +48,8 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
     setDirection('')
     setStretch(0)
     setWithQuiz(true)
+    setQuizCount(5)
+    setFocus(FOCUS.map(([key]) => key))
     setWithAudio(false)
     setError('')
     setPassage(null)
@@ -67,6 +81,8 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
           direction: direction.trim(),
           levelStretch: stretch,
           withQuiz,
+          quizCount,
+          comprehension: focus,
           screenshotId: screenshotId || null,
           clipId,
         },
@@ -162,6 +178,55 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, on
           <input checked={withQuiz} type="checkbox" onChange={(event) => setWithQuiz(event.target.checked)} />
           {t('readingWithQuiz')}
         </label>
+
+        {withQuiz && (
+          <div className="reading-quiz-options">
+            <div className="reading-field">
+              {t('readingCount')}
+              <div className="segmented-control">
+                {[3, 5, 8].map((value) => (
+                  <button
+                    aria-pressed={quizCount === value}
+                    className={quizCount === value ? 'selected' : ''}
+                    key={value}
+                    type="button"
+                    onClick={() => setQuizCount(value)}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="reading-field">
+              {t('readingFocus')}
+              <div className="reading-focus">
+                {FOCUS.map(([key, label]) => {
+                  const on = focus.includes(key)
+                  return (
+                    <button
+                      aria-pressed={on}
+                      className={on ? 'selected' : ''}
+                      key={key}
+                      type="button"
+                      onClick={() => setFocus((current) => (
+                        // Never all off: a quiz has to be testing something, and
+                        // an empty list silently means "all four" downstream,
+                        // which would not be what the teacher just pressed.
+                        current.includes(key)
+                          ? (current.length > 1 ? current.filter((entry) => entry !== key) : current)
+                          : [...current, key]
+                      ))}
+                    >
+                      {t(label)}
+                    </button>
+                  )
+                })}
+              </div>
+              <small className="muted">{t('readingFocusHint')}</small>
+            </div>
+          </div>
+        )}
 
         <label className="interaction-check reading-check">
           <input checked={withAudio} type="checkbox" onChange={(event) => setWithAudio(event.target.checked)} />

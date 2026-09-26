@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowSquareOut, CheckCircle, CircleDashed, CircleNotch, FloppyDisk, HardDrives, Key, Rocket, XCircle } from '@phosphor-icons/react'
 import { backendConfig, clearBackendConfig, requireSupabase, saveBackendConfig, testBackendConfig } from '../lib/supabase'
-import { canDeployBackend, checkToken, deployableFunctions, deployFunction, runSchema, setOwnerKey, setSecrets, verifyBackend } from '../lib/backendDeploy'
+import { canDeployBackend, checkToken, deployableFunctions, deployFunction, runSchema, setOwnerKey, setSecrets, verifyBackend, verifyPublicAccess } from '../lib/backendDeploy'
 import { generateOwnerKey, getOwnerKey, saveOwnerKey } from '../lib/ownerKey'
 import type { DeployStep } from '../lib/backendDeploy'
 
@@ -52,6 +52,7 @@ export function BackendSetup({ onCancel }: Props) {
       { slug: '設定 API 金鑰', status: 'pending' },
       { slug: '產生管理金鑰', status: 'pending' },
       { slug: '檢查部署結果', status: 'pending' },
+      { slug: '確認學生端讀得到', status: 'pending' },
     ]
     setSteps(plan)
     setDeploying(true)
@@ -94,6 +95,7 @@ export function BackendSetup({ onCancel }: Props) {
           setOwnerKeyState(key)
         },
         () => verifyBackend(cleanRef, token.trim()),
+        () => verifyPublicAccess(cleanRef, key.trim()),
       ]
 
       let failed = false

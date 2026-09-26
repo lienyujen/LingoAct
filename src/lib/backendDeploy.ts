@@ -1,4 +1,5 @@
 // Deploys the backend straight from the app, so nobody has to install the
+import { testBackendConfig } from './supabase'
 // Supabase CLI to get started. The request shape mirrors what the CLI sends:
 // multipart/form-data with one JSON `metadata` part and a `file` part per
 // source file, named by its path relative to the project root.
@@ -136,6 +137,25 @@ export async function runSchema(ref: string, token: string) {
 // Confirms the project really has what the app needs. Without this a schema that
 // silently did nothing would only surface later as an unexplained failure the
 // first time someone tries to dispatch a screenshot.
+// The check below proves the tables are there. It does not prove the class can
+// read them, because it asks through the Management API, which answers with the
+// project's own authority and sees everything regardless of who has been
+// granted what. The publishable key is the only key a student's browser ever
+// holds, so it is the one that has to be able to read a row — and PostgREST
+// answers a table the key cannot see with a 404, which the setup screen then
+// reported as "run schema.sql", sending people off to do by hand what had just
+// been done for them. Asking with the real key turns that into a sentence here,
+// while the deployment is still on screen.
+export async function verifyPublicAccess(ref: string, key: string) {
+  if (!key) {
+    throw new Error('請先在上面填入 publishable key —— 部署完要用它確認學生端讀得到資料。')
+  }
+  const result = await testBackendConfig(ref, key)
+  if (!result.ok) {
+    throw new Error(`資料表建好了，但用 publishable key 讀不到：${result.message}`)
+  }
+}
+
 export async function verifyBackend(ref: string, token: string) {
   const body = await query(
     ref,

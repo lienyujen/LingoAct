@@ -590,28 +590,6 @@ grant select on public.sessions, public.screenshots, public.questions, public.ai
 grant select, insert on public.participants to anon, authenticated;
 grant select, insert on public.messages, public.answers, public.exit_tickets to anon, authenticated;
 
-alter table public.listening_clips enable row level security;
-
--- A clip becomes readable only once a question has carried it to the class.
--- Without this a student could list the session's clips and listen to the test
--- before it starts, which is the audio equivalent of handing out the paper early.
-drop policy if exists "read dispatched listening clips" on public.listening_clips;
-create policy "read dispatched listening clips" on public.listening_clips for select to anon, authenticated using (
-  exists (
-    select 1 from public.questions
-    where questions.listening_clip_id = listening_clips.id
-      and questions.status in ('active', 'stopped', 'closed')
-  )
-);
-
--- Column-level, not row-level: the transcript is the answer key for a listening
--- exercise, and the screenshot is the passage in written form. Row access alone
--- would let a crafted PostgREST select ask for either one.
-grant select (id, session_id, kind, language, duration_ms, public_url, created_at)
-  on public.listening_clips to anon, authenticated;
-
-grant all on public.listening_clips to service_role;
-
 revoke all on public.participant_session_keys, public.audio_responses, public.file_responses, public.quiz_item_keys,
   public.quiz_attempts, public.quiz_item_answers, public.quiz_item_tries from public, anon, authenticated;
 grant all on public.participant_session_keys, public.audio_responses, public.shared_files, public.file_responses, public.quizzes, public.quiz_items,
@@ -922,6 +900,33 @@ create table if not exists public.listening_clips (
   content_hash text not null,
   created_at timestamptz not null default now()
 );
+
+-- Security for the table above, which used to sit four hundred lines higher
+-- with the other grants. The whole file runs as one transaction, so touching
+-- a table before it exists does not fail one statement — it rolls back every
+-- table created before it, and a new project came out of a deployment that
+-- looked fine with nothing in it at all.
+alter table public.listening_clips enable row level security;
+
+-- A clip becomes readable only once a question has carried it to the class.
+-- Without this a student could list the session's clips and listen to the test
+-- before it starts, which is the audio equivalent of handing out the paper early.
+drop policy if exists "read dispatched listening clips" on public.listening_clips;
+create policy "read dispatched listening clips" on public.listening_clips for select to anon, authenticated using (
+  exists (
+    select 1 from public.questions
+    where questions.listening_clip_id = listening_clips.id
+      and questions.status in ('active', 'stopped', 'closed')
+  )
+);
+
+-- Column-level, not row-level: the transcript is the answer key for a listening
+-- exercise, and the screenshot is the passage in written form. Row access alone
+-- would let a crafted PostgREST select ask for either one.
+grant select (id, session_id, kind, language, duration_ms, public_url, created_at)
+  on public.listening_clips to anon, authenticated;
+
+grant all on public.listening_clips to service_role;
 
 -- The readings each character may take, in the order the font froze them.
 --

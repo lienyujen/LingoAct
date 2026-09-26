@@ -43,17 +43,32 @@ if (!fs.existsSync(unpacked)) throw new Error(`electron-builder produced no ${un
 
 // Replaced rather than merged: a stale file left behind from an older build is
 // the kind of thing that only shows up in front of a class.
-try {
-  fs.rmSync(target, { recursive: true, force: true })
-  fs.renameSync(unpacked, target)
-} catch (error) {
-  // Dropbox sometimes keeps the just-emptied directory handle alive. The old
-  // files are already gone at that point, so copying the completed build into
-  // that exact empty directory is equivalent to the rename. Never merge into a
-  // non-empty target: that would reintroduce the stale-file problem above.
-  if (error?.code !== 'EPERM' || !fs.existsSync(target) || fs.readdirSync(target).length) throw error
-  fs.cpSync(unpacked, target, { recursive: true })
+//
+// The delete does NOT come first. Dropbox holds handles inside this folder, and
+// rmSync walks it deleting as it goes — so an EPERM partway through leaves the
+// exe and the DLLs gone and the folder unrunnable, which is what happened on
+// 2026-09-26. The previous EPERM fallback could not help, because it only
+// accepted a target that had been emptied cleanly.
+//
+// So: find the stale files first, while the working build is still on disk and
+// nothing has been touched. If there are none, copying the new build over the
+// top is exactly equivalent to a replace, and it is atomic per file. If there
+// are, remove only those.
+const relativeFiles = (dir, prefix = '') => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (
+  entry.isDirectory()
+    ? relativeFiles(path.join(dir, entry.name), `${prefix}${entry.name}/`)
+    : [`${prefix}${entry.name}`]
+))
+
+if (fs.existsSync(target)) {
+  const built = new Set(relativeFiles(unpacked))
+  const stale = relativeFiles(target).filter((file) => !built.has(file))
+  for (const file of stale) fs.rmSync(path.join(target, file), { force: true })
+  if (stale.length) console.log(`removed ${stale.length} stale file(s) from the previous build`)
+} else {
+  fs.mkdirSync(target, { recursive: true })
 }
+fs.cpSync(unpacked, target, { recursive: true, force: true })
 fs.rmSync(staging, { recursive: true, force: true })
 
 console.log(`\nready: ${path.join(target, `${productName}.exe`)}`)

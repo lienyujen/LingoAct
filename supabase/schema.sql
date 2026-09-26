@@ -1022,7 +1022,7 @@ alter table public.questions
 -- How many points one student may drop on a 圖上點選 image. Null everywhere else.
 alter table public.questions
   add column if not exists max_pins integer null;
-do $
+do $$
 begin
   if not exists (
     select 1 from pg_constraint
@@ -1032,7 +1032,7 @@ begin
       add constraint questions_max_pins_check
       check (max_pins is null or max_pins between 1 and 10);
   end if;
-end $;
+end $$;
 
 alter table public.questions drop constraint if exists questions_type_check;
 alter table public.questions

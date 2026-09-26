@@ -1,4 +1,5 @@
-// Refuses a schema that names a table above its own create table.
+// Refuses a schema that cannot be applied: a table named above its own
+// create table, or a dollar-quote that lost a dollar.
 //
 //   node scripts/check-schema-order.mjs
 //
@@ -32,6 +33,41 @@ lines.forEach((line, index) => {
   if (found && !createdAt.has(found[1])) createdAt.set(found[1], index + 1)
 })
 
+// Every dollar-quote in this file is a pair of identical tags — $$ or $board$.
+// A lone $ is not valid SQL here (the file uses no positional parameters), and
+// it is a mistake with one specific cause worth naming: String.replace() reads
+// $$ in its REPLACEMENT string as an escaped single $, so a script that appends
+// SQL through .replace(old, sqlContainingDollarQuotes) silently halves every
+// one of them. That is how `do $$ begin` shipped as `do $ begin` and took a
+// whole deployment down at line 1025 with "syntax error at or near $".
+//
+// Counting $ per line is not enough on its own: the matching `end $$;` was
+// corrupted too, which left the file's total even and a naive check happy.
+const dollarProblems = []
+{
+  const TAG = /\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$/g
+  const openTags = new Map()
+  lines.forEach((line, index) => {
+    const withoutTags = line.replace(TAG, '')
+    if (withoutTags.includes('$')) {
+      dollarProblems.push(`  schema.sql:${index + 1} has a bare $ — a dollar-quote lost a dollar: ${line.trim()}`)
+    }
+    for (const [tag] of line.matchAll(TAG)) {
+      openTags.set(tag, (openTags.get(tag) || 0) + 1)
+    }
+  })
+  for (const [tag, count] of openTags) {
+    if (count % 2 !== 0) dollarProblems.push(`  schema.sql: ${tag} appears ${count} times — dollar-quotes must pair up.`)
+  }
+}
+
+if (dollarProblems.length) {
+  console.error(`schema.sql: ${dollarProblems.length} broken dollar-quote(s).\n`)
+  console.error(dollarProblems.join('\n'))
+  console.error('\nPostgres stops at the first one, and the file is one transaction.')
+  process.exit(1)
+}
+
 const problems = []
 lines.forEach((line, index) => {
   if (CREATE.test(line)) return
@@ -49,4 +85,4 @@ if (problems.length) {
   console.error('\nThe file is one transaction: this empties a new project rather than failing one statement.')
   process.exit(1)
 }
-console.log(`schema.sql: every table is created before it is used (${createdAt.size} tables).`)
+console.log(`schema.sql: ${createdAt.size} tables, each created before it is used, and every dollar-quote paired.`)

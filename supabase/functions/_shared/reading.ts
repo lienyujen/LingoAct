@@ -63,12 +63,29 @@ export function passageLength(tbcl: number) {
   return PASSAGE_LENGTH[tbcl] || PASSAGE_LENGTH[4]
 }
 
-// The points a learner at this level has met, plus the level above so a passage
-// at i+1 can be annotated honestly. Names only — the examples would triple the
-// prompt and the model does not need them to recognise the pattern.
+// The levels worth annotating, which is not the same as every level the class
+// has passed. Annotating 的 for a B1 reader is noise, and sending all 496 points
+// to have most of them ignored costs a third of this call's input.
+//
+// Widened downwards when the window comes back empty: the grammar table stops
+// at level 5, so a class at 6 or 7 asked for levels 5 to 8 and would have been
+// handed nothing at all.
+function grammarLevels(ceiling: number) {
+  for (let floor = Math.max(1, ceiling - 1); floor >= 1; floor -= 1) {
+    const levels: number[] = []
+    for (let level = floor; level <= Math.min(7, ceiling + 1); level += 1) {
+      if ((GRAMMAR_BY_LEVEL[level] || []).length) levels.push(level)
+    }
+    if (levels.length) return levels
+  }
+  return []
+}
+
+// Names only — the examples would triple the prompt and the model does not need
+// them to recognise the pattern.
 function grammarMenu(ceiling: number) {
   const points: string[] = []
-  for (let level = 1; level <= Math.min(7, ceiling + 1); level += 1) {
+  for (const level of grammarLevels(ceiling)) {
     for (const entry of GRAMMAR_BY_LEVEL[level] || []) points.push(`${entry.point}（第${level}級）`)
   }
   return points
@@ -76,7 +93,7 @@ function grammarMenu(ceiling: number) {
 
 function grammarIndex(ceiling: number) {
   const index = new Map<string, { level: number; example: string }>()
-  for (let level = 1; level <= Math.min(7, ceiling + 1); level += 1) {
+  for (const level of grammarLevels(ceiling)) {
     for (const entry of GRAMMAR_BY_LEVEL[level] || []) {
       if (!index.has(entry.point)) index.set(entry.point, { level, example: entry.example })
     }
@@ -109,6 +126,11 @@ const passageSchema = (locales: string[]) => ({
         additionalProperties: false,
       },
     },
+    // No note here. What a pattern does is the same sentence whatever passage
+    // it turns up in, so it is written once into grammar_notes and looked up —
+    // which takes the most expensive part of this response out of every
+    // dispatch after the first, and stops one class being told something
+    // slightly different from the next.
     grammar: {
       type: 'array',
       items: {
@@ -116,9 +138,8 @@ const passageSchema = (locales: string[]) => ({
         properties: {
           point: { type: 'string' },
           span: { type: 'string' },
-          note: glossSchema(locales),
         },
-        required: ['point', 'span', 'note'],
+        required: ['point', 'span'],
         additionalProperties: false,
       },
     },
@@ -164,7 +185,6 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     'vocabulary: every word in the passage that a learner at this level has NOT met, with its part of speech in Chinese (名詞、動詞、形容詞、副詞、量詞、連接詞…) and a short gloss in each requested language. A word the class already knows does not belong here; padding this list makes the colouring useless.',
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
-    'note: what the pattern does, in one or two sentences, in each requested language, written for a learner and not for a linguist.',
     'Do not invent a grammar point that is not on the list, and do not attribute a pattern to a sentence that does not contain it.',
   ].join('\n')
 
@@ -236,14 +256,67 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
         const span = String(entry.span || '').trim()
         const known = index.get(point)
         if (!known || !span || !body.includes(span)) return null
-        return {
-          point,
-          level: known.level,
-          example: known.example,
-          span,
-          note: (entry.note || {}) as ReadingAnnotationGloss,
-        }
+        // The note is filled in by the caller from grammar_notes.
+        return { point, level: known.level, example: known.example, span, note: {} }
       })
       .filter((entry): entry is ReadingGrammar => entry !== null),
   }
+}
+
+// Notes for points this deployment has not explained yet. One call for all of
+// them together, and only for the ones actually missing — so a class on its
+// tenth passage almost never makes this call at all.
+export async function writeMissingGrammarNotes(
+  points: Array<{ point: string; level: number; example: string }>,
+  locales: string[],
+): Promise<Record<string, ReadingAnnotationGloss>> {
+  if (!points.length) return {}
+  const schema = {
+    type: 'object',
+    properties: {
+      notes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            point: { type: 'string' },
+            note: {
+              type: 'object',
+              properties: Object.fromEntries(locales.map((locale) => [locale, { type: 'string' }])),
+              required: locales,
+              additionalProperties: false,
+            },
+          },
+          required: ['point', 'note'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['notes'],
+    additionalProperties: false,
+  }
+
+  const result = await callAiJson(
+    [
+      '你是華語文法說明助理。下面是臺灣華語文能力基準的語法點，每一個附了官方例句。',
+      '請為每一個語法點寫一到兩句說明：這個句型在做什麼、什麼時候用。寫給學語言的人看，不是寫給語言學家看。',
+      '用每一個要求的語言各寫一份，意思相同。不要重述例句，不要加上級別或術語。',
+    ].join('\n'),
+    { points, languages: locales },
+    schema,
+    null,
+    'realtime',
+  )
+  if (result.status !== 'success') return {}
+  const written = (result.output as { notes?: unknown }).notes
+  if (!Array.isArray(written)) return {}
+  return Object.fromEntries(
+    written
+      .map((raw) => {
+        const entry = raw as Record<string, unknown>
+        const point = String(entry.point || '').trim()
+        return point ? [point, (entry.note || {}) as ReadingAnnotationGloss] as const : null
+      })
+      .filter((entry): entry is readonly [string, ReadingAnnotationGloss] => entry !== null),
+  )
 }

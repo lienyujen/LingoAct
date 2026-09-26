@@ -1628,3 +1628,29 @@ do $$ begin
     alter publication supabase_realtime add table public.reading_passages;
   end if;
 end $$;
+
+-- 語法點說明. What 雖然…但是 does is the same sentence whatever passage it
+-- appears in, so it is written once and kept. Before this it was generated with
+-- every passage, in every language, which cost output tokens — the expensive
+-- kind — on every dispatch and gave the same point a slightly different
+-- explanation each time a class met it.
+--
+-- Not scoped to a session: a note about 把字句 belongs to the language, not to
+-- one teacher's afternoon.
+create table if not exists public.grammar_notes (
+  point text not null,
+  locale text not null,
+  note text not null,
+  -- The TBCL level, carried so a note can be shown with where it sits.
+  level integer not null check (level between 1 and 7),
+  created_at timestamptz not null default now(),
+  primary key (point, locale)
+);
+
+alter table public.grammar_notes enable row level security;
+
+drop policy if exists "read grammar notes" on public.grammar_notes;
+create policy "read grammar notes" on public.grammar_notes for select to anon, authenticated using (true);
+
+grant select on public.grammar_notes to anon, authenticated;
+grant all on public.grammar_notes to service_role;

@@ -14,7 +14,7 @@ import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } fr
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
-import { generateReadingPassage } from '../_shared/reading.ts'
+import { generateReadingPassage, writeMissingGrammarNotes } from '../_shared/reading.ts'
 
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -2717,6 +2717,49 @@ Deno.serve(async (req) => {
         locales,
       })
       if (!passage) return jsonResponse({ message: '文章生成失敗，請再試一次。' }, 502)
+
+      // What each pattern does is the same sentence whatever passage it turns
+      // up in, so it is looked up rather than rewritten. Only the points this
+      // deployment has never explained cost anything, and after a few lessons
+      // that is almost none of them.
+      if (passage.grammar.length) {
+        const wanted = passage.grammar.map((entry) => entry.point)
+        const { data: cached } = await supabase.from('grammar_notes')
+          .select('point, locale, note').in('point', wanted)
+        const notes = new Map<string, Record<string, string>>()
+        for (const row of (cached || []) as Array<{ point: string; locale: string; note: string }>) {
+          const existing = notes.get(row.point) || {}
+          existing[row.locale] = row.note
+          notes.set(row.point, existing)
+        }
+
+        const missing = passage.grammar.filter((entry) => (
+          locales.some((locale) => !notes.get(entry.point)?.[locale])
+        ))
+        if (missing.length) {
+          const written = await writeMissingGrammarNotes(
+            missing.map((entry) => ({ point: entry.point, level: entry.level, example: entry.example })),
+            locales,
+          )
+          const rows: Array<{ point: string; locale: string; note: string; level: number }> = []
+          for (const entry of missing) {
+            const note = written[entry.point]
+            if (!note) continue
+            const merged = { ...(notes.get(entry.point) || {}), ...note }
+            notes.set(entry.point, merged)
+            for (const locale of locales) {
+              if (note[locale]) rows.push({ point: entry.point, locale, note: note[locale], level: entry.level })
+            }
+          }
+          // Written for everyone, not for this class: another teacher on this
+          // deployment meeting 把字句 next week pays nothing for it.
+          if (rows.length) await supabase.from('grammar_notes').upsert(rows, { onConflict: 'point,locale' })
+        }
+
+        for (const entry of passage.grammar) entry.note = notes.get(entry.point) || {}
+        // A point nobody could explain is dropped rather than shown blank.
+        passage.grammar = passage.grammar.filter((entry) => Object.keys(entry.note).length > 0)
+      }
 
       const questionId = crypto.randomUUID()
       const { data: question, error: questionError } = await supabase.from('questions').insert({

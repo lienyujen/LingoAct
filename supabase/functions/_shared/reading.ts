@@ -232,7 +232,13 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     input.image
       ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
       : '',
-    'vocabulary: every word in the passage that a learner at this level has NOT met, with its part of speech in Chinese (名詞、動詞、形容詞、副詞、量詞、連接詞…) and a short gloss in each requested language. A word the class already knows does not belong here; padding this list makes the colouring useless.',
+    // 生詞 is not only what is above the class — a word learned AT this level is
+    // new this term and is exactly what the lesson is teaching. What the class
+    // already had before this level is not new and must not be marked, or the
+    // colouring says nothing.
+    `vocabulary: every word in the passage that a learner meets at 第${tbcl || 4}級 or later — that is, everything NOT already on the list for 第${Math.max(1, (tbcl || 4) - 1)}級 and below. Include the words being taught at this level, not only the ones above it.`,
+    'For each: its part of speech in Chinese (名詞、動詞、形容詞、副詞、量詞、連接詞…) and a short gloss in each requested language.',
+    'A word the class already had before this level does not belong here. Padding the list makes the colouring useless.',
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
     'Do not invent a grammar point that is not on the list, and do not attribute a pattern to a sentence that does not contain it.',

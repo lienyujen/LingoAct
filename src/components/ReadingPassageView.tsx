@@ -134,7 +134,12 @@ export function ReadingPassageView({ passage, locale, imageUrl }: Props) {
         {runs.map((run) => {
           const words = run.words.map((word, at) => (word.entry ? (
             <button
-              className={`reading-mark is-word${open?.kind === 'word' && open.entry === word.entry ? ' is-open' : ''}`}
+              // Coloured by the level the word is learned at, so a reader can see at
+              // a glance which of the new words are the ones for this term and
+              // which are reaching further. Level 0 is a word on no TBCL list at
+              // all — a name, a loanword — and gets its own quiet green ground
+              // rather than a level colour it does not have.
+              className={`reading-mark is-word level-${word.entry.level || 0}${open?.kind === 'word' && open.entry === word.entry ? ' is-open' : ''}`}
               key={`${run.key}-w${at}`}
               type="button"
               onClick={(event) => {

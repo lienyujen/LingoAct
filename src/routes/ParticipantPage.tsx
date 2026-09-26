@@ -948,6 +948,11 @@ export function ParticipantPage() {
           question={question} sessionId={sessionId} participantId={participant.id} participantToken={participantToken} locale={locale}
           active={session?.status === 'active' && question.status === 'active'} />}
       </div>
+      {/* The passage and its picture come before the questions, because the
+          questions are about them — and a student scrolling past the questions
+          to find the text is being asked to answer from memory. */}
+      {passage && <ReadingPassageView imageUrl={passageImageUrl} locale={locale} passage={passage} />}
+
       {screenshot && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
@@ -991,8 +996,6 @@ export function ParticipantPage() {
           somewhere the class goes back to, not something they are being asked
           right now, so it stays put while questions come and go above it. */}
       {/* Above the question, because the question is about it. */}
-      {passage && <ReadingPassageView imageUrl={passageImageUrl} locale={locale} passage={passage} />}
-
       {boardQuestion && participant && participantToken && session && (
         <ParticipantBoard
           imageUrl={boardImageUrl}

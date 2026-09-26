@@ -123,11 +123,12 @@ const readingSample = {
   id: 'p', session_id: 'preview', question_id: 'q', created_at: '',
   source: 'ai' as const, listening_clip_id: null,
   title: '週末的市場',
-  body: "星期六早上，我跟朋友去了學校附近的市場。\n\n市場裡有很多人。雖然人很多，但是大家都很有禮貌。我們買了水果和青菜，也喝了一杯豆漿。\n\n老闆說，這個市場已經開了三十年了。因為東西新鮮，所以附近的人都來這裡買菜。",
+  body: "星期六早上，我跟小明去了學校附近的市場。\n\n市場裡有很多人。雖然人很多，但是大家都很有禮貌。我們買了水果和青菜，也喝了一杯豆漿。\n\n老闆說，這個市場已經開了三十年了。因為東西新鮮，所以附近的人都來這裡買菜。",
   vocabulary: [
     { word: '禮貌', level: 4, pos: '名詞', gloss: { en: 'manners; politeness', zh_tw: '待人的態度很好', es: 'modales; cortesía' } },
     { word: '豆漿', level: 5, pos: '名詞', gloss: { en: 'soy milk', zh_tw: '黃豆做的飲料', es: 'leche de soja' } },
-    { word: '新鮮', level: 4, pos: '形容詞', gloss: { en: 'fresh', zh_tw: '剛採收、還沒放久', es: 'fresco' } },
+    { word: '新鮮', level: 5, pos: '形容詞', gloss: { en: 'fresh', zh_tw: '剛採收、還沒放久', es: 'fresco' } },
+    { word: '小明', level: 0, pos: '名詞', gloss: { en: 'a personal name', zh_tw: '人名', es: 'un nombre propio' } },
   ],
   grammar: [
     { point: '雖然…但是', level: 3, span: '雖然人很多，但是大家都很有禮貌', example: '雖然下雨，但是我還是去了。',

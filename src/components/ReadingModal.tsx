@@ -199,7 +199,11 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
         // Read aloud after the fact rather than before: the passage the class
         // hears has to be the passage they were given, and until it is written
         // there is nothing to read.
-        const { data: clip } = await supabase.functions.invoke('synthesize-listening', {
+        setStatus(t('readingSpeaking'))
+        // Both of these used to swallow their errors, so a failed clip looked
+        // exactly like a passage with no audio asked for: nothing on the
+        // student's screen and nothing said about it.
+        const { data: clip, error: clipError } = await supabase.functions.invoke('synthesize-listening', {
           body: {
             sessionId,
             presenterToken,
@@ -208,12 +212,14 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
             accent,
           },
         })
+        if (clipError) throw new Error(await edgeFunctionErrorMessage(clipError, t('readingAudioFailed')))
         clipId = clip?.clip?.id || null
-        if (clipId) {
-          await supabase.functions.invoke('presenter-action', {
-            body: { action: 'attach_reading_audio', sessionId, presenterToken, questionId: written.question_id, clipId },
-          })
-        }
+        if (!clipId) throw new Error(clip?.message || t('readingAudioFailed'))
+
+        const { error: attachError } = await supabase.functions.invoke('presenter-action', {
+          body: { action: 'attach_reading_audio', sessionId, presenterToken, questionId: written.question_id, clipId },
+        })
+        if (attachError) throw new Error(await edgeFunctionErrorMessage(attachError, t('readingAudioFailed')))
       }
       writeSettings({ stretch, withQuiz, quizCount, focus, withAudio, accent, useImage, shareShot, verbatim })
       onDispatched()

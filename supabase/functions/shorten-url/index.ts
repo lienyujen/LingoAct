@@ -31,14 +31,23 @@ Deno.serve(async (req) => {
     if (session.short_join_url) return jsonResponse({ shortUrl: session.short_join_url, cached: true })
 
     // The join hash carries the Supabase project so students can use the shared
-    // page: accept those two parameters, and nothing else, alongside the code.
+    // page, and which edition's student page to show: accept those three
+    // parameters, and nothing else, alongside the code.
+    //
+    // The allow-list is the point — this endpoint turns a URL we are handed
+    // into a public short link, so anything not recognised is refused rather
+    // than passed through. Adding a parameter to the join URL therefore means
+    // adding it here too: b was added to buildJoinUrl and every NCACLS
+    // short link silently failed until this caught up, because the caller
+    // ignores the error and quietly keeps the long URL.
     const parsedUrl = new URL(longUrl)
     const [hashPath, hashQuery] = parsedUrl.hash.split('?')
     const allowedQuery = (() => {
       if (hashQuery === undefined) return true
       const params = new URLSearchParams(hashQuery)
       const keys = [...params.keys()]
-      if (keys.some((name) => name !== 'p' && name !== 'k')) return false
+      if (keys.some((name) => name !== 'p' && name !== 'k' && name !== 'b')) return false
+      if (params.has('b') && !/^[a-z]{1,16}$/.test(params.get('b') || '')) return false
       return /^[a-z0-9]{20}$/.test(params.get('p') || '')
         && /^sb_publishable_[A-Za-z0-9_-]{8,}$/.test(params.get('k') || '')
     })()

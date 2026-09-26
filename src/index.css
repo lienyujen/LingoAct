@@ -3716,11 +3716,18 @@ h2 {
   to { translate: 30px 115vh; rotate: 560deg; }
 }
 
+/* A column rather than two named grid rows. The rows were auto + 1fr, which
+   was right while the page held a header and the cloud and stopped being right
+   the moment the timeline was added between them: the cloud dropped into an
+   implicit auto row, collapsed to zero height because every word in it is
+   absolutely positioned, and the page went blank — no words, and not even the
+   waiting message, because there were messages and there were words. A column
+   does not care how many things sit above the part that stretches. */
 .word-cloud-page {
   background: var(--surface-strong);
   color: #f4f2f6;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
   padding: 58px 34px 26px;
@@ -3785,6 +3792,7 @@ h2 {
 }
 
 .word-cloud-canvas {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   position: relative;

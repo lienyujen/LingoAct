@@ -64,7 +64,16 @@ export function WordCloudCanvas({ messages }: { messages: Message[] }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [layoutWords, setLayoutWords] = useState<CloudWord[]>([])
-  const counts = useMemo(() => wordCounts(messages), [messages])
+  // Keyed on which messages these are, not on the array that holds them. The
+  // page rebuilds that array every five seconds, because the timeline right
+  // edge follows the clock — same messages, new array, so counts changed
+  // identity, the effect below re-ran and its cleanup called layout.stop().
+  // d3-cloud places ninety words over several seconds, so a restart every five
+  // meant it rarely reached the end and the cloud stayed empty while the words
+  // were being counted perfectly well.
+  const messageKey = messages.map((message) => message.id).join(",")
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- messageKey is the identity of messages
+  const counts = useMemo(() => wordCounts(messages), [messageKey])
 
   useEffect(() => {
     if (!containerRef.current) return

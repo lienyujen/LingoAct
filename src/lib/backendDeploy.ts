@@ -18,17 +18,28 @@ const schemaSql = Object.values(
   import.meta.glob('/supabase/schema.sql', { query: '?raw', import: 'default', eager: true }),
 )[0] as string | undefined
 
-export const deployableFunctions = [
-  'create-session',
-  'participant-action',
-  'presenter-action',
-  'analyze-question',
-  'analyze-session',
-  'generate-exit-ticket',
-  'shorten-url',
-  'openai-realtime-session',
-  'gemini-caption-relay',
-] as const
+// Read off the sources above rather than listed by hand. The hand-written
+// list had fallen three behind what the app calls — synthesize-listening,
+// annotate-reading and analyze-listening-source were in the bundle and on
+// disk but never deployed, so a freshly set up project answered a non-2xx the
+// first time anyone pressed 轉成語音, and 注音／拼音 標注 was dead on arrival.
+// The glob that carries the code is now the same thing that decides what gets
+// deployed, so the two cannot drift apart again.
+//
+// create-session leads because it is the one the setup screen verifies next;
+// the rest follow in a stable order so the progress list does not reshuffle
+// between runs.
+const FIRST = 'create-session'
+export const deployableFunctions: string[] = (() => {
+  const slugs = new Set<string>()
+  for (const path of Object.keys(functionSources)) {
+    const slug = path.replace('/supabase/functions/', '').split('/')[0]
+    // _shared holds helpers that every function imports, not a function.
+    if (slug && !slug.startsWith('_')) slugs.add(slug)
+  }
+  slugs.delete(FIRST)
+  return [FIRST, ...[...slugs].sort()]
+})()
 
 export type DeployStep = {
   slug: string

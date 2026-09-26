@@ -13,6 +13,8 @@ import { DragAnswers } from '../components/DragAnswers'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
+import { WordCloudCanvas } from '../components/WordCloudCanvas'
+import { DanmakuTimeline } from '../components/DanmakuTimeline'
 import type { ParticipantQuizData } from '../types'
 import type { Session, Question } from '../types'
 import { APP_PROFILE } from '../lib/appProfiles'
@@ -66,6 +68,10 @@ export function Preview() {
   // dialog previews without a class, a token or a database behind it.
   // The first screen a new deployer ever sees, and the one place the app has
   // to explain where a Supabase project comes from.
+  // The word cloud window's own layout, header and timeline and all: the page
+  // is a column whose last child has to stretch, and the cloud draws nothing at
+  // all if it does not.
+  if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
@@ -104,6 +110,50 @@ export function Preview() {
       <SentenceWallModal open={open} initialPrompt={prompt} busy={false} error="" onCancel={() => setOpen(false)} onOpen={() => { setOpen(false); setNotice('預覽完成，沒有派送題目。') }} />
     </main>
   </div>
+}
+
+function CloudPreview() {
+  const base = Date.now() - 20 * 60_000
+  const sentences = [
+    '老師這題我聽不懂', '剛剛的發音可以再念一次嗎', '我覺得第二個答案比較合理',
+    '請問這個字的注音是什麼', '聲調好難分辨', '我選了第三個',
+    '這個句子的語順怎麼排', '剛剛那張圖看不清楚', '發音練習很有趣',
+  ]
+  const messages = sentences.flatMap((content, index) => (
+    Array.from({ length: 1 + (index % 3) }, (_, copy) => ({
+      id: `m${index}-${copy}`,
+      session_id: 'preview',
+      participant_id: null,
+      display_name: null,
+      content,
+      created_at: new Date(base + index * 90_000 + copy * 4_000).toISOString(),
+    }))
+  )) as unknown as import('../types').Message[]
+  const times = messages.map((m) => new Date(m.created_at).getTime()).sort((a, b) => a - b)
+  const bounds = { start: times[0], end: Date.now() + 30_000 }
+  const [selection, setSelection] = useState({ from: bounds.start, to: bounds.end })
+  return (
+    <main className="word-cloud-page">
+      <header className="word-cloud-header">
+        <div>
+          <p>彈幕文字雲</p>
+          <h1>介面預覽</h1>
+        </div>
+        <div className="word-cloud-tools"><span>{messages.length} 則</span></div>
+      </header>
+      <DanmakuTimeline
+        selection={selection}
+        sessionEnd={bounds.end}
+        sessionStart={bounds.start}
+        times={times}
+        onChange={setSelection}
+      />
+      <WordCloudCanvas messages={messages.filter((m) => {
+        const at = new Date(m.created_at).getTime()
+        return at >= selection.from && at <= selection.to
+      })} />
+    </main>
+  )
 }
 
 function InteractionPreview() {

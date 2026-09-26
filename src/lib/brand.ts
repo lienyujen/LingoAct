@@ -28,16 +28,17 @@ export function brandFromSearch(search: URLSearchParams): BrandId | null {
 }
 
 // Which guidance languages an edition offers a student. NCACLS teach Chinese
-// in the United States, so their classes need English and Spanish and nothing
-// else — a list of eight is a list to get lost in when two of them are ever
-// going to be picked.
+// in the United States, so their classes need English and Spanish — and
+// 繁體中文 itself, which is the language being taught and the one the teacher
+// demonstrates in. Cutting the other five is the point; cutting Chinese from a
+// Chinese course is not.
 //
 // Filtered rather than replaced, so the codes stay the ones the rest of the
-// app already knows and a student who arrives on a locale the edition does not
-// offer is moved to its first one rather than left on a language the picker
-// cannot show.
+// app already knows and the menu keeps the app-wide order. A student who
+// arrives on a locale the edition does not offer is moved to its first one
+// rather than left on a language whose entry is not in the picker.
 const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
-  ncacls: ['en', 'es'],
+  ncacls: ['zh-TW', 'en', 'es'],
 }
 
 export function guidanceLocalesForBrand<T extends { code: string }>(all: readonly T[], brand: BrandId | null) {

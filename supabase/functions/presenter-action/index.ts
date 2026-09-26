@@ -2774,12 +2774,19 @@ Deno.serve(async (req) => {
       const clipId = typeof input.clipId === 'string' ? input.clipId : ''
       if (!validUuid(questionId) || !validUuid(clipId)) return jsonResponse({ message: '資料格式不正確。' }, 400)
 
+      const { data: clip } = await supabase.from('listening_clips')
+        .select('karaoke_cues').eq('id', clipId).eq('session_id', sessionId).maybeSingle()
+
       const { error: passageError } = await supabase.from('reading_passages')
         .update({ listening_clip_id: clipId }).eq('question_id', questionId).eq('session_id', sessionId)
       if (passageError) throw passageError
 
       const { error: questionError } = await supabase.from('questions')
-        .update({ listening_clip_id: clipId }).eq('id', questionId).eq('session_id', sessionId)
+        .update({
+          listening_clip_id: clipId,
+          karaoke_cues: Array.isArray(clip?.karaoke_cues) ? clip.karaoke_cues : [],
+        })
+        .eq('id', questionId).eq('session_id', sessionId)
       if (questionError) throw questionError
 
       return jsonResponse({ ok: true })

@@ -4,7 +4,7 @@ import { BookOpen, Translate, X } from '@phosphor-icons/react'
 import { useReadingFont } from '../lib/readingFont'
 import { contentLocaleKey, participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
-import type { ReadingPassage, ReadingGrammar, ReadingVocabulary } from '../types'
+import type { KaraokeCue, ReadingPassage, ReadingGrammar, ReadingVocabulary } from '../types'
 
 type Props = {
   passage: ReadingPassage
@@ -22,6 +22,11 @@ type Props = {
   // readings and the audio stay — they help a student read, not answer — and a
   // passage sent without a quiz locks nothing at all.
   locked?: boolean
+  // Where the voice is, so the passage lights up as it is read. The timings
+  // count characters of the body, which is why they belong to whoever draws it
+  // — and that is this component, not the player.
+  cues?: KaraokeCue[] | null
+  activeCue?: number
 }
 
 // Where the readings come from, one entry per character of the body.
@@ -74,6 +79,19 @@ function byOffset(body: string, entries: string[] | null) {
   let index = 0
   for (const character of body) {
     map.set(offset, entries[index] || '')
+    offset += character.length
+    index += 1
+  }
+  return map
+}
+
+// The same translation for the karaoke timings, which count characters.
+function characterIndexes(body: string) {
+  const map = new Map<number, number>()
+  let offset = 0
+  let index = 0
+  for (const character of body) {
+    map.set(offset, index)
     offset += character.length
     index += 1
   }
@@ -165,7 +183,7 @@ function glossFor(gloss: Record<string, string> | undefined, locale: Participant
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
 }
 
-export function ReadingPassageView({ passage, locale, imageUrl, player, locked = false }: Props) {
+export function ReadingPassageView({ passage, locale, imageUrl, player, locked = false, cues, activeCue = -1 }: Props) {
   // The student's own switches, separate from the teacher's. A teacher who
   // turned the grammar on wants it available; a reader who finds it busy can
   // put it away without losing the vocabulary colouring, and the other way
@@ -201,23 +219,32 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   const showGlyphs = Boolean(glyphs && showRuby && family)
   const showRubyText = Boolean(ruby && showRuby)
 
+  const charAt = useMemo(() => characterIndexes(passage.body), [passage.body])
+  // The stretch being spoken right now, in character positions. Null whenever
+  // nothing is playing, which is what keeps the passage still while it is read.
+  const spoken = (cues && activeCue >= 0 ? cues[activeCue] : null) || null
+
   // One character at a time, so a reading sits over the character it belongs to
   // and not over the word it happens to start.
   function annotated(text: string, at: number) {
-    if (!showGlyphs && !showRubyText) return text
+    if (!showGlyphs && !showRubyText && !spoken) return text
     const out: ReactNode[] = []
     let offset = 0
     for (const character of text) {
       const key = at + offset
+      const position = charAt.get(key) ?? -1
+      const lit = Boolean(spoken) && position >= (spoken as KaraokeCue).start_index && position < (spoken as KaraokeCue).end_index
+      const className = lit ? 'karaoke-character active' : undefined
       if (showGlyphs) {
-        out.push(<span key={key}>{glyphs?.get(key) || character}</span>)
+        out.push(<span className={className} key={key}>{glyphs?.get(key) || character}</span>)
       } else {
         const reading = ruby?.get(key)
+        const body = <span className={className}>{character}</span>
         out.push(reading
-          ? <ruby key={key}>{character}<rt>{reading}</rt></ruby>
+          ? <ruby key={key}>{body}<rt>{reading}</rt></ruby>
           // Not wrapped: a character with no reading should sit on the same
           // baseline as the annotated ones, and an empty <rt> pushes it down.
-          : <span key={key}>{character}</span>)
+          : <span key={key}>{body}</span>)
       }
       offset += character.length
     }

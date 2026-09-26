@@ -17,12 +17,15 @@ type Props = {
   // 'inline' is the passage reader's row, where the player is two buttons
   // beside the annotation switches rather than a panel of its own.
   variant?: 'listening' | 'model' | 'inline'
+  // Where the voice has got to, for a caller drawing the text itself. The
+  // passage reader does: the words are its own, so the highlight has to be too.
+  onActiveCue?: (index: number) => void
   locale: ParticipantLocale
 }
 
 const SLOW_RATE = 0.75
 
-export function ListeningPlayer({ clip, questionId, replayLimit, prompt, readingFontUrl, readingRuby, karaokeCues, variant = 'listening', locale }: Props) {
+export function ListeningPlayer({ clip, questionId, replayLimit, prompt, readingFontUrl, readingRuby, karaokeCues, variant = 'listening', locale, onActiveCue }: Props) {
   const isModel = variant === 'model'
   const isInline = variant === 'inline'
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -63,6 +66,8 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
     return () => cancelAnimationFrame(frame)
   }, [karaokeCues, playing])
 
+  useEffect(() => { onActiveCue?.(playing ? activeCue : -1) }, [activeCue, onActiveCue, playing])
+
   const exhausted = replayLimit !== null && used >= replayLimit
   const remaining = replayLimit === null ? null : Math.max(replayLimit - used, 0)
 
@@ -92,15 +97,20 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
         onError={() => setFailed(true)}
       />
       <button
-        className="reading-toggle"
+        className={`reading-toggle${failed || exhausted ? '' : ' is-on'}`}
         disabled={exhausted || playing || failed}
+        title={failed ? participantText(locale, 'listeningFailed') : undefined}
         type="button"
         onClick={start}
       >
         <Play size={15} />
-        {participantText(locale, playing
-          ? 'listeningPlaying'
-          : used > 0 ? 'listeningReplay' : 'listeningPlay')}
+        {participantText(locale, failed
+          ? 'listeningAudioBroken'
+          : exhausted
+            ? 'listeningNoPlaysLeft'
+            : playing
+              ? 'listeningPlaying'
+              : used > 0 ? 'listeningReplay' : 'listeningPlay')}
       </button>
       <button
         aria-pressed={slow}

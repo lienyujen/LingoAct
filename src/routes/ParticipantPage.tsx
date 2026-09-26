@@ -68,6 +68,9 @@ export function ParticipantPage() {
   const [quizBusy, setQuizBusy] = useState(false)
   const [quizLoadError, setQuizLoadError] = useState('')
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null)
+  // Which stretch of a passage is being spoken. It lives here because the
+  // player produces it and the reader draws it, and they are siblings.
+  const [readingCue, setReadingCue] = useState(-1)
   const [listeningClip, setListeningClip] = useState<ListeningClip | null>(null)
   const [exitTicket, setExitTicket] = useState<ExitTicket | null>(null)
   const [sessionSummary, setSessionSummary] = useState<SessionAnalysis | null>(null)
@@ -956,6 +959,8 @@ export function ParticipantPage() {
           to find the text is being asked to answer from memory. */}
       {passage && (
         <ReadingPassageView
+          activeCue={readingCue}
+          cues={question?.karaoke_cues}
           imageUrl={passageImageUrl}
           locale={locale}
           // Under an unfinished quiz the glosses are the answer key, so they
@@ -979,6 +984,7 @@ export function ParticipantPage() {
               readingRuby={question.reading_ruby}
               replayLimit={question.replay_limit}
               variant="inline"
+              onActiveCue={setReadingCue}
             />
           ) : null}
         />

@@ -77,6 +77,9 @@ export function Preview() {
   if (location.hash === '#reading-send') return <ReadingModal open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   // The same panel reached by capturing rather than pasting.
   if (location.hash === '#reading-shot') return <ReadingModal capture={sampleCapture()} open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
+  // The voice part-way through the second phrase, which runs straight into a
+  // marked word — the case where the highlight and the 生詞 colour meet.
+  if (location.hash === '#reading-ktv') return <main className="participant-page"><ReadingPassageView activeCue={1} cues={previewCues} locale="zh-TW" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#reading-locked') return <main className="participant-page"><ReadingPassageView locale="zh-TW" locked passage={readingSample} /></main>
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
@@ -153,6 +156,11 @@ function previewPlayer() {
   }
   return <ListeningPlayer clip={clip} locale="zh-TW" questionId="q" replayLimit={null} variant="inline" />
 }
+
+const previewCues = [
+  { start_index: 0, end_index: 5, start_ms: 0, end_ms: 900 },
+  { start_index: 6, end_index: 12, start_ms: 900, end_ms: 1800 },
+]
 
 // A tiny PNG standing in for a screen grab, so the capture half of the reading
 // panel can be looked at without a screen to grab.

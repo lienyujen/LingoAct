@@ -8278,6 +8278,29 @@ h2 {
   display: none;
 }
 
+/* Following the voice through the passage. The listening page's karaoke has
+   its own presentation — a white card in 2.25rem bold — and none of that
+   belongs on a passage, so only the mark itself is shared. */
+.reading-passage-body .karaoke-character {
+  border-radius: .16em;
+  box-decoration-break: clone;
+  padding: .04em .015em;
+  transition: background 70ms linear, color 70ms linear;
+  -webkit-box-decoration-break: clone;
+}
+
+.reading-passage-body .karaoke-character.active {
+  background: #6d1857;
+  color: #fff;
+}
+
+/* A 生詞 or a 語法 mark keeps its own colour until the voice reaches it, and
+   then has to give way — otherwise the level colour wins over the highlight
+   and the word being spoken is the one hardest to see. */
+.reading-passage-body .reading-mark .karaoke-character.active {
+  color: #fff;
+}
+
 /* On a phone the title takes the line to itself, so the switches start where
    the eye already is rather than hugging the far edge. */
 @media (max-width: 560px) {

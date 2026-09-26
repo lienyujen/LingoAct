@@ -523,6 +523,11 @@ function createWordCloudWindow(sessionId) {
   wordCloudWindow.once('ready-to-show', () => {
     overlayVisibilitySuppressed = true
     overlayWindow?.hide()
+    // The control panel and the QR go away entirely while the cloud is up. It
+    // is a full-screen thing the whole room is looking at, and the panel sitting
+    // on top of it is the presenter’s own workspace, not something the class
+    // should be reading.
+    mainWindow?.hide()
     wordCloudWindow?.show()
     wordCloudWindow?.moveTop()
     wordCloudWindow?.focus()
@@ -531,7 +536,10 @@ function createWordCloudWindow(sessionId) {
     wordCloudWindow = null
     overlayVisibilitySuppressed = false
     showOverlayInactive()
-    setTimeout(() => bringControlToFront(false), 60)
+    // Focused, not merely shown: closing the cloud is the presenter asking for
+    // the controls back, and they were hidden rather than sent behind, so they
+    // return to whatever screen they were left on.
+    setTimeout(() => bringControlToFront(true), 60)
   })
 }
 

@@ -2,6 +2,7 @@ import { ChatText, Cloud } from '@phosphor-icons/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
+import { BUILT_IN_TERMS, parseTermInput, readCustomTerms, writeCustomTerms } from '../lib/wordCloudTerms'
 import { DanmakuTimeline } from '../components/DanmakuTimeline'
 import { currentBurst } from '../lib/danmakuBursts'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
@@ -17,6 +18,12 @@ export function WordCloudPage() {
   const locale = presenterLocaleFor(session?.teaching_language)
   const t = presenterLookup(locale)
   const [messages, setMessages] = useState<Message[]>([])
+  // The presenter's own words, kept on this computer beside the class lists. A
+  // subject always has vocabulary no general list anticipated, and the moment
+  // to add it is when the cloud gets it wrong in front of the class.
+  const [customTerms, setCustomTerms] = useState<string[]>(readCustomTerms)
+  const [termsOpen, setTermsOpen] = useState(false)
+  const [termText, setTermText] = useState('')
   // Where the teacher has dragged the timeline, or null to follow the class.
   const [pinned, setPinned] = useState<{ from: number; to: number } | null>(null)
   const [now, setNow] = useState(Date.now())
@@ -173,9 +180,35 @@ export function WordCloudPage() {
         </div>
         <div className="word-cloud-tools">
           <span><ChatText size={16} />{t('messageCount', { n: visibleMessages.length })}</span>
-          {pinned && (
-            <button type="button" onClick={() => setPinned(null)}>{t('cloudFollowClass')}</button>
-          )}
+          {/* Two named ranges, because those are the two questions a teacher
+              actually asks — what are they saying right now, and what has this
+              class been about. The timeline below is still there for anything
+              in between. */}
+          <div className="segmented-control" aria-label={t('cloudRange')}>
+            <button
+              aria-pressed={!pinned}
+              className={!pinned ? 'selected' : ''}
+              type="button"
+              onClick={() => setPinned(null)}
+            >
+              {t('cloudThisWave')}
+            </button>
+            <button
+              aria-pressed={Boolean(pinned) && selection.from <= bounds.start}
+              className={pinned && selection.from <= bounds.start ? 'selected' : ''}
+              type="button"
+              onClick={() => setPinned({ from: bounds.start, to: bounds.end })}
+            >
+              {t('cloudWholeSession')}
+            </button>
+          </div>
+          <button
+            className="ghost-button word-cloud-terms-toggle"
+            type="button"
+            onClick={() => { setTermText(customTerms.join('\n')); setTermsOpen((open) => !open) }}
+          >
+            {t('cloudTerms')}
+          </button>
         </div>
       </header>
       {times.length > 0 && (
@@ -188,7 +221,33 @@ export function WordCloudPage() {
         />
       )}
       {loadError && <p className="word-cloud-error" role="alert">{t('cloudUpdateFailed', { message: loadError })}</p>}
-      <WordCloudCanvas messages={visibleMessages} />
+      {termsOpen && (
+        <section className="word-cloud-terms" aria-label={t('cloudTerms')}>
+          <p className="muted">{t('cloudTermsHint', { n: BUILT_IN_TERMS.length })}</p>
+          <textarea
+            aria-label={t('cloudTerms')}
+            placeholder={t('cloudTermsPlaceholder')}
+            rows={5}
+            value={termText}
+            onChange={(event) => setTermText(event.target.value)}
+          />
+          <div className="word-cloud-terms-actions">
+            <button
+              type="button"
+              onClick={() => {
+                const saved = writeCustomTerms(parseTermInput(termText))
+                setTermText(saved.join('\n'))
+                setCustomTerms(saved)
+                setTermsOpen(false)
+              }}
+            >
+              {t('cloudTermsSave')}
+            </button>
+            <button className="ghost-button" type="button" onClick={() => setTermsOpen(false)}>{t('cancel')}</button>
+          </div>
+        </section>
+      )}
+      <WordCloudCanvas customTerms={customTerms} messages={visibleMessages} />
     </main>
     </PresenterLocaleContext.Provider>
   )

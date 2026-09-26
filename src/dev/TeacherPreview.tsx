@@ -135,7 +135,7 @@ function CloudPreview() {
     <main className="word-cloud-page">
       <header className="word-cloud-header">
         <div>
-          <p>彈幕文字雲</p>
+          <p>文字雲</p>
           <h1>介面預覽</h1>
         </div>
         <div className="word-cloud-tools"><span>{messages.length} 則</span></div>

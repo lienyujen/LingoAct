@@ -364,8 +364,8 @@ const messages = {
     backToSessions: '返回場次管理', closeReport: '關閉報告',
     connectingMic: '正在連接麥克風...',
 
-    // 彈幕文字雲
-    wordCloudTitle: 'LingoAct 彈幕文字雲', loadingSession: '載入場次...',
+    // 文字雲
+    wordCloudTitle: 'LingoAct 文字雲', loadingSession: '載入場次...',
     messageCount: '{n} 則彈幕', 
        
     waitingFirstMessage: '等待第一則彈幕...', buildingKeywords: '正在累積可分析的關鍵詞...',

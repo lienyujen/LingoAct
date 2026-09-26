@@ -499,7 +499,7 @@ function createWordCloudWindow(sessionId) {
     maximizable: true,
     alwaysOnTop: true,
     backgroundColor: '#0b1020',
-    title: 'LingoAct 彈幕文字雲',
+    title: 'LingoAct 文字雲',
     icon: APP_WINDOW_ICON_PATH,
     webPreferences: {
       contextIsolation: true,

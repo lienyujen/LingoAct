@@ -73,6 +73,7 @@ const messages = {
     captureTitle: '截圖派題', capturePreviewAlt: '截圖預覽',
     typeSendScreen: '派送畫面', typeCustomQuiz: '自訂測驗', typePoll: '投票題',
     typeMultipleChoice: '選擇題', typeFileUpload: '上傳作答', typeShortAnswer: '問答題', typeDrawing: '電寫題',
+    cloudFollowClass: '跟著班上走',
     captureQuestionHint: 'screenshot to interact',
     drawingTypeHint: '學生會拿到這張截圖當底圖，直接在上面寫解題過程或作答，也可以勾掉底圖用白紙自己畫。收回來的是一人一張圖，可以逐張放大看，也可以一次交給 AI 批改全班。',
     drawingPromptLabel: '題目（選填，寫了 AI 更知道怎麼改）',
@@ -327,8 +328,8 @@ const messages = {
 
     // 彈幕文字雲
     wordCloudTitle: 'LingoAct 彈幕文字雲', loadingSession: '載入場次...',
-    messageCount: '{n} 則彈幕', cloudRangeLabel: '文字雲統計範圍',
-    rangeAll: '整個場次', range3m: '3 分鐘', range10m: '10 分鐘', range1h: '1 小時',
+    messageCount: '{n} 則彈幕', 
+       
     waitingFirstMessage: '等待第一則彈幕...', buildingKeywords: '正在累積可分析的關鍵詞...',
     wordTimes: '{word}：{n} 次',
     danmakuLoadFailed: '無法讀取彈幕資料。', danmakuUpdateFailed: '無法更新彈幕資料。',
@@ -471,6 +472,7 @@ const messages = {
     captureTitle: 'Send from the screen', capturePreviewAlt: 'Captured screen',
     typeSendScreen: 'Just the screen', typeCustomQuiz: 'AI quiz', typePoll: 'Poll',
     typeMultipleChoice: 'Multiple choice', typeFileUpload: 'Upload an answer', typeShortAnswer: 'Written answer', typeDrawing: 'Write on the page',
+    cloudFollowClass: 'Follow the class',
     captureQuestionHint: 'screenshot to interact',
     drawingTypeHint: 'Students get this capture as the background and write their working straight onto it, or clear it and start on blank paper. One page comes back per student: enlarge them one at a time, or hand the whole class to the AI at once.',
     drawingPromptLabel: 'Question (optional — it helps the AI mark)',
@@ -712,8 +714,8 @@ const messages = {
     connectingMic: 'Connecting the microphone...',
 
     wordCloudTitle: 'LingoAct word cloud', loadingSession: 'Loading...',
-    messageCount: '{n} messages', cloudRangeLabel: 'Word cloud range',
-    rangeAll: 'The whole class', range3m: '3 minutes', range10m: '10 minutes', range1h: '1 hour',
+    messageCount: '{n} messages', 
+       
     waitingFirstMessage: 'Waiting for the first message...', buildingKeywords: 'Gathering enough words to read...',
     wordTimes: '{word}: {n} times',
     danmakuLoadFailed: 'The messages could not be read.', danmakuUpdateFailed: 'The messages could not be refreshed.',

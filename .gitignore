@@ -17,6 +17,10 @@ release
 # The unpacked build kept around to run directly: pnpm desktop:folder.
 # 300-odd MB of Electron, and it carries the .env of whoever built it.
 /LingoAct/
+/LingoAct-Huayu/
+/LingoAct-English/
+/LingoAct-Guoyu/
+/LingoAct-NCACLS/
 .codex-tmp/
 supabase/.temp/
 .env

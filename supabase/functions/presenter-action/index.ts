@@ -14,6 +14,7 @@ import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } fr
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
+import { generateReadingPassage } from '../_shared/reading.ts'
 
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -2663,6 +2664,147 @@ Deno.serve(async (req) => {
     // Calling off a round nobody buzzed on. Without this the only way past the
     // overlay is to start another one, which is not a thing a teacher wants to
     // do in front of a class that has moved on.
+    // 閱讀與測驗. The passage is written first and returned, because a teacher
+    // wants to read it before the class does; the quiz over it, if asked for,
+    // is built in the background the way every other generated quiz is.
+    if (action === 'dispatch_reading') {
+      const sourceText = clean(input.sourceText, 8000)
+      const direction = clean(input.direction, 2000)
+      if (!sourceText && !direction) return jsonResponse({ message: '請先貼上內容，或寫下這篇要講什麼。' }, 400)
+
+      const stretch = Number(input.levelStretch)
+      const levelStretch = Number.isInteger(stretch) && stretch >= 0 && stretch <= 2 ? stretch : 0
+      const withQuiz = input.withQuiz === true
+      const clipId = typeof input.clipId === 'string' && validUuid(input.clipId) ? input.clipId : null
+      const screenshotId = typeof input.screenshotId === 'string' && validUuid(input.screenshotId)
+        ? input.screenshotId
+        : null
+
+      const { data: classRow } = await supabase.from('sessions')
+        .select('teaching_language, guidance_language, level_framework, level_code')
+        .eq('id', sessionId).maybeSingle()
+
+      // The languages the annotations have to exist in: the two that are always
+      // hand-written in the app, plus whatever this class's students can pick.
+      const locales = [...new Set(['zh_tw', 'en', String(classRow?.guidance_language || 'en').toLowerCase().replace('-', '_')])]
+
+      const passage = await generateReadingPassage({
+        source: sourceText,
+        direction,
+        teachingLanguage: classRow?.teaching_language ?? null,
+        levelFramework: classRow?.level_framework ?? null,
+        levelCode: classRow?.level_code ?? null,
+        levelStretch,
+        locales,
+      })
+      if (!passage) return jsonResponse({ message: '文章生成失敗，請再試一次。' }, 502)
+
+      const questionId = crypto.randomUUID()
+      const { data: question, error: questionError } = await supabase.from('questions').insert({
+        id: questionId,
+        session_id: sessionId,
+        screenshot_id: screenshotId,
+        listening_clip_id: clipId,
+        level_stretch: levelStretch,
+        // A reading with a quiz is still a reading: the passage is the thing
+        // the class is given, and the quiz hangs off it.
+        type: withQuiz ? 'custom_quiz' : 'reading',
+        status: 'active',
+        title: passage.title || '閱讀',
+        prompt_text: withQuiz ? '讀完後回答下面的問題。' : '',
+        options: [],
+        allow_multiple: false,
+      }).select('*').single()
+      if (questionError) throw questionError
+
+      const { error: passageError } = await supabase.from('reading_passages').insert({
+        session_id: sessionId,
+        question_id: questionId,
+        title: passage.title || null,
+        body: passage.body,
+        source: screenshotId ? 'screenshot' : (sourceText ? 'pasted' : 'ai'),
+        vocabulary: passage.vocabulary,
+        grammar: passage.grammar,
+        listening_clip_id: clipId,
+      })
+      if (passageError) throw passageError
+
+      const { error: sessionError } = await supabase.from('sessions')
+        .update({ current_question_id: questionId }).eq('id', sessionId).eq('status', 'active')
+      if (sessionError) throw sessionError
+
+      // The questions are about the passage the class was actually given, not
+      // about the teacher's source material — which is the whole point of
+      // writing the passage first. The class reads while these are built.
+      if (withQuiz) {
+        const quizId = crypto.randomUUID()
+        const readingQuiz = async () => {
+          try {
+            const generated = await generateCustomQuiz({
+              sourceText: passage.body,
+              extraInstruction: [
+                'The source text IS the passage the class has just been given, written for their level. Ask about it and nothing else.',
+                'Do not ask about a word the passage does not contain, and do not reach for background knowledge the passage does not supply.',
+              ].join('\n'),
+              teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+              guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
+              levelFramework: classRow?.level_framework ?? null,
+              levelCode: classRow?.level_code ?? null,
+              levelStretch,
+              direction: direction || '閱讀理解',
+              requestedCount: 5,
+              requestedType: 'random',
+            })
+
+            const { error: quizError } = await supabase.from('quizzes').insert({
+              id: quizId,
+              session_id: sessionId,
+              question_id: questionId,
+              title: generated.title,
+              direction: direction || '閱讀理解',
+              requested_count: 5,
+              requested_type: 'random',
+              graded: true,
+            })
+            if (quizError) throw quizError
+
+            const { error: itemError } = await supabase.from('quiz_items').insert(generated.items.map((item) => ({
+              id: item.id,
+              quiz_id: quizId,
+              position: item.position,
+              type: item.type,
+              prompt_text: item.prompt_text,
+              options: item.options,
+              pair_prompts: item.pair_prompts,
+              points: item.points,
+              prompt_is_word: item.prompt_is_word,
+              translations: item.translations,
+            })))
+            if (itemError) throw itemError
+
+            const { error: keyError } = await supabase.from('quiz_item_keys').insert(generated.items.map((item) => ({
+              item_id: item.id,
+              accepted_answers: item.accepted_answers,
+              rubric: item.rubric,
+            })))
+            if (keyError) throw keyError
+          } catch (error) {
+            const detail = errorDetail(error, 'Reading quiz generation failed.')
+            console.error('reading quiz generation failed', detail)
+            // The passage is still a lesson without questions over it, so the
+            // question keeps its title and only says the quiz is missing.
+            await supabase.from('questions').update({
+              prompt_text: '這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。',
+            }).eq('id', questionId)
+          }
+        }
+        EdgeRuntime.waitUntil(readingQuiz())
+        return jsonResponse({ question, passage, quizId, generating: true }, 202)
+      }
+
+      return jsonResponse({ question, passage })
+    }
+
     if (action === 'cancel_buzzer') {
       const { data: liveEvents, error: liveError } = await supabase
         .from('session_events')

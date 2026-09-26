@@ -65,8 +65,8 @@ const messages = {
     sentenceWallPlaceholder: '例如：用「雖然……但是……」造一個跟天氣有關的句子',
     opening: '開啟中…', sendAndOpenWall: '派題並開牆',
     sentenceWallShort: '造句寫作牆', wallShowing: '大螢幕顯示中', wallShow: '投到大螢幕',
-    composeN: 'AI 集成這 {n} 句', composeAgain: '重新集成', composing: '集成中…',
-    sendViaText: '用文字派送給學生', composeNeedsTwo: '至少收到兩個句子後就可以集成。',
+    composeN: '看 AI 怎麼寫這 {n} 句', composeAgain: '重新生成', composing: '生成中…',
+    sendViaText: '用文字派送給學生', composeNeedsTwo: '至少收到兩個句子後就可以生成。',
     worthLearning: '值得學的句子', watchOutFor: '要注意的地方',
 
     // 拍照描述
@@ -430,7 +430,7 @@ const messages = {
     // 教師端流程訊息
     pictureGenerateFailed: '無法生成四格圖。', imageProcessFailed: '無法處理圖片。',
     pictureUploadPrepareFailed: '無法準備圖片上傳。',
-    composeFailed: '集成失敗。', readingCountMismatch: '標音結果與卡片數量對不上。',
+    composeFailed: '生成失敗。', readingCountMismatch: '標音結果與卡片數量對不上。',
     desktopOnlySubset: '注音字型子集化只能在 LingoAct 桌面版執行。',
     lotteryConfirmFailed: '無法確認抽籤結果。', sessionCloseFailed: '無法關閉場次。',
     blankAnswer: '未填答',

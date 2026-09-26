@@ -529,11 +529,11 @@ export function PresenterPage() {
   useEffect(() => {
     if (!window.lingoActDesktop || !session?.id || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
-      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen || photoTaskOpen,
+      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen || photoTaskOpen || readingOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, selectionMode, sentenceWallOpen, session?.id, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, readingOpen, selectionMode, sentenceWallOpen, session?.id, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return

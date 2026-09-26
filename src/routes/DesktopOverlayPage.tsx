@@ -249,6 +249,21 @@ export function DesktopOverlayPage() {
     setLotteryEvent(await finalizeLottery(sessionId, lotteryEvent.id, winnerId, t))
   }
 
+  // The overlay is the window the room is actually looking at, so this is the
+  // copy of the buzzer that needs a way out. The presenter window has its own,
+  // but it is hidden behind this one while a round is up.
+  async function cancelBuzzer() {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error(t('noControlRights'))
+    const { error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'cancel_buzzer', sessionId, presenterToken },
+    })
+    if (error) throw error
+    // Every other window learns it from the row change; this one is closing
+    // the thing it is showing, so it does not wait for the round trip.
+    setBuzzerEvent(null)
+  }
+
   async function activateBuzzer() {
     if (!buzzerEvent || !isBuzzerPending(buzzerEvent) || isBuzzerAccepting(buzzerEvent)) return
     const presenterToken = getPresenterToken(sessionId)
@@ -285,7 +300,7 @@ export function DesktopOverlayPage() {
         />
       )}
       <LotteryOverlay event={lotteryEvent} onSelect={selectLotteryCandidate} />
-      <BuzzerOverlay event={buzzerEvent} onStart={activateBuzzer} />
+      <BuzzerOverlay event={buzzerEvent} onClose={cancelBuzzer} onStart={activateBuzzer} />
     </div>
     </PresenterLocaleContext.Provider>
   )

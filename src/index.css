@@ -3840,11 +3840,15 @@ h2 {
   font-size: 26px;
 }
 
+/* A row, not a grid. As a grid every control stacked, so 自訂詞彙 sat on a
+   line below the range buttons it belongs beside. Wrapping is kept for a
+   narrow window; the count stays leftmost and 自訂詞彙 last. */
 .word-cloud-tools {
-  align-items: flex-end;
-  display: grid;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  justify-items: end;
+  justify-content: flex-end;
 }
 
 .segmented-control {

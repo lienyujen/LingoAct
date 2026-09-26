@@ -1040,14 +1040,13 @@ begin
   end if;
 end $$;
 
-alter table public.questions drop constraint if exists questions_type_check;
-alter table public.questions
-  add constraint questions_type_check
-  check (type in (
-    'send_screen', 'poll', 'multiple_choice', 'true_false', 'short_answer',
-    'pronunciation', 'oral_response', 'custom_quiz', 'file_upload', 'listening',
-    'drawing', 'hotspot'
-  ));
+-- questions_type_check is defined once, further down, with every type in it.
+-- It used to be defined here as well, without 'board' — and a constraint is
+-- checked against the rows already in the table, so on any database that had
+-- ever opened a discussion board this line failed with 23514 and took the whole
+-- transaction with it. The narrow definition is gone rather than widened:
+-- two definitions of one constraint only ever means the earlier one is waiting
+-- to reject data the app has since learned to write.
 
 do $$
 begin

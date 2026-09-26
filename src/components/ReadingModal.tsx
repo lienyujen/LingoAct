@@ -104,6 +104,9 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
       // every other screenshot in the app does — a megabyte of base64 in the
       // request body is how you find the edge function's size limit.
       let shotId = screenshotId || null
+      // The path travels with the id: the function needs it to confirm the
+      // upload landed and to write the screenshots row the question points at.
+      let shotPath: string | null = null
       if (capture && !shotId) {
         setStatus(t('readingUploading'))
         const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
@@ -121,6 +124,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           })
         if (uploadError) throw uploadError
         shotId = prepared.screenshotId as string
+        shotPath = prepared.storagePath as string
       }
       setStatus(t('readingWorking'))
 
@@ -136,6 +140,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           quizCount,
           comprehension: focus,
           screenshotId: shotId,
+          storagePath: shotPath,
           shareScreenshot: shareShot,
           useImage,
           verbatim,

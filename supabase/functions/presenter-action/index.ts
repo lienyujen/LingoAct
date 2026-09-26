@@ -101,6 +101,51 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary)
 }
 
+// prepare_screenshot_upload hands back an id and a signed URL and creates no
+// row: the screenshots row is written afterwards, by whoever is going to point
+// at it. Miss that step and the id looks perfectly valid right up until
+// questions.screenshot_id refuses it —
+// questions_screenshot_id_fkey, 23503, which is what 閱讀與測驗 did.
+//
+// So it lives in one place and returns the public URL, which is the other thing
+// every caller wants.
+async function registerScreenshot(
+  supabase: ReturnType<typeof getAdminClient>,
+  sessionId: string,
+  screenshotId: string,
+  storagePath: string,
+) {
+  const extension = storagePath.split('.').at(-1)
+  if (storagePath !== `sessions/${sessionId}/screenshots/${screenshotId}.${extension}` ||
+      !/\.(png|jpg|webp)$/.test(storagePath)) {
+    return { error: '截圖路徑不正確。', status: 400 as const }
+  }
+
+  const { data: objectList, error: objectError } = await supabase.storage
+    .from('lingoact-screenshots')
+    .list(`sessions/${sessionId}/screenshots`, { search: `${screenshotId}.`, limit: 2 })
+  if (objectError) throw objectError
+  if (!objectList?.some((object: { name: string }) => storagePath.endsWith(`/${object.name}`))) {
+    return { error: '找不到已上傳的截圖。', status: 400 as const }
+  }
+
+  const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
+  const publicUrl = publicData.publicUrl
+
+  // upsert, not insert: a teacher who pressed send twice on the same capture
+  // should get the second question, not a duplicate-key error.
+  const { error: insertError } = await supabase.from('screenshots').upsert({
+    id: screenshotId,
+    session_id: sessionId,
+    storage_path: storagePath,
+    public_url: publicUrl,
+    ai_status: 'pending',
+  }, { onConflict: 'id' })
+  if (insertError) throw insertError
+
+  return { publicUrl }
+}
+
 function validUuid(value: unknown) {
   return typeof value === 'string' && uuidPattern.test(value)
 }
@@ -2729,14 +2774,23 @@ Deno.serve(async (req) => {
         ? input.screenshotId
         : null
 
+      // The upload is only a file in a bucket until this writes the row that
+      // questions.screenshot_id points at.
+      let shotUrl: string | null = null
+      if (screenshotId) {
+        const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
+        if (!storagePath) return jsonResponse({ message: '截圖路徑不正確。' }, 400)
+        const registered = await registerScreenshot(supabase, sessionId, screenshotId, storagePath)
+        if ('error' in registered) return jsonResponse({ message: registered.error }, registered.status)
+        shotUrl = registered.publicUrl
+      }
+
       // The capture, downloaded so the model can read it. A passage written
       // from a textbook page is the point of the screenshot path, and without
       // this the id travelled all the way to the generator and was ignored.
       let image: { mimeType: string; base64: string } | null = null
-      if (screenshotId && useImage && !verbatim) {
-        const { data: shot } = await supabase.from('screenshots')
-          .select('public_url').eq('id', screenshotId).eq('session_id', sessionId).maybeSingle()
-        const url = (shot as { public_url?: string } | null)?.public_url
+      if (shotUrl && useImage && !verbatim) {
+        const url = shotUrl
         if (url) {
           try {
             const response = await fetch(url, { signal: AbortSignal.timeout(15_000) })

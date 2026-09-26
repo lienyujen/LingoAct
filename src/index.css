@@ -2574,6 +2574,16 @@ h2 {
   fill: #fff;
 }
 
+/* The edition’s own app icon, which arrives as a filled rounded tile rather
+   than a glyph — so it is sized to sit inside the circle instead of being
+   coloured like the others. */
+.student-social-link.ncacls img {
+  border-radius: 7px;
+  height: 26px;
+  object-fit: contain;
+  width: 26px;
+}
+
 .student-social-link.viewsonic img {
   height: 30px;
   object-fit: contain;

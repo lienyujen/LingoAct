@@ -1,3 +1,4 @@
+import { buildBrand, BRAND_PARAM } from './brand'
 import { backendConfig } from './supabase'
 
 // Students load this shared page instead of one the presenter has to deploy, so
@@ -15,8 +16,18 @@ export function buildJoinUrl(sessionReference: string) {
     ? `${window.location.origin}${window.location.pathname}`
     : DEFAULT_PUBLIC_APP_URL
   const base = (configuredBase || fallback).replace(/\/$/, '')
-  const project = backendConfig
-    ? `?p=${encodeURIComponent(backendConfig.ref)}&k=${encodeURIComponent(backendConfig.key)}`
-    : ''
-  return `${base}/#/join/${sessionReference}${project}`
+  // Built as a list rather than concatenated, because the edition has to
+  // survive a presenter who has no backendConfig — the old code produced the
+  // project parameters or nothing at all, so anything appended after it landed
+  // on a URL with no ? in front of it.
+  const params = new URLSearchParams()
+  if (backendConfig) {
+    params.set('p', backendConfig.ref)
+    params.set('k', backendConfig.key)
+  }
+  // Which organisation's student page to show; see lib/brand.ts for why this
+  // rides on the link instead of being compiled in.
+  if (buildBrand) params.set(BRAND_PARAM, buildBrand)
+  const query = params.toString()
+  return `${base}/#/join/${sessionReference}${query ? `?${query}` : ''}`
 }

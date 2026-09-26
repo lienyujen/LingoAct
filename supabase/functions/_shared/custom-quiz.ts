@@ -273,6 +273,7 @@ export async function generateCustomQuiz(input: {
     ? `必須產生恰好 ${input.requestedCount} 題。`
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
   const flashcard = input.requestedType === 'flashcard'
+  const level = levelCeiling(input.levelFramework ?? null, input.levelCode ?? null)
   const writing = input.requestedType === 'writing'
   // The class's language decides this, and the teacher's direction can still
   // override it — a 華語文 teacher does sometimes want an English gloss. Reading
@@ -290,6 +291,14 @@ export async function generateCustomQuiz(input: {
     ? [
         '這是單字卡練習，不是測驗。每一張卡片都必須是 multiple_choice，題幹只放要辨認的提示，選項放 3 到 4 個候選答案，accepted_answers 只放唯一正確的那一個。卡片之間互相獨立，不要互相參照；重點是能不能立刻反應出來，所以題幹要短，不要考長篇理解。',
         `一張卡片一定分成「詞彙」與「解釋」兩邊。詞彙是要學的那個詞，用 ${requestedLanguage} 寫；解釋是它的意思，用 ${guidanceName} 寫，讓學生看得懂。解釋要說出這個詞是什麼意思，不要只換一個同義詞。`,
+        // 「讓學生看得懂」was the only thing pinning the explanation side, and it
+        // pins nothing: the level rules elsewhere are written about question
+        // stems, while a card's explanation sits in the options. So a class at
+        // the lowest level got a definition harder than the word it defined —
+        // which is the one thing a vocabulary card must never be.
+        level
+          ? `解釋這一邊和詞彙一樣受課程程度限制。這個班是 ${level.label}，解釋只能用這個程度以內的字詞寫，長度不超過 ${level.maxStem} 個${level.unit === 'char' ? '字' : '詞'}。學生讀不懂的解釋等於沒有解釋，所以寧可用更常見、更口語的說法，也不要為了精準而用更難的詞。如果一個詞在這個程度真的解釋不清楚，就換一個這個程度說得清楚的詞來出卡。`
+          : '解釋要用比詞彙本身更淺白的字詞寫：學生讀不懂的解釋等於沒有解釋。',
         '方向由教師的出卡方向決定：看詞選解釋就把詞彙放題幹、三到四個解釋放選項；看解釋選詞就把解釋放題幹、三到四個詞彙放選項。',
         'target_word 一律填這張卡要學的那個詞（只填詞，不要填解釋、不要加標點或引號）。系統用它來判斷詞彙在哪一邊，並只在那一邊加標音。',
         '看詞選解釋時，題幹就只放那個詞本身，不要包成問句。「差異」比「「差異」的意思是什麼？」好：卡片本來就是在問意思，多出來的字只會被一起標上注音。',
@@ -367,7 +376,7 @@ ${input.sourceText}` }] : []),
   // the options: it knows the framework by name and drifts to the material's own
   // difficulty anyway. A stem far over the limit is the visible end of that
   // drift, so it earns one more attempt with the failure named.
-  const ceiling = levelCeiling(input.levelFramework ?? null, input.levelCode ?? null)
+  const ceiling = level
   function overLength(candidate: { items?: unknown }) {
     if (!ceiling || !Array.isArray(candidate.items)) return []
     return candidate.items

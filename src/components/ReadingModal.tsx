@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, SpeakerHigh, X } from '@phosphor-icons/react'
 import { requireSupabase } from '../lib/supabase'
+import { edgeFunctionErrorMessage } from '../lib/edgeError'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { ReadingPassage } from '../types'
 
@@ -43,6 +44,10 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
   // A photograph is usually worth showing the class; a page of text usually is
   // not, because the passage is the version they can read.
   const [shareShot, setShareShot] = useState(false)
+  // On when there is a capture, because that is why they captured. Off means
+  // the picture is for the class and the teacher's own text is the material.
+  const [useImage, setUseImage] = useState(true)
+  const [verbatim, setVerbatim] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [accent, setAccent] = useState<Accent>('standard_guoyu')
   const [busy, setBusy] = useState(false)
@@ -67,6 +72,8 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
     setFocus(FOCUS.map(([key]) => key))
     setWithAudio(false)
     setShareShot(false)
+    setUseImage(true)
+    setVerbatim(false)
     setError('')
     setPassage(null)
   }, [open])
@@ -75,6 +82,10 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
   async function dispatch() {
     if (busy) return
+    if (verbatim && !sourceText.trim()) {
+      setError(t('readingNeedsText'))
+      return
+    }
     if (!sourceText.trim() && !direction.trim() && !screenshotId && !capture) {
       setError(t('readingNeedsSomething'))
       return
@@ -126,11 +137,15 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           comprehension: focus,
           screenshotId: shotId,
           shareScreenshot: shareShot,
+          useImage,
+          verbatim,
           clipId,
         },
       })
-      if (dispatchError) throw dispatchError
-      if (data?.message) throw new Error(data.message)
+      // The SDK's own message is the same sentence for every failure, with
+      // the reason sitting unread on the response.
+      if (dispatchError) throw new Error(await edgeFunctionErrorMessage(dispatchError, t('readingFailed')))
+      if (data?.message && !data?.passage) throw new Error(data.message)
       const written = (data?.passage || null) as ReadingPassage | null
       setPassage(written)
 
@@ -174,30 +189,47 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           </button>
         </header>
 
-        {capture || screenshotId
-          ? (
-            <div className="reading-capture">
-              {previewUrl && <img alt="" className="capture-preview" src={previewUrl} />}
-              <p className="muted">{t('readingFromCapture')}</p>
-              <label className="interaction-check reading-check">
-                <input checked={shareShot} type="checkbox" onChange={(event) => setShareShot(event.target.checked)} />
-                {t('readingShareShot')}
-              </label>
-              <small className="muted">{t('readingShareShotHint')}</small>
-            </div>
-          )
-          : (
-            <label className="reading-field">
-              {t('readingSource')}
-              <textarea
-                autoFocus
-                placeholder={t('readingSourcePlaceholder')}
-                rows={6}
-                value={sourceText}
-                onChange={(event) => setSourceText(event.target.value)}
+        {/* The capture and the teacher's own words are both here, always.
+            Which one the passage is written from is a tick, not a fork in the
+            flow — a teacher who captured a page may still want to type the
+            paragraph they actually care about. */}
+        {(capture || screenshotId) && (
+          <div className="reading-capture">
+            {previewUrl && <img alt="" className="capture-preview" src={previewUrl} />}
+            <label className="interaction-check reading-check">
+              <input
+                checked={useImage && !verbatim}
+                disabled={verbatim}
+                type="checkbox"
+                onChange={(event) => setUseImage(event.target.checked)}
               />
+              {t('readingUseImage')}
             </label>
-          )}
+            <small className="muted">{t('readingUseImageHint')}</small>
+            <label className="interaction-check reading-check">
+              <input checked={shareShot} type="checkbox" onChange={(event) => setShareShot(event.target.checked)} />
+              {t('readingShareShot')}
+            </label>
+            <small className="muted">{t('readingShareShotHint')}</small>
+          </div>
+        )}
+
+        <label className="reading-field">
+          {t('readingSource')}
+          <textarea
+            autoFocus={!capture}
+            placeholder={t('readingSourcePlaceholder')}
+            rows={capture || screenshotId ? 4 : 6}
+            value={sourceText}
+            onChange={(event) => setSourceText(event.target.value)}
+          />
+        </label>
+
+        <label className="interaction-check reading-check">
+          <input checked={verbatim} type="checkbox" onChange={(event) => setVerbatim(event.target.checked)} />
+          {t('readingVerbatim')}
+        </label>
+        <small className="muted">{t('readingVerbatimHint')}</small>
 
         <label className="reading-field">
           {t('readingDirection')}
@@ -210,6 +242,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
         {/* 超綱: i+1 and i+2. Off by default, because a class is set to a level
             for a reason and stretching them is a decision, not a default. */}
+        {!verbatim && (
         <div className="reading-field">
           {t('readingStretch')}
           <div className="segmented-control">
@@ -226,6 +259,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
             ))}
           </div>
         </div>
+        )}
 
         <label className="interaction-check reading-check">
           <input checked={withQuiz} type="checkbox" onChange={(event) => setWithQuiz(event.target.checked)} />

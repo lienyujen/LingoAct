@@ -10,6 +10,7 @@ import { QRCodePanel } from '../components/QRCodePanel'
 import { ExitTicketResult } from '../components/ExitTicketResult'
 import { LotteryOverlay } from '../components/LotteryOverlay'
 import { QuestionEditor } from '../components/QuestionEditor'
+import { edgeFunctionErrorMessage } from '../lib/edgeError'
 import { ReadingModal } from '../components/ReadingModal'
 import { resolveTrack } from '../lib/teachingTracks'
 import { workspaceText } from '../lib/workspaceText'
@@ -100,19 +101,6 @@ function readableRealtimeError(message: string, t: PresenterT) {
   if (/tokens per min|TPM/i.test(message)) return t('realtimeQuota')
   if (/rate limit reached/i.test(message)) return t('realtimeRateLimited')
   return message
-}
-
-async function edgeFunctionErrorMessage(error: unknown, fallback: string) {
-  const context = (error as { context?: Response } | null)?.context
-  if (context) {
-    try {
-      const payload = await context.clone().json() as { message?: unknown }
-      if (typeof payload.message === 'string' && payload.message.trim()) return payload.message.trim()
-    } catch {
-      // Fall back to the SDK error message when the response is not JSON.
-    }
-  }
-  return error instanceof Error && error.message ? error.message : fallback
 }
 
 // joined_at is not guaranteed to be there. The realtime handler below already

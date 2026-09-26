@@ -2701,6 +2701,14 @@ Deno.serve(async (req) => {
       const sourceText = typeof input.sourceText === 'string' ? input.sourceText.trim().slice(0, 8000) : ''
       const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 2000) : ''
       const shareScreenshot = input.shareScreenshot === true
+      // Whether the model should read the capture at all. Off means the
+      // teacher's own text is the material and the picture, if it is going out,
+      // is going out for the class rather than for the model — which is one
+      // fewer image to send and the cheaper of the two paths.
+      const useImage = input.useImage === true
+      // Already at the right level: store it as written and make no rewrite
+      // call at all.
+      const verbatim = input.verbatim === true
 
       // A capture is material on its own, so it satisfies this the way pasted
       // text does.
@@ -2725,7 +2733,7 @@ Deno.serve(async (req) => {
       // from a textbook page is the point of the screenshot path, and without
       // this the id travelled all the way to the generator and was ignored.
       let image: { mimeType: string; base64: string } | null = null
-      if (screenshotId) {
+      if (screenshotId && useImage && !verbatim) {
         const { data: shot } = await supabase.from('screenshots')
           .select('public_url').eq('id', screenshotId).eq('session_id', sessionId).maybeSingle()
         const url = (shot as { public_url?: string } | null)?.public_url
@@ -2753,7 +2761,15 @@ Deno.serve(async (req) => {
       // hand-written in the app, plus whatever this class's students can pick.
       const locales = [...new Set(['zh_tw', 'en', String(classRow?.guidance_language || 'en').toLowerCase().replace('-', '_')])]
 
-      const passage = await generateReadingPassage({
+      if (verbatim && !sourceText) {
+        return jsonResponse({ message: '勾了「不改寫」就要貼上文章內容。' }, 400)
+      }
+
+      // Written by the teacher, kept as written. No annotations, because
+      // working out which words are new is the rewrite call they just declined.
+      const passage = verbatim
+        ? { title: direction || '閱讀', body: sourceText, vocabulary: [], grammar: [] }
+        : await generateReadingPassage({
         source: sourceText,
         image,
         direction,

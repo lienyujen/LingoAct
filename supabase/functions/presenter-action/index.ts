@@ -101,6 +101,24 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary)
 }
 
+// Whether the object the client says it uploaded is really in the bucket.
+//
+// This used to list the directory and look for the name. A listing is a query
+// over the bucket index and can lag a write that has already returned, so a
+// capture the teacher had just sent could come back missing — and the message
+// said only 找不到已上傳的截圖, which reads as "your upload failed" when the
+// upload was fine. Signing the exact path is a direct lookup of one object: it
+// answers about that object, and its error says what actually went wrong.
+async function storedObject(
+  supabase: ReturnType<typeof getAdminClient>,
+  bucket: string,
+  storagePath: string,
+) {
+  const { error } = await supabase.storage.from(bucket).createSignedUrl(storagePath, 60)
+  if (!error) return { ok: true as const }
+  return { ok: false as const, detail: error instanceof Error ? error.message : String(error) }
+}
+
 // prepare_screenshot_upload hands back an id and a signed URL and creates no
 // row: the screenshots row is written afterwards, by whoever is going to point
 // at it. Miss that step and the id looks perfectly valid right up until
@@ -121,12 +139,9 @@ async function registerScreenshot(
     return { error: '截圖路徑不正確。', status: 400 as const }
   }
 
-  const { data: objectList, error: objectError } = await supabase.storage
-    .from('lingoact-screenshots')
-    .list(`sessions/${sessionId}/screenshots`, { search: `${screenshotId}.`, limit: 2 })
-  if (objectError) throw objectError
-  if (!objectList?.some((object: { name: string }) => storagePath.endsWith(`/${object.name}`))) {
-    return { error: '找不到已上傳的截圖。', status: 400 as const }
+  const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
+  if (!stored.ok) {
+    return { error: `找不到已上傳的截圖：${stored.detail}`, status: 400 as const }
   }
 
   const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
@@ -1088,12 +1103,9 @@ Deno.serve(async (req) => {
           return jsonResponse({ message: '截圖路徑不正確。' }, 400)
         }
 
-        const { data: objectList, error: objectError } = await supabase.storage
-          .from('lingoact-screenshots')
-          .list(`sessions/${sessionId}/screenshots`, { search: `${screenshotId}.`, limit: 2 })
-        if (objectError) throw objectError
-        if (!objectList?.some((object) => storagePath.endsWith(`/${object.name}`))) {
-          return jsonResponse({ message: '找不到已上傳的截圖。' }, 400)
+        const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
+        if (!stored.ok) {
+          return jsonResponse({ message: `找不到已上傳的截圖：${stored.detail}` }, 400)
         }
 
         const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
@@ -1674,12 +1686,9 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '截圖路徑不正確。' }, 400)
       }
 
-      const { data: objectList, error: objectError } = await supabase.storage
-        .from('lingoact-screenshots')
-        .list(`sessions/${sessionId}/screenshots`, { search: `${screenshotId}.`, limit: 2 })
-      if (objectError) throw objectError
-      if (!objectList?.some((object) => storagePath.endsWith(`/${object.name}`))) {
-        return jsonResponse({ message: '找不到已上傳的截圖。' }, 400)
+      const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
+      if (!stored.ok) {
+        return jsonResponse({ message: `找不到已上傳的截圖：${stored.detail}` }, 400)
       }
 
       const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
@@ -2234,12 +2243,9 @@ Deno.serve(async (req) => {
       } catch (translationError) {
         console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
       }
-      const { data: objectList, error: objectError } = await supabase.storage
-        .from('lingoact-screenshots')
-        .list(`sessions/${sessionId}/screenshots`, { search: `${screenshotId}.`, limit: 2 })
-      if (objectError) throw objectError
-      if (!objectList?.some((object) => storagePath.endsWith(`/${object.name}`))) {
-        return jsonResponse({ message: '找不到已上傳的截圖。' }, 400)
+      const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
+      if (!stored.ok) {
+        return jsonResponse({ message: `找不到已上傳的截圖：${stored.detail}` }, 400)
       }
 
       const stoppedAt = new Date().toISOString()

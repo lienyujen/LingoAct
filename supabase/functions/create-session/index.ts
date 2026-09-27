@@ -124,7 +124,12 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ sessionId: session.id, code: session.code, presenterToken })
   } catch (error) {
-    console.error('create-session failed', errorDetail(error, 'failed'))
-    return jsonResponse({ message: '建立場次失敗。' }, 500)
+    // The reason used to stay in this log and never reach the teacher, who got
+    // the same five words whether the project was paused, a column was missing
+    // or the key had been rotated — with no way to tell which, and no way for
+    // anyone helping them to ask a better question.
+    const detail = errorDetail(error, '')
+    console.error('create-session failed', detail || error)
+    return jsonResponse({ message: detail ? `建立場次失敗：${detail}` : '建立場次失敗。' }, 500)
   }
 })

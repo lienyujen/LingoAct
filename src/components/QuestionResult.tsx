@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, ArrowsOut, CheckCircle, CircleNotch, DiceFive, DownloadSimple, Eye, EyeSlash, Faders, FileArrowUp, Play, Sparkle, Square, Waveform, X, XSquare } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowsOut, CaretLeft, CaretRight, CheckCircle, CircleNotch, DiceFive, DownloadSimple, Eye, EyeSlash, Faders, FileArrowUp, Play, Sparkle, Square, Waveform, X, XSquare } from '@phosphor-icons/react'
 import { createPortal } from 'react-dom'
 import { BoardWall } from './BoardWall'
 import { TimingRow } from './TimingRow'
@@ -11,6 +11,10 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { correctnessStats, countByAnswer } from '../lib/stats'
 import { downloadHref } from '../lib/fileLinks'
+import { isImageFile } from '../lib/fileKinds'
+import { FileTypeIcon } from './FileTypeIcon'
+import { createZip, safeFileName, uniqueName } from '../lib/zip'
+import type { ZipEntry } from '../lib/zip'
 import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
@@ -261,12 +265,57 @@ const uploadStatusLabels: Record<FileResponse['analysis_status'], PresenterMessa
   unsupported: 'statusUnsupported',
 }
 
-function isImageFile(mimeType: string, name: string) {
-  return mimeType.startsWith('image/') || /.(png|jpe?g|webp|gif|heic|heif)$/i.test(name)
-}
-
 // One row per student, not per file: an essay photographed as three pages is
 // one answer, and the marker treats it that way too.
+type Plate = { url: string; name: string; owner: string; verdict: string; score: number | null }
+
+// The same pages full-screen, for a browser where there is no second window to
+// open. The desktop app has one, and uses it instead.
+function SubmissionViewer({ plates, index, onClose, onMove }: {
+  plates: Plate[]
+  index: number
+  onClose: () => void
+  onMove: (delta: number) => void
+}) {
+  const t = usePresenterText()
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+      if (event.key === 'ArrowRight') onMove(1)
+      if (event.key === 'ArrowLeft') onMove(-1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, onMove])
+
+  const plate = plates[index]
+  if (!plate) return null
+
+  return createPortal(
+    <div className="submission-viewer" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="submission-viewer-inner" onClick={(event) => event.stopPropagation()}>
+        <header>
+          <strong>{plate.owner}</strong>
+          {plate.verdict && <span className={`file-verdict is-${plate.verdict}`}>{verdictLabels[plate.verdict] ? t(verdictLabels[plate.verdict]) : plate.verdict}</span>}
+          {typeof plate.score === 'number' && <span className="upload-score">{t('points', { n: plate.score })}</span>}
+          <span className="muted">{index + 1} / {plates.length}</span>
+          <button aria-label={t('close')} className="ghost-button icon-button" type="button" onClick={onClose}><X size={18} /></button>
+        </header>
+        <div className="submission-viewer-stage">
+          <button aria-label={t('reviewPrevious')} className="ghost-button icon-button" disabled={plates.length < 2} type="button" onClick={() => onMove(-1)}>
+            <CaretLeft size={22} />
+          </button>
+          <img alt={plate.name} src={plate.url} />
+          <button aria-label={t('reviewNext')} className="ghost-button icon-button" disabled={plates.length < 2} type="button" onClick={() => onMove(1)}>
+            <CaretRight size={22} />
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 function UploadResults({
   anonymousEnabled, fileBusyId, fileResponses, question, onAnalyzeFile,
 }: Pick<Props, 'anonymousEnabled' | 'fileBusyId' | 'fileResponses' | 'onAnalyzeFile'> & { question: Question }) {
@@ -288,19 +337,89 @@ function UploadResults({
     return [...groups.values()].map((files) => [...files].sort((left, right) => rank(left) - rank(right)))
   }, [fileResponses])
 
+  const [zipping, setZipping] = useState(false)
+  const [zipDone, setZipDone] = useState(0)
+  const [zipError, setZipError] = useState('')
+  const [viewing, setViewing] = useState<number | null>(null)
+
+  // 電寫題 is answered, not uploaded. Same panel, but a teacher who asked the
+  // class to write on screen did not ask them to hand a file in.
+  const drawn = question.type === 'drawing'
+
+  // Every readable page in the class, in the order they are listed, so the
+  // arrows in the viewer walk the same sequence the presenter sees.
+  const plates = useMemo<Plate[]>(() => submissions.flatMap((files, index) => files
+    .filter((file) => isImageFile(file.mime_type, file.name) && file.file_url)
+    .map((file) => ({
+      url: file.file_url as string,
+      name: file.name,
+      owner: anonymousEnabled ? t('anonymousUpload', { n: index + 1 }) : file.participant_name,
+      verdict: files[0].analysis_json?.verdict || '',
+      score: typeof files[0].analysis_json?.score === 'number' ? files[0].analysis_json.score : null,
+    }))), [anonymousEnabled, submissions, t])
+
+  // One archive rather than a click per student. A class of thirty hands back
+  // thirty-odd files and saving them one at a time is most of a break.
+  async function downloadAll() {
+    const wanted = submissions.flatMap((files, index) => files
+      .filter((file) => file.file_url)
+      .map((file) => ({ file, owner: anonymousEnabled ? t('anonymousUpload', { n: index + 1 }) : file.participant_name })))
+    if (!wanted.length) return
+    setZipping(true)
+    setZipDone(0)
+    setZipError('')
+    try {
+      const taken = new Set<string>()
+      const entries: ZipEntry[] = []
+      // Sequentially, not Promise.all: thirty parallel fetches of photographs
+      // is how a classroom wifi connection starts dropping them.
+      for (const { file, owner } of wanted) {
+        const response = await fetch(file.file_url as string)
+        if (!response.ok) throw new Error(`${file.name}（${response.status}）`)
+        const data = new Uint8Array(await response.arrayBuffer())
+        entries.push({ name: uniqueName(taken, safeFileName(`${owner}-${file.name}`)), data })
+        setZipDone((done) => done + 1)
+      }
+      const stamp = new Date().toISOString().slice(0, 10)
+      const url = URL.createObjectURL(createZip(entries))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${safeFileName(question.prompt_text || question.title)}-${stamp}.zip`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      // Revoked late: Chromium reads the blob after the click returns.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (caught) {
+      setZipError(caught instanceof Error ? t('zipFailed', { message: caught.message }) : t('zipFailedPlain'))
+    } finally {
+      setZipping(false)
+    }
+  }
+
   const marked = submissions.filter((files) => files[0].analysis_status === 'success').length
+  const totalFiles = submissions.reduce((sum, files) => sum + files.filter((file) => file.file_url).length, 0)
 
   if (!submissions.length) {
     return (
       <p className="muted">
-        {question.status === 'active' ? t('noUploadsYet') : t('noUploadsAtAll')}
+        {drawn
+          ? question.status === 'active' ? t('noDrawingsYet') : t('noDrawingsAtAll')
+          : question.status === 'active' ? t('noUploadsYet') : t('noUploadsAtAll')}
       </p>
     )
   }
 
   return (
     <>
-      <p className="muted">{t('uploadedCount', { n: submissions.length })} · {t('markedCount', { n: marked })}</p>
+      <div className="upload-summary-row">
+        <p className="muted">{t(drawn ? 'drawnCount' : 'uploadedCount', { n: submissions.length })} · {t('markedCount', { n: marked })}</p>
+        <button className="ghost-button" disabled={zipping} type="button" onClick={() => void downloadAll()}>
+          {zipping ? <CircleNotch className="spin" size={15} /> : <DownloadSimple size={15} />}
+          {zipping ? t('zipping', { done: zipDone, total: totalFiles }) : t('downloadAll', { n: totalFiles })}
+        </button>
+      </div>
+      {zipError && <p className="error">{zipError}</p>}
       <ul className="file-list upload-answer-list">
         {submissions.map((files, index) => {
           const lead = files[0]
@@ -313,10 +432,31 @@ function UploadResults({
             <li key={lead.participant_id}>
               <div className="file-response-row">
                 {preview ? (
-                  <a href={preview.file_url} rel="noreferrer" target="_blank">
+                  <button
+                    aria-label={t('enlargeAnswer', { who: anonymousEnabled ? t('anonymousUpload', { n: index + 1 }) : lead.participant_name })}
+                    className="file-response-thumb-button"
+                    type="button"
+                    onClick={() => {
+                      // A real window on the desktop, where marking a class
+                      // means looking at each page at the size it was written.
+                      if (window.lingoActDesktop?.openSubmissionReview) {
+                        void window.lingoActDesktop.openSubmissionReview(question.session_id, question.id)
+                        return
+                      }
+                      const at = plates.findIndex((plate) => plate.url === preview.file_url)
+                      // -1 would open the viewer on nothing; leaving it closed
+                      // is at least honest about having nothing to show.
+                      if (at >= 0) setViewing(at)
+                    }}
+                  >
                     <img alt={preview.name} className="file-response-thumb" src={preview.file_url} />
-                  </a>
-                ) : <span className="file-response-thumb is-placeholder"><FileArrowUp size={18} /></span>}
+                    <ArrowsOut size={14} />
+                  </button>
+                ) : (
+                  <span className="file-response-thumb is-placeholder">
+                    <FileTypeIcon mimeType={lead.mime_type} name={lead.name} size={24} />
+                  </span>
+                )}
                 <div className="file-list-meta">
                   <strong>{anonymousEnabled ? t('anonymousUpload', { n: index + 1 }) : lead.participant_name}</strong>
                   <span className="muted">
@@ -394,6 +534,18 @@ function UploadResults({
           )
         })}
       </ul>
+      {viewing !== null && (
+        <SubmissionViewer
+          index={viewing}
+          plates={plates}
+          onClose={() => setViewing(null)}
+          // Wraps rather than stopping: going past the last one lands on the
+          // first, which is what a presenter flicking through a class expects.
+          onMove={(delta) => setViewing((current) => (
+            current === null ? null : (current + delta + plates.length) % plates.length
+          ))}
+        />
+      )}
     </>
   )
 }

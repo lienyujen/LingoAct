@@ -15,6 +15,8 @@ import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ListeningPlayer } from '../components/ListeningPlayer'
+import { QuestionResult } from '../components/QuestionResult'
+import type { FileResponse } from '../types'
 import { ReadingPassageView } from '../components/ReadingPassageView'
 import { ReadingModal } from '../components/ReadingModal'
 import { DanmakuTimeline } from '../components/DanmakuTimeline'
@@ -85,6 +87,15 @@ export function Preview() {
   // 授課錦囊 on its own, because reaching it in the full shell means
   // double-clicking a QR code to open the workspace first.
   if (location.hash === '#plan') return <main style={{ maxWidth: 480, margin: '20px auto' }}><div className="panel"><LessonPlan courseName="介面預覽" onStart={(item) => { document.title = 'opened:' + item.kind }} /></div></main>
+  // 電寫題 results: the summary row, the thumbnail that opens a page properly,
+  // and the viewer the browser build falls back to.
+  if (location.hash === '#drawing') return <main style={{ maxWidth: 460, margin: '20px auto' }}><QuestionResult
+    anonymousEnabled={false} question={drawingQuestion} answers={[]} audioResponses={[]} fileResponses={drawingFiles}
+    fileBusyId="" gradeProgress={null} analysis={null} analysisBusy={false} analysisError=""
+    busy={false} isCurrentQuestion onlineCount={2}
+    onAnalyze={action} onAnalyzeFile={action} onDrawUnanswered={action}
+    onSetCorrectAnswer={action} onStopQuestion={asyncAction} onResumeQuestion={asyncAction}
+  /></main>
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
@@ -181,6 +192,37 @@ const previewCues = [
   { start_index: 0, end_index: 5, start_ms: 0, end_ms: 900 },
   { start_index: 6, end_index: 12, start_ms: 900, end_ms: 1800 },
 ]
+
+// Two pages of handwriting, so the arrows in the viewer have somewhere to go.
+const asyncAction = async () => undefined
+
+const drawingPage = (label: string) => `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="300"><rect width="420" height="300" fill="#fff"/><text x="24" y="150" font-size="28" fill="#7b2d5e">${label}</text></svg>`,
+)}`
+
+const drawingQuestion = ({
+  id: 'q', session_id: 's', type: 'drawing' as const, status: 'active' as const,
+  title: '電寫題', prompt_text: '把「雖然…但是…」寫成一個句子。',
+  options: [], correct_answer: null, correct_answers: [], allow_multiple: false,
+  translations: {}, created_at: '', stopped_at: null, screenshot_id: null,
+} as unknown) as Question
+
+const drawingFiles = ([
+  {
+    id: 'f1', session_id: 's', question_id: 'q', participant_id: 'p1', participant_name: '王小明',
+    name: 'drawing.png', mime_type: 'image/png', file_url: drawingPage('王小明'), size_bytes: 100,
+    analysis_status: 'pending' as const, analysis_json: null, error_message: null, created_at: '',
+  },
+  {
+    id: 'f2', session_id: 's', question_id: 'q', participant_id: 'p2', participant_name: '李小華',
+    name: 'drawing.png', mime_type: 'image/png', file_url: drawingPage('李小華'), size_bytes: 100,
+    analysis_status: 'success' as const, error_message: null, created_at: '',
+    analysis_json: {
+      verdict: 'correct', score: 90, summary_zh_tw: '句子完整，連接詞用得正確。',
+      strengths_zh_tw: ['「雖然…但是…」前後對比清楚'], improvements_zh_tw: ['第二句可以再具體一點'],
+    },
+  },
+] as unknown) as FileResponse[]
 
 // A tiny PNG standing in for a screen grab, so the capture half of the reading
 // panel can be looked at without a screen to grab.

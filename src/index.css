@@ -8362,3 +8362,320 @@ h2 {
   letter-spacing: 0.06em;
   line-height: 2.3;
 }
+
+/* 電寫題 / 上傳作答 review — the thumbnail, the in-page viewer for the browser
+   build, and the window the desktop app opens instead. */
+.file-response-thumb-button {
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: none;
+  padding: 0;
+  position: relative;
+}
+
+.file-response-thumb-button > svg {
+  background: rgb(23 22 26 / 72%);
+  border-radius: 6px;
+  bottom: 3px;
+  color: #fff;
+  opacity: 0;
+  padding: 2px;
+  position: absolute;
+  right: 3px;
+  transition: opacity 120ms ease;
+}
+
+.file-response-thumb-button:hover > svg,
+.file-response-thumb-button:focus-visible > svg {
+  opacity: 1;
+}
+
+/* 已作答 N 人 on one side, 下載全部 on the other. */
+.upload-summary-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.upload-summary-row p {
+  margin: 0;
+}
+
+/* Reading a class of handwritten answers means looking at each one properly,
+   so the page fills the window and the arrows walk the class. */
+.submission-viewer {
+  align-items: center;
+  background: rgb(23 22 26 / 88%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 120;
+}
+
+.submission-viewer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* min-height:0 on both this and the stage below is what stops a tall page
+     pushing its own bottom off the screen: without it a flex child keeps its
+     content height and max-height on the image has nothing to measure against. */
+  max-height: 100%;
+  max-width: 100%;
+  min-height: 0;
+}
+
+.submission-viewer-inner > header {
+  align-items: center;
+  color: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.submission-viewer-inner > header .muted {
+  color: rgb(255 255 255 / 70%);
+  margin-left: auto;
+}
+
+.submission-viewer-inner > header .ghost-button {
+  background: rgb(255 255 255 / 12%);
+  border-color: rgb(255 255 255 / 28%);
+  color: #fff;
+}
+
+.submission-viewer-stage {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 10px;
+  justify-content: center;
+  min-height: 0;
+}
+
+/* svh rather than a percentage: a percentage max-height resolves against the
+   stage, whose own height comes from this image, so it is ignored and a tall
+   page runs off the bottom of the window. The window is the one height here
+   that is definite. 120px is the header, the gaps and the backdrop padding. */
+.submission-viewer-stage img {
+  background: #fff;
+  border-radius: 10px;
+  max-height: calc(100svh - 120px);
+  max-width: 100%;
+  min-height: 0;
+  min-width: 0;
+  object-fit: contain;
+}
+
+.submission-viewer-stage .ghost-button {
+  background: rgb(255 255 255 / 12%);
+  border-color: rgb(255 255 255 / 28%);
+  color: #fff;
+}
+
+.submission-review-window {
+  background: var(--surface);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.submission-review-window > header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 14px 20px;
+  -webkit-app-region: drag;
+}
+
+.submission-review-window > header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.submission-review-window > header .show-answers-toggle,
+.submission-review-window > header .icon-button {
+  -webkit-app-region: no-drag;
+}
+
+.submission-review-window > .muted,
+.submission-review-window > .error {
+  margin: 16px 20px 0;
+}
+
+.submission-review-body {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  min-height: 0;
+  padding: 16px 20px;
+}
+
+.submission-review-stage {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+}
+
+.submission-review-stage img {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  max-height: 100%;
+  max-width: 100%;
+  min-height: 0;
+  min-width: 0;
+  object-fit: contain;
+}
+
+.submission-review-stage .icon-button {
+  flex: none;
+}
+
+/* A submission the window cannot draw still gets its turn in the sequence:
+   leaving it out would silently drop a student from a class the presenter is
+   reading through. */
+.submission-review-file {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 36px 28px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.submission-review-file svg {
+  color: var(--muted);
+}
+
+.submission-review-file strong {
+  overflow-wrap: anywhere;
+}
+
+.submission-review-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.submission-review-side h2 {
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
+
+.submission-review-side p {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.submission-review-side ul {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* 拍照描述 hands in a picture with something said about it. The description is
+   the answer, so it sits above the marking rather than under it. */
+.submission-review-caption {
+  background: var(--surface-subtle);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.submission-review-caption audio {
+  width: 100%;
+}
+
+.submission-review-who {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.submission-review-who strong {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.submission-review-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+
+.submission-review-verdict {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.submission-review-strip {
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 20px;
+}
+
+.submission-review-chip {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: none;
+  padding: 0;
+}
+
+.submission-review-chip img {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: block;
+  height: 54px;
+  object-fit: contain;
+  object-position: top left;
+  width: 72px;
+}
+
+.submission-review-chip-file {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  display: flex;
+  height: 54px;
+  justify-content: center;
+  width: 72px;
+}
+
+.submission-review-chip.is-current {
+  border-color: var(--primary);
+}

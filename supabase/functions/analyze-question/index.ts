@@ -136,7 +136,10 @@ Deno.serve(async (req) => {
     // An upload question collected through the file panel has no screenshot; it
     // is analysed from what the marker already wrote about each submission.
     const isFileUpload = question.type === 'file_upload'
-    if (!question.screenshot_id && !isFileUpload) return jsonResponse({ message: '這個題目沒有截圖。' }, 400)
+    const hasPrompt = String(question.prompt_text || '').trim().length > 0
+    if (!question.screenshot_id && !isFileUpload && !hasPrompt) {
+      return jsonResponse({ message: '這個題目沒有截圖，也沒有題目文字，無法分析。' }, 400)
+    }
 
     const [{ data: screenshot }, { data: answers }, participantResult, { data: uploads }] = await Promise.all([
       question.screenshot_id
@@ -231,7 +234,12 @@ Deno.serve(async (req) => {
 
     // Upload questions were marked file by file already, so this pass reads the
     // marks rather than the images and the class picture costs one text call.
-    const instruction = isFileUpload
+    // A text question has no picture to read, and an instruction written about
+    // a screenshot invites the model to describe one that is not there.
+    const textOnly = !question.screenshot_id && !isFileUpload
+    const instruction = textOnly
+      ? '你是 LingoAct 的課堂形成性評量分析助理。這一題沒有截圖，只有教師出的題目與學生的文字作答，請就這兩者分析，不要提到截圖或畫面，也不要臆測任何沒有提供的教材內容。detected_question 請忠實使用 presenter_question。請以繁體中文分析全班的理解程度、實際使用的說法、反覆出現的錯誤與迷思，並在 teaching_recommendations 給出可以立刻接著做的講解或追問。選擇題與是非題只能提出建議答案，最後決定權屬於講者。投票題不判定對錯。'
+      : isFileUpload
       ? '你是 LingoAct 的課堂形成性評量分析助理。這是一題「上傳作答」：學生把答案寫在紙上或做成檔案後上傳，每份都已由 AI 逐份批改，anonymous_answers 帶的是每份批改的判定、分數與摘要，不是學生原文。請以繁體中文彙整全班表現。若有題目截圖請據以判讀題目；沒有截圖時以 presenter_question 為準。suggested_correct_answer 一律填 null，因為這種題型沒有選項可選。response_analysis 要指出全班共通的正確作法與反覆出現的錯誤步驟，並說明尚未批改的份數對結論的影響。teaching_recommendations 要針對觀察到的錯誤給出可立即執行的講解與追問。不可臆測尚未批改的內容。'
       : '你是 LingoAct 的課堂形成性評量分析助理。請以繁體中文分析截圖中的題目與匿名化群體作答。若 presenter_question 有內容，detected_question 應優先忠實使用該題目；若為空，截圖有明確題幹時忠實轉寫或精簡，沒有明顯題幹時依畫面脈絡與選項產生中立、不誘導且不暗示正解的題目。無論是否有 presenter_question，都必須繼續根據截圖、選項及實際作答行為分析理解、證據、常見誤解與教學行動，不可只依題目文字推測。選擇題與是非題只能提出建議答案，最後決定權屬於講者。投票題不判定對錯。'
 

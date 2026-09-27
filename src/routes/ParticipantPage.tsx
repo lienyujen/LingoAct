@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { BookOpen, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-icons/react'
+import { BookOpen, Coffee, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-icons/react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { ListeningPlayer } from '../components/ListeningPlayer'
@@ -903,6 +903,15 @@ export function ParticipantPage() {
           </div>
         )}
       </header>
+      {onBreak && (
+        <section className="panel participant-break" aria-live="polite">
+          <span className="participant-break-icon"><Coffee size={26} /></span>
+          <div>
+            <h2>{participantText(locale, 'onBreak')}</h2>
+            <p>{participantText(locale, 'teacherAway')}</p>
+          </div>
+        </section>
+      )}
       {session && (
         <ParticipantInterpretationAudio
           enabled={session.interpretation_enabled && session.interpretation_audio_enabled}

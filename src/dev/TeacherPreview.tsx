@@ -15,6 +15,9 @@ import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ListeningPlayer } from '../components/ListeningPlayer'
+import { Coffee } from '@phosphor-icons/react'
+import { ExitTicketForm } from '../components/ExitTicketForm'
+import { participantText } from '../lib/participantI18n'
 import { QuestionResult } from '../components/QuestionResult'
 import type { FileResponse } from '../types'
 import { ReadingPassageView } from '../components/ReadingPassageView'
@@ -96,6 +99,12 @@ export function Preview() {
     onAnalyze={action} onAnalyzeFile={action} onDrawUnanswered={action}
     onSetCorrectAnswer={action} onStopQuestion={asyncAction} onResumeQuestion={asyncAction}
   /></main>
+  // The star rating, which rendered as an empty box, and the 下課中 card.
+  if (location.hash === '#exit-ticket') return <main className="participant-page"><ExitTicketForm busy={false} category="lesson_summary" locale="zh-TW" prompt="請寫一個今天學到的新詞。" ticket={null} onSubmit={action} /></main>
+  if (location.hash === '#break') return <main className="participant-page"><section className="panel participant-break" aria-live="polite">
+    <span className="participant-break-icon"><Coffee size={26} /></span>
+    <div><h2>{participantText('zh-TW', 'onBreak')}</h2><p>{participantText('zh-TW', 'teacherAway')}</p></div>
+  </section></main>
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>

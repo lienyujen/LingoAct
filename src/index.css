@@ -8679,3 +8679,35 @@ h2 {
 .submission-review-chip.is-current {
   border-color: var(--primary);
 }
+
+/* 下課中. The warm ground says "nothing is wrong, wait" rather than the red an
+   error would use — the class has not broken, the teacher has stepped out. */
+.participant-break {
+  align-items: center;
+  background: var(--energy-soft);
+  border-color: var(--energy);
+  display: flex;
+  gap: 14px;
+}
+
+.participant-break-icon {
+  align-items: center;
+  background: var(--energy-dark);
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.participant-break h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.participant-break p {
+  color: var(--muted);
+  margin: 4px 0 0;
+}

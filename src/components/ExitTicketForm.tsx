@@ -56,7 +56,7 @@ export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, local
                 type="button"
                 onClick={() => setRating(value)}
               >
-                <Star fill={value <= rating ? 'currentColor' : 'none'} size={32} />
+                <Star size={32} weight={value <= rating ? 'fill' : 'regular'} />
               </button>
               ))}
             </div>

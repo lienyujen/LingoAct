@@ -17,7 +17,7 @@ import { workspaceText } from '../lib/workspaceText'
 import { LessonPlan } from '../components/LessonPlan'
 import type { PlannedActivity, PlannedActivityKind } from '../components/LessonPlan'
 import type { QuestionDraft } from '../components/QuestionEditor'
-import type { QuizRequestedType } from '../types'
+import type { QuestionType, QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
 import { QuestionResult } from '../components/QuestionResult'
@@ -2328,11 +2328,11 @@ export function PresenterPage() {
       )}
       <ListeningStudioModal
         initialTranscript={plannedPrompt}
-        initialKind={plannedActivity?.kind === 'listen' ? plannedActivity.listeningKind : undefined}
-        initialAccent={plannedActivity?.kind === 'listen' ? plannedActivity.accent : undefined}
-        initialReplayLimit={plannedActivity?.kind === 'listen' ? plannedActivity.replayLimit : undefined}
-        initialPrepareSeconds={plannedActivity?.kind === 'listen' ? plannedActivity.prepareSeconds : undefined}
-        initialAnswerSeconds={plannedActivity?.kind === 'listen' ? plannedActivity.answerSeconds : undefined}
+        initialKind={plannedActivity?.kind === 'listeningStudio' ? plannedActivity.listeningKind : undefined}
+        initialAccent={plannedActivity?.kind === 'listeningStudio' ? plannedActivity.accent : undefined}
+        initialReplayLimit={plannedActivity?.kind === 'listeningStudio' ? plannedActivity.replayLimit : undefined}
+        initialPrepareSeconds={plannedActivity?.kind === 'listeningStudio' ? plannedActivity.prepareSeconds : undefined}
+        initialAnswerSeconds={plannedActivity?.kind === 'listeningStudio' ? plannedActivity.answerSeconds : undefined}
         capturedScreen={listeningCapture}
         open={listeningOpen}
         // Hidden rather than closed while the teacher drags out the crop: the
@@ -2357,10 +2357,10 @@ export function PresenterPage() {
       />
       <PictureStudioModal
         initialMode={pictureInitialMode}
-        initialDirection={(plannedActivity?.kind === 'picture' || plannedActivity?.kind === 'picture_ordering') ? plannedPrompt : ''}
-        initialAiGrading={plannedActivity?.kind === 'picture_ordering' && plannedActivity.aiGrading === true}
-        initialPrepareSeconds={plannedActivity?.kind === 'picture' ? plannedActivity.prepareSeconds : undefined}
-        initialAnswerSeconds={plannedActivity?.kind === 'picture' ? plannedActivity.answerSeconds : undefined}
+        initialDirection={(plannedActivity?.kind === 'pictureTalk' || plannedActivity?.kind === 'storyOrdering') ? plannedPrompt : ''}
+        initialAiGrading={plannedActivity?.kind === 'storyOrdering' && plannedActivity.aiGrading === true}
+        initialPrepareSeconds={plannedActivity?.kind === 'pictureTalk' ? plannedActivity.prepareSeconds : undefined}
+        initialAnswerSeconds={plannedActivity?.kind === 'pictureTalk' ? plannedActivity.answerSeconds : undefined}
         capturedScreen={pictureCapture}
         open={pictureOpen}
         suspended={selectionMode}
@@ -2374,7 +2374,7 @@ export function PresenterPage() {
       />
       <SentenceWallModal
         initialPrompt={plannedPrompt}
-        initialAnswerSeconds={plannedActivity?.kind === 'sentence' ? plannedActivity.answerSeconds : undefined}
+        initialAnswerSeconds={plannedActivity?.kind === 'sentenceWall' ? plannedActivity.answerSeconds : undefined}
         busy={busy}
         error={sentenceWallError}
         open={sentenceWallOpen}
@@ -2393,7 +2393,7 @@ export function PresenterPage() {
         busy={busy}
         error={textDispatchError}
         initialBody={textDispatchDraft}
-        initialUrl={plannedActivity?.kind === 'text' ? plannedActivity.url : undefined}
+        initialUrl={plannedActivity?.kind === 'textDispatch' ? plannedActivity.url : undefined}
         open={textDispatchOpen}
         onCancel={() => { setTextDispatchOpen(false); setTextDispatchDraft('') }}
         onSend={sendSharedContent}

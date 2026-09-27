@@ -1497,6 +1497,10 @@ alter table public.participants
   -- who typed something other than what is on the class list cannot fix it
   -- themselves: joining is keyed to the device, so every later attempt hands
   -- them back the first name they used.
+  -- Which language this student is reading the page in. Stored so a dispatch
+  -- can translate into the languages actually in the room and no others: the
+  -- alternative is translating into all seven and paying for six nobody reads.
+  add column if not exists locale text null,
   add column if not exists removed_at timestamptz null,
   -- Set when the student asks to be called on, cleared when the presenter
   -- acknowledges it. A timestamp rather than a flag so the class list can put

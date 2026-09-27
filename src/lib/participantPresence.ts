@@ -9,9 +9,13 @@ type Args = {
   sessionId: string
   participantId: string
   participantToken: string
+  // What the page is being read in, asked for at send time. The server
+  // translates a dispatch into the languages the room is actually using, so a
+  // language nobody reads never costs anything.
+  locale: () => string
 }
 
-export function trackParticipantPresence({ sessionId, participantId, participantToken }: Args) {
+export function trackParticipantPresence({ sessionId, participantId, participantToken, locale }: Args) {
   let hiddenSince = document.visibilityState === 'hidden' ? Date.now() : 0
   let unreportedMs = 0
   let stopped = false
@@ -32,7 +36,7 @@ export function trackParticipantPresence({ sessionId, participantId, participant
     const focusStreakMs = focusedSince ? Date.now() - focusedSince : 0
     try {
       const { error } = await requireSupabase().functions.invoke('participant-action', {
-        body: { action: 'heartbeat', sessionId, participantId, participantToken, unfocusedMs, focusStreakMs },
+        body: { action: 'heartbeat', sessionId, participantId, participantToken, unfocusedMs, focusStreakMs, locale: locale() },
         ...(keepalive ? { headers: { 'keep-alive': 'true' } } : {}),
       })
       // Put it back rather than lose it, so a dropped beat does not understate

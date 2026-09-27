@@ -46,12 +46,12 @@ async function verifyParticipant(
   const tokenHash = await hashParticipantToken(participantToken)
   const { data } = await supabase
     .from('participant_session_keys')
-    .select('participant_id, participants!inner(id, session_id, name)')
+    .select('participant_id, participants!inner(id, session_id, name, locale)')
     .eq('participant_id', participantId)
     .eq('token_hash', tokenHash)
     .eq('participants.session_id', sessionId)
     .maybeSingle()
-  const participant = data?.participants as unknown as { id: string; session_id: string; name: string } | null
+  const participant = data?.participants as unknown as { id: string; session_id: string; name: string; locale: string | null } | null
   return participant || null
 }
 
@@ -140,6 +140,15 @@ Deno.serve(async (req) => {
         focus_streak: focusStreak,
       })
       if (error) throw error
+
+      const locale = guidanceLanguages.has(input.locale) ? input.locale as string : ''
+      if (locale && locale !== participant.locale) {
+        // Not fatal: a beat that fails to record the language costs a warm-up,
+        // not the lesson, and the next beat will carry it again.
+        const { error: localeError } = await supabase.from('participants')
+          .update({ locale }).eq('id', participantId)
+        if (localeError) console.warn('participant locale not stored', localeError.message)
+      }
       return jsonResponse({ ok: true })
     }
 

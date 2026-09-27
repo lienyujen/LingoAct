@@ -129,10 +129,15 @@ export function ParticipantPage() {
     setLocale(localeForDispatchedGuidance(sessionId, session.guidance_language))
   }, [session?.guidance_language, sessionId])
 
+  // Read through a ref so switching language does not tear down the heartbeat
+  // and start a new one; the next beat simply carries the new value.
+  const localeRef = useRef(locale)
+  localeRef.current = locale
+
   // Presence in the channel is live-only; this is what the report reads later.
   useEffect(() => {
     if (session?.status !== 'active' || !participant?.id || !participantToken) return
-    return trackParticipantPresence({ sessionId, participantId: participant.id, participantToken })
+    return trackParticipantPresence({ sessionId, participantId: participant.id, participantToken, locale: () => localeRef.current })
   }, [participant?.id, participantToken, session?.status, sessionId])
   const localizedSummary = sessionSummary?.translations?.[contentLocaleKey(locale)] || sessionSummary
   const participantName = participant?.name || localStorage.getItem(`lingoact_name_${sessionId}`) || ''

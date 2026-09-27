@@ -10,7 +10,7 @@ import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
-import { resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
+import { classLevelInstruction, resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
@@ -584,11 +584,8 @@ Deno.serve(async (req) => {
         // Every submission is marked against the class's own level. This used
         // to be built only for 拍照描述, so a 電寫題 from a beginner was judged
         // by no stated standard at all.
-        const { data: markingClass } = await supabase.from('sessions')
-          .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
         const classInstruction = [
-          trackInstruction(markingClass?.teaching_language),
-          levelInstruction(markingClass?.level_framework ?? null, markingClass?.level_code ?? null),
+          await classLevelInstruction(supabase, sessionId),
           'You are marking what a learner at this level wrote. Judge it against that level: an answer that is correct and complete for this level is correct, however simple it looks, and feedback must be written in words they can read.',
         ].join('\n')
 
@@ -2983,6 +2980,14 @@ Deno.serve(async (req) => {
             const generated = await generateCustomQuiz({
               sourceText: passage.body,
               extraInstruction: [
+                // The passage is at the class's level; the questions over it were
+                // not being told so. They had the stem-length ceiling and the
+                // word-list check, which custom-quiz applies from the level
+                // fields, but not the rules that stop an item drifting up to
+                // the material's own difficulty — and the material here is a
+                // passage the class can read, which makes drifting easy.
+                trackInstruction(classRow?.teaching_language),
+                levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
                 'The source text IS the passage the class has just been given, written for their level. Ask about it and nothing else.',
                 'Do not ask about a word the passage does not contain, and do not reach for background knowledge the passage does not supply.',
                 comprehensionInstruction(comprehension, quizCount),
@@ -3032,9 +3037,12 @@ Deno.serve(async (req) => {
           } catch (error) {
             const detail = errorDetail(error, 'Reading quiz generation failed.')
             console.error('reading quiz generation failed', detail)
-            // The passage is still a lesson without questions over it, so the
-            // question keeps its title and only says the quiz is missing.
+            // The passage is still a lesson without questions over it, so it
+            // becomes what it actually is: a reading. Leaving the type as
+            // custom_quiz left the class waiting for a quiz that was never
+            // coming, with the vocabulary locked behind finishing it.
             await supabase.from('questions').update({
+              type: 'reading',
               prompt_text: '這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。',
             }).eq('id', questionId)
           }

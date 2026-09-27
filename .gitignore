@@ -41,3 +41,8 @@ supabase/.temp/
 # 17MB of font binary, fetched by scripts/fetch-bopomofo-font.mjs rather than
 # carried in git history.
 /resources/fonts/
+
+# The release build moves .env aside and puts it back afterwards. If it is
+# interrupted the copy is left behind, and it holds a project URL and key —
+# this repository is public, so one 'git add -A' would publish them.
+.env.bak-*

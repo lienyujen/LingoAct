@@ -1070,11 +1070,12 @@ Deno.serve(async (req) => {
           audioBytes: new Uint8Array(await audioBlob.arrayBuffer()),
           audioMimeType: 'audio/wav',
         }
+        const classInstruction = await classLevelInstruction(supabase, sessionId)
         let analysis = null
         let lastError: unknown = null
         for (let attempt = 0; attempt < 2 && !analysis; attempt += 1) {
           try {
-            analysis = await analyzeAudioResponse({ ...request, classInstruction: await classLevelInstruction(supabase, sessionId) })
+            analysis = await analyzeAudioResponse({ ...request, classInstruction })
           } catch (error) {
             lastError = error
           }

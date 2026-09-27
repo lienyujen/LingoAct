@@ -82,6 +82,9 @@ export function Preview() {
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
   if (location.hash === '#setup') return <BackendSetup />
+  // 授課錦囊 on its own, because reaching it in the full shell means
+  // double-clicking a QR code to open the workspace first.
+  if (location.hash === '#plan') return <main style={{ maxWidth: 480, margin: '20px auto' }}><div className="panel"><LessonPlan courseName="介面預覽" onStart={(item) => { document.title = 'opened:' + item.kind }} /></div></main>
   if (location.hash === '#roster') return <RosterManager open sessionId="preview" onChanged={action} onClose={action} />
   if (location.hash === '#new') return <HashRouter><PresenterNewPage /></HashRouter>
   if (location.hash === '#flashcard') return <main className="participant-page"><ParticipantFlashcards active data={flashcard} locale="zh-TW" onTry={async () => ({ correct: true, correctAnswer: null })} /></main>
@@ -111,7 +114,7 @@ export function Preview() {
             onDrawLottery={action} onStartBuzzer={action} onOpenListeningStudio={action} onOpenSentenceWall={() => { setPrompt(''); setOpen(true) }} onOpenPhotoTask={action}
             onOpenTextDispatch={action} onOpenFileTransfer={action} onOpenReading={action} onOpenRoster={action} onOpenWordCloud={action} onOpenSettings={action}
             onToggleRecording={action} onToggleCaptionVisibility={action} onGenerateExitTicket={action} onLowerHands={action} onEndClass={action} />
-          <div className="panel"><LessonPlan courseName="介面預覽" onStart={(item) => { if (item.kind === 'sentence') { setPrompt(item.prompt); setOpen(true) } else action() }} /></div>
+          <div className="panel"><LessonPlan courseName="介面預覽" onStart={(item) => { if (item.kind === 'sentenceWall') { setPrompt(item.prompt); setOpen(true) } else setNotice(`預覽：開啟「${item.kind}」`) }} /></div>
         </> : <p className="panel muted">{view === '目前活動' ? '還沒有活動。選一個練習，讓學生開始。' : '完成的活動會留在這裡，方便回看學生的表達。'}</p>}
         {notice && <p role="status">{notice}</p>}
       </aside>}

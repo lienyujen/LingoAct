@@ -216,8 +216,8 @@ export function PresenterNewPage() {
       <SetupNotice />
       <form className="panel form-panel" onSubmit={createSession}>
         <span className="form-heading-icon"><Sparkle size={24} /></span>
-        <h1>今天，讓學生開口表達</h1>
-        <p className="muted">{APP_PROFILE.id === 'full' ? '選好課程，掃碼加入，就能開始練習。' : `${APP_PROFILE.productName}・選好課程，掃碼加入，就能開始練習。`}</p>
+        <h1>今天，讓學生愛上互動</h1>
+        <p className="muted">{APP_PROFILE.id === 'full' ? '華語教學的 AI 助教。' : `${APP_PROFILE.productName}・華語教學的 AI 助教。`}</p>
         {courses.length > 0 && <label>最近的課程
           <select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
             const selected = courses.find((item) => item.title === event.target.value)
@@ -232,7 +232,7 @@ export function PresenterNewPage() {
           課程名稱
           <input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：華語初級班・週二" />
         </label>
-        <div className="course-summary"><strong>{courseSummary(course)}</strong><span>每次開始上課，都會建立新的課堂紀錄。</span></div>
+        <div className="course-summary"><strong>{courseSummary(course)}</strong><span>每個教學活動，都有全新體驗。</span></div>
         <details className="teacher-disclosure" open={courseSettingsOpen} onToggle={(event) => setCourseSettingsOpen(event.currentTarget.open)}>
         <summary>調整語言與程度</summary>
         <LanguagePairFields

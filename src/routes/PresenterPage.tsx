@@ -15,7 +15,7 @@ import { ReadingModal } from '../components/ReadingModal'
 import { resolveTrack } from '../lib/teachingTracks'
 import { workspaceText } from '../lib/workspaceText'
 import { LessonPlan } from '../components/LessonPlan'
-import type { PlannedActivity } from '../components/LessonPlan'
+import type { PlannedActivity, PlannedActivityKind } from '../components/LessonPlan'
 import type { QuestionDraft } from '../components/QuestionEditor'
 import type { QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
@@ -70,13 +70,8 @@ function plannedDirection(prompt: string, goal: string) {
   return goal ? `${prompt.trim()}\n\n這堂課的學習目標：${goal}` : prompt.trim()
 }
 
-function plannedQuizDraft(activity: PlannedActivity, goal: string): QuestionDraft {
+function plannedQuizDraft(activity: PlannedActivity, goal: string, requestedType: QuizRequestedType): QuestionDraft {
   const direction = plannedDirection(activity.prompt, goal)
-  const requestedType = activity.kind === 'flashcard'
-    ? 'flashcard'
-    : activity.kind === 'writing'
-      ? 'writing'
-      : activity.quizType || 'random'
   const count = activity.count && activity.count !== 'auto' ? Number(activity.count) : null
   return {
     type: 'custom_quiz', options: [], allowMultiple: false, promptText: direction,
@@ -84,7 +79,7 @@ function plannedQuizDraft(activity: PlannedActivity, goal: string): QuestionDraf
       direction,
       requestedCount: Number.isFinite(count) ? count : null,
       requestedType,
-      coaching: activity.kind === 'writing' && activity.coaching === true,
+      coaching: requestedType === 'writing' && activity.coaching === true,
     },
     prepareSeconds: null, answerSeconds: null,
   }
@@ -1509,6 +1504,93 @@ export function PresenterPage() {
     }
   }
 
+  // Every activity this app can start, started in one place.
+  //
+  // The menu calls it with nothing planned; 授課錦囊 calls it with the activity
+  // a teacher saved. Two copies of this switch is exactly how the cheat sheet
+  // drifted away from the app — it could open eight things while the menu grew
+  // to thirteen — so there is one, and check-lesson-plan.mjs fails the build if
+  // an activity is added to the library without a case here.
+  function openActivity(kind: PlannedActivityKind, planned: PlannedActivity | null = null, goal = '') {
+    setPlannedActivity(planned)
+    setPlannedPrompt(planned ? plannedDirection(planned.prompt, goal) : '')
+
+    // A question the teacher writes over a capture: the prompt and the timings
+    // travel with it, so a planned one arrives ready to send.
+    const asQuestion = (type: QuestionType) => {
+      const draft: QuestionDraft = {
+        type,
+        options: planned?.options?.filter((item) => item.trim()) || ['A', 'B', 'C', 'D'],
+        allowMultiple: planned?.allowMultiple === true,
+        promptText: planned?.prompt || '',
+        prepareSeconds: planned?.prepareSeconds ?? null,
+        answerSeconds: planned?.answerSeconds ?? null,
+      }
+      void captureWindowsScreen(null, 'question', draft)
+    }
+
+    // A generated set over a capture or a file. The teacher may have planned to
+    // use a file instead, in which case the file panel carries the settings.
+    const asQuiz = (preset: QuizRequestedType) => {
+      const draft = planned
+        ? plannedQuizDraft(planned, goal, preset)
+        : ({ type: 'custom_quiz', options: [], allowMultiple: false, promptText: '', prepareSeconds: null, answerSeconds: null,
+            quizSettings: { direction: '', requestedCount: null, requestedType: preset, coaching: false } } as QuestionDraft)
+      if (planned?.source === 'file') {
+        setPlannedFileQuizSettings(draft.quizSettings || null)
+        setFileTransferOpen(true)
+        void refreshSharedFiles()
+        return
+      }
+      void captureWindowsScreen(draft.quizSettings?.requestedType || preset, 'question', draft)
+    }
+
+    switch (kind) {
+      case 'reading':
+        setControlsOpen(false)
+        setReadingCapture(null)
+        if (window.lingoActDesktop) void captureWindowsScreen(null, 'reading')
+        else setReadingOpen(true)
+        return
+      case 'listeningStudio': setListeningOpen(true); return
+      case 'flashcards': asQuiz('flashcard'); return
+      case 'writingCoach': asQuiz('writing'); return
+      case 'ordering': asQuiz('ordering'); return
+      case 'matching': asQuiz('matching'); return
+      case 'pronunciation': asQuestion('pronunciation'); return
+      case 'oralResponse': asQuestion('oral_response'); return
+      case 'drawing': asQuestion('drawing'); return
+      case 'pictureTalk':
+        setPictureInitialMode(planned?.pictureMode || 'spoken')
+        setPictureOpen(true)
+        return
+      case 'storyOrdering':
+        setPictureInitialMode('ordering')
+        setPictureOpen(true)
+        return
+      case 'sentenceWall': setSentenceWallOpen(true); return
+      case 'photoTask': setPhotoTaskOpen(true); return
+      case 'captureQuestion':
+        if (planned?.questionType === 'custom_quiz') { asQuiz(planned.quizType || 'random'); return }
+        if (planned) { asQuestion(planned.questionType || 'multiple_choice'); return }
+        if (window.lingoActDesktop) void captureWindowsScreen()
+        else openBlankQuestion()
+        return
+      case 'textDispatch':
+        setTextDispatchError('')
+        setTextDispatchDraft(planned?.prompt || '')
+        setTextDispatchOpen(true)
+        return
+      case 'wordCloud': void openWordCloud(); return
+      case 'fileTransfer':
+        setPlannedFileQuizSettings(null)
+        setFileTransferOpen(true)
+        void refreshSharedFiles()
+        return
+      case 'exitTicket': void generateExitTicket(goal); return
+    }
+  }
+
   async function openWordCloud() {
     if (window.lingoActDesktop) {
       await window.lingoActDesktop.openWordCloud(sessionId)
@@ -2058,72 +2140,33 @@ export function PresenterPage() {
           onStartBuzzer={startBuzzer}
           onToggleAnonymous={() => updateSession({ anonymous_enabled: !session.anonymous_enabled })}
           onToggleDanmaku={() => updateSession({ danmaku_enabled: !session.danmaku_enabled })}
-          onCaptureScreen={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen() } : openBlankQuestion}
-          onCaptureFlashcards={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('flashcard') } : undefined}
-          onCaptureWriting={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('writing') } : undefined}
-          onCaptureOrdering={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('ordering') } : undefined}
-          onCaptureMatching={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen('matching') } : undefined}
-          onCapturePronunciation={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'pronunciation' }) } : undefined}
-          onCaptureOral={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'oral_response' }) } : undefined}
-          onCaptureDrawing={window.lingoActDesktop ? () => { setPlannedActivity(null); void captureWindowsScreen(null, 'question', { type: 'drawing' }) } : undefined}
-          onOpenPicture={() => { setPlannedActivity(null); setPictureInitialMode('spoken'); setPictureOpen(true) }}
-          onOpenPictureWriting={() => { setPlannedActivity(null); setPictureInitialMode('ordering'); setPictureOpen(true) }}
-          onGenerateExitTicket={() => void generateExitTicket()}
+          onCaptureScreen={() => openActivity('captureQuestion')}
+          onCaptureFlashcards={window.lingoActDesktop ? () => openActivity('flashcards') : undefined}
+          onCaptureWriting={window.lingoActDesktop ? () => openActivity('writingCoach') : undefined}
+          onCaptureOrdering={window.lingoActDesktop ? () => openActivity('ordering') : undefined}
+          onCaptureMatching={window.lingoActDesktop ? () => openActivity('matching') : undefined}
+          onCapturePronunciation={window.lingoActDesktop ? () => openActivity('pronunciation') : undefined}
+          onCaptureOral={window.lingoActDesktop ? () => openActivity('oralResponse') : undefined}
+          onCaptureDrawing={window.lingoActDesktop ? () => openActivity('drawing') : undefined}
+          onOpenPicture={() => openActivity('pictureTalk')}
+          onOpenPictureWriting={() => openActivity('storyOrdering')}
+          onGenerateExitTicket={() => openActivity('exitTicket')}
           onEndClass={() => setEndClassConfirmOpen(true)}
-          onOpenFileTransfer={() => {
-            setPlannedFileQuizSettings(null)
-            setFileTransferOpen(true)
-            void refreshSharedFiles()
-          }}
-          onOpenListeningStudio={() => { setPlannedActivity(null); setPlannedPrompt(''); setListeningOpen(true) }}
-          onOpenSentenceWall={() => { setPlannedActivity(null); setPlannedPrompt(''); setSentenceWallOpen(true) }}
-          onOpenPhotoTask={() => { setPlannedActivity(null); setPlannedPrompt(''); setPhotoTaskOpen(true) }}
-          onOpenTextDispatch={() => {
-            setPlannedActivity(null)
-            setTextDispatchError('')
-            setTextDispatchDraft('')
-            setTextDispatchOpen(true)
-          }}
+          onOpenFileTransfer={() => openActivity('fileTransfer')}
+          onOpenListeningStudio={() => openActivity('listeningStudio')}
+          onOpenSentenceWall={() => openActivity('sentenceWall')}
+          onOpenPhotoTask={() => openActivity('photoTask')}
+          onOpenTextDispatch={() => openActivity('textDispatch')}
           onOpenSettings={openPresenterSettings}
-          onOpenReading={() => { setPlannedActivity(null); setControlsOpen(false); setReadingCapture(null); setReadingOpen(true) }}
-          onCaptureReading={window.lingoActDesktop ? () => { setPlannedActivity(null); setReadingCapture(null); void captureWindowsScreen(null, 'reading') } : undefined}
+          onOpenReading={() => openActivity('reading')}
+          onCaptureReading={window.lingoActDesktop ? () => openActivity('reading') : undefined}
           onOpenRoster={() => void window.lingoActDesktop?.openRoster(sessionId)}
-          onOpenWordCloud={openWordCloud}
+          onOpenWordCloud={() => openActivity('wordCloud')}
           onToggleRecording={toggleCourseRecording}
           onToggleCaptionVisibility={toggleCaptionVisibility}
         />
-        <div className="panel"><LessonPlan key={session.title} courseName={session.title} busy={busy} onStart={(activity, goal) => {
-          setPlannedActivity(activity)
-          setPlannedPrompt(activity.prompt)
-          if (activity.kind === 'listen') setListeningOpen(true)
-          if (activity.kind === 'sentence') setSentenceWallOpen(true)
-          if (activity.kind === 'photo') setPhotoTaskOpen(true)
-          if (activity.kind === 'text') { setTextDispatchDraft(activity.prompt); setTextDispatchOpen(true) }
-          if (activity.kind === 'picture' || activity.kind === 'picture_ordering') {
-            setPlannedPrompt(plannedDirection(activity.prompt, goal))
-            setPictureInitialMode(activity.kind === 'picture_ordering' ? 'ordering' : activity.pictureMode || 'spoken')
-            setPictureOpen(true)
-          }
-          if (activity.kind === 'capture') {
-            const draft: QuestionDraft = {
-              type: activity.questionType || 'multiple_choice', options: activity.options?.filter((item) => item.trim()) || ['A', 'B', 'C', 'D'], allowMultiple: activity.allowMultiple === true,
-              promptText: activity.prompt, prepareSeconds: activity.prepareSeconds ?? null, answerSeconds: activity.answerSeconds ?? null,
-            }
-            void captureWindowsScreen(null, 'question', draft)
-          }
-          if (activity.kind === 'flashcard' || activity.kind === 'quiz' || activity.kind === 'writing') {
-            const draft = plannedQuizDraft(activity, goal)
-            if (activity.source === 'file') {
-              setPlannedFileQuizSettings(draft.quizSettings || null)
-              setFileTransferOpen(true)
-              void refreshSharedFiles()
-            } else {
-              void captureWindowsScreen(draft.quizSettings?.requestedType || 'random', 'question', draft)
-            }
-          }
-          if (activity.kind === 'file') { setPlannedFileQuizSettings(null); setFileTransferOpen(true); void refreshSharedFiles() }
-          if (activity.kind === 'exit_ticket') void generateExitTicket(goal)
-        }} /></div>
+        <div className="panel"><LessonPlan key={session.title} courseName={session.title} busy={busy}
+          onStart={(activity, goal) => openActivity(activity.kind, activity, goal)} /></div>
         </div>
         <div hidden={workspaceView !== 'history'}>
         {questions.filter((item) => item.id !== session.current_question_id).length === 0 && <p className="panel muted">{w.historyEmpty}</p>}

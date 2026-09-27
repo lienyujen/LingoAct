@@ -1,3 +1,4 @@
+import { buildBrand, guidanceLocalesForBrand } from '../lib/brand'
 import { GUIDANCE_LOCALES } from '../lib/participantI18n'
 import { APP_PROFILE } from '../lib/appProfiles'
 import { TEACHING_TRACKS, resolveFramework, resolveTrack } from '../lib/teachingTracks'
@@ -69,7 +70,6 @@ export function LanguagePairFields({
       {choices.length > 1 && (
         <div className="language-pair-field">
           <span className="language-pair-label">{t('proficiencyFramework')}</span>
-          <p className="language-pair-hint">{t('proficiencyFrameworkHint')}</p>
           <div className="language-pair-options">
             {choices.map((option) => (
               <button
@@ -93,7 +93,6 @@ export function LanguagePairFields({
             {t('levelLabel')}
             {choices.length > 1 ? <em>{framework.name}</em> : <em>{t('levelFromTrack', { name: framework.name })}</em>}
           </span>
-          <p className="language-pair-hint">{t('levelHint')}</p>
           <div className="language-pair-options">
             <button
               aria-pressed={!levelCode}
@@ -148,7 +147,7 @@ export function LanguagePairFields({
         <span className="language-pair-label">{t('mainGuidanceLanguage')}</span>
         <p className="language-pair-hint">{t('mainGuidanceHint')}</p>
         <div className="language-pair-options">
-          {GUIDANCE_LOCALES.map((locale) => (
+          {guidanceLocalesForBrand(GUIDANCE_LOCALES, buildBrand).map((locale) => (
             <button
               aria-pressed={guidanceLanguage === locale.code}
               className={guidanceLanguage === locale.code ? 'language-chip selected' : 'language-chip'}

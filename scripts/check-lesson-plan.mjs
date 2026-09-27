@@ -9,7 +9,11 @@
 // plan offers, reaches a case in openActivity.
 import fs from 'node:fs'
 
-const read = (path) => fs.readFileSync(path, 'utf8')
+// Read with line endings normalised. A Windows checkout writes CRLF, so a
+// pattern containing "\n" matches locally and not on the runner — which is
+// exactly how this file failed a release while passing on the machine that
+// wrote it.
+const read = (path) => fs.readFileSync(path, 'utf8').split('\r\n').join('\n')
 
 const library = read('src/lib/activities.tsx')
 const plan = read('src/components/LessonPlan.tsx')

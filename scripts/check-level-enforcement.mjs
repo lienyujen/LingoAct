@@ -12,6 +12,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+// Read with line endings normalised. A Windows checkout writes CRLF, so a
+// pattern containing "\n" matches locally and not on the runner — which is
+// exactly how this file failed a release while passing on the machine that
+// wrote it.
+const read = (path) => fs.readFileSync(path, 'utf8').split('\r\n').join('\n')
+
 const ROOT = 'supabase/functions'
 
 // Exempt, and why. "It does not generate anything a student reads" is the only
@@ -42,7 +48,7 @@ const problems = []
 const enforcing = []
 
 for (const file of files) {
-  const source = fs.readFileSync(file, 'utf8')
+  const source = read(file)
   const callsModel = /callAiJson|requestGemini|generativelanguage/.test(source)
   if (!callsModel) continue
 
@@ -59,7 +65,7 @@ for (const file of files) {
 for (const key of Object.keys(EXEMPT)) {
   const full = path.join(ROOT, key)
   if (!fs.existsSync(full)) { problems.push(`${key} is listed as exempt but does not exist`); continue }
-  const source = fs.readFileSync(full, 'utf8')
+  const source = read(full)
   if (!/callAiJson|requestGemini|generativelanguage/.test(source)) {
     problems.push(`${key} is listed as exempt but no longer calls the model — drop the entry`)
   } else if (source.includes('levelInstruction')) {
@@ -77,7 +83,7 @@ const DELEGATES = [
 ]
 
 for (const file of files) {
-  const source = fs.readFileSync(file, 'utf8')
+  const source = read(file)
   const key = path.relative(ROOT, file).split(path.sep).join('/')
   for (const { call, own, carries } of DELEGATES) {
     if (key === own) continue

@@ -2243,9 +2243,11 @@ Deno.serve(async (req) => {
       } catch (translationError) {
         console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
       }
-      const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
-      if (!stored.ok) {
-        return jsonResponse({ message: `找不到已上傳的截圖：${stored.detail}` }, 400)
+      if (hasBackdrop) {
+        const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
+        if (!stored.ok) {
+          return jsonResponse({ message: `找不到已上傳的截圖：${stored.detail}` }, 400)
+        }
       }
 
       const stoppedAt = new Date().toISOString()
@@ -2256,17 +2258,19 @@ Deno.serve(async (req) => {
         .eq('status', 'active')
       if (stopError) throw stopError
 
-      const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
-      const { error: screenshotError } = await supabase
-        .from('screenshots')
-        .insert({
-          id: screenshotId,
-          session_id: sessionId,
-          storage_path: storagePath,
-          public_url: publicData.publicUrl,
-          ai_status: 'skipped',
-        })
-      if (screenshotError) throw screenshotError
+      if (hasBackdrop) {
+        const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
+        const { error: screenshotError } = await supabase
+          .from('screenshots')
+          .insert({
+            id: screenshotId,
+            session_id: sessionId,
+            storage_path: storagePath,
+            public_url: publicData.publicUrl,
+            ai_status: 'skipped',
+          })
+        if (screenshotError) throw screenshotError
+      }
 
       const { data: question, error: questionError } = await supabase
         .from('questions')

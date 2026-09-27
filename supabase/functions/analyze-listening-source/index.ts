@@ -1,5 +1,6 @@
 import { corsHeaders, errorDetail, geminiThinkingConfig, jsonResponse, requestGemini } from '../_shared/ai.ts'
-import { resolveLevel } from '../_shared/proficiency.ts'
+import { levelInstruction, resolveLevel, tbclLevelOf } from '../_shared/proficiency.ts'
+import { ceilingFor, overLevelComplaint, overLevelWords } from '../_shared/tbcl-check.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { resolveTrack, trackInstruction } from '../_shared/teaching.ts'
 
@@ -76,9 +77,8 @@ Deno.serve(async (req) => {
     const instruction = [
       'You are preparing listening material for a language class.',
       trackInstruction(teachingTrack),
-      resolvedLevel
-        ? `The class is working at ${resolvedLevel.level.label} on the ${resolvedLevel.framework.name} scale. Its listening material must stay within this ceiling: ${resolvedLevel.level.ceiling}`
-        : 'No proficiency level was set, so write for an intermediate learner and keep the wording plain.',
+      levelInstruction(levelFramework, levelCode),
+      'This is material the class will hear rather than read, which makes the level harder to hold, not easier: a listener cannot go back over a sentence that was too long or a word they have not met.',
       '',
       `The teacher chose ${requestedKind === 'dialogue' ? 'a dialogue' : 'a listening passage'}. Return exactly that kind; do not decide another format.`,
       'First read all useful information in the image, including printed text, labels, people, actions, objects and setting.',
@@ -116,8 +116,54 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: 'AI 回傳的辨識結果無法解析。' }, 502)
     }
 
-    const transcript = (result.transcript || '').trim()
+    let transcript = (result.transcript || '').trim()
     if (!transcript) return jsonResponse({ message: '這張截圖沒有可以朗讀的內容。' }, 422)
+
+    // Checked against 國教院's published lists, not merely asked for — the same
+    // loop the reading passage runs. Material students only hear is the case
+    // where an unmet word does the most damage, because there is nothing on
+    // screen to work it out from.
+    const tbcl = tbclLevelOf(levelFramework, levelCode)
+    const ceiling = tbcl ? ceilingFor(tbcl, 0) : 0
+    if (ceiling && resolvedLevel) {
+      const above = overLevelWords(transcript, ceiling)
+      if (above.length > 3) {
+        console.warn(`Listening material used ${above.length} words above ${resolvedLevel.level.label}: ${above.slice(0, 12).map((entry) => entry.word).join(' ')}`)
+        try {
+          const retryResponse = await requestGemini(
+            JSON.stringify({
+              systemInstruction: {
+                parts: [
+                  { text: instruction },
+                  { text: overLevelComplaint(above, resolvedLevel.level.label, ceiling) },
+                ],
+              },
+              contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: image } }] }],
+              generationConfig: {
+                thinkingConfig: geminiThinkingConfig('realtime'),
+                responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema } },
+              },
+            }),
+            'realtime',
+            { primaryTimeoutMs: 30_000, fallbackTimeoutMs: 25_000 },
+          )
+          const retryPayload = await retryResponse.json()
+          const retryRaw = retryPayload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || ''
+          const retried = retryRaw ? JSON.parse(retryRaw) as typeof result : null
+          const retriedText = (retried?.transcript || '').trim()
+          // Kept only if it is actually better. A retry that traded one set of
+          // hard words for another is not worth the wait or the call.
+          if (retriedText && overLevelWords(retriedText, ceiling).length < above.length) {
+            transcript = retriedText
+            result = retried as typeof result
+          }
+        } catch (retryError) {
+          // The first transcript is still usable material; a failed second
+          // attempt must not cost the teacher the first one.
+          console.warn('listening level retry failed', retryError instanceof Error ? retryError.message : retryError)
+        }
+      }
+    }
 
     return jsonResponse({
       kind: requestedKind,

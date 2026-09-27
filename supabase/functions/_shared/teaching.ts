@@ -1,4 +1,23 @@
 import type { Framework } from './proficiency.ts'
+import { levelInstruction } from './proficiency.ts'
+
+// The class's track and its level, as one instruction, read from the session.
+//
+// Every generator needs both and none of them should be deciding for itself
+// which half to look up: the Exit Ticket had neither, 下一步教學 had a bare
+// level code, and AI 批改 had them only when the answer happened to carry a
+// 拍照描述. One lookup, so there is one thing to get right.
+export async function classLevelInstruction(
+  db: { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => { maybeSingle: () => Promise<{ data: Record<string, string | null> | null }> } } } },
+  sessionId: string,
+) {
+  const { data } = await db.from('sessions')
+    .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+  return [
+    trackInstruction(data?.teaching_language),
+    levelInstruction(data?.level_framework ?? null, data?.level_code ?? null),
+  ].join('\n')
+}
 
 // The teaching track, as the server needs it.
 //

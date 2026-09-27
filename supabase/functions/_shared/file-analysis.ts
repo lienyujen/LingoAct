@@ -68,8 +68,10 @@ export async function analyzeFileResponse(input: {
   // Its presence changes what is being marked — the language, not the answer —
   // because the photograph is of a real thing and has no right or wrong.
   caption?: { text: string | null; audio: { mimeType: string; bytes: Uint8Array } | null } | null
-  // Only meaningful alongside a caption: what the class is learning and how far
-  // along it is, so the feedback lands at a level they can act on.
+  // What the class is learning and how far along it is. It applies to every
+  // submission, not only a 拍照描述: a sentence that is right for TBCL 1 is not
+  // a poor answer, and marking it without knowing the level is marking it
+  // against whatever standard the model happens to reach for.
   classInstruction?: string
 }) {
   const describing = Boolean(input.caption?.text || input.caption?.audio)

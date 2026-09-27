@@ -67,6 +67,10 @@ export async function analyzeAudioResponse(input: {
   screenshotUrl: string | null
   audioBytes: Uint8Array
   audioMimeType: string
+  // What the class is learning and how far along it is. Scoring speech out of
+  // 100 against no stated standard is scoring it against a native speaker, and
+  // the feedback comes back in language the learner cannot read either.
+  classInstruction?: string
 }) {
   let imagePart: Record<string, unknown> | null = null
   if (input.screenshotUrl) {
@@ -95,7 +99,13 @@ export async function analyzeAudioResponse(input: {
   const response = await requestGemini(JSON.stringify({
       systemInstruction: {
         parts: [{
-          text: `你是 LingoAct 的口語學習評測助理。請先使用繁體中文提供具體、尊重且可行的個別回饋，再於 translations.en 提供結構相同且忠實的英文翻譯；英文版不可另行評分或推論。${modeInstruction} transcript 必須忠實轉寫學員實際說出的內容。score 為 0 到 100 的整體表現分數。若音質不足、語音太短或無法辨識，請保守評分並在 limitations 說明，不可捏造內容。`,
+          text: [
+            input.classInstruction || '',
+            `你是 LingoAct 的口語學習評測助理。請先使用繁體中文提供具體、尊重且可行的個別回饋，再於 translations.en 提供結構相同且忠實的英文翻譯；英文版不可另行評分或推論。${modeInstruction} transcript 必須忠實轉寫學員實際說出的內容。score 為 0 到 100 的整體表現分數。若音質不足、語音太短或無法辨識，請保守評分並在 limitations 說明，不可捏造內容。`,
+            // A beginner who says the sentence clearly has done the task. The
+            // score is against this level, not against a native speaker.
+            'score 是以這個班的程度為基準：達到這個程度應有的表現就是高分，不要用更高程度的標準扣分。回饋也要用這個程度讀得懂的話寫。',
+          ].filter(Boolean).join('\n'),
         }],
       },
       contents: [{

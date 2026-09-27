@@ -5,6 +5,7 @@ import { gradeCustomQuizAttempt, translateFlashcardItems } from '../_shared/cust
 import { getAdminClient, hashParticipantToken } from '../_shared/supabase.ts'
 import { askWritingCoach } from '../_shared/writing-coach.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
+import { classLevelInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { participantTeachingCycle } from '../_shared/teaching-cycle.ts'
 
@@ -1073,7 +1074,7 @@ Deno.serve(async (req) => {
         let lastError: unknown = null
         for (let attempt = 0; attempt < 2 && !analysis; attempt += 1) {
           try {
-            analysis = await analyzeAudioResponse(request)
+            analysis = await analyzeAudioResponse({ ...request, classInstruction: await classLevelInstruction(supabase, sessionId) })
           } catch (error) {
             lastError = error
           }

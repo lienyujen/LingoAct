@@ -581,7 +581,17 @@ Deno.serve(async (req) => {
         // private bucket and handed over as audio — asking the model to judge a
         // description it cannot hear would be judging the photograph alone.
         let caption = null
-        let classInstruction = ''
+        // Every submission is marked against the class's own level. This used
+        // to be built only for 拍照描述, so a 電寫題 from a beginner was judged
+        // by no stated standard at all.
+        const { data: markingClass } = await supabase.from('sessions')
+          .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+        const classInstruction = [
+          trackInstruction(markingClass?.teaching_language),
+          levelInstruction(markingClass?.level_framework ?? null, markingClass?.level_code ?? null),
+          'You are marking what a learner at this level wrote. Judge it against that level: an answer that is correct and complete for this level is correct, however simple it looks, and feedback must be written in words they can read.',
+        ].join('\n')
+
         if (question?.wants_caption) {
           const spoken = submission.find((row) => row.caption_audio_path)
           const written = submission.map((row) => row.caption).filter(Boolean).join('\n')
@@ -592,12 +602,6 @@ Deno.serve(async (req) => {
             if (clip) audio = { mimeType: 'audio/wav', bytes: new Uint8Array(await clip.arrayBuffer()) }
           }
           caption = { text: written || null, audio }
-          const { data: classRow } = await supabase.from('sessions')
-            .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
-          classInstruction = [
-            trackInstruction(classRow?.teaching_language),
-            levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
-          ].join('\n')
         }
 
         const analysis = await analyzeFileResponse({

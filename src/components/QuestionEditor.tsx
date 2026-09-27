@@ -115,28 +115,36 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [interactionBusy, setInteractionBusy] = useState(false)
   const isInteraction = type === 'custom_quiz' && (quizType === 'ordering' || quizType === 'matching') && Boolean(onGenerateInteraction)
   // 派送畫面 has nothing to send, 自訂測驗 has nothing to read and 圖上點選 has
-  // nothing to tap when no picture is going out — all three are made out of the
-  // image rather than merely shown over it, so they are left out rather than
-  // offered and then refused. Unticking is the same state as never capturing:
-  // what matters is whether a picture will be sent, not whether one exists.
+  // nothing to tap when no picture is going out: all three are made out of the
+  // image rather than merely shown over it. Unticking is the same state as
+  // never capturing — what matters is whether a picture will be sent, not
+  // whether one exists.
+  //
+  // They are greyed rather than removed. A grid that changes shape reads as a
+  // fault, and leaves the teacher working out which button went and why; in
+  // place and disabled, the answer is on the button itself.
   const withPicture = Boolean(previewUrl) && sendScreenshot
+  const needsPicture = (candidate: QuestionType) => !withPicture
+    && ['send_screen', 'custom_quiz', 'hotspot'].includes(candidate)
   // With a picture the question can be "what do you see here?" and the prompt
   // is genuinely optional. Without one it is the entire question: 朗讀發音 with
   // nothing written is a recorder and no words to read, and 問答題 is an empty
   // heading over a text box. 投票題 and 選擇題 are the exceptions — their
   // options say what is being asked.
   const promptIsTheQuestion = !withPicture && !['poll', 'multiple_choice', 'custom_quiz'].includes(type)
-  const offeredTypes = withPicture
+  const offeredTypes = previewUrl
     ? questionTypes
-    : questionTypes.filter((item) => !['send_screen', 'custom_quiz', 'hotspot'].includes(item.type))
+    : questionTypes.filter((item) => !needsPicture(item.type))
 
   // Untick after choosing one of the three and the selection has to move with
   // it: the type grid would show nothing selected while the question still went
   // out as whatever was picked before.
   useEffect(() => {
-    if (offeredTypes.some((item) => item.type === type)) return
+    if (!needsPicture(type)) return
     setType('short_answer')
-  }, [offeredTypes, type])
+    // needsPicture is rebuilt every render; withPicture is what it reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [withPicture, type])
 
   useEffect(() => {
     if (!open) return
@@ -226,12 +234,14 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
         <div className="type-grid">
           {offeredTypes.map((item) => (
             <button
+              disabled={needsPicture(item.type)}
               className={`${type === item.type ? 'selected-type' : 'ghost-button'}${item.type === 'send_screen' ? ' send-screen-type' : ''}`}
               key={item.type}
               type="button"
               onClick={() => setType(item.type)}
             >
               {t(item.label)}
+              {needsPicture(item.type) && <small>{t('typeNeedsPicture')}</small>}
             </button>
           ))}
         </div>

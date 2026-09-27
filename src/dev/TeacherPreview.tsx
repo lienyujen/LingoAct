@@ -66,6 +66,8 @@ export function Preview() {
   const action = () => setNotice('介面預覽：此操作在桌面版中使用。')
   if (location.hash === '#qr-narrow') return <div className="desktop-shell" style={{ width: 230 }}><aside className="qr-floating"><QRCodePanel joinUrl="https://example.org/preview" onMinimize={action} onClose={action} /></aside></div>
   if (location.hash === '#question-types') return <QuestionEditor open previewUrl={null} onCancel={action} onCreate={action} onPictureTalk={action} onGenerateInteraction={async () => ({})} />
+  // With a capture, so the tick that decides whether it goes out can be tried.
+  if (location.hash === '#question-types-shot') return <QuestionEditor open previewUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='80'%3E%3Crect width='200' height='80' fill='%23ddd'/%3E%3C/svg%3E" onCancel={action} onCreate={action} onPictureTalk={action} onGenerateInteraction={async () => ({})} />
   if (location.hash === '#interactions') return <InteractionPreview />
   if (location.hash === '#teaching-cycle') return <main style={{ maxWidth: 420, margin: '20px auto' }}>
     <TeachingCyclePanel question={practiceQuestion} sessionId="preview" presenterToken="preview" active participants={['小明', '莉莉', '小華', '美玲'].map((name, i) => ({

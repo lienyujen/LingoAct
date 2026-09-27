@@ -114,10 +114,29 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [sendScreenshot, setSendScreenshot] = useState(true)
   const [interactionBusy, setInteractionBusy] = useState(false)
   const isInteraction = type === 'custom_quiz' && (quizType === 'ordering' || quizType === 'matching') && Boolean(onGenerateInteraction)
-  // 派送畫面 has nothing to send and 自訂測驗 has nothing to read when there is
-  // no backdrop — both are made out of the image rather than merely shown over
-  // it, so they are left out rather than offered and then refused.
-  const offeredTypes = previewUrl ? questionTypes : questionTypes.filter((item) => !['send_screen', 'custom_quiz'].includes(item.type))
+  // 派送畫面 has nothing to send, 自訂測驗 has nothing to read and 圖上點選 has
+  // nothing to tap when no picture is going out — all three are made out of the
+  // image rather than merely shown over it, so they are left out rather than
+  // offered and then refused. Unticking is the same state as never capturing:
+  // what matters is whether a picture will be sent, not whether one exists.
+  const withPicture = Boolean(previewUrl) && sendScreenshot
+  // With a picture the question can be "what do you see here?" and the prompt
+  // is genuinely optional. Without one it is the entire question: 朗讀發音 with
+  // nothing written is a recorder and no words to read, and 問答題 is an empty
+  // heading over a text box. 投票題 and 選擇題 are the exceptions — their
+  // options say what is being asked.
+  const promptIsTheQuestion = !withPicture && !['poll', 'multiple_choice', 'custom_quiz'].includes(type)
+  const offeredTypes = withPicture
+    ? questionTypes
+    : questionTypes.filter((item) => !['send_screen', 'custom_quiz', 'hotspot'].includes(item.type))
+
+  // Untick after choosing one of the three and the selection has to move with
+  // it: the type grid would show nothing selected while the question still went
+  // out as whatever was picked before.
+  useEffect(() => {
+    if (offeredTypes.some((item) => item.type === type)) return
+    setType('short_answer')
+  }, [offeredTypes, type])
 
   useEffect(() => {
     if (!open) return
@@ -369,7 +388,10 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
         )}
         {(type !== 'send_screen' || isBoard) && type !== 'custom_quiz' && (
           <label className="question-prompt-field">
-            {type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : type === 'drawing' ? t('drawingPromptLabel') : t('promptLabel')}
+            {promptIsTheQuestion
+              ? (type === 'pronunciation' ? t('readAloudNeeded') : type === 'file_upload' ? t('uploadPromptNeeded') : t('promptNeeded'))
+              : type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : type === 'drawing' ? t('drawingPromptLabel') : t('promptLabel')}
+            {promptIsTheQuestion && <small className="muted">{t('promptNeededHint')}</small>}
             <input
               value={promptText}
               placeholder={type === 'pronunciation'
@@ -410,7 +432,9 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
           <button className="ghost-button" type="button" onClick={onCancel}>
             <X size={17} />{t('cancel')}
           </button>
-          <button disabled={interactionBusy || (isInteraction ? quizType === 'ordering' && Math.max(interaction.items.length, interaction.tiles.length) < 2 : type === 'custom_quiz' && !quizDirection.trim())} type="submit">
+          <button disabled={interactionBusy
+            || (promptIsTheQuestion && !promptText.trim())
+            || (isInteraction ? quizType === 'ordering' && Math.max(interaction.items.length, interaction.tiles.length) < 2 : type === 'custom_quiz' && !quizDirection.trim())} type="submit">
             {type === 'custom_quiz' ? <Sparkle size={17} /> : <PaperPlaneTilt size={17} />}
             {type === 'custom_quiz' ? t('generateAndSend') : t('send')}
           </button>

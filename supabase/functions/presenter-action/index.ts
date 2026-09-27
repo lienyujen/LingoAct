@@ -2171,6 +2171,12 @@ Deno.serve(async (req) => {
       if (!questionTypes.has(type)) {
         return jsonResponse({ message: '題目資料格式不正確。' }, 400)
       }
+      // 圖上點選 is taps on a picture. With none the student page renders
+      // nothing at all — not an empty question, literally nothing — so it is
+      // refused here as well as left out of the menu.
+      if (type === 'hotspot' && !hasBackdrop) {
+        return jsonResponse({ message: '圖上點選需要一張截圖。' }, 400)
+      }
       if (type === 'send_screen' && !hasBackdrop) {
         // 派送畫面 with nothing to send is not a question, it is a blank screen.
         return jsonResponse({ message: '派送畫面需要一張截圖。' }, 400)

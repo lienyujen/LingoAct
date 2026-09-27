@@ -1,4 +1,4 @@
-name: Release Windows build
+name: Release desktop builds
 
 on:
   push:
@@ -9,13 +9,30 @@ on:
       tag:
         description: 'Tag to publish (must already exist)'
         required: true
+      publish:
+        description: 'Publish to the release page (off = build only, so a Mac build can be opened before it goes public)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Neither platform is worth publishing on its own, but one failing should
+      # still leave the other downloadable rather than cancelled.
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            os: windows-latest
+            artifact: '*.zip'
+          - label: macOS
+            os: macos-latest
+            artifact: '*.dmg'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,6 +42,8 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
+          # In step with the workflows and Cloudflare Pages: this repository's
+          # lockfile is a pnpm 11 one.
           version: 11.7.0
 
       - name: Setup Node
@@ -36,10 +55,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint and typecheck
-        run: |
-          pnpm lint
-          pnpm exec tsc -b
+      # 17 MB of binary deliberately kept out of git, and named in
+      # extraResources — so without this the packaging step fails outright
+      # looking for resources/fonts, and it is the注音 every Chinese class uses.
+      - name: Fetch the Bopomofo font
+        run: node scripts/fetch-bopomofo-font.mjs
+
+      # pnpm lint starts with tsc -b and runs the schema checks. The schema ones
+      # matter most here: the whole of schema.sql is handed to Postgres as one
+      # transaction, so a single fault anywhere in it leaves whoever downloads
+      # this with a project that has no tables and a setup screen that only says
+      # 建立資料表失敗.
+      - name: Lint, typecheck and check the schema
+        run: pnpm lint
 
       # Deliberately built with no Supabase project configured: whoever downloads
       # this enters their own on first launch. Baking one in would send every
@@ -62,39 +90,92 @@ jobs:
           fi
           echo "No Supabase project embedded."
 
-      - name: Package all Windows teaching profiles
-        shell: pwsh
+      # Every teaching edition, both platforms. Each pass rebuilds the renderer
+      # because the profile is compiled into it, then packages that profile;
+      # artifactName puts each one in release/ under its own product name.
+      - name: Package every teaching profile
+        shell: bash
+        env:
+          # Zip only on Windows. The single-file portable build re-extracts its
+          # whole payload to a temp folder on every launch, so it starts slowly
+          # and was never the one to recommend; shipping both only invited
+          # people to pick the worse one.
+          TARGET: ${{ matrix.os == 'macos-latest' && '--mac dmg --universal' || '--win zip --x64' }}
         run: |
-          foreach ($profile in @('full', 'huayu', 'english', 'guoyu')) {
-            $env:VITE_APP_PROFILE = $profile
-            $env:APP_PROFILE = $profile
-            pnpm build
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            pnpm exec electron-builder --win portable zip --x64 --publish never
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          for profile in full huayu english guoyu ncacls; do
+            echo "::group::$profile"
+            VITE_APP_PROFILE="$profile" pnpm build
+            APP_PROFILE="$profile" pnpm exec electron-builder $TARGET --publish never
+            echo "::endgroup::"
+          done
+
+      # identity: '-' is easy to set and easy to have silently ignored, and the
+      # difference only shows up as an app that will not open on an Apple Silicon
+      # Mac. Read the signature back off a built app instead of assuming it.
+      - name: Verify the Mac app is signed and universal
+        if: matrix.os == 'macos-latest'
+        run: |
+          app="release/mac-universal/LingoAct-NCACLS.app"
+          codesign --display --verbose=2 "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          echo "Architectures:"
+          lipo -archs "$app/Contents/MacOS/LingoAct-NCACLS"
+          # Without these two strings macOS denies the microphone and the screen
+          # outright, and the app looks broken rather than unapproved.
+          # PlistBuddy exits non-zero on a missing key, so a dropped extendInfo
+          # fails here instead of on someone's Mac.
+          echo "Usage descriptions:"
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :NSScreenCaptureUsageDescription' "$app/Contents/Info.plist"
+
+      - name: Upload build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.label }}
+          path: release/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    # Pushing a tag publishes, as before. A manual run defaults to building
+    # only, so an unsigned Mac build can be downloaded and actually opened on a
+    # Mac before it goes onto the public release page.
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download builds
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: builds
+          merge-multiple: true
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           notes=$(cat <<'MD'
           ## 下載
 
-          | 檔案 | 說明 |
-          |---|---|
-          | `LingoAct.zip` / `.exe` | 保留所有教學語言的完整版 |
-          | `LingoAct-Huayu.zip` / `.exe` | 華語教學版（TBCL／TOCFL、注音／拼音） |
-          | `LingoAct-English.zip` / `.exe` | 英語教學版（108課綱／全民英檢／多益） |
-          | `LingoAct-Guoyu.zip` / `.exe` | 國語文教學版（108課綱、固定注音） |
+          | 版本 | Windows | macOS |
+          |---|---|---|
+          | 完整版（所有教學語言） | `LingoAct.zip` | `LingoAct.dmg` |
+          | 華語教學版（TBCL／TOCFL、注音／拼音） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
+          | 英語教學版（108課綱／全民英檢／多益） | `LingoAct-English.zip` | `LingoAct-English.dmg` |
+          | 國語文教學版（108課綱、固定注音） | `LingoAct-Guoyu.zip` | `LingoAct-Guoyu.dmg` |
+          | 全美中文學校聯合總會版 | `LingoAct-NCACLS.zip` | `LingoAct-NCACLS.dmg` |
 
-          zip 解壓後執行較快，**建議使用**；單一 exe 每次啟動需先自我解壓。
+          **Windows：** 解壓縮後執行裡面的 exe。
+          **macOS：** 開啟 dmg，把 App 拖進「應用程式」。同一個檔案支援 Apple Silicon 與 Intel。
 
           ## 首次使用
 
-          開啟後會出現設定畫面，填入你自己的 Supabase 專案（專案識別碼與 publishable key）即可開始。
+          開啟後會出現設定畫面，填入你自己的 Supabase 專案（專案識別碼與 publishable key），
+          再展開「還沒建立後端？讓 LingoAct 幫你部署」，按一次自動部署就會建好資料表與 AI 功能。
+
           學員端網址留空就好 —— QR Code 會自動帶上你的專案，課堂資料只會進你自己的 Supabase。
 
           尚未建立 Supabase 專案，請參考
@@ -102,8 +183,9 @@ jobs:
 
           ## 注意
 
-          執行檔未經程式碼簽章，Windows SmartScreen 可能顯示「不明發行者」，
-          請點「其他資訊 → 仍要執行」。部分公司電腦的資安政策可能直接封鎖。
+          執行檔未經程式碼簽章。Windows SmartScreen 可能顯示「不明發行者」，
+          請點「其他資訊 → 仍要執行」；macOS 第一次開啟請在「系統設定 → 隱私權與安全性」按「仍要開啟」。
+          部分公司電腦的資安政策可能直接封鎖。
 
           個人與教育用途免費；補習班、企業內訓與收費課程屬商業用途，
           請見 [授權說明](https://github.com/lienyujen/LingoAct#授權)。
@@ -112,5 +194,5 @@ jobs:
           gh release create "$TAG" \
             --title "LingoAct $TAG" \
             --notes "$notes" \
-            release/*.exe \
-            release/*.zip
+            builds/*.zip \
+            builds/*.dmg

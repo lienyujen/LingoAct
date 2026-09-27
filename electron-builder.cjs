@@ -8,7 +8,7 @@ const profiles = {
   huayu: { executable: 'LingoAct-Huayu', appId: 'tw.lingoact.huayu.desktop' },
   english: { executable: 'LingoAct-English', appId: 'tw.lingoact.english.desktop' },
   guoyu: { executable: 'LingoAct-Guoyu', appId: 'tw.lingoact.guoyu.desktop' },
-  ncacls: { executable: 'LingoAct-NCACLS', appId: 'org.ncacls.lingoact.desktop', icon: 'build/icon-ncacls.ico' },
+  ncacls: { executable: 'LingoAct-NCACLS', appId: 'org.ncacls.lingoact.desktop', icon: 'build/icon-ncacls.ico', macIcon: 'build/ncacls-source.png' },
 }
 const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
 const profile = profiles[profileId]
@@ -18,6 +18,12 @@ const profile = profiles[profileId]
 const iconPath = profile.icon && fs.existsSync(path.join(__dirname, profile.icon))
   ? profile.icon
   : 'build/icon.ico'
+// The same fallback on the other side. electron-builder renders the .icns from
+// a png; build/icon.png is 512px square and the NCACLS source is 1254px, both
+// comfortably past the minimum.
+const macIconPath = profile.macIcon && fs.existsSync(path.join(__dirname, profile.macIcon))
+  ? profile.macIcon
+  : 'build/icon.png'
 const productName = process.env.APP_EDITION === 'plus'
   ? `${profile.executable}${profileId === 'full' ? 'Plus' : '-Plus'}`
   : profile.executable
@@ -86,6 +92,40 @@ module.exports = {
         arch: ['x64'],
       },
     ],
+  },
+  mac: {
+    icon: macIconPath,
+    category: 'public.app-category.education',
+    target: [
+      {
+        // One download for both Apple Silicon and Intel. Two architecture
+        // specific files would be smaller, but the audience is teachers, and
+        // "which one is my Mac?" is a question a download page should not have
+        // to answer.
+        target: 'dmg',
+        arch: ['universal'],
+      },
+    ],
+    // There is no Apple Developer ID to sign with, but "no signature at all"
+    // is not an option on Apple Silicon: the kernel refuses to run an arm64
+    // binary that carries none, and no amount of clearing quarantine helps.
+    // '-' is the ad-hoc identity — worth nothing as an assurance of who built
+    // this, but it is what makes the app launchable once Gatekeeper has been
+    // cleared once. identity: null means something else entirely: skip signing.
+    identity: '-',
+    // Hardened runtime only means anything alongside notarization, and enabling
+    // it unsigned costs the entitlements without buying the trust.
+    hardenedRuntime: false,
+    extendInfo: {
+      // macOS denies these outright when the usage string is absent, and the
+      // refusal reaches the renderer as an ordinary permission error — so the
+      // feature looks broken rather than unapproved.
+      NSMicrophoneUsageDescription: 'LingoAct 使用麥克風提供錄音評測、即時字幕與口譯。',
+      NSScreenCaptureUsageDescription: 'LingoAct 需要錄製螢幕，才能把畫面上的教材擷取成題目派送給學生。',
+    },
+  },
+  dmg: {
+    title: productName,
   },
   nsis: {
     allowElevation: false,

@@ -167,6 +167,8 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
     ['已判定答案數', metrics.assessed_answer_count],
     ['答對數', metrics.correct_answer_count],
     ['整體正確率', metrics.correct_rate === null ? '尚未設定正確答案' : metrics.correct_rate / 100],
+    ['討論板發表則數', metrics.board_post_count ?? 0],
+    ['討論板發表人數', metrics.board_post_participants ?? 0],
     ['Exit Ticket 份數', metrics.exit_ticket_count],
     ['錄音作答數', metrics.audio_response_count],
     ['錄音完成分析數', metrics.analyzed_audio_count],

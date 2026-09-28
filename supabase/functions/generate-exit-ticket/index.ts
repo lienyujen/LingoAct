@@ -69,15 +69,18 @@ Deno.serve(async (req) => {
       })
     }
 
-    const [questionResult, answerResult, messageResult, screenshotResult, analysisResult, participantResult] = await Promise.all([
+    const [questionResult, answerResult, messageResult, screenshotResult, analysisResult, participantResult, boardPostResult] = await Promise.all([
       supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at').limit(500),
       supabase.from('answers').select('question_id, answer_value, answer_values, answer_text, is_correct').eq('session_id', sessionId).order('submitted_at').limit(10000),
       supabase.from('messages').select('content, created_at').eq('session_id', sessionId).order('created_at').limit(5000),
       supabase.from('screenshots').select('id, public_url').eq('session_id', sessionId).order('created_at').limit(500),
       supabase.from('ai_summaries').select('question_id, output_json').eq('session_id', sessionId).eq('type', 'question_analysis').eq('status', 'success').order('created_at').limit(500),
       supabase.from('participants').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
+      // 討論板 answers live in their own table, so a summary built only from
+      // answers reports an empty discussion as if nobody joined in.
+      supabase.from('board_posts').select('question_id, participant_id, body, kind').eq('session_id', sessionId).order('created_at').limit(5000),
     ])
-    for (const result of [questionResult, answerResult, messageResult, screenshotResult, analysisResult, participantResult]) {
+    for (const result of [questionResult, answerResult, messageResult, screenshotResult, analysisResult, participantResult, boardPostResult]) {
       if (result.error) throw result.error
     }
 
@@ -86,6 +89,11 @@ Deno.serve(async (req) => {
     const messages = messageResult.data || []
     const screenshots = new Map((screenshotResult.data || []).map((item) => [item.id, item.public_url]))
     const analyses = new Map((analysisResult.data || []).map((item) => [item.question_id, item.output_json]))
+    // How many of the class joined a discussion, not how many times they
+    // spoke — the same unit the other question types are counted in.
+    const boardParticipants = (questionId: string) => new Set(
+      (boardPostResult.data || []).filter((post) => post.question_id === questionId).map((post) => post.participant_id),
+    ).size
     const questionSummaries = questions.map((question, index) => {
       const questionAnswers = answers.filter((answer) => answer.question_id === question.id)
       const distribution = Object.fromEntries(
@@ -103,9 +111,11 @@ Deno.serve(async (req) => {
         ai_detected_question: priorAnalysis?.question_understanding?.detected_question || null,
         options: question.options,
         allow_multiple: question.allow_multiple,
-        answer_count: questionAnswers.length,
+        answer_count: question.type === 'board' ? boardParticipants(question.id) : questionAnswers.length,
         distribution,
-        written_answers: questionAnswers.map((answer) => answer.answer_text).filter(Boolean).slice(0, 100),
+        written_answers: question.type === 'board'
+          ? (boardPostResult.data || []).filter((post) => post.question_id === question.id).map((post) => post.body).filter(Boolean).slice(0, 100)
+          : questionAnswers.map((answer) => answer.answer_text).filter(Boolean).slice(0, 100),
         correct_count: questionAnswers.filter((answer) => answer.is_correct === true).length,
         assessed_count: questionAnswers.filter((answer) => answer.is_correct !== null).length,
       }

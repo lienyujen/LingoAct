@@ -398,6 +398,9 @@ export type SessionMetrics = {
   correct_answer_count: number
   correct_rate: number | null
   exit_ticket_count: number
+  // Absent from reports generated before 討論板 posts were counted at all.
+  board_post_count?: number
+  board_post_participants?: number
   audio_response_count: number
   analyzed_audio_count: number
   average_audio_score: number | null

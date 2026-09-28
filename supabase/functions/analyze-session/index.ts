@@ -132,11 +132,11 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (!regenerate && cached?.input_json?.analysis_version === 9) {
+    if (!regenerate && cached?.input_json?.analysis_version === 10) {
       return jsonResponse({ analysis: cached.output_json, metrics: cached.input_json?.metrics, cached: true })
     }
 
-    const [participantResult, messageResult, sharedContentResult, captionResult, questionResult, answerResult, audioResponseResult, fileResponseResult, questionAnalysisResult, exitTicketResult] = await Promise.all([
+    const [participantResult, messageResult, sharedContentResult, captionResult, questionResult, answerResult, audioResponseResult, fileResponseResult, questionAnalysisResult, exitTicketResult, boardPostResult] = await Promise.all([
       supabase.from('participants').select('id').eq('session_id', sessionId).order('joined_at').limit(5000),
       supabase.from('messages').select('participant_id, content, created_at').eq('session_id', sessionId).order('created_at').limit(5000),
       supabase.from('shared_contents').select('body, url, created_at').eq('session_id', sessionId).order('created_at').limit(1000),
@@ -147,9 +147,15 @@ Deno.serve(async (req) => {
       supabase.from('file_responses').select('question_id, participant_id, name, mime_type, analysis_status, analysis_json, submitted_at').eq('session_id', sessionId).order('submitted_at').limit(10000),
       supabase.from('ai_summaries').select('question_id, output_json').eq('session_id', sessionId).eq('type', 'question_analysis').eq('status', 'success').order('created_at').limit(500),
       supabase.from('exit_tickets').select('most_useful, still_confused, understanding_score, engagement_score, next_suggestion, response_text, rating').eq('session_id', sessionId).order('submitted_at').limit(5000),
+      // A 討論板 post is the answer to a 討論板, and it is the only kind of
+      // answer that never lands in the answers table. Without this the report
+      // said 作答率 0% about a board the whole class had written on, and the
+      // discussion itself — often the most quotable thing in the lesson — was
+      // not in front of the model at all.
+      supabase.from('board_posts').select('question_id, participant_id, participant_name, kind, body, url, created_at').eq('session_id', sessionId).order('created_at').limit(5000),
     ])
 
-    for (const result of [participantResult, messageResult, sharedContentResult, captionResult, questionResult, answerResult, audioResponseResult, fileResponseResult, questionAnalysisResult, exitTicketResult]) {
+    for (const result of [participantResult, messageResult, sharedContentResult, captionResult, questionResult, answerResult, audioResponseResult, fileResponseResult, questionAnalysisResult, exitTicketResult, boardPostResult]) {
       if (result.error) throw result.error
     }
 
@@ -159,6 +165,7 @@ Deno.serve(async (req) => {
     const captionSegments = captionResult.data || []
     const questions = questionResult.data || []
     const answers = answerResult.data || []
+    const boardPosts = boardPostResult.data || []
     const audioResponses = audioResponseResult.data || []
     // A student's pages carry one mark between them, so the submission — not
     // the file — is the unit everything below counts in.
@@ -193,7 +200,19 @@ Deno.serve(async (req) => {
       quizAttemptIds.length ? supabase.from('quiz_item_answers').select('*').in('attempt_id', quizAttemptIds).order('created_at').limit(50000) : Promise.resolve({ data: [], error: null }),
     ])
     if (quizKeyError || quizAnswerError) throw quizKeyError || quizAnswerError
-    const interactiveQuestions = questions.filter((question) => question.type !== 'send_screen')
+    // What was actually put to the class. A screen sent to be looked at asks
+    // for nothing, and neither does an article sent to be read — counting
+    // either of them as unanswered makes the class look like it ignored work
+    // it was never given. A reading WITH questions over it is a custom_quiz and
+    // still counts.
+    const interactiveQuestions = questions.filter((question) => question.type !== 'send_screen' && question.type !== 'reading')
+    // Counted the same way the per-question table counts it: how many of the
+    // class joined the discussion, not how many times they spoke.
+    const boardResponders = questions
+      .filter((question) => question.type === 'board')
+      .reduce((total, question) => total + new Set(
+        boardPosts.filter((post) => post.question_id === question.id).map((post) => post.participant_id),
+      ).size, 0)
     const assessedAnswers = answers.filter((answer) => answer.is_correct !== null)
     const correctAnswers = assessedAnswers.filter((answer) => answer.is_correct)
     const submittedQuizAttempts = quizAttempts || []
@@ -203,7 +222,7 @@ Deno.serve(async (req) => {
     const durationEnd = new Date(endedAt).getTime()
     const durationMinutes = Math.max(0, Math.round((durationEnd - new Date(session.created_at).getTime()) / 60000))
     const averageResponseRate = participants.length && interactiveQuestions.length
-      ? roundPercent(((answers.length + submittedQuizAttempts.length) / (participants.length * interactiveQuestions.length)) * 100)
+      ? roundPercent(((answers.length + submittedQuizAttempts.length + boardResponders) / (participants.length * interactiveQuestions.length)) * 100)
       : 0
 
     const analysisByQuestion = new Map(questionAnalyses.map((item) => [item.question_id, item.output_json]))
@@ -211,6 +230,7 @@ Deno.serve(async (req) => {
     const quizKeyByItem = new Map((quizKeys || []).map((key) => [key.item_id, key]))
     const questionResults = questions.map((question) => {
       const questionAnswers = answers.filter((answer) => answer.question_id === question.id)
+      const questionBoardPosts = boardPosts.filter((post) => post.question_id === question.id)
       const distribution = Object.fromEntries(
         (Array.isArray(question.options) ? question.options : []).map((option: string) => [
           option,
@@ -255,7 +275,14 @@ Deno.serve(async (req) => {
           })),
         })),
       } : null
-      const answerCount = quiz ? questionQuizAttempts.length : questionAnswers.length
+      // A board is answered by posting to it, and one learner may post several
+      // times — so the count that means anything, and the one the response rate
+      // is read against, is how many of the class joined in.
+      const answerCount = quiz
+        ? questionQuizAttempts.length
+        : question.type === 'board'
+          ? new Set(questionBoardPosts.map((post) => post.participant_id)).size
+          : questionAnswers.length
 
       return {
         question_id: question.id,
@@ -292,6 +319,15 @@ Deno.serve(async (req) => {
           strengths: upload.analysis_json?.strengths_zh_tw ?? [],
           improvements: upload.analysis_json?.improvements_zh_tw ?? [],
         })),
+        // What the class actually wrote to each other. A summary of a lesson
+        // that held a discussion and cannot quote any of it is missing the
+        // lesson.
+        board_posts: questionBoardPosts.slice(0, 200).map((post) => ({
+          participant_name: post.participant_name,
+          kind: post.kind,
+          text: post.body || '',
+          url: post.url || '',
+        })),
         prior_ai_analysis: analysisByQuestion.get(question.id) || null,
         custom_quiz: customQuiz,
       }
@@ -306,13 +342,15 @@ Deno.serve(async (req) => {
       active_message_participants: new Set(messages.map((message) => message.participant_id)).size,
       question_count: questions.length,
       interactive_question_count: interactiveQuestions.length,
-      answer_count: answers.length + submittedQuizAttempts.length,
+      answer_count: answers.length + submittedQuizAttempts.length + boardResponders,
       average_response_rate: averageResponseRate,
       assessed_answer_count: assessedAnswers.length + scoredQuizItemAnswers.length,
       correct_answer_count: correctAnswers.length + correctQuizItemAnswers.length,
       correct_rate: assessedAnswers.length + scoredQuizItemAnswers.length
         ? roundPercent(((correctAnswers.length + correctQuizItemAnswers.length) / (assessedAnswers.length + scoredQuizItemAnswers.length)) * 100)
         : null,
+      board_post_count: boardPosts.length,
+      board_post_participants: new Set(boardPosts.map((post) => post.participant_id)).size,
       exit_ticket_count: exitTickets.length,
       audio_response_count: audioResponses.length,
       analyzed_audio_count: analyzedAudioResponses.length,
@@ -329,7 +367,7 @@ Deno.serve(async (req) => {
     }
 
     summaryInput = {
-      analysis_version: 9,
+      analysis_version: 10,
       session: {
         title: session.title,
         created_at: session.created_at,
@@ -354,7 +392,7 @@ Deno.serve(async (req) => {
     }
 
     const result = await callAiJson(
-      '你是 LingoAct 的課堂互動與形成性評量分析顧問。請先以繁體中文根據匿名化統計、講師派送的課程文字與連結、課堂原文逐字稿、彈幕內容、每題作答結果、錄音評測、既有題目分析與 Exit Ticket，產生可供講者課後使用的完整報告；再於 translations.en 輸出結構相同、證據與意義一致的自然英文版本。英文版本是翻譯，不可另行推論。lesson_transcript 是講師授課內容：若有內容，lesson_key_points 必須將整節課整理成精煉、具結構且可直接給教師與學生閱讀的課堂重點，不可逐句照抄、不可顯示逐字稿；若 lesson_transcript 為空，中英文 lesson_key_points 都必須回傳空陣列。逐字稿可用來核對互動脈絡與提出教學建議，但不可把講師說的話誤認為學生意見或學習證據。錄音題的 audio_evaluations 包含匿名化逐字稿、分數及個別 AI 評語，必須納入該題的 result_summary、evidence 與整體學習分析。上傳作答題的 file_submissions 是學生寫在紙上或做成檔案後上傳、再由 AI 逐份批改的結果，一位學生一筆（file_count 是他交了幾個檔）；判定與分數必須納入該題的 result_summary 與 evidence，analysis_status 不是 success 的代表尚未批改，只能算在未批改份數裡，不可當成沒作答，也不可臆測其內容。自訂測驗的 custom_quiz 包含題目、選項、正確答案、匿名化學生答案、得分與回饋，必須逐題分析其答題表現、錯誤與迷思，並納入對應的 question_findings；只要 attempts 有資料，就不可把該測驗判斷為無人作答。instructor_shared_contents 是講師提供的課程參考資料。所有結論都要指出資料證據；資料不足時必須寫入 limitations。不可推測學生身分，也不可把投票題當成對錯題。question_findings 的 question_id 必須原樣使用輸入中的 ID 以供系統對應，但不可在其他文字欄位中顯示或解釋 ID。',
+      '你是 LingoAct 的課堂互動與形成性評量分析顧問。請先以繁體中文根據匿名化統計、講師派送的課程文字與連結、課堂原文逐字稿、彈幕內容、每題作答結果、錄音評測、既有題目分析與 Exit Ticket，產生可供講者課後使用的完整報告；再於 translations.en 輸出結構相同、證據與意義一致的自然英文版本。英文版本是翻譯，不可另行推論。lesson_transcript 是講師授課內容：若有內容，lesson_key_points 必須將整節課整理成精煉、具結構且可直接給教師與學生閱讀的課堂重點，不可逐句照抄、不可顯示逐字稿；若 lesson_transcript 為空，中英文 lesson_key_points 都必須回傳空陣列。逐字稿可用來核對互動脈絡與提出教學建議，但不可把講師說的話誤認為學生意見或學習證據。錄音題的 audio_evaluations 包含匿名化逐字稿、分數及個別 AI 評語，必須納入該題的 result_summary、evidence 與整體學習分析。上傳作答題的 file_submissions 是學生寫在紙上或做成檔案後上傳、再由 AI 逐份批改的結果，一位學生一筆（file_count 是他交了幾個檔）；判定與分數必須納入該題的 result_summary 與 evidence，analysis_status 不是 success 的代表尚未批改，只能算在未批改份數裡，不可當成沒作答，也不可臆測其內容。討論板題目的學生作答是 board_posts，不是 answers：只要 board_posts 有資料，就不可把該題判斷為無人作答或作答率 0%，其 answer_count 計的是有發表的人數。討論板的內容要納入該題的 result_summary 與 evidence，並可用來觀察學生之間的互動與想法。自訂測驗的 custom_quiz 包含題目、選項、正確答案、匿名化學生答案、得分與回饋，必須逐題分析其答題表現、錯誤與迷思，並納入對應的 question_findings；只要 attempts 有資料，就不可把該測驗判斷為無人作答。instructor_shared_contents 是講師提供的課程參考資料。所有結論都要指出資料證據；資料不足時必須寫入 limitations。不可推測學生身分，也不可把投票題當成對錯題。question_findings 的 question_id 必須原樣使用輸入中的 ID 以供系統對應，但不可在其他文字欄位中顯示或解釋 ID。',
       summaryInput,
       sessionAnalysisSchema,
       null,

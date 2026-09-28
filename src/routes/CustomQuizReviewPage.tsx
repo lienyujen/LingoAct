@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Brain, X } from '@phosphor-icons/react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Brain, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
 import { QuizAnswerEditor } from '../components/CustomQuizResult'
 import { InteractionResults } from '../components/InteractionResults'
@@ -107,6 +107,34 @@ export function CustomQuizReviewPage() {
     if (!pictureWriting || !results?.attempts.length) return
     setSelectedAttemptId((current) => results.attempts.some((attempt) => attempt.id === current) ? current : results.attempts[0].id)
   }, [pictureWriting, results])
+
+  // One learner at a time, stepped through in order. Marking a class of these
+  // means reading them one after another, and hunting for the next name in a
+  // list of thumbnails is not reading — the arrow keys are how the other review
+  // windows already work, so this behaves the way a teacher expects it to.
+  const attempts = useMemo(() => results?.attempts || [], [results])
+  const attemptIndex = Math.max(0, attempts.findIndex((attempt) => attempt.id === selectedAttemptId))
+  const stepAttempt = useCallback((delta: number) => {
+    setSelectedAttemptId((current) => {
+      if (!attempts.length) return current
+      const at = Math.max(0, attempts.findIndex((attempt) => attempt.id === current))
+      return attempts[(at + delta + attempts.length) % attempts.length].id
+    })
+  }, [attempts])
+
+  useEffect(() => {
+    if (!pictureWriting) return
+    const onKey = (event: KeyboardEvent) => {
+      // Not while the teacher is typing a correction into a field.
+      const tag = (event.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (event.key === 'Escape') void window.lingoActDesktop?.close()
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'PageDown') stepAttempt(1)
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp') stepAttempt(-1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pictureWriting, stepAttempt])
   const reviewProps: QuizReviewProps | null = results ? {
     busyItemId,
     draftAnswers,
@@ -141,6 +169,20 @@ export function CustomQuizReviewPage() {
             {!results.attempts.length && <p className="muted">{t('noAnswersYet')}</p>}
           </aside>
           <main>
+            {attempts.length > 0 && (
+              <div className="picture-writing-native-step">
+                <button aria-label={t('reviewPrevious')} className="icon-button" disabled={attempts.length < 2} title={t('reviewPrevious')} type="button" onClick={() => stepAttempt(-1)}>
+                  <CaretLeft size={24} />
+                </button>
+                <span>
+                  <strong>{attempts[attemptIndex]?.participant_name}</strong>
+                  <small>{attemptIndex + 1} / {attempts.length}</small>
+                </span>
+                <button aria-label={t('reviewNext')} className="icon-button" disabled={attempts.length < 2} title={t('reviewNext')} type="button" onClick={() => stepAttempt(1)}>
+                  <CaretRight size={24} />
+                </button>
+              </div>
+            )}
             {results.attempts.find((attempt) => attempt.id === selectedAttemptId)?.feedback?.zh_tw && <p className="picture-writing-native-feedback">{results.attempts.find((attempt) => attempt.id === selectedAttemptId)?.feedback?.zh_tw}</p>}
             {pictureSegments(selectedAttemptId).map((segment, index) => <article key={segment.panelId}><div><b>{index + 1}</b><img alt="" src={segment.image} /></div><p>{segment.text}</p></article>)}
           </main>

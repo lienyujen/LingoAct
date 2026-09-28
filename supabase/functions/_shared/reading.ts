@@ -20,7 +20,7 @@ import { GRAMMAR_BY_LEVEL } from './tbcl-levels.generated.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
 import { wordLevel } from './tbcl-levels.generated.ts'
 import { levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
-import { trackInstruction } from './teaching.ts'
+import { resolveTrack, trackInstruction } from './teaching.ts'
 
 export type ReadingAnnotationGloss = Record<string, string>
 
@@ -42,6 +42,10 @@ export type ReadingGrammar = {
 export type ReadingPassage = {
   title: string
   body: string
+  // The passage cut into words, each with its 正詞法 pinyin. One segmentation
+  // serves both the 生詞 colouring and the readings, because both are decided
+  // per word rather than per character.
+  words: ReadingWord[]
   vocabulary: ReadingVocabulary[]
   grammar: ReadingGrammar[]
 }
@@ -150,21 +154,20 @@ const glossSchema = (locales: string[]) => ({
   additionalProperties: false,
 })
 
-const passageSchema = (locales: string[]) => ({
+const passageSchema = () => ({
   type: 'object',
   properties: {
     title: { type: 'string' },
     body: { type: 'string' },
-    vocabulary: {
+    words: {
       type: 'array',
       items: {
         type: 'object',
         properties: {
-          word: { type: 'string' },
-          pos: { type: 'string' },
-          gloss: glossSchema(locales),
+          text: { type: 'string' },
+          pinyin: { type: 'string' },
         },
-        required: ['word', 'pos', 'gloss'],
+        required: ['text', 'pinyin'],
         additionalProperties: false,
       },
     },
@@ -186,7 +189,7 @@ const passageSchema = (locales: string[]) => ({
       },
     },
   },
-  required: ['title', 'body', 'vocabulary', 'grammar'],
+  required: ['title', 'body', 'words', 'grammar'],
   additionalProperties: false,
 })
 
@@ -206,6 +209,88 @@ export type ReadingInput = {
   // Which languages the annotations are written in. zh-TW and en always, plus
   // whatever this class's students can choose.
   locales: string[]
+}
+
+export type ReadingWord = { text: string; pinyin: string }
+
+// Which of the passage's words the class has not met.
+//
+// 國教院's list decides, not the model. A word listed above the class is 超綱
+// and keeps its level so the colour can say how far above; a word on no list
+// at all is 0, which the reader draws on a pale green ground — a name, a
+// loanword, a compound the benchmark never covered. 閱讀是讀詞不是讀字, so an
+// unlisted word counts as new even when every character in it is easy: 資料夾
+// is not 資料 + 夾 to someone meeting it for the first time.
+function newWords(words: ReadingWord[], classLevel: number) {
+  const seen = new Set<string>()
+  const out: Array<{ word: string; level: number }> = []
+  for (const { text } of words) {
+    const word = (text || '').trim()
+    if (!word || seen.has(word) || !HAN_WORD.test(word)) continue
+    const level = wordLevel(word)
+    if (level && level <= classLevel) continue
+    seen.add(word)
+    out.push({ word, level })
+  }
+  return out
+}
+
+const HAN_WORD = /^[\p{Script=Han}]+$/u
+
+// What each new word means, asked for once the list is settled.
+//
+// A separate call because the list cannot exist until the passage does, and
+// asking the model to both choose and explain is what produced a passage with
+// one mark in it. This one only explains.
+async function glossNewWords(
+  entries: Array<{ word: string; level: number }>,
+  locales: string[],
+  languageName: string,
+): Promise<ReadingVocabulary[]> {
+  if (!entries.length) return []
+  const result = await callAiJson(
+    [
+      `這些是一篇${languageName}短文裡學生還沒學過的詞。請只做兩件事：給詞類，並翻譯。`,
+      '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
+      '翻譯要短，說出這個詞在這篇文章裡的意思，不要只換一個同義詞。',
+      '不要增加或刪除任何詞，回傳的順序與輸入相同。',
+    ].join('\n'),
+    { words: entries.map((entry) => entry.word), languages: locales },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['words'],
+      properties: {
+        words: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['word', 'pos', 'gloss'],
+            properties: { word: { type: 'string' }, pos: { type: 'string' }, gloss: glossSchema(locales) },
+          },
+        },
+      },
+    },
+    null,
+    'realtime',
+  )
+
+  const rows = result.status === 'success'
+    ? ((result.output as { words?: unknown }).words as Array<Record<string, unknown>> | undefined) || []
+    : []
+  const byWord = new Map(rows.map((row) => [String(row.word || ''), row]))
+  // A word the gloss call dropped is still a word the class has not met, so it
+  // keeps its mark and its colour and simply has nothing to say when tapped.
+  return entries.map(({ word, level }) => {
+    const row = byWord.get(word)
+    return {
+      word,
+      level,
+      pos: String(row?.pos || '').trim(),
+      gloss: (row?.gloss || {}) as ReadingAnnotationGloss,
+    }
+  })
 }
 
 export async function generateReadingPassage(input: ReadingInput): Promise<ReadingPassage | null> {
@@ -232,13 +317,14 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     input.image
       ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
       : '',
-    // 生詞 is not only what is above the class — a word learned AT this level is
-    // new this term and is exactly what the lesson is teaching. What the class
-    // already had before this level is not new and must not be marked, or the
-    // colouring says nothing.
-    `vocabulary: every word in the passage that a learner meets at 第${tbcl || 4}級 or later — that is, everything NOT already on the list for 第${Math.max(1, (tbcl || 4) - 1)}級 and below. Include the words being taught at this level, not only the ones above it.`,
-    'For each: its part of speech in Chinese (名詞、動詞、形容詞、副詞、量詞、連接詞…) and a short gloss in each requested language.',
-    'A word the class already had before this level does not belong here. Padding the list makes the colouring useless.',
+    'words: 把 body 逐詞切開放進 words，順序與原文相同。所有 text 接起來必須和 body 完全一樣，包含標點；標點自成一項，pinyin 留空字串。',
+    '每個詞的 pinyin 依《漢語拼音正詞法基本規則》(GB/T 16159) 書寫，不是逐字注音：',
+    '一、以詞為單位連寫：zīliàojiā（資料夾）、jīntiān（今天）、dǎkāi（打開）。',
+    '二、句首字母大寫；專有名詞大寫，人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。',
+    '三、動詞與賓語分寫（kàn xìn）；動詞與動態助詞連寫（kànzhe、kànle、kànguò）。',
+    '四、數詞與量詞分寫（qī gè）；11 到 99 的整數連寫（shíwǔ）。',
+    '五、結構助詞的、地、得分寫；語氣詞嗎、呢、吧分寫。',
+    '六、聲調一律用調號標出，不用數字。阿拉伯數字與外文照原樣留在 text，pinyin 留空字串。',
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
     'Do not invent a grammar point that is not on the list, and do not attribute a pattern to a sentence that does not contain it.',
@@ -248,7 +334,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     const result = await callAiJson(
       complaint ? `${instruction}\n\n${complaint}` : instruction,
       { source: input.source, direction: input.direction, languages: locales },
-      passageSchema(locales),
+      passageSchema(),
       input.image || null,
       // A passage is longer and has to hold together, which is what the deeper
       // profile is for; a quiz item is a sentence and uses the realtime one.
@@ -260,48 +346,49 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   let output = await ask()
   if (!output) return null
 
-  // The same loop the quiz generator uses, for the same reason.
+  const TOO_MANY_ABOVE = 6
   if (ceiling) {
     const above = overLevelWords(String(output.body || ''), ceiling)
-    // Words the model itself listed as new are the point of the exercise; only
-    // the ones it used without saying so are a failure.
-    const declared = new Set(
-      (Array.isArray(output.vocabulary) ? output.vocabulary : [])
-        .map((entry) => String((entry as Record<string, unknown>).word || '')),
-    )
-    const undeclared = above.filter((entry) => !declared.has(entry.word))
-    if (undeclared.length > 3) {
-      console.warn(`Reading passage used ${undeclared.length} unlisted words above ${label}: ${undeclared.slice(0, 12).map((e) => e.word).join(' ')}`)
-      const retried = await ask(overLevelComplaint(undeclared, label, ceiling))
-      if (retried) {
-        const stillAbove = overLevelWords(String(retried.body || ''), ceiling)
-          .filter((entry) => !declared.has(entry.word))
-        if (stillAbove.length < undeclared.length) output = retried
-      }
+    if (above.length > TOO_MANY_ABOVE) {
+      console.warn(`Reading passage used ${above.length} words above ${label}: ${above.slice(0, 12).map((e) => e.word).join(' ')}`)
+      const retried = await ask(overLevelComplaint(above, label, ceiling))
+      if (retried && overLevelWords(String(retried.body || ''), ceiling).length < above.length) output = retried
     }
   }
 
   const body = String(output.body || '').trim()
   if (!body) return null
 
+  // The segmentation has to be OF this passage, so it is checked the way the
+  // sentence-ordering chunks are: joining the pieces must give the body back.
+  // A list that does not reassemble would put the readings over the wrong
+  // words and mark words the passage does not contain.
+  const segmented = (Array.isArray(output.words) ? output.words : [])
+    .map((raw) => {
+      const entry = raw as Record<string, unknown>
+      return { text: String(entry.text || ''), pinyin: String(entry.pinyin || '').trim() }
+    })
+    .filter((entry) => entry.text)
+  const rejoined = segmented.map((entry) => entry.text).join('')
+  const words = rejoined.replace(/\s/g, '') === body.replace(/\s/g, '') ? segmented : []
+  if (segmented.length && !words.length) {
+    console.warn(`Reading segmentation did not reassemble: ${rejoined.slice(0, 80)}`)
+  }
+
+  // 國教院's list decides which of them are new, and a second call says what
+  // they mean. Without a usable segmentation there is nothing to judge, so the
+  // passage goes out unmarked rather than marked wrongly.
+  const vocabulary = await glossNewWords(
+    newWords(words, tbcl || 4),
+    locales,
+    resolveTrack(input.teachingLanguage).promptLanguage,
+  )
+
   return {
     title: String(output.title || '').trim(),
     body,
-    vocabulary: (Array.isArray(output.vocabulary) ? output.vocabulary : [])
-      .map((raw) => {
-        const entry = raw as Record<string, unknown>
-        const word = String(entry.word || '').trim()
-        if (!word || !body.includes(word)) return null
-        return {
-          word,
-          // The level 國教院 lists it at, or 0 when it is on no list — a name,
-          // a loanword, a term the benchmark never covered.
-          level: wordLevel(word),
-          pos: String(entry.pos || '').trim(),
-          gloss: (entry.gloss || {}) as ReadingAnnotationGloss,
-        }
-      })
-      .filter((entry): entry is ReadingVocabulary => entry !== null),
+    words,
+    vocabulary,
     // Dropped unless the point is one TBCL actually lists and the span is
     // really in the passage: an annotation pointing at the wrong sentence is
     // worse than no annotation.

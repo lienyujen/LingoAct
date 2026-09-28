@@ -39,6 +39,20 @@ type Props = {
 const VS_FIRST = 0xE0100
 const VS_LAST = 0xE01EF
 
+function wordReadings(passage: ReadingPassage) {
+  const words = passage.words || []
+  if (!words.length) return null
+  const map = new Map<number, { text: string; pinyin: string }>()
+  let offset = 0
+  for (const word of words) {
+    if (word.pinyin) map.set(offset, word)
+    offset += word.text.length
+  }
+  // A list that does not lay over the body would put every reading on the
+  // wrong word, so it is not used at all rather than used wrongly.
+  return offset === passage.body.length ? map : null
+}
+
 function perCharacter(passage: ReadingPassage): { glyphs: string[] | null; ruby: string[] | null } {
   const none = { glyphs: null, ruby: null }
   const text = passage.annotation_text || ''
@@ -208,14 +222,18 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   )
 
   const readings = useMemo(() => perCharacter(passage), [passage])
+  // 拼音 is written per word; 注音 is written per character and stays that way,
+  // because that is how 注音 is written.
+  const byWord = useMemo(() => wordReadings(passage), [passage])
   const glyphs = useMemo(() => byOffset(passage.body, readings.glyphs), [passage.body, readings.glyphs])
   const ruby = useMemo(() => byOffset(passage.body, readings.ruby), [passage.body, readings.ruby])
   const hasReadings = Boolean(glyphs || ruby)
   // 注音 is set into the glyphs, so the subset the teacher cut has to load
   // before the passage can show it; 拼音 needs no font.
   const family = useReadingFont(readings.glyphs && rubyOn ? passage.font_url : null)
+  const overLevelReadings = Boolean(byWord || ruby)
   const showGlyphs = Boolean(glyphs && rubyOn && family)
-  const showRubyText = Boolean(ruby && rubyOn)
+  const showRubyText = Boolean((byWord || ruby) && rubyOn)
 
   const charAt = useMemo(() => characterIndexes(passage.body), [passage.body])
   // The stretch being spoken right now, in character positions. Null whenever
@@ -225,8 +243,24 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   // One character at a time, so a reading sits over the character it belongs to
   // and not over the word it happens to start.
   function annotated(text: string, at: number, isNewWord = false) {
-    const marks = (showGlyphs || showRubyText) && isNewWord
+    // A new word always carries its reading; everything else waits for the
+    // switch, which waits for the quiz.
+    const marks = showGlyphs || showRubyText || (overLevelReadings && isNewWord && !locked)
     if (!marks && !spoken) return text
+
+    // 拼音 goes over the whole word rather than over each character.
+    const word = byWord?.get(at)
+    if (word && marks && !showGlyphs && word.text === text) {
+      const lit = Boolean(spoken)
+        && (charAt.get(at) ?? -1) >= (spoken as KaraokeCue).start_index
+        && (charAt.get(at) ?? -1) < (spoken as KaraokeCue).end_index
+      return [
+        <ruby key={at}>
+          <span className={lit ? 'karaoke-character active' : undefined}>{text}</span>
+          <rt>{word.pinyin}</rt>
+        </ruby>,
+      ]
+    }
     const out: ReactNode[] = []
     let offset = 0
     for (const character of text) {
@@ -285,7 +319,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
               {participantText(locale, 'readingGrammar')}
             </button>
           )}
-          {hasReadings && hasWords && (
+          {(hasReadings || Boolean(byWord)) && hasWords && (
             <button
               aria-pressed={rubyOn}
               className={`reading-toggle${rubyOn ? ' is-on' : ''}`}

@@ -3043,6 +3043,7 @@ Deno.serve(async (req) => {
         title: passage.title || null,
         body: passage.body,
         source: screenshotId ? 'screenshot' : (sourceText ? 'pasted' : 'ai'),
+        words: passage.words,
         vocabulary: passage.vocabulary,
         grammar: passage.grammar,
         listening_clip_id: clipId,

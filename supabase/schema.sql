@@ -1602,6 +1602,11 @@ create table if not exists public.reading_passages (
   -- Set when the teacher also had it read aloud; the clip lives in
   -- listening_clips like every other piece of speech in the app.
   listening_clip_id uuid null references public.listening_clips(id) on delete set null,
+  -- The passage cut into words, each with its 漢語拼音正詞法 spelling:
+  -- [{ text, pinyin }]. One segmentation decides both which words are new and
+  -- how the readings are written, because 正詞法 spells a word rather than a
+  -- character — zīliàojiā, not zī liào jiā.
+  words jsonb not null default '[]'::jsonb,
   -- 注音 or 拼音 over the passage, in whichever system the class is set to.
   -- Both shapes are exactly the ones listening_clips already uses: zhuyin is
   -- the body with variation selectors woven in and needs the subset font,
@@ -1614,6 +1619,7 @@ create table if not exists public.reading_passages (
 
 -- For projects deployed before the readings were put on the passage itself.
 alter table public.reading_passages
+  add column if not exists words jsonb not null default '[]'::jsonb,
   add column if not exists annotation text not null default 'none',
   add column if not exists annotation_text text null,
   add column if not exists font_url text null;

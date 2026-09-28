@@ -238,27 +238,27 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
         ceiling: 'The published 準備級一級 word list is about three hundred words. Topics: greetings, name, country, numbers, family, food, classroom, time, price. Sentences of five to ten characters, one clause. No abstract nouns whatsoever and no compound a beginner has not met.',
       },
       {
-        code: 'novice2', tbcl: 2, label: 'TOCFL 準備級二級（低於 CEFR A1）', band: 0, maxStem: 18,
+        code: 'novice2', tbcl: 1, label: 'TOCFL 準備級二級（低於 CEFR A1）', band: 0, maxStem: 18,
         ceiling: 'Still below CEFR A1, roughly the first five hundred words. Shopping, transport, weather, the day\'s routine, feelings named in one word. Ten to eighteen characters, at most two clauses. No abstract or academic vocabulary.',
       },
       {
-        code: 'level1', tbcl: 3, label: 'TOCFL 入門級（CEFR A1，約 500 詞）', band: 1, maxStem: 24,
+        code: 'level1', tbcl: 2, label: 'TOCFL 入門級（CEFR A1，約 500 詞）', band: 1, maxStem: 24,
         ceiling: 'About five hundred words. Familiar concrete topics and short narratives. Up to about twenty-four characters. Keep to the 入門級 word list: a word outside it makes the item untestable however simple the idea behind it.',
       },
       {
-        code: 'level2', tbcl: 4, label: 'TOCFL 基礎級（CEFR A2，約 1,270 詞）', band: 2, maxStem: 32,
+        code: 'level2', tbcl: 3, label: 'TOCFL 基礎級（CEFR A2，約 1,270 詞）', band: 2, maxStem: 32,
         ceiling: 'About 1,270 words. Familiar subjects, reasons for a preference, a short article on daily life. Up to about thirty-two characters. Everyday abstractions are fair; specialised terminology is not.',
       },
       {
-        code: 'level3', tbcl: 5, label: 'TOCFL 進階級（CEFR B1，約 3,245 詞）', band: 3, maxStem: 40,
+        code: 'level3', tbcl: 4, label: 'TOCFL 進階級（CEFR B1，約 3,245 詞）', band: 3, maxStem: 40,
         ceiling: 'About 3,245 words. Public affairs and general-interest writing, cause and comparison. Up to about forty characters. Newspaper vocabulary is fair; technical jargon is not.',
       },
       {
-        code: 'level4', tbcl: 6, label: 'TOCFL 高階級（CEFR B2，約 4,316 詞）', band: 4, maxStem: 52,
+        code: 'level4', tbcl: 5, label: 'TOCFL 高階級（CEFR B2，約 4,316 詞）', band: 4, maxStem: 52,
         ceiling: 'About 4,316 words. Argument and commentary, weighing positions, written register. Ask for inference and judgement rather than retrieval.',
       },
       {
-        code: 'level5', tbcl: 7, label: 'TOCFL 流利級（CEFR C1，約 5,456 詞）', band: 5, maxStem: 70,
+        code: 'level5', tbcl: 6, label: 'TOCFL 流利級（CEFR C1，約 5,456 詞）', band: 5, maxStem: 70,
         ceiling: 'About 5,456 words. Specialised and academic Chinese, implication, register, ideas carried across a whole text. An item answerable from one sentence is below this level.',
       },
       {

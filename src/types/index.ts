@@ -704,6 +704,10 @@ export type ReadingPassage = {
   title: string | null
   body: string
   source: 'ai' | 'pasted' | 'screenshot'
+  // The passage cut into words, each with its 漢語拼音正詞法 spelling. 拼音 is
+  // written per word — zīliàojiā, not zī liào jiā — so the ruby is grouped by
+  // word rather than by character.
+  words?: Array<{ text: string; pinyin: string }>
   vocabulary: ReadingVocabulary[]
   grammar: ReadingGrammar[]
   listening_clip_id: string | null

@@ -12,6 +12,8 @@ import { ParticipantTeachingContext } from './ParticipantTeachingContext'
 import { participantQuizPayload } from '../lib/participantQuizPayload'
 import { InteractionReadout } from './InteractionReadout'
 import { RevisedWriting } from './RevisedWriting'
+import { HotspotImage } from './HotspotImage'
+import { parsePins } from '../lib/hotspot'
 
 type Props = {
   // What the AI read the question as, and what it thought the answer was.
@@ -147,7 +149,20 @@ export function ParticipantQuestionHistory({ analyses,
                     {question.teaching_mode && teachingCredentials && <ParticipantTeachingContext key={question.id} question={question} {...teachingCredentials} locale={locale} active={false} />}
                     {/* A passage draws its own capture above the text, so
                         showing it here as well is the same picture twice. */}
-                    {screenshot && !passage && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
+                    {screenshot && !passage && question.type !== 'hotspot' && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
+                    {screenshot && question.type === 'hotspot' && answer && (
+                      <div className="participant-hotspot participant-history-hotspot">
+                        <HotspotImage
+                          alt={participantText(locale, 'dispatchedQuestion')}
+                          imageUrl={screenshot.public_url}
+                          pins={parsePins(answer.answer_values).map((pin, pinIndex) => ({
+                            ...pin,
+                            label: String(pinIndex + 1),
+                            own: true,
+                          }))}
+                        />
+                      </div>
+                    )}
                     {passage && (
                       <ReadingPassageView
                         imageUrl={screenshot?.public_url || null}
@@ -251,7 +266,7 @@ export function ParticipantQuestionHistory({ analyses,
                         {audio.analysis_json?.summary && <p>{localizedFields(audio.analysis_json.translations, locale)?.summary || audio.analysis_json.summary}</p>}
                         {audio.transcript && <small>{participantText(locale, 'transcriptLabel')}{audio.transcript}</small>}
                       </div>
-                    ) : answer ? (
+                    ) : answer && question.type !== 'hotspot' ? (
                       <p className="participant-history-answer"><CheckCircle size={17} />{participantText(locale, 'yourAnswerLabel')}<strong>{answerText(question, answer, locale)}</strong></p>
                     ) : null}
                     {/* Sits below what the student handed in, never instead of

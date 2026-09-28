@@ -21,6 +21,8 @@ import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
 import { wordLevel } from './tbcl-levels.generated.ts'
 import { levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
 import { resolveTrack, trackInstruction } from './teaching.ts'
+import { applyRegionalWordPinyin, regionalPronunciationInstruction } from './mandarin-pronunciation.ts'
+import type { MandarinAccent } from './mandarin-pronunciation.ts'
 
 export type ReadingAnnotationGloss = Record<string, string>
 
@@ -206,6 +208,10 @@ export type ReadingInput = {
   levelFramework: string | null
   levelCode: string | null
   levelStretch: number
+  // The same selection drives the visible readings and any recording made
+  // from the passage. Standard Guoyu and Taiwanese share MOE lexical readings;
+  // their spoken cadence remains different in the TTS prompt.
+  accent: MandarinAccent
   // Which languages the annotations are written in. zh-TW and en always, plus
   // whatever this class's students can choose.
   locales: string[]
@@ -400,6 +406,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     input.image
       ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
       : '',
+    regionalPronunciationInstruction(`${input.source}\n${input.direction}`, input.accent),
     ...orthographyRules('body'),
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
@@ -448,7 +455,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   // sentence-ordering chunks are: joining the pieces must give the body back.
   // A list that does not reassemble would put the readings over the wrong
   // words and mark words the passage does not contain.
-  const words = settleWords(output.words, body)
+  const words = applyRegionalWordPinyin(body, settleWords(output.words, body), input.accent)
 
   // 國教院's list decides which of them are new, and a second call says what
   // they mean. Without a usable segmentation there is nothing to judge, so the

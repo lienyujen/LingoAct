@@ -219,6 +219,7 @@ export async function applyReadingAnnotation(input: {
   questionId: string
   mode: Exclude<AnnotationMode, 'none'>
   annotationText: string
+  annotationWords?: ReadingWord[]
 }, t: PresenterT = presenterLookup('zh-TW')) {
   let fontBase64 = ''
   if (input.mode === 'zhuyin') {
@@ -237,6 +238,7 @@ export async function applyReadingAnnotation(input: {
       questionId: input.questionId,
       annotation: input.mode,
       annotationText: input.annotationText,
+      annotationWords: input.mode === 'pinyin' ? input.annotationWords || [] : [],
       fontBase64,
     },
   })

@@ -1,8 +1,10 @@
 import {
   applyRegionalPinyin,
+  applyRegionalWordPinyin,
   pinyinToBopomofo,
   regionalPronunciationInstruction,
 } from './mandarin-pronunciation.ts'
+import { buildVoicePlan } from './listening.ts'
 
 function assertEquals(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -70,4 +72,35 @@ Deno.test('TTS instructions and Bopomofo conversion use the same selected standa
   assertEquals(pinyinToBopomofo('xìng'), 'ㄒㄧㄥˋ')
   assertEquals(pinyinToBopomofo('xíng'), 'ㄒㄧㄥˊ')
   assertEquals(pinyinToBopomofo('fǎ'), 'ㄈㄚˇ')
+})
+
+Deno.test('standalone conjunction 和 follows the selected regional standard in word pinyin', () => {
+  const text = '他希望每天都能和家人朋友在一起玩。'
+  const words = [
+    { text: '他', pinyin: 'Tā' }, { text: '希望', pinyin: 'xīwàng' },
+    { text: '每天', pinyin: 'měitiān' }, { text: '都', pinyin: 'dōu' },
+    { text: '能', pinyin: 'néng' }, { text: '和', pinyin: 'hé' },
+    { text: '家人', pinyin: 'jiārén' }, { text: '朋友', pinyin: 'péngyou' },
+    { text: '在', pinyin: 'zài' }, { text: '一起', pinyin: 'yìqǐ' },
+    { text: '玩', pinyin: 'wán' }, { text: '。', pinyin: '' },
+  ]
+  const picked = (accent: 'standard_guoyu' | 'putonghua' | 'taiwanese') => (
+    applyRegionalWordPinyin(text, words, accent).find((word) => word.text === '和')?.pinyin
+  )
+  assertEquals(picked('standard_guoyu'), 'hàn')
+  assertEquals(picked('taiwanese'), 'hàn')
+  assertEquals(picked('putonghua'), 'hé')
+
+  const compounds = [{ text: '和平', pinyin: 'hépíng' }, { text: '溫和', pinyin: 'wēnhé' }]
+  assertEquals(applyRegionalWordPinyin('和平溫和', compounds, 'standard_guoyu'), compounds)
+})
+
+Deno.test('Taiwan accent keeps MOE readings but has a distinct restrained cadence prompt', () => {
+  const standard = buildVoicePlan('passage', 'zh-tw', 'standard_guoyu', [], [], '我和你').instruction
+  const taiwanese = buildVoicePlan('passage', 'zh-tw', 'taiwanese', [], [], '我和你').instruction
+  const mainland = buildVoicePlan('passage', 'zh-tw', 'putonghua', [], [], '我和你').instruction
+  if (!standard.includes('formal broadcasting in Taiwan') || !standard.includes('hàn')) throw new Error(standard)
+  if (!taiwanese.includes('light, warm Taiwan cadence') || !taiwanese.includes('do not exaggerate') || !taiwanese.includes('hàn')) throw new Error(taiwanese)
+  if (!mainland.includes('Mainland China') || !mainland.includes('hé')) throw new Error(mainland)
+  if (standard === taiwanese) throw new Error('Standard Guoyu and Taiwanese prompts must stay distinct.')
 })

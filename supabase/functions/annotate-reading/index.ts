@@ -1,6 +1,6 @@
 import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
-import { applyRegionalPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
+import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
 import { orthographyRules, settleWords } from '../_shared/reading.ts'
 
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
         'realtime',
       )
       if (result.status !== 'success') throw new Error('AI 標音沒有回應。')
-      const words = settleWords((result.output as { words?: unknown })?.words, text)
+      const words = applyRegionalWordPinyin(text, settleWords((result.output as { words?: unknown })?.words, text), accent)
       if (!words.length) throw new Error('AI 標音的分詞對不上原文。')
       return jsonResponse({ mode, annotationText: '', words })
     }

@@ -359,10 +359,20 @@ export function PresenterPage() {
       return counts
     }, {}))
 
+    // A dispatch changes the class's current question. Keep a history selection
+    // only while that current id has not changed; otherwise the old selection
+    // made a freshly dispatched activity look as if it never arrived until the
+    // teacher visited 課堂紀錄 and came back.
+    const newlyActivatedId = nextSession?.current_question_id
+      && nextSession.current_question_id !== previousActivity.current
+      ? nextSession.current_question_id
+      : null
     const selectedStillExists = selectedQuestionId && nextQuestions.some((item) => item.id === selectedQuestionId)
-    const targetQuestionId = selectedStillExists
-      ? selectedQuestionId
-      : nextSession?.current_question_id || nextQuestions.at(-1)?.id || null
+    const targetQuestionId = newlyActivatedId
+      || (selectedStillExists ? selectedQuestionId : null)
+      || nextSession?.current_question_id
+      || nextQuestions.at(-1)?.id
+      || null
 
     if (targetQuestionId) {
       const [{ data: questionData }, { data: answerData }, { data: summaryData }, { data: wallData }] = await Promise.all([
@@ -2307,7 +2317,13 @@ export function PresenterPage() {
         presenterToken={getPresenterToken(sessionId) || ''}
         sessionId={sessionId}
         onClose={() => { setReadingOpen(false); setReadingCapture(null) }}
-        onDispatched={() => { setReadingOpen(false); setReadingCapture(null); void loadAll() }}
+        onDispatched={(questionId) => {
+          setReadingOpen(false)
+          setReadingCapture(null)
+          setSelectedQuestionId(questionId)
+          setWorkspaceView('current')
+          void loadAll()
+        }}
       />
 
       <QuestionEditor

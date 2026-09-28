@@ -139,6 +139,11 @@ const CHARACTER_RULES: RuleSpec[] = [
 // A polyphonic contrast is meaning-dependent and must remain phrase-scoped.
 const POLYPHONE_RULES: RuleSpec[] = [
   rule('我和你', 1, 'hàn', 'hé'), rule('攪和', 1, 'huò', 'huo'),
+  // 和 used on its own as 「and / with」 is hàn in Taiwan Guoyu and hé in
+  // Mainland Putonghua. These right-hand contexts make the deterministic
+  // character override safe; the word-level pass below covers every other
+  // standalone conjunction without changing 和平、溫和 or 和麵.
+  rule('和家人|和朋友|和同學|和同事|和老師|和學生|和大家|和我們|和你們|和他們|和她們', 0, 'hàn', 'hé'),
   rule('和麵|和面', 0, 'huò', 'huó'), rule('傍晚', 0, 'bāng', 'bàng'),
   rule('嘵咋|晓咋', 1, 'zhà', 'zǎ'), rule('咋呼', 0, 'zé', 'zhā'),
   rule('勝任|胜任', 0, 'shēng', 'shèng'), rule('老撾|老挝', 1, 'zhuā', 'wō'),
@@ -168,8 +173,8 @@ export function usesMainlandStandard(accent: MandarinAccent | null) {
 
 export function regionalStandardInstruction(accent: MandarinAccent | null) {
   return usesMainlandStandard(accent)
-    ? 'Use the official Mainland China Putonghua dictionary reading of every word, including region-specific initials, finals, tones, neutral tones and polyphonic-word choices. Do not substitute Taiwan Guoyu readings.'
-    : 'Use the official Taiwan Ministry of Education Guoyu dictionary reading of every word, including region-specific initials, finals, tones and polyphonic-word choices. Do not substitute Mainland Putonghua readings.'
+    ? 'Use the official Mainland China Putonghua dictionary reading of every word, including region-specific initials, finals, tones, neutral tones and polyphonic-word choices. When 和 is a standalone conjunction or preposition meaning “and / with”, pronounce it hé. Do not substitute Taiwan Guoyu readings.'
+    : 'Use the official Taiwan Ministry of Education Guoyu dictionary reading of every word, including region-specific initials, finals, tones and polyphonic-word choices. When 和 is a standalone conjunction or preposition meaning 「and / with」, pronounce it hàn. Do not substitute Mainland Putonghua readings.'
 }
 
 function matchingRules(text: string, accent: MandarinAccent | null) {
@@ -216,6 +221,63 @@ export function applyRegionalPinyin(text: string, syllables: string[], accent: M
     }
   }
   return output
+}
+
+// 正詞法 output already tells us where a word begins and ends. That makes the
+// regional reading of standalone 和 deterministic without guessing from the
+// neighbouring characters: 和 is one word when it means and/with, but part of
+// 和平、溫和、和尚 or 和麵 in its other senses.
+export function applyRegionalWordPinyin<T extends { text: string; pinyin: string }>(text: string, words: T[], accent: MandarinAccent | null): T[] {
+  const mainland = usesMainlandStandard(accent)
+  const targets = new Map<number, { wanted: string; alternatives: string[] }>()
+  for (const entry of matchingRules(text, accent)) {
+    let from = 0
+    while (from <= text.length) {
+      const found = text.indexOf(entry.term, from)
+      if (found < 0) break
+      const start = [...text.slice(0, found)].length
+      for (const offset of entry.offsets) {
+        targets.set(start + offset, {
+          wanted: mainland ? entry.mainland : entry.taiwan,
+          alternatives: [entry.taiwan, entry.mainland],
+        })
+      }
+      from = found + entry.term.length
+    }
+  }
+
+  let cursor = 0
+  return words.map((word) => {
+    const length = [...word.text].length
+    let pinyin = word.pinyin
+    // Segmentation settles the ambiguous conjunction without guessing: 和 is
+    // one word here, while the same character in 和平 or 溫和 is not.
+    if (word.text === '和') {
+      const wanted = mainland ? 'hé' : 'hàn'
+      targets.set(cursor, { wanted, alternatives: ['hàn', 'hé'] })
+    }
+    for (let at = cursor; at < cursor + length; at += 1) {
+      const target = targets.get(at)
+      if (!target) continue
+      const lowered = pinyin.toLocaleLowerCase()
+      const found = target.alternatives
+        .map((candidate) => ({ candidate, at: lowered.indexOf(candidate.toLocaleLowerCase()) }))
+        .find((candidate) => candidate.at >= 0)
+      if (found) {
+        const original = pinyin.slice(found.at, found.at + found.candidate.length)
+        const wanted = /^[A-Z]/.test(original)
+          ? target.wanted.charAt(0).toUpperCase() + target.wanted.slice(1)
+          : target.wanted
+        pinyin = `${pinyin.slice(0, found.at)}${wanted}${pinyin.slice(found.at + found.candidate.length)}`
+      } else if (length === 1) {
+        pinyin = /^[A-Z]/.test(pinyin)
+          ? target.wanted.charAt(0).toUpperCase() + target.wanted.slice(1)
+          : target.wanted
+      }
+    }
+    cursor += length
+    return pinyin === word.pinyin ? word : { ...word, pinyin }
+  })
 }
 
 export function regionalPinyinOverrides(text: string, accent: MandarinAccent | null) {

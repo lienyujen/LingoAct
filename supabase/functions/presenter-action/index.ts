@@ -1750,12 +1750,13 @@ Deno.serve(async (req) => {
           .select('teaching_language').eq('id', sessionId).maybeSingle()
         await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
       }
-      const [{ data: items, error: itemError }, { data: attempts, error: attemptError }, { data: question, error: questionError }] = await Promise.all([
+      const [{ data: items, error: itemError }, { data: attempts, error: attemptError }, { data: question, error: questionError }, { data: readingPassage, error: passageError }] = await Promise.all([
         supabase.from('quiz_items').select('*').eq('quiz_id', quiz.id).order('position'),
         supabase.from('quiz_attempts').select('*').eq('quiz_id', quiz.id).order('submitted_at'),
-        supabase.from('questions').select('screenshot_id').eq('id', questionId).eq('session_id', sessionId).single(),
+        supabase.from('questions').select('screenshot_id, share_screenshot, karaoke_cues').eq('id', questionId).eq('session_id', sessionId).single(),
+        supabase.from('reading_passages').select('*').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle(),
       ])
-      if (itemError || attemptError || questionError) throw itemError || attemptError || questionError
+      if (itemError || attemptError || questionError || passageError) throw itemError || attemptError || questionError || passageError
       const itemIds = (items || []).map((item) => item.id)
       const attemptIds = (attempts || []).map((attempt) => attempt.id)
       const [{ data: keys, error: keyError }, { data: answers, error: answerError }, { data: screenshot, error: screenshotError }, { data: tries }] = await Promise.all([
@@ -1779,6 +1780,12 @@ Deno.serve(async (req) => {
           .select('id, item_id, participant_id, round, draft, reply, created_at')
           .eq('question_id', questionId).order('created_at')
         : { data: [] }
+      const { data: readingClip, error: readingClipError } = readingPassage?.listening_clip_id
+        ? await supabase.from('listening_clips')
+          .select('id, session_id, kind, language, duration_ms, public_url, created_at')
+          .eq('id', readingPassage.listening_clip_id).eq('session_id', sessionId).maybeSingle()
+        : { data: null, error: null }
+      if (readingClipError) throw readingClipError
       return jsonResponse({
         quiz,
         items: items || [],
@@ -1788,6 +1795,10 @@ Deno.serve(async (req) => {
         tries: tries || [],
         coachTurns: coachTurns || [],
         screenshot: screenshot || null,
+        readingPassage: readingPassage || null,
+        readingClip: readingClip || null,
+        readingCues: Array.isArray(question.karaoke_cues) ? question.karaoke_cues : [],
+        readingImageUrl: readingPassage && question.share_screenshot ? screenshot?.public_url || null : null,
       })
     }
 
@@ -2950,7 +2961,7 @@ Deno.serve(async (req) => {
       }
 
       const { data: passageRow } = await supabase.from('reading_passages')
-        .select('id').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
+        .select('id, body').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
       if (!passageRow) return jsonResponse({ message: '找不到這篇文章。' }, 404)
 
       let fontUrl: string | null = null
@@ -2968,12 +2979,20 @@ Deno.serve(async (req) => {
         fontUrl = publicUrl.publicUrl
       }
 
+      const passageUpdate: Record<string, unknown> = {
+        annotation,
+        annotation_text: annotation === 'none' ? null : annotationText,
+        font_url: fontUrl,
+      }
+      if (annotation === 'pinyin') {
+        const annotationWords = settleWords(input.annotationWords, String(passageRow.body || ''))
+        // Keep the generator's usable segmentation if an annotation response
+        // was malformed. Emptying it would remove every new-word reading from
+        // a passage that had already gone out successfully.
+        if (annotationWords.length) passageUpdate.words = annotationWords
+      }
       const { data: updated, error: updateError } = await supabase.from('reading_passages')
-        .update({
-          annotation,
-          annotation_text: annotation === 'none' ? null : annotationText,
-          font_url: fontUrl,
-        })
+        .update(passageUpdate)
         .eq('id', passageRow.id)
         .select('*')
         .single()
@@ -3019,6 +3038,9 @@ Deno.serve(async (req) => {
       // Already at the right level: store it as written and make no rewrite
       // call at all.
       const verbatim = input.verbatim === true
+      const accent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+        ? input.accent as 'standard_guoyu' | 'putonghua' | 'taiwanese'
+        : 'standard_guoyu'
 
       // A capture is material on its own, so it satisfies this the way pasted
       // text does.
@@ -3096,6 +3118,7 @@ Deno.serve(async (req) => {
         levelFramework: classRow?.level_framework ?? null,
         levelCode: classRow?.level_code ?? null,
         levelStretch,
+        accent,
         locales,
       })
       if (!passage) return jsonResponse({ message: '文章生成失敗，請再試一次。' }, 502)

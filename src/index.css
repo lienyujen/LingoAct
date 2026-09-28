@@ -2275,6 +2275,29 @@ h2 {
   padding: 18px;
 }
 
+/* A reading quiz is built around its passage, not around the questions and not
+   around the capture the passage happened to come from. The teacher gets the
+   same interactive reader as the class, with three quarters of the workspace;
+   the answer editor remains visible beside it without competing for width. */
+.custom-quiz-review-content.has-reading,
+.custom-quiz-native-content.has-reading {
+  grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);
+}
+
+.custom-quiz-reading-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.custom-quiz-reading-panel .reading-passage {
+  border: 0;
+  padding: 0;
+}
+
 .writing-review-native > aside {
   display: flex;
   flex-direction: column;
@@ -4421,6 +4444,11 @@ h2 {
   .custom-quiz-native-content {
     grid-template-columns: 1fr;
     overflow: auto;
+  }
+
+  .custom-quiz-review-content.has-reading,
+  .custom-quiz-native-content.has-reading {
+    grid-template-columns: 1fr;
   }
 
   .custom-quiz-source-panel,

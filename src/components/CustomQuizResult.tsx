@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sparkle, Square, Trash, X } from '@phosphor-icons/react'
 import type { PresenterQuizResults, Question, QuizItemAnswer, WritingReviewSaveInput } from '../types'
-import { usePresenterText } from '../lib/presenterI18n'
+import { usePresenterLocale, usePresenterText } from '../lib/presenterI18n'
 import { RevisedWriting } from './RevisedWriting'
 import { QuestionActivityStatus } from './QuestionActivityStatus'
 import { InteractionResults } from './InteractionResults'
+import { ListeningPlayer } from './ListeningPlayer'
+import { ReadingPassageView } from './ReadingPassageView'
 
 type Props = {
   anonymousEnabled: boolean
@@ -132,7 +134,9 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
 
 export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onSaveWritingReview, onEditDeck, onActivateQuestion, onStopQuestion, onResumeQuestion }: Props) {
   const t = usePresenterText()
+  const locale = usePresenterLocale()
   const [expanded, setExpanded] = useState(false)
+  const [readingCue, setReadingCue] = useState(-1)
   const [toggling, setToggling] = useState(false)
   const [busyItemId, setBusyItemId] = useState('')
   const [reviewingId, setReviewingId] = useState('')
@@ -664,13 +668,34 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                   {!selectedAttemptId && <p className="muted">{t('noAnswersYet')}</p>}
                 </main>
               </div>
-            ) : <div className={`custom-quiz-review-content${results.screenshot ? '' : ' is-single'}`}>
-              {results.screenshot && (
+            ) : <div className={`custom-quiz-review-content${results.readingPassage ? ' has-reading' : results.screenshot ? '' : ' is-single'}`}>
+              {results.readingPassage ? (
+                <aside className="custom-quiz-reading-panel">
+                  <ReadingPassageView
+                    activeCue={readingCue}
+                    cues={results.readingCues}
+                    imageUrl={results.readingImageUrl}
+                    locale={locale}
+                    passage={results.readingPassage}
+                    player={results.readingClip ? (
+                      <ListeningPlayer
+                        clip={results.readingClip}
+                        karaokeCues={results.readingCues}
+                        locale={locale}
+                        questionId={question.id}
+                        replayLimit={null}
+                        variant="inline"
+                        onActiveCue={setReadingCue}
+                      />
+                    ) : null}
+                  />
+                </aside>
+              ) : results.screenshot ? (
                 <aside className="custom-quiz-source-panel">
                   <h3>{t('sourceScreenshot')}</h3>
                   <img alt={t('sourceScreenshotAlt')} src={results.screenshot.public_url} />
                 </aside>
-              )}
+              ) : null}
               <div className="custom-quiz-question-panel">
                 <h3>{writing ? t('writingFields') : t('questionsAndAnswers')}</h3>
                 {!writing && (

@@ -56,7 +56,7 @@ function accentFor(language: string, accent: ChineseAccent | null) {
       return 'standard Putonghua (普通話) as defined and taught in Mainland China, with neutral standard pronunciation, accurate retroflex initials and erhua only where standard Putonghua calls for it; do not use Taiwanese Mandarin pronunciation or vocabulary'
     }
     if (accent === 'taiwanese') {
-      return 'natural Taiwanese Mandarin as spoken in Taiwan, with recognisably Taiwanese pronunciation, phrasing and intonation'
+      return 'natural contemporary Taiwanese Mandarin as spoken in Taiwan, with a light, warm Taiwan cadence and phrasing while keeping official Taiwan Ministry of Education lexical readings and tones; do not exaggerate the accent, imitate Taiwanese Hokkien, use slang, or turn it into a caricature'
     }
     return 'Standard Guoyu (標準國語) as taught and used in formal broadcasting in Taiwan, with neutral careful diction and accurate tones; avoid strongly local Taiwanese Mandarin pronunciation, slang or exaggerated Taiwan-style intonation'
   }

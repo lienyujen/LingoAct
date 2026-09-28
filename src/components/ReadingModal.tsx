@@ -22,7 +22,7 @@ type Props = {
   // property of the class, not of one activity, so it is not asked again here.
   annotation?: AnnotationMode
   onClose: () => void
-  onDispatched: () => void
+  onDispatched: (questionId: string) => void
 }
 
 type Accent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
@@ -190,6 +190,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           shareScreenshot: shareShot,
           useImage,
           verbatim,
+          accent,
           clipId,
         },
       })
@@ -249,6 +250,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
             questionId: writtenQuestionId,
             mode: annotation,
             annotationText: marked.annotationText,
+            annotationWords: marked.words,
           }, t)
         } catch (caught) {
           warnings.push(caught instanceof Error && caught.message ? t('readingAnnotateFailedWith', { message: caught.message }) : t('readingAnnotateFailed'))
@@ -257,7 +259,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
       writeSettings({ stretch, withQuiz, quizCount, focus, withAudio, accent, useImage, shareShot, verbatim })
       if (warnings.length) { setError(warnings.join(' ')); return }
-      onDispatched()
+      onDispatched(writtenQuestionId)
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : t('readingFailed'))
     } finally {

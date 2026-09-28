@@ -603,6 +603,12 @@ export type PresenterQuizResults = ParticipantQuizData & {
   coachTurns: WritingCoachTurn[]
   keys: Array<{ item_id: string; accepted_answers: string[]; rubric: string }>
   screenshot: Screenshot | null
+  // 閱讀測驗的文章才是題目的正文。教師放大檢視拿到和學生端同一列，
+  // 包括詞彙、語法、標音與朗讀音檔，而不是退回去看產生文章前的截圖。
+  readingPassage: ReadingPassage | null
+  readingClip: ListeningClip | null
+  readingCues: KaraokeCue[]
+  readingImageUrl: string | null
 }
 
 export type SessionCustomQuizResults = {

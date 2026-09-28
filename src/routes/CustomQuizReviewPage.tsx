@@ -3,6 +3,8 @@ import { Brain, CaretLeft, CaretRight, CircleNotch, FloppyDisk, Sparkle, X } fro
 import { useParams } from 'react-router-dom'
 import { QuizAnswerEditor } from '../components/CustomQuizResult'
 import { InteractionResults } from '../components/InteractionResults'
+import { ListeningPlayer } from '../components/ListeningPlayer'
+import { ReadingPassageView } from '../components/ReadingPassageView'
 import type { QuizReviewProps } from '../components/CustomQuizResult'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { PresenterLocaleContext, presenterLookup, storedPresenterLocale } from '../lib/presenterI18n'
@@ -59,6 +61,7 @@ export function CustomQuizReviewPage() {
   const [writingDraft, setWritingDraft] = useState<WritingReviewDraft | null>(null)
   const [writingBusy, setWritingBusy] = useState<'ai' | 'save' | ''>('')
   const [saved, setSaved] = useState(false)
+  const [readingCue, setReadingCue] = useState(-1)
   const [error, setError] = useState('')
 
   const loadQuiz = useCallback(async (): Promise<PresenterQuizResults | null> => {
@@ -316,8 +319,29 @@ export function CustomQuizReviewPage() {
             </section>
           </div>
         ) : results && reviewProps ? (
-          <div className={`custom-quiz-native-content${results.screenshot ? '' : ' is-single'}`}>
-            {results.screenshot && <aside className="custom-quiz-source-panel"><h2>{t('sourceScreenshot')}</h2><img alt={t('sourceScreenshotAlt')} src={results.screenshot.public_url} /></aside>}
+          <div className={`custom-quiz-native-content${results.readingPassage ? ' has-reading' : results.screenshot ? '' : ' is-single'}`}>
+            {results.readingPassage ? (
+              <aside className="custom-quiz-reading-panel">
+                <ReadingPassageView
+                  activeCue={readingCue}
+                  cues={results.readingCues}
+                  imageUrl={results.readingImageUrl}
+                  locale={locale}
+                  passage={results.readingPassage}
+                  player={results.readingClip ? (
+                    <ListeningPlayer
+                      clip={results.readingClip}
+                      karaokeCues={results.readingCues}
+                      locale={locale}
+                      questionId={questionId}
+                      replayLimit={null}
+                      variant="inline"
+                      onActiveCue={setReadingCue}
+                    />
+                  ) : null}
+                />
+              </aside>
+            ) : results.screenshot ? <aside className="custom-quiz-source-panel"><h2>{t('sourceScreenshot')}</h2><img alt={t('sourceScreenshotAlt')} src={results.screenshot.public_url} /></aside> : null}
             <section className="custom-quiz-question-panel">
               <h2>{t('questionsAndAnswers')}</h2>
               <label className="show-answers-toggle"><input checked={showAnswers} type="checkbox" onChange={(event) => setShowAnswers(event.target.checked)} />{t('showAnswersToggle')}</label>

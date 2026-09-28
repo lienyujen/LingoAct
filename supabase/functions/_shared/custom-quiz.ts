@@ -542,9 +542,9 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts').select('*').eq('id', attemptId).single()
     if (attemptError || !attempt) throw attemptError || new Error('Quiz attempt not found.')
 
-    // 寫作教練 hands the writing straight back to the teacher. Marking it would
-    // be the most expensive call this app makes, and it is not what was asked
-    // for — so the attempt is simply complete, with no score to report.
+    // 寫作教練 hands the writing back before spending an AI call. The teacher
+    // can then ask for marking or mark it themselves; submission itself stays
+    // cheap and ends in `submitted` until that later review is saved.
     const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type, interaction_mode').eq('id', attempt.quiz_id).single()
     if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
     if (quiz.graded === false) {

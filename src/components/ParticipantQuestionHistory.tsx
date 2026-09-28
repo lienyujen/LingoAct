@@ -11,6 +11,7 @@ import { ListeningPlayer } from './ListeningPlayer'
 import { ParticipantTeachingContext } from './ParticipantTeachingContext'
 import { participantQuizPayload } from '../lib/participantQuizPayload'
 import { InteractionReadout } from './InteractionReadout'
+import { RevisedWriting } from './RevisedWriting'
 
 type Props = {
   // What the AI read the question as, and what it thought the answer was.
@@ -85,11 +86,17 @@ export function ParticipantQuestionHistory({ analyses,
     const visible = defaultExpandAll ? history : history.slice(0, 1)
     setOpenIds(new Set(visible.map((question) => question.id)))
     for (const question of visible) {
+      // A teacher edit invalidates this entry in ParticipantPage. Let that
+      // missing value through even if this question was loaded before, so the
+      // corrected article and comments arrive without a student reload.
+      if (question.type === 'custom_quiz' && quizData[question.id] === undefined) {
+        requestedDetails.current.delete(question.id)
+      }
       if (requestedDetails.current.has(question.id)) continue
       requestedDetails.current.add(question.id)
       void onLoadDetails(question)
     }
-  }, [defaultExpandAll, history, newestId, onLoadDetails])
+  }, [defaultExpandAll, history, newestId, onLoadDetails, quizData])
 
   if (!history.length) return null
 
@@ -123,6 +130,10 @@ export function ParticipantQuestionHistory({ analyses,
             const audio = audioResponses[question.id]
             const listeningClip = listeningClips[question.id]
             const quiz = participantQuizPayload(quizData[question.id], question.id)
+            const writingQuiz = Boolean(quiz && quiz.quiz.graded === false
+              && quiz.quiz.requested_type !== 'flashcard'
+              && quiz.quiz.requested_type !== 'picture_writing'
+              && !quiz.quiz.interaction_mode)
             const loading = loadingQuestionIds.has(question.id)
             return (
               <article className="participant-history-item" key={question.id}>
@@ -190,7 +201,26 @@ export function ParticipantQuestionHistory({ analyses,
                       />
                     ) : question.type === 'custom_quiz' && quiz?.attempt ? (
                       <div className="participant-history-quiz">
-                        <p><CheckCircle size={17} />{quiz.quiz.interaction_mode && !quiz.quiz.graded ? participantText(locale, 'submittedAnswer') : <>{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score}</>}</p>
+                        <p><CheckCircle size={17} />{quiz.quiz.interaction_mode && !quiz.quiz.graded ? participantText(locale, 'submittedAnswer') : writingQuiz && quiz.attempt.total_score === null ? participantText(locale, 'writingSubmitted') : <>{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score ?? 100}</>}</p>
+                        {writingQuiz && quiz.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(quiz.attempt.feedback, locale)}</p>}
+                        {writingQuiz && quiz.attempt.composition && (
+                          <article className="quiz-graded-item writing-composition-result">
+                            <div><strong>{participantText(locale, 'composeHeading')}</strong></div>
+                            {quiz.attempt.revision?.zh_tw ? (
+                              <RevisedWriting
+                                labels={{
+                                  added: participantText(locale, 'revisionAdded'),
+                                  removed: participantText(locale, 'revisionRemoved'),
+                                  unchanged: participantText(locale, 'revisionUnchanged'),
+                                  notesHeading: participantText(locale, 'revisionNotes'),
+                                }}
+                                notes={quiz.attempt.revision.notes}
+                                original={quiz.attempt.composition}
+                                revised={quiz.attempt.revision.zh_tw}
+                              />
+                            ) : <p className="quiz-written-back">{quiz.attempt.composition}</p>}
+                          </article>
+                        )}
                         {quiz.items.map((item, itemIndex) => {
                           const response = quiz.answers.find((entry) => entry.item_id === item.id)
                           const prompt = localizedFields(item.translations, locale)?.prompt_text || item.prompt_text

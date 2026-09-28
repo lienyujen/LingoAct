@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sparkle, Square, Trash, X } from '@phosphor-icons/react'
-import type { PresenterQuizResults, Question, QuizItemAnswer } from '../types'
+import type { PresenterQuizResults, Question, QuizItemAnswer, WritingReviewSaveInput } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 import { RevisedWriting } from './RevisedWriting'
 import { QuestionActivityStatus } from './QuestionActivityStatus'
@@ -18,12 +18,7 @@ type Props = {
   onReviewWriting: (attemptId: string, force: boolean) => Promise<void>
   // The teacher's final word on the mark and feedback, whether or not they
   // asked the AI to take a first pass.
-  onSaveWritingReview: (input: {
-    attemptId: string
-    score: number | null
-    overall: string
-    fields: Array<{ itemId: string; text: string }>
-  }) => Promise<void>
+  onSaveWritingReview: (input: WritingReviewSaveInput) => Promise<void>
   // 單字卡 only: drop a card, or ask for more from the same screenshot.
   onEditDeck: (input: { removeItemId?: string; addCount?: number }) => Promise<void>
   onActivateQuestion: (questionId: string) => Promise<void>
@@ -284,8 +279,8 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   function roundsFor(participantId: string) {
     return coachTurns.filter((turn) => turn.participant_id === participantId).length
   }
-  // 寫作教練 and a deck are both ungraded, but for different reasons and with
-  // different things worth showing, so they are not one branch.
+  // 寫作教練 and a deck both begin with graded=false, but only the writing can
+  // receive a later whole-piece mark. They therefore stay separate branches.
   const writing = results.quiz.graded === false && !flashcard && !pictureWriting && !results.quiz.interaction_mode
   const graded = results.attempts.filter((attempt) => attempt.status === 'graded')
   const grading = results.attempts.filter((attempt) => attempt.status === 'grading')

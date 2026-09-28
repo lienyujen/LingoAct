@@ -54,7 +54,7 @@ import { SOURCE_CAPTION_LANGUAGE, resolvedCaptionLanguage } from '../lib/caption
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useStandingsBroadcast } from '../lib/standings'
 import { useSessionPresence } from '../lib/useSessionPresence'
-import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, FileResponse, SharedFile, LotterySessionEvent, Participant, PresenterQuizResults, Question, QuestionAnalysis, Session, SessionEvent } from '../types'
+import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, FileResponse, SharedFile, LotterySessionEvent, Participant, PresenterQuizResults, Question, QuestionAnalysis, Session, SessionEvent, WritingReviewSaveInput } from '../types'
 import { useParams } from 'react-router-dom'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -1466,12 +1466,7 @@ export function PresenterPage() {
     await loadAll()
   }
 
-  async function saveWritingReview(input: {
-    attemptId: string
-    score: number | null
-    overall: string
-    fields: Array<{ itemId: string; text: string }>
-  }) {
+  async function saveWritingReview(input: WritingReviewSaveInput) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {

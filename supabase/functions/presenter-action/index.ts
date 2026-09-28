@@ -1429,21 +1429,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ answers: refreshed || [], overall: review.overall, revision: review.revision, score: review.score, maxScore: 100 })
     }
 
-    // The teacher's own marking of a piece of writing, which overwrites
-    // whatever is there — the AI's, or an earlier pass of their own. It is
-    // also how a piece gets marked at all when the teacher never ran the AI.
-    //
-    // The corrected article is deliberately NOT editable. The learner reads it
-    // against their own text with the differences marked, so every word of it
-    // is presented to them as something they got wrong; a teacher rewriting it
-    // by hand would change that comparison in ways neither of them can see.
-    // What the teacher wants to say goes in the overall comment, which is
-    // theirs to write freely.
+    // The teacher's final version of a piece of writing and its marking. The AI
+    // is a first pass: every field, the joined article, the revision, comments
+    // and score remain the teacher's to correct before they send it back.
     if (action === 'save_writing_review') {
       const attemptId = input.attemptId
       if (!validUuid(attemptId)) return jsonResponse({ message: '作答資料不正確。' }, 400)
       const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts')
-        .select('id, quiz_id, participant_id, question_id').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
+        .select('id, quiz_id, participant_id, question_id, composition, revision').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
       if (attemptError) throw attemptError
       if (!attempt) return jsonResponse({ message: '找不到這份作答。' }, 404)
 
@@ -1466,29 +1459,51 @@ Deno.serve(async (req) => {
       // original text, which the teacher has just overruled.
       const overallFeedback = overall ? { zh_tw: overall, en: overall } : null
 
-      const { error: attemptWriteError } = await supabase.from('quiz_attempts').update({
+      const attemptValues: Record<string, unknown> = {
         total_score: totalScore,
         max_score: totalScore === null ? null : 100,
         feedback: overallFeedback,
-      }).eq('id', attemptId)
+      }
+      if (Object.prototype.hasOwnProperty.call(input, 'composition')) {
+        const composition = typeof input.composition === 'string' ? input.composition.trim().slice(0, 12000) : ''
+        attemptValues.composition = composition || null
+      }
+      if (Object.prototype.hasOwnProperty.call(input, 'revision')) {
+        const revision = typeof input.revision === 'string' ? input.revision.trim().slice(0, 12000) : ''
+        const oldRevision = attempt.revision as { zh_tw?: unknown; notes?: unknown } | null
+        // Notes describe exact before/after fragments. Keep them only while the
+        // revised article itself is unchanged; otherwise they would explain a
+        // version the learner is no longer looking at.
+        const notes = oldRevision?.zh_tw === revision && Array.isArray(oldRevision?.notes) ? oldRevision.notes : []
+        attemptValues.revision = revision ? { zh_tw: revision, notes } : null
+      }
+
+      const { error: attemptWriteError } = await supabase.from('quiz_attempts').update(attemptValues).eq('id', attemptId)
       if (attemptWriteError) throw attemptWriteError
 
       const fields = Array.isArray(input.fields) ? input.fields : []
       for (const raw of fields.slice(0, 50)) {
-        const field = raw as { itemId?: unknown; text?: unknown }
+        const field = raw as { itemId?: unknown; text?: unknown; answerText?: unknown }
         if (typeof field.itemId !== 'string' || !validUuid(field.itemId)) continue
         const text = typeof field.text === 'string' ? field.text.trim().slice(0, 2000) : ''
+        const values: Record<string, unknown> = { feedback: text ? { zh_tw: text, en: text } : null }
+        if (Object.prototype.hasOwnProperty.call(field, 'answerText')) {
+          const answerText = typeof field.answerText === 'string' ? field.answerText.trim().slice(0, 4000) : ''
+          values.answer_text = answerText || null
+        }
         const { error } = await supabase.from('quiz_item_answers')
-          .update({ feedback: text ? { zh_tw: text, en: text } : null })
+          .update(values)
           .eq('attempt_id', attemptId).eq('item_id', field.itemId)
         if (error) throw error
       }
 
       await touchWritingAnswer(supabase, attempt.question_id as string, attempt.participant_id as string)
 
-      const { data: saved } = await supabase.from('quiz_attempts')
-        .select('id, total_score, max_score, feedback').eq('id', attemptId).maybeSingle()
-      return jsonResponse({ attempt: saved })
+      const [{ data: saved }, { data: savedAnswers }] = await Promise.all([
+        supabase.from('quiz_attempts').select('*').eq('id', attemptId).maybeSingle(),
+        supabase.from('quiz_item_answers').select('*').eq('attempt_id', attemptId),
+      ])
+      return jsonResponse({ attempt: saved, answers: savedAnswers || [] })
     }
 
     // 單字卡 標音. The readings arrive already chosen and the font already cut:

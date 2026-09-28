@@ -451,8 +451,8 @@ export type Quiz = {
   direction: string
   requested_count: number | null
   requested_type: QuizRequestedType
-  // False for 寫作教練. The results view reads this to know whether a missing
-  // score means 'still marking' or 'nothing to mark'.
+  // False for modes that are not automatically item-scored. 寫作教練 can still
+  // receive a later whole-piece score from AI or the teacher.
   graded: boolean
   // 寫作教練 only: whether students may take a draft to the coach before sending.
   coaching?: boolean
@@ -495,8 +495,8 @@ export type QuizItem = {
   created_at: string
 }
 
-// 'submitted' is where an ungraded attempt ends: received, with no score to
-// wait for and none coming.
+// 'submitted' is where a non-item-scored attempt rests. A writing attempt stays
+// there while a later whole-piece review adds or changes its score.
 export type QuizAttemptStatus = 'grading' | 'graded' | 'submitted' | 'failed'
 
 export type QuizAttempt = {
@@ -534,6 +534,22 @@ export type QuizItemAnswer = {
   score: number | null
   feedback: { zh_tw?: string; en?: string } | null
   created_at: string
+}
+
+// The teacher's final version of a writing review. The enlarged review window
+// edits the learner's draft as well as the marking, while the compact panel may
+// send only feedback; optional text fields keep both routes on one endpoint.
+export type WritingReviewSaveInput = {
+  attemptId: string
+  score: number | null
+  overall: string
+  composition?: string
+  revision?: string
+  fields: Array<{
+    itemId: string
+    text: string
+    answerText?: string
+  }>
 }
 
 // One round with 寫作教練: the draft the student showed and what the coach asked

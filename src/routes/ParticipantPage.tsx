@@ -487,7 +487,23 @@ export function ParticipantPage() {
       .channel(`participant:${sessionId}:${participantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, (payload) => {
+        // save_writing_review touches the ordinary answer row to wake this
+        // page. Drop only that history cache entry so its full quiz payload —
+        // article, revision, comments and score — is fetched again.
+        const changed = ((payload.new as { question_id?: string } | null)?.question_id
+          || (payload.old as { question_id?: string } | null)?.question_id
+          || '')
+        if (changed) {
+          setHistoryQuizData((current) => {
+            if (!(changed in current)) return current
+            const next = { ...current }
+            delete next[changed]
+            return next
+          })
+        }
+        scheduleLoad()
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       // The readings and the audio are put on the passage a few seconds after
       // it is dispatched, so a student already looking at it has to be told.

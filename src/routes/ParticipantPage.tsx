@@ -78,6 +78,10 @@ export function ParticipantPage() {
   const [historyQuestions, setHistoryQuestions] = useState<Question[]>([])
   const [historyAnswers, setHistoryAnswers] = useState<Answer[]>([])
   const [historyScreenshots, setHistoryScreenshots] = useState<Record<string, Screenshot>>({})
+  // The passages the class has already read, kept by question. A reading is
+  // the one activity whose value outlasts the answer: the article, the new
+  // words and the grammar notes are what a student goes back to afterwards.
+  const [historyPassages, setHistoryPassages] = useState<Record<string, ReadingPassageRow>>({})
   const [historyListeningClips, setHistoryListeningClips] = useState<Record<string, ListeningClip | null>>({})
   const [historyAudioResponses, setHistoryAudioResponses] = useState<Record<string, AudioResponse | null>>({})
   const [historyQuizData, setHistoryQuizData] = useState<Record<string, ParticipantQuizData | null>>({})
@@ -207,11 +211,36 @@ export function ParticipantPage() {
     for (const item of (allQuestions || []) as Question[]) {
       if (item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
     }
+    // A passage is course material, not a submission. An article sent to be
+    // read produces no answer row at all, and a reading quiz keeps only its
+    // score — so without this the text and its vocabulary vanish the moment
+    // the teacher moves on, which is exactly what a student wants back.
+    const dispatchedIds = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft').map((item) => item.id)
+    const passagesByQuestion: Record<string, ReadingPassageRow> = {}
+    if (dispatchedIds.length) {
+      const { data: historyPassageData } = await supabase
+        .from('reading_passages').select('*').in('question_id', dispatchedIds)
+      if (requestId !== loadSequence.current) return
+      for (const row of (historyPassageData || []) as ReadingPassageRow[]) {
+        passagesByQuestion[row.question_id] = row
+        answeredQuestionIds.add(row.question_id)
+      }
+    }
+    setHistoryPassages(passagesByQuestion)
+
     const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft' && answeredQuestionIds.has(item.id))
     setHistoryAnswers(participantAnswers)
     setHistoryQuestions(answeredQuestions)
 
-    const screenshotIds = [...new Set(answeredQuestions.map((item) => item.screenshot_id).filter((id): id is string => Boolean(id)))]
+    // share_screenshot is the teacher's decision about whether the class may
+    // see the material a question was built from, and it does not expire when
+    // the question does. History was showing every capture regardless, which
+    // handed back the source page of a reading whose teacher had deliberately
+    // withheld it.
+    const screenshotIds = [...new Set(answeredQuestions
+      .filter((item) => item.share_screenshot !== false)
+      .map((item) => item.screenshot_id)
+      .filter((id): id is string => Boolean(id)))]
     if (screenshotIds.length) {
       const { data: historyScreenshotData } = await supabase.from('screenshots').select('*').in('id', screenshotIds)
       if (requestId !== loadSequence.current) return
@@ -845,6 +874,7 @@ export function ParticipantPage() {
           questions={historyQuestions}
           quizData={historyQuizData}
           screenshots={historyScreenshots}
+          passages={historyPassages}
           unlimitedListening
           onLoadDetails={loadHistoryDetails}
         />
@@ -1004,7 +1034,10 @@ export function ParticipantPage() {
         />
       )}
 
-      {screenshot && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && (
+      {/* A reading shows its own capture above the passage, where it belongs —
+          so this must not show it a second time underneath. Both were loading
+          the same screenshot from the same question and both were drawing it. */}
+      {screenshot && !passage && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
       {listeningClip && question && !passage && (
@@ -1070,6 +1103,7 @@ export function ParticipantPage() {
         questions={historyQuestions}
         quizData={historyQuizData}
         screenshots={historyScreenshots}
+        passages={historyPassages}
         onLoadDetails={loadHistoryDetails}
       />
       {/* The field goes away rather than being disabled. A disabled box still

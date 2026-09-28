@@ -148,7 +148,7 @@ export type BoardReaction = {
   emoji: string
 }
 
-export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'drawing' | 'hotspot' | 'board' | 'listening'
+export type QuestionType = 'send_screen' | 'poll' | 'multiple_choice' | 'true_false' | 'short_answer' | 'pronunciation' | 'oral_response' | 'custom_quiz' | 'file_upload' | 'drawing' | 'hotspot' | 'board' | 'listening' | 'reading'
 
 export type ListeningKind = 'passage' | 'dialogue' | 'scene'
 

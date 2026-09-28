@@ -40,6 +40,7 @@ const questionTypeLabels = {
   hotspot: '圖上點選',
   board: '討論板',
   listening: '聽力',
+  reading: '閱讀',
 }
 
 const quizItemTypeLabels = {

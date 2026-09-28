@@ -15,6 +15,7 @@ import { RosterManager } from '../components/RosterManager'
 import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ListeningPlayer } from '../components/ListeningPlayer'
+import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { Coffee } from '@phosphor-icons/react'
 import { ExitTicketForm } from '../components/ExitTicketForm'
 import { participantText } from '../lib/participantI18n'
@@ -85,6 +86,10 @@ export function Preview() {
   // The same panel reached by capturing rather than pasting.
   if (location.hash === '#reading-shot') return <ReadingModal capture={sampleCapture()} open sessionId="preview" presenterToken="preview" onClose={action} onDispatched={action} />
   if (location.hash === '#reading-ktv') return <ReadingKaraokePreview />
+  // What a student has left after the class moves on. The passage and its
+  // vocabulary have to survive into history, because reviewing them is the
+  // whole point of a reading.
+  if (location.hash === '#history') return <HistoryPreview />
   if (location.hash === '#reading-locked') return <main className="participant-page"><ReadingPassageView locale="zh-TW" locked passage={readingSample} /></main>
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
@@ -245,6 +250,34 @@ function sampleCapture() {
   const bytes = new Uint8Array(png.length)
   for (let i = 0; i < png.length; i += 1) bytes[i] = png.charCodeAt(i)
   return new File([bytes], 'capture.png', { type: 'image/png' })
+}
+
+// A finished reading in the review list: the article, the new words and the
+// grammar notes, all unlocked because the quiz is over.
+function HistoryPreview() {
+  const question = {
+    ...practiceQuestion,
+    id: 'q', type: 'reading' as const, status: 'stopped' as const,
+    title: '閱讀', prompt_text: '週末的市場', screenshot_id: null,
+  }
+  return (
+    <main className="participant-page">
+      <ParticipantQuestionHistory
+        analyses={{}}
+        answers={[]}
+        audioResponses={{}}
+        defaultExpandAll
+        listeningClips={{}}
+        loadingQuestionIds={new Set()}
+        locale="zh-TW"
+        passages={{ q: readingSample }}
+        questions={[question]}
+        quizData={{}}
+        screenshots={{}}
+        onLoadDetails={async () => {}}
+      />
+    </main>
+  )
 }
 
 function CloudPreview() {

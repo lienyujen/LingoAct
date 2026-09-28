@@ -32,6 +32,7 @@ const questionTypeLabels: Record<Question['type'], PresenterMessageKey> = {
   hotspot: 'typeHotspot',
   board: 'typeBoard',
   listening: 'typeListening',
+  reading: 'typeReading',
 }
 
 async function fetchAllRows<T>(table: string, sessionId: string, orderColumn: string) {

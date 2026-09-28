@@ -3,7 +3,8 @@ import { CaretDown, CaretUp, CheckCircle, Clock, ClockCounterClockwise, Micropho
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
-import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, QuestionAnalysis, Screenshot } from '../types'
+import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, QuestionAnalysis, ReadingPassage, Screenshot } from '../types'
+import { ReadingPassageView } from './ReadingPassageView'
 import { ParticipantFlashcards } from './ParticipantFlashcards'
 import { ListeningPlayer } from './ListeningPlayer'
 import { ParticipantTeachingContext } from './ParticipantTeachingContext'
@@ -26,6 +27,10 @@ type Props = {
   questions: Question[]
   quizData: Record<string, ParticipantQuizData | null>
   screenshots: Record<string, Screenshot>
+  // The article behind a reading, kept so the class can go back to it. Nothing
+  // is locked here: history only holds questions that are over, and the words
+  // and grammar notes are the entire reason to return to a passage.
+  passages: Record<string, ReadingPassage>
   unlimitedListening?: boolean
 }
 
@@ -65,6 +70,7 @@ export function ParticipantQuestionHistory({ analyses,
   questions,
   quizData,
   screenshots,
+  passages,
   unlimitedListening = false,
 }: Props) {
   const history = useMemo(() => questions.filter((item) => item.status !== 'draft' && item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
@@ -112,6 +118,7 @@ export function ParticipantQuestionHistory({ analyses,
             const open = openIds.has(question.id)
             const answer = answers.find((item) => item.question_id === question.id)
             const screenshot = question.screenshot_id ? screenshots[question.screenshot_id] : null
+            const passage = passages[question.id] || null
             const audio = audioResponses[question.id]
             const listeningClip = listeningClips[question.id]
             const quiz = participantQuizPayload(quizData[question.id], question.id)
@@ -126,7 +133,16 @@ export function ParticipantQuestionHistory({ analyses,
                 {open && (
                   <div className="participant-history-body">
                     {question.teaching_mode && teachingCredentials && <ParticipantTeachingContext key={question.id} question={question} {...teachingCredentials} locale={locale} active={false} />}
-                    {screenshot && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
+                    {/* A passage draws its own capture above the text, so
+                        showing it here as well is the same picture twice. */}
+                    {screenshot && !passage && <img alt={participantText(locale, 'dispatchedQuestion')} src={screenshot.public_url} />}
+                    {passage && (
+                      <ReadingPassageView
+                        imageUrl={screenshot?.public_url || null}
+                        locale={locale}
+                        passage={passage}
+                      />
+                    )}
                     {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}
                     {question.type === 'custom_quiz' && !quiz && !loading && <button className="ghost-button" type="button" onClick={() => void onLoadDetails(question)}>
                       {participantText(locale, 'tryAgain')}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import { PresenterControlPanel } from '../components/PresenterControlPanel'
@@ -17,6 +17,7 @@ import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
+import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import { Coffee } from '@phosphor-icons/react'
 import { ExitTicketForm } from '../components/ExitTicketForm'
 import { participantText } from '../lib/participantI18n'
@@ -91,6 +92,8 @@ export function Preview() {
   // vocabulary have to survive into history, because reviewing them is the
   // whole point of a reading.
   if (location.hash === '#history') return <HistoryPreview />
+  // The signed URL churn that stopped a recording a few seconds in.
+  if (location.hash === '#signed-urls') return <SignedUrlPreview />
   // 朗讀 and 聽力 showing the transcript with the same 正詞法 pinyin the
   // passage reader uses, the switch that puts it away, and a play button that
   // pauses.
@@ -314,6 +317,25 @@ function HistoryPreview() {
         screenshots={{}}
         onLoadDetails={async () => {}}
       />
+    </main>
+  )
+}
+
+// Polls the way the review window does — same file, freshly signed each time —
+// and shows what reaches the <audio> with the fix and without it.
+function SignedUrlPreview() {
+  const [poll, setPoll] = useState(0)
+  useEffect(() => {
+    const timer = window.setInterval(() => setPoll((n) => n + 1), 700)
+    return () => window.clearInterval(timer)
+  }, [])
+  const rows = useMemo(() => [{ id: 'rec', caption_audio_url: `https://example.test/said.webm?token=SIGNED-${poll}` }], [poll])
+  const stable = useStableSignedUrls(rows, 'caption_audio_url')
+  return (
+    <main className="participant-page">
+      <p>poll <b id="poll">{poll}</b></p>
+      <audio id="fixed" controls preload="none" src={stable[0].caption_audio_url} />
+      <audio id="unfixed" controls preload="none" src={rows[0].caption_audio_url} />
     </main>
   )
 }

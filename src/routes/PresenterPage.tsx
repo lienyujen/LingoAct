@@ -41,6 +41,7 @@ import { FileTransferModal } from '../components/FileTransferModal'
 import { finalizeLottery } from '../lib/lottery'
 import { classAnnotation } from '../lib/listening'
 import { getPresenterToken } from '../lib/presenterAuth'
+import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import { endManagedSession } from '../lib/presenterSessions'
 import { isBuzzerPending } from '../lib/buzzer'
 import { buildJoinUrl } from '../lib/qrcode'
@@ -173,7 +174,11 @@ export function PresenterPage() {
   const [fileTransferOpen, setFileTransferOpen] = useState(false)
   const [plannedFileQuizSettings, setPlannedFileQuizSettings] = useState<CustomQuizSettings | null>(null)
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([])
-  const [fileResponses, setFileResponses] = useState<FileResponse[]>([])
+  const [rawFileResponses, setRawFileResponses] = useState<FileResponse[]>([])
+  // The panel re-reads the uploads every ten seconds while a question is open,
+  // and every read signs the spoken 說明 again. Handing the <audio> a new src
+  // is what stopped a recording a few seconds after the teacher pressed play.
+  const fileResponses = useStableSignedUrls(rawFileResponses, 'caption_audio_url')
   const [collectQuestion, setCollectQuestion] = useState<Question | null>(null)
   const [fileBusyId, setFileBusyId] = useState('')
   // Read by the polling timer, which must not overwrite a row mid-marking.
@@ -1868,7 +1873,7 @@ export function PresenterPage() {
     const { data } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'get_file_responses', sessionId, presenterToken },
     })
-    setFileResponses((data?.responses || []) as FileResponse[])
+    setRawFileResponses((data?.responses || []) as FileResponse[])
   }, [sessionId])
 
   useEffect(() => {
@@ -1891,7 +1896,7 @@ export function PresenterPage() {
         action: 'create_file_request', sessionId, presenterToken, promptText,
       }, t('collectStartFailed'))
       setCollectQuestion(data.question as Question)
-      setFileResponses([])
+      setRawFileResponses([])
       await loadAll()
     } finally {
       setBusy(false)
@@ -1928,7 +1933,7 @@ export function PresenterPage() {
         || (data.response ? [data.response as FileResponse] : [])
       if (updated.length) {
         const byId = new Map(updated.map((item) => [item.id, item]))
-        setFileResponses((current) => current.map((item) => byId.get(item.id) || item))
+        setRawFileResponses((current) => current.map((item) => byId.get(item.id) || item))
       }
       return updated
     } finally {

@@ -6,6 +6,7 @@ import { FileTypeIcon } from '../components/FileTypeIcon'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
 import { requireSupabase } from '../lib/supabase'
+import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import type { FileResponse, Question } from '../types'
 
 const verdictLabels = {
@@ -27,7 +28,11 @@ export function SubmissionReviewPage() {
   const [locale, setLocale] = useState(() => presenterLocaleFor(null))
   const t = presenterLookup(locale)
   const [question, setQuestion] = useState<Question | null>(null)
-  const [responses, setResponses] = useState<FileResponse[]>([])
+  const [rawResponses, setRawResponses] = useState<FileResponse[]>([])
+  // This window reloads itself every four seconds, and each reload signs the
+  // spoken 說明 afresh. Without this the <audio> was handed a new src mid-play
+  // and stopped.
+  const responses = useStableSignedUrls(rawResponses, 'caption_audio_url')
   const [anonymous, setAnonymous] = useState(false)
   const [at, setAt] = useState(0)
   const [error, setError] = useState('')
@@ -52,7 +57,7 @@ export function SubmissionReviewPage() {
     }
     setLocale(presenterLocaleFor((sessionRow as { teaching_language?: string } | null)?.teaching_language || null))
     if (questionRow) setQuestion(questionRow as Question)
-    setResponses((data?.responses || []) as FileResponse[])
+    setRawResponses((data?.responses || []) as FileResponse[])
     setError('')
   }, [questionId, sessionId, t])
 

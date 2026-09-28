@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardFileName, isImageCard } from '../lib/boardCards'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { participantText } from '../lib/participantI18n'
+// The bucket the server signs board uploads for. It was written out by hand
+// here as interact-files — the name it has in the app this file was copied
+// from — so every picture, file, recording and drawing posted to a board was
+// uploaded to a bucket that does not exist, and the class was told 貼文失敗.
+const BOARD_BUCKET = 'lingoact-files'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import type { BoardPost, BoardPostKind, BoardReaction, Participant, Question, Session } from '../types'
 
@@ -30,7 +35,7 @@ const REACTIONS = ['👍', '❤️', '🤔']
 function withPublicUrls(supabase: ReturnType<typeof requireSupabase>, posts: BoardPost[]) {
   return posts.map((post) => {
     if (post.public_url || !post.storage_path) return post
-    const { data } = supabase.storage.from('interact-files').getPublicUrl(post.storage_path)
+    const { data } = supabase.storage.from(BOARD_BUCKET).getPublicUrl(post.storage_path)
     return { ...post, public_url: data.publicUrl }
   })
 }
@@ -187,7 +192,7 @@ export function ParticipantBoard({ locale, locked, participant, participantToken
       fileSize: file.size,
     })
     const { error: uploadError } = await requireSupabase().storage
-      .from('interact-files')
+      .from(BOARD_BUCKET)
       .uploadToSignedUrl(prepared.storagePath, prepared.uploadToken, file)
     if (uploadError) throw uploadError
     await post({

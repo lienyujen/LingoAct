@@ -40,7 +40,10 @@ const PREPARE_PRESETS: Array<number | null> = [null, 10, 20, 30]
 function promptFor(mode: Mode, storyboard: PictureStoryboard) {
   if (mode === 'spoken') return storyboard.spokenPrompt
   if (mode === 'written') return storyboard.writtenPrompt
-  return storyboard.orderPrompt
+  // Only a drawn picture comes with an ordering prompt, because only a drawn
+  // one was composed as four panels. A teacher who brings their own four-panel
+  // picture gets the writing prompt to edit rather than an empty box.
+  return storyboard.orderPrompt || storyboard.writtenPrompt
 }
 
 export function PictureStudioModal({
@@ -123,12 +126,13 @@ export function PictureStudioModal({
       setPicture(read)
       setDrawn(false)
       setCaution(read.caution)
-      // 排順序 is not available for a captured picture, so a teacher who was on
-      // it lands somewhere that works rather than on a tab that has gone.
-      const next = mode === 'ordering' ? 'spoken' : mode
-      setMode(next)
+      // The mode is the teacher's choice and stays theirs. This used to force
+      // 排序 back to 口說 whenever the picture was brought rather than drawn,
+      // which silently turned 排序寫作題 into 看圖說寫 — the teacher picked one
+      // activity from the menu and the class was sent a different one, with
+      // nothing said about it.
       setPromptTouched(false)
-      setPromptText(promptFor(next, read.storyboard))
+      setPromptText(promptFor(mode, read.storyboard))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t('pictureReadFailed'))
     } finally {
@@ -271,17 +275,20 @@ export function PictureStudioModal({
                 >
                   <PencilSimpleLine size={16} />{t('modeWritten')}
                 </button>
-                {drawn && (
-                  <button
-                    aria-selected={mode === 'ordering'}
-                    className={mode === 'ordering' ? 'is-on' : ''}
-                    role="tab"
-                    type="button"
-                    onClick={() => setMode('ordering')}
-                  >
-                    <CardsThree size={16} />{t('modeOrdering')}
-                  </button>
-                )}
+                {/* Offered for a brought picture too. The panels are cut by
+                    geometry, not by anything the drawing knows, so a teacher's
+                    own four-panel picture from a textbook works exactly as a
+                    drawn one does — and withholding the tab was how choosing
+                    排序寫作題 quietly produced 看圖寫作 instead. */}
+                <button
+                  aria-selected={mode === 'ordering'}
+                  className={mode === 'ordering' ? 'is-on' : ''}
+                  role="tab"
+                  type="button"
+                  onClick={() => setMode('ordering')}
+                >
+                  <CardsThree size={16} />{t('modeOrdering')}
+                </button>
               </div>
 
               {mode === 'ordering' && (

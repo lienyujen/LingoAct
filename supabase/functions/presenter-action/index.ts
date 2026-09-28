@@ -248,6 +248,19 @@ function storageSafeName(name: string) {
   return `${stem || 'file'}${ext ? `.${ext}` : ''}`
 }
 
+// Sending a new activity closes the one it replaces. A 討論板 is the exception,
+// because it is not the question the class is on: it sits alongside whatever
+// they are being asked now, on purpose, so a teacher can carry on teaching and
+// the discussion is still there to come back to. Before this, dispatching
+// anything at all closed the board out from under the class — the wall went
+// read-only mid-discussion and nobody had asked for that. Only 結束討論 closes
+// it now, and the end of the lesson.
+function stopActiveQuestions(supabase: ReturnType<typeof getAdminClient>, sessionId: string, stoppedAt: string) {
+  return supabase.from('questions')
+    .update({ status: 'stopped', stopped_at: stoppedAt })
+    .eq('session_id', sessionId).eq('status', 'active').neq('type', 'board')
+}
+
 function withFileUrl<T extends { storage_path?: string }>(row: T) {
   const base = Deno.env.get('SUPABASE_URL') || ''
   if (!row?.storage_path || !base) return row
@@ -834,9 +847,7 @@ Deno.serve(async (req) => {
       }
 
       const stoppedAt = new Date().toISOString()
-      const { error: stopError } = await supabase.from('questions')
-        .update({ status: 'stopped', stopped_at: stoppedAt })
-        .eq('session_id', sessionId).eq('status', 'active')
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
       if (stopError) throw stopError
 
       const { data: question, error: questionError } = await supabase.from('questions').insert({
@@ -876,9 +887,7 @@ Deno.serve(async (req) => {
       }
 
       const stoppedAt = new Date().toISOString()
-      const { error: stopError } = await supabase.from('questions')
-        .update({ status: 'stopped', stopped_at: stoppedAt })
-        .eq('session_id', sessionId).eq('status', 'active')
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
       if (stopError) throw stopError
 
       // No screenshot: the prompt is a 句型, and the wall is where the class
@@ -1005,9 +1014,7 @@ Deno.serve(async (req) => {
       const aiGrading = input.aiGrading === true
 
       const stoppedAt = new Date().toISOString()
-      const { error: stopError } = await supabase.from('questions')
-        .update({ status: 'stopped', stopped_at: stoppedAt })
-        .eq('session_id', sessionId).eq('status', 'active')
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
       if (stopError) throw stopError
 
       const withUrls = panels.map((panel) => ({
@@ -1180,9 +1187,7 @@ Deno.serve(async (req) => {
       }
 
       const stoppedAt = new Date().toISOString()
-      const { error: stopError } = await supabase.from('questions')
-        .update({ status: 'stopped', stopped_at: stoppedAt })
-        .eq('session_id', sessionId).eq('status', 'active')
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
       if (stopError) throw stopError
 
       // Only a screenshot-sourced quiz has a screenshot to record; a file-sourced
@@ -1932,11 +1937,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const { error: stopError } = await supabase
-        .from('questions')
-        .update({ status: 'stopped', stopped_at: new Date().toISOString() })
-        .eq('session_id', sessionId)
-        .eq('status', 'active')
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, new Date().toISOString())
       if (stopError) throw stopError
 
       const { data: question, error: questionError } = await supabase
@@ -2345,11 +2346,7 @@ Deno.serve(async (req) => {
       }
 
       const stoppedAt = new Date().toISOString()
-      const { error: stopError } = await supabase
-        .from('questions')
-        .update({ status: 'stopped', stopped_at: stoppedAt })
-        .eq('session_id', sessionId)
-        .eq('status', 'active')
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
       if (stopError) throw stopError
 
       if (hasBackdrop) {
@@ -2490,9 +2487,7 @@ Deno.serve(async (req) => {
       if (liveSession?.status !== 'active') return jsonResponse({ message: '課堂已結束。' }, 409)
 
       const now = new Date().toISOString()
-      const { error: stopError } = await supabase.from('questions')
-        .update({ status: 'stopped', stopped_at: now })
-        .eq('session_id', sessionId).eq('status', 'active').neq('id', questionId)
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, now).neq('id', questionId)
       if (stopError) throw stopError
       const { data: question, error: questionError } = await supabase.from('questions')
         .update({ status: 'active', stopped_at: null, started_at: now })

@@ -7800,10 +7800,24 @@ h2 {
 
 /* ---- the presenter's wall ---- */
 
+/* Three controls, one row. They sit in the results panel beside the class
+   list, which is a few hundred pixels wide, and wrapping cost a whole second
+   row — 102px of a narrow panel to say three things. Three equal columns fit
+   them by construction rather than by hoping the labels stay short: a long
+   label in another interface language grows its own button taller instead of
+   pushing the third one onto a line of its own. */
 .board-results-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.board-results-actions .ghost-button {
+  font-size: 0.85rem;
+  justify-content: center;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
 }
 
 /* Columns, so a wall reads as a wall rather than a list. The count follows the

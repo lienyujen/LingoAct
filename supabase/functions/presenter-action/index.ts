@@ -1318,11 +1318,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ question: pendingQuestion, quizId, generating: true }, 202)
     }
 
-    // AI 批改 for 寫作教練, one student at a time and only when asked. Feedback
-    // rather than a mark: the activity is unscored by design, and total_score
-    // stays null. Work already paid for is never redone — the same rule the
-    // upload marking follows — so a second press costs nothing unless the
-    // teacher explicitly asks for a re-read.
+    // AI 批改 for 寫作教練, one student at a time and only when asked. It writes
+    // a mark as well as feedback, judged against the level the class is set to,
+    // and the teacher can change both before the class sees either. Work
+    // already paid for is never redone — the same rule the upload marking
+    // follows — so a second press costs nothing unless the teacher explicitly
+    // asks for a re-read.
     if (action === 'analyze_writing_attempt') {
       const attemptId = input.attemptId
       if (!validUuid(attemptId)) return jsonResponse({ message: '作答資料不正確。' }, 400)
@@ -1375,14 +1376,20 @@ Deno.serve(async (req) => {
         const field = feedbackByItem.get(answer.item_id as string)
         if (!field) continue
         const { error: writeError } = await supabase.from('quiz_item_answers')
-          // score stays untouched: 寫作教練 carries no mark, and writing one
-          // here would turn 「已送出」 into a grade on the teacher's panel.
+          // Per-field scores stay untouched. The mark is for the piece, not for
+          // each box, and splitting it across the fields would invent a
+          // breakdown the model was never asked for.
           .update({ feedback: { zh_tw: field.zhTw, en: field.en } }).eq('id', answer.id)
         if (writeError) throw writeError
       }
       const { error: overallError } = await supabase.from('quiz_attempts')
         .update({
           feedback: { zh_tw: review.overall.zhTw, en: review.overall.en },
+          // A mark out of 100, which the teacher may overwrite before releasing
+          // it. status stays where it is: marking is not releasing, and the
+          // class sees nothing until the teacher sends it.
+          total_score: review.score,
+          max_score: 100,
           // The corrected article, which the student's own page diffs against
           // what they wrote and shows marked up.
           revision: review.revision ? { zh_tw: review.revision.zhTw, notes: review.revision.notes } : null,
@@ -1391,7 +1398,7 @@ Deno.serve(async (req) => {
 
       const { data: refreshed } = await supabase.from('quiz_item_answers')
         .select('*').eq('attempt_id', attemptId)
-      return jsonResponse({ answers: refreshed || [], overall: review.overall, revision: review.revision })
+      return jsonResponse({ answers: refreshed || [], overall: review.overall, revision: review.revision, score: review.score, maxScore: 100 })
     }
 
     // 單字卡 標音. The readings arrive already chosen and the font already cut:

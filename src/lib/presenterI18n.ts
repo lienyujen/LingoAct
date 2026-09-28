@@ -58,7 +58,7 @@ const messages = {
     cloudTermsHint: '一行一個詞，用逗號或頓號分隔也可以。內建 {n} 個領域詞（華語教學、語言學、教學設計、課堂用語、機構簡稱等），這裡加的是你自己課上的說法。',
     cloudTermsPlaceholder: '例如：\n分組討論\n口說練習',
     cloudTermsSave: '儲存並套用',
-    flashcards: '字詞卡派送', writingCoach: 'AI 寫作教練',
+    flashcards: '字詞卡派送', writingCoach: '寫作教練',
     classWrapUp: '課堂收尾', generateExitTicket: 'AI 生成 Exit Ticket', exitTicketSent: 'Exit Ticket 已派送',
     endClass: '下課並產生報告',
     classSettings: '課堂設定',

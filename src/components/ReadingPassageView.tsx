@@ -45,7 +45,7 @@ function wordReadings(passage: ReadingPassage) {
   const map = new Map<number, { text: string; pinyin: string }>()
   let offset = 0
   for (const word of words) {
-    if (word.pinyin) map.set(offset, word)
+    map.set(offset, word)
     offset += word.text.length
   }
   // A list that does not lay over the body would put every reading on the
@@ -217,8 +217,8 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   const rubyOn = showRuby && !locked
 
   const runs = useMemo(
-    () => layout(wordsOn ? passage : { ...passage, vocabulary: [] }, grammarOn && hasGrammar),
-    [passage, grammarOn, hasGrammar, wordsOn],
+    () => layout(passage, grammarOn && hasGrammar),
+    [passage, grammarOn, hasGrammar],
   )
 
   const readings = useMemo(() => perCharacter(passage), [passage])
@@ -243,23 +243,33 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   // One character at a time, so a reading sits over the character it belongs to
   // and not over the word it happens to start.
   function annotated(text: string, at: number, isNewWord = false) {
-    // A new word always carries its reading; everything else waits for the
-    // switch, which waits for the quiz.
-    const marks = showGlyphs || showRubyText || (overLevelReadings && isNewWord && !locked)
+    // A word the class has not met carries its reading from the very start,
+    // quiz or no quiz. Nobody is being tested on whether they can guess how
+    // 小明 or 資料夾 is pronounced, and a learner who cannot say the word
+    // cannot read the sentence it sits in. The rest of the passage waits for
+    // the switch, which waits for the questions to be finished.
+    const marks = showGlyphs || showRubyText || (overLevelReadings && isNewWord)
     if (!marks && !spoken) return text
 
-    // 拼音 goes over the whole word rather than over each character.
-    const word = byWord?.get(at)
-    if (word && marks && !showGlyphs && word.text === text) {
-      const lit = Boolean(spoken)
-        && (charAt.get(at) ?? -1) >= (spoken as KaraokeCue).start_index
-        && (charAt.get(at) ?? -1) < (spoken as KaraokeCue).end_index
-      return [
-        <ruby key={at}>
-          <span className={lit ? 'karaoke-character active' : undefined}>{text}</span>
-          <rt>{word.pinyin}</rt>
-        </ruby>,
-      ]
+    if (byWord && !showGlyphs) {
+      const out: ReactNode[] = []
+      let cursor = 0
+      while (cursor < text.length) {
+        const here = at + cursor
+        const word = byWord.get(here)
+        const span = word && word.text.length <= text.length - cursor ? word.text.length : 1
+        const piece = text.slice(cursor, cursor + span)
+        const position = charAt.get(here) ?? -1
+        const lit = Boolean(spoken)
+          && position >= (spoken as KaraokeCue).start_index
+          && position < (spoken as KaraokeCue).end_index
+        const body = <span className={lit ? 'karaoke-character active' : undefined}>{piece}</span>
+        out.push(marks && word?.pinyin
+          ? <ruby key={here}>{body}<rt>{word.pinyin}</rt></ruby>
+          : <span key={here}>{body}</span>)
+        cursor += span
+      }
+      return out
     }
     const out: ReactNode[] = []
     let offset = 0
@@ -347,7 +357,9 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
         style={showGlyphs && family ? { fontFamily: family } : undefined}
       >
         {runs.map((run) => {
-          const words = run.words.map((word, at) => (word.entry ? (
+          const words = run.words.map((word, at) => (word.entry && !wordsOn ? (
+            <span key={`${run.key}-w${at}`}>{annotated(word.text, word.at, true)}</span>
+          ) : word.entry ? (
             <button
               // Coloured by the level the word is learned at, so a reader can see at
               // a glance which of the new words are the ones for this term and

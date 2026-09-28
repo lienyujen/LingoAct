@@ -240,7 +240,7 @@ export async function karaokeCues(wav: Uint8Array, transcript: string, language:
         signal: AbortSignal.timeout(10_000),
       })
       if (!response.ok) throw new Error((await response.text()).slice(0, 400))
-      const aligned = alignWordInfo(await response.json(), transcript, language)
+      const aligned = alignWordInfo(await response.json(), transcript, language, totalMs)
       const completed = completeCues(aligned, transcript, totalMs, language)
       if (completed.length) return completed
     } catch (error) {
@@ -294,15 +294,46 @@ function searchable(text: string) {
   return { value: value.join(''), indexes }
 }
 
-function alignWordInfo(payload: unknown, transcript: string, language: string) {
+// Which occurrence of a repeated word is the one being spoken.
+//
+// 檔案 appears five times in one passage about files. Taking the first match
+// at or after the cursor is right until a word is mis-transcribed and skipped:
+// the next word then matches a LATER repeat, and from there every cue sits
+// several lines ahead of the voice and never recovers — which is what a
+// teacher sees as the highlight jumping and never coming back.
+//
+// The clock says which one. A word spoken a third of the way through a clip
+// belongs about a third of the way through the text, so the candidate nearest
+// that estimate wins, and one too far from it is dropped rather than guessed
+// at. A gap left behind is interpolated below, which is a small error in the
+// right place instead of a large one in the wrong place.
+function expectedIndex(startMs: number, totalMs: number, length: number) {
+  if (!totalMs || !Number.isFinite(startMs)) return null
+  return Math.round((Math.min(Math.max(startMs, 0), totalMs) / totalMs) * length)
+}
+
+function alignWordInfo(payload: unknown, transcript: string, language: string, totalMs: number) {
   const haystack = searchable(transcript)
+  // Speech is not evenly paced, so this has to tolerate real drift while still
+  // rejecting a repeat a few lines away.
+  const tolerance = Math.max(24, Math.round(haystack.value.length * 0.15))
   let cursor = 0
   const cues: KaraokeCue[] = []
   for (const word of collectWordInfo(payload)) {
     const needle = searchable(word.text).value
     if (!needle) continue
-    const found = haystack.value.indexOf(needle, cursor)
+
+    const expected = expectedIndex(word.start, totalMs, haystack.value.length)
+    let found = -1
+    for (let at = haystack.value.indexOf(needle, cursor); at >= 0; at = haystack.value.indexOf(needle, at + 1)) {
+      if (expected === null) { found = at; break }
+      if (found < 0 || Math.abs(at - expected) < Math.abs(found - expected)) found = at
+      // Past the estimate there is nothing nearer to find.
+      if (at > expected) break
+    }
     if (found < 0) continue
+    if (expected !== null && Math.abs(found - expected) > tolerance) continue
+
     const startIndex = haystack.indexes[found]
     const endIndex = (haystack.indexes[found + needle.length - 1] ?? startIndex) + 1
     const cue = { start_index: startIndex, end_index: endIndex, start_ms: word.start, end_ms: word.end }
@@ -361,7 +392,19 @@ function isSpeakerLabel(text: string, start: number, length: number) {
 // timestamps are still the best anchors available, but a KTV line with dark
 // holes is worse than an interpolated syllable. Fill only those holes between
 // neighbouring real timestamps; recognised words keep their measured times.
-function completeCues(measured: KaraokeCue[], transcript: string, totalMs: number, language: string) {
+function inTimeOrder(cues: KaraokeCue[]) {
+  const kept: KaraokeCue[] = []
+  let last = -1
+  for (const cue of cues) {
+    if (cue.start_ms < last) continue
+    kept.push(cue)
+    last = cue.start_ms
+  }
+  return kept
+}
+
+function completeCues(input: KaraokeCue[], transcript: string, totalMs: number, language: string) {
+  const measured = inTimeOrder(input)
   if (!measured.length) return fallbackCues(transcript, totalMs, language)
   const expected = fallbackCues(transcript, totalMs, language)
   const bySpan = new Map(measured.map((cue) => [`${cue.start_index}:${cue.end_index}`, cue]))

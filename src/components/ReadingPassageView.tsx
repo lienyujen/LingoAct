@@ -191,10 +191,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   // where they would be the answer key.
   const [showGrammar, setShowGrammar] = useState(!locked)
   const [showWords, setShowWords] = useState(!locked)
-  // The readings are the one mark a locked passage keeps: they say how a word
-  // sounds, not what it means, so they help a student read the questions rather
-  // than answer them.
-  const [showRuby, setShowRuby] = useState(true)
+  const [showRuby, setShowRuby] = useState(false)
   const [open, setOpen] = useState<Mark | null>(null)
   const hasGrammar = (passage.grammar || []).length > 0
   const hasWords = (passage.vocabulary || []).length > 0
@@ -203,6 +200,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   // happens after mount too, when the teacher sends the questions.
   const wordsOn = showWords && !locked
   const grammarOn = showGrammar && !locked
+  const rubyOn = showRuby && !locked
 
   const runs = useMemo(
     () => layout(wordsOn ? passage : { ...passage, vocabulary: [] }, grammarOn && hasGrammar),
@@ -215,9 +213,9 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   const hasReadings = Boolean(glyphs || ruby)
   // 注音 is set into the glyphs, so the subset the teacher cut has to load
   // before the passage can show it; 拼音 needs no font.
-  const family = useReadingFont(readings.glyphs && showRuby ? passage.font_url : null)
-  const showGlyphs = Boolean(glyphs && showRuby && family)
-  const showRubyText = Boolean(ruby && showRuby)
+  const family = useReadingFont(readings.glyphs && rubyOn ? passage.font_url : null)
+  const showGlyphs = Boolean(glyphs && rubyOn && family)
+  const showRubyText = Boolean(ruby && rubyOn)
 
   const charAt = useMemo(() => characterIndexes(passage.body), [passage.body])
   // The stretch being spoken right now, in character positions. Null whenever
@@ -226,8 +224,9 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
 
   // One character at a time, so a reading sits over the character it belongs to
   // and not over the word it happens to start.
-  function annotated(text: string, at: number) {
-    if (!showGlyphs && !showRubyText && !spoken) return text
+  function annotated(text: string, at: number, isNewWord = false) {
+    const marks = (showGlyphs || showRubyText) && isNewWord
+    if (!marks && !spoken) return text
     const out: ReactNode[] = []
     let offset = 0
     for (const character of text) {
@@ -235,10 +234,10 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
       const position = charAt.get(key) ?? -1
       const lit = Boolean(spoken) && position >= (spoken as KaraokeCue).start_index && position < (spoken as KaraokeCue).end_index
       const className = lit ? 'karaoke-character active' : undefined
-      if (showGlyphs) {
+      if (marks && showGlyphs) {
         out.push(<span className={className} key={key}>{glyphs?.get(key) || character}</span>)
       } else {
-        const reading = ruby?.get(key)
+        const reading = marks ? ruby?.get(key) : ''
         const body = <span className={className}>{character}</span>
         out.push(reading
           ? <ruby key={key}>{body}<rt>{reading}</rt></ruby>
@@ -286,10 +285,12 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
               {participantText(locale, 'readingGrammar')}
             </button>
           )}
-          {hasReadings && (
+          {hasReadings && hasWords && (
             <button
-              aria-pressed={showRuby}
-              className={`reading-toggle${showRuby ? ' is-on' : ''}`}
+              aria-pressed={rubyOn}
+              className={`reading-toggle${rubyOn ? ' is-on' : ''}`}
+              disabled={locked}
+              title={locked ? participantText(locale, 'readingLocked') : undefined}
               type="button"
               onClick={() => setShowRuby((current) => !current)}
             >
@@ -308,7 +309,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
       )}
 
       <p
-        className={`reading-passage-body${showGlyphs ? ' is-annotated' : ''}${showRubyText ? ' reading-ruby is-ruby' : ''}`}
+        className={`reading-passage-body${showGlyphs && hasWords ? ' is-annotated' : ''}${showRubyText && hasWords ? ' reading-ruby is-ruby' : ''}`}
         style={showGlyphs && family ? { fontFamily: family } : undefined}
       >
         {runs.map((run) => {
@@ -329,7 +330,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
                 setOpen((current) => (current?.kind === 'word' && current.entry === word.entry ? null : { kind: 'word', entry: word.entry as ReadingVocabulary }))
               }}
             >
-              {annotated(word.text, word.at)}
+              {annotated(word.text, word.at, true)}
             </button>
           ) : (
             <span key={`${run.key}-t${at}`}>{annotated(word.text, word.at)}</span>

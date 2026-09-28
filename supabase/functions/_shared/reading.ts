@@ -213,6 +213,45 @@ export type ReadingInput = {
 
 export type ReadingWord = { text: string; pinyin: string }
 
+// 正詞法 rules a program can apply itself, applied after the model answers.
+//
+// Capitalising the first word of a sentence needs no Chinese at all: it needs
+// to know where sentences end, which the punctuation says. Asking the model
+// for it and hoping is how a whole passage came back in lower case. Anything
+// deterministic is done here; the model is left with the part that genuinely
+// needs to understand the language, which is where the words divide.
+const SENTENCE_END = /[。．！!？?…]/
+
+function applyOrthography(words: ReadingWord[]) {
+  let atSentenceStart = true
+  return words.map((word) => {
+    if (!word.pinyin) {
+      // Punctuation carries no reading, but it does say where the next
+      // sentence begins.
+      if (SENTENCE_END.test(word.text)) atSentenceStart = true
+      return word
+    }
+    const pinyin = atSentenceStart
+      ? word.pinyin.charAt(0).toLocaleUpperCase() + word.pinyin.slice(1)
+      : word.pinyin
+    atSentenceStart = SENTENCE_END.test(word.text)
+    return { ...word, pinyin }
+  })
+}
+
+// Segments that are almost certainly two words written as one.
+//
+// 國教院's list is not a complete dictionary — 每天 and 很多 are not on it —
+// so "absent from the list" cannot mean "not a word". Length can: its entries
+// are overwhelmingly one to three characters, and a four-character run that it
+// does not list is nearly always a phrase. 每天早上 came back as one word
+// spelled měitiānzǎoshang, which is exactly the shape this catches.
+function overJoined(words: ReadingWord[]) {
+  return words
+    .filter((word) => /^[\p{Script=Han}]{4,}$/u.test(word.text) && !wordLevel(word.text))
+    .map((word) => `${word.text}（${word.pinyin}）`)
+}
+
 // Which of the passage's words the class has not met.
 //
 // 國教院's list decides, not the model. A word listed above the class is 超綱
@@ -319,12 +358,16 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
       : '',
     'words: 把 body 逐詞切開放進 words，順序與原文相同。所有 text 接起來必須和 body 完全一樣，包含標點；標點自成一項，pinyin 留空字串。',
     '每個詞的 pinyin 依《漢語拼音正詞法基本規則》(GB/T 16159) 書寫，不是逐字注音：',
-    '一、以詞為單位連寫：zīliàojiā（資料夾）、jīntiān（今天）、dǎkāi（打開）。',
-    '二、句首字母大寫；專有名詞大寫，人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。',
-    '三、動詞與賓語分寫（kàn xìn）；動詞與動態助詞連寫（kànzhe、kànle、kànguò）。',
-    '四、數詞與量詞分寫（qī gè）；11 到 99 的整數連寫（shíwǔ）。',
-    '五、結構助詞的、地、得分寫；語氣詞嗎、呢、吧分寫。',
-    '六、聲調一律用調號標出，不用數字。阿拉伯數字與外文照原樣留在 text，pinyin 留空字串。',
+    '一、一個 text 放一個詞，不是一個詞組。詞和詞之間要分開放，不可以併成一項。',
+    '   「每天早上」是兩個詞：每天 (měitiān)、早上 (zǎoshang)，不可以寫成一項 měitiānzǎoshang。',
+    '   「以後都」是兩個詞：以後 (yǐhòu)、都 (dōu)。一個 text 很少超過三個漢字，超過就要再想想是不是兩個詞。',
+    '二、一個詞的內部連寫，不留空格：zīliàojiā（資料夾）、jīntiān（今天）、dǎkāi（打開）、shuāyá（刷牙）。',
+    '三、專有名詞首字母大寫；人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。句首大寫由系統處理，你不用管。',
+    '四、動詞與賓語分寫（kàn xìn、chī fàn）；動詞與動態助詞連寫（kànzhe、kànle、kànguò）。',
+    '五、數詞與量詞分寫（qī gè）；11 到 99 的整數連寫（shíwǔ）。',
+    '六、結構助詞的、地、得分寫；語氣詞嗎、呢、吧分寫。',
+    "七、a、o、e 開頭的音節接在別的音節後面時，前面加隔音符號：dàng'àn（檔案）、Xī'ān（西安）。",
+    '八、聲調一律用調號標出，不用數字。阿拉伯數字與外文照原樣留在 text，pinyin 留空字串。',
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
     'Do not invent a grammar point that is not on the list, and do not attribute a pattern to a sentence that does not contain it.',
@@ -347,13 +390,22 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   if (!output) return null
 
   const TOO_MANY_ABOVE = 6
+  const complaints: string[] = []
   if (ceiling) {
     const above = overLevelWords(String(output.body || ''), ceiling)
     if (above.length > TOO_MANY_ABOVE) {
       console.warn(`Reading passage used ${above.length} words above ${label}: ${above.slice(0, 12).map((e) => e.word).join(' ')}`)
-      const retried = await ask(overLevelComplaint(above, label, ceiling))
-      if (retried && overLevelWords(String(retried.body || ''), ceiling).length < above.length) output = retried
+      complaints.push(overLevelComplaint(above, label, ceiling))
     }
+  }
+  const joined = overJoined((Array.isArray(output.words) ? output.words : []) as ReadingWord[])
+  if (joined.length) {
+    console.warn(`Reading segmentation ran words together: ${joined.slice(0, 8).join(' ')}`)
+    complaints.push(`這幾項把兩個詞併成一個了：${joined.slice(0, 12).join('、')}。請照《漢語拼音正詞法基本規則》重新切開，例如 每天早上 要切成 每天 (měitiān) 和 早上 (zǎoshang)，以後都 要切成 以後 (yǐhòu) 和 都 (dōu)。`)
+  }
+  if (complaints.length) {
+    const retried = await ask(complaints.join('\n'))
+    if (retried && !overJoined((Array.isArray(retried.words) ? retried.words : []) as ReadingWord[]).length) output = retried
   }
 
   const body = String(output.body || '').trim()
@@ -370,7 +422,9 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     })
     .filter((entry) => entry.text)
   const rejoined = segmented.map((entry) => entry.text).join('')
-  const words = rejoined.replace(/\s/g, '') === body.replace(/\s/g, '') ? segmented : []
+  const words = rejoined.replace(/\s/g, '') === body.replace(/\s/g, '')
+    ? applyOrthography(segmented)
+    : []
   if (segmented.length && !words.length) {
     console.warn(`Reading segmentation did not reassemble: ${rejoined.slice(0, 80)}`)
   }

@@ -90,10 +90,10 @@ jobs:
           fi
           echo "No Supabase project embedded."
 
-      # Every teaching edition, both platforms. Each pass rebuilds the renderer
-      # because the profile is compiled into it, then packages that profile;
-      # artifactName puts each one in release/ under its own product name.
-      - name: Package every teaching profile
+      # The public classroom downloads. The full build remains the developer's
+      # local workbench; English and 國語文 are not part of this release. Each
+      # pass rebuilds the renderer because the profile is compiled into it.
+      - name: Package Huayu and NCACLS
         shell: bash
         env:
           # Zip only on Windows. The single-file portable build re-extracts its
@@ -102,7 +102,7 @@ jobs:
           # people to pick the worse one.
           TARGET: ${{ matrix.os == 'macos-latest' && '--mac dmg --universal' || '--win zip --x64' }}
         run: |
-          for profile in full huayu english guoyu ncacls; do
+          for profile in huayu ncacls; do
             echo "::group::$profile"
             VITE_APP_PROFILE="$profile" pnpm build
             APP_PROFILE="$profile" pnpm exec electron-builder $TARGET --publish never
@@ -162,10 +162,7 @@ jobs:
 
           | 版本 | Windows | macOS |
           |---|---|---|
-          | 完整版（所有教學語言） | `LingoAct.zip` | `LingoAct.dmg` |
           | 華語教學版（TBCL／TOCFL、注音／拼音） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
-          | 英語教學版（108課綱／全民英檢／多益） | `LingoAct-English.zip` | `LingoAct-English.dmg` |
-          | 國語文教學版（108課綱、固定注音） | `LingoAct-Guoyu.zip` | `LingoAct-Guoyu.dmg` |
           | 全美中文學校聯合總會版 | `LingoAct-NCACLS.zip` | `LingoAct-NCACLS.dmg` |
 
           **Windows：** 解壓縮後執行裡面的 exe。
@@ -178,8 +175,7 @@ jobs:
 
           學員端網址留空就好 —— QR Code 會自動帶上你的專案，課堂資料只會進你自己的 Supabase。
 
-          尚未建立 Supabase 專案，請參考
-          [部署教學](https://github.com/lienyujen/LingoAct/blob/main/docs/LingoAct-%E5%BE%9E%E9%9B%B6%E9%83%A8%E7%BD%B2%E8%88%87%E6%89%93%E5%8C%85%E6%95%99%E5%AD%B8.md)。
+          尚未建立 Supabase 專案，可直接依程式內的部署精靈操作。
 
           ## 注意
 
@@ -188,7 +184,7 @@ jobs:
           部分公司電腦的資安政策可能直接封鎖。
 
           個人與教育用途免費；補習班、企業內訓與收費課程屬商業用途，
-          請見 [授權說明](https://github.com/lienyujen/LingoAct#授權)。
+          授權說明請見公開下載頁。
           MD
           )
           gh release create "$TAG" \

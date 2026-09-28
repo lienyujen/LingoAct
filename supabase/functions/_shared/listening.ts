@@ -363,6 +363,17 @@ function splitChineseCue(cue: KaraokeCue, transcript: string, language: string) 
   }))
 }
 
+// Milliseconds per character, as measured between the first and last anchor.
+// Falling back to the file's duration is only for a clip with a single anchor,
+// where there is nothing to measure a rate from.
+function measuredPace(result: Array<KaraokeCue | null>, totalMs: number) {
+  const first = result.findIndex(Boolean)
+  const last = result.findLastIndex(Boolean)
+  if (first < 0 || last <= first) return totalMs / Math.max(result.length, 1)
+  const span = (result[last] as KaraokeCue).end_ms - (result[first] as KaraokeCue).start_ms
+  return span / (last - first + 1)
+}
+
 function fallbackCues(transcript: string, totalMs: number, language: string) {
   const matcher = language.toLowerCase().startsWith('zh')
     ? /[\p{L}\p{N}]/gu
@@ -405,29 +416,49 @@ function completeCues(input: KaraokeCue[], transcript: string, totalMs: number, 
 
   // Anchors have to run forward in POSITION and in TIME together.
   //
-  // The last attempt checked them in the order the transcriber returned
-  // them, which is time order — so they always looked fine. What matters is
-  // this array, which is in reading order: a word matched to the wrong place
-  // sits at an index whose time belongs somewhere else, and the player,
-  // which takes the first cue whose window holds the current moment, jumps
-  // to it. Dropping the anchor leaves a gap the interpolation below fills —
-  // a small error where the voice actually is, instead of a large one lines
-  // away.
+  // Checking them in the order the transcriber returned them proves nothing,
+  // because that order is already time order. This array is the one that
+  // matters: it is in reading order, so a word matched to the wrong place sits
+  // at an index whose time belongs somewhere else, and the player — which
+  // takes the first cue whose window holds the current moment — jumps to it.
+  // Dropping the anchor leaves a gap the interpolation below fills, which is a
+  // small error where the voice actually is instead of a large one lines away.
   let lastAnchor = -1
+  let kept = 0
+  let dropped = 0
   for (let index = 0; index < result.length; index += 1) {
     const cue = result[index]
     if (!cue) continue
-    if (cue.start_ms < lastAnchor) { result[index] = null; continue }
+    if (cue.start_ms < lastAnchor) { result[index] = null; dropped += 1; continue }
     lastAnchor = cue.start_ms
+    kept += 1
   }
-  if (!result.some(Boolean)) return expected
 
+  if (!kept) return expected
+  if (dropped) console.warn(`Karaoke alignment: dropped ${dropped} of ${kept + dropped} anchors that ran backwards.`)
+
+  const pace = measuredPace(result, totalMs)
   for (let start = 0; start < result.length;) {
     if (result[start]) { start += 1; continue }
     let end = start + 1
     while (end < result.length && !result[end]) end += 1
-    const lower = start > 0 ? (result[start - 1] as KaraokeCue).end_ms : 0
-    const upper = end < result.length ? (result[end] as KaraokeCue).start_ms : totalMs
+    // The clip is longer than the speech in it. A recording ends with a beat
+    // of silence, and the transcriber often gives up on the last few
+    // characters as the voice trails off — so the final run of unmeasured
+    // characters is exactly where stretching to the end of the FILE spreads a
+    // couple of syllables over seconds of nothing. That is the highlight
+    // crawling through the last two sentences while the speaker has already
+    // finished them.
+    //
+    // The anchors already say how fast this person talks. Pace the two edges
+    // at that rate instead of against the file's duration, and the ending
+    // lands with the voice.
+    const lower = start > 0
+      ? (result[start - 1] as KaraokeCue).end_ms
+      : Math.max(0, (end < result.length ? (result[end] as KaraokeCue).start_ms : totalMs) - pace * (end - start))
+    const upper = end < result.length
+      ? (result[end] as KaraokeCue).start_ms
+      : Math.min(totalMs, lower + pace * (end - start))
     const width = Math.max(upper - lower, end - start) / (end - start)
     for (let index = start; index < end; index += 1) {
       result[index] = {

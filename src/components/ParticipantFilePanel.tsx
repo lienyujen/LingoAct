@@ -5,6 +5,7 @@ import { requireSupabase } from '../lib/supabase'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { downloadHref, publicFileUrl } from '../lib/fileLinks'
+import { isImageFile } from '../lib/fileKinds'
 import { PhotoCaptionCard } from './PhotoCaptionCard'
 import type { FileAnalysis, SharedFile } from '../types'
 
@@ -107,6 +108,8 @@ type Uploaded = { id: string; name: string; previewUrl: string | null }
 type MyResponse = {
   id: string
   name: string
+  mime_type: string | null
+  storage_path?: string | null
   caption: string | null
   analysis_status: 'pending' | 'analyzing' | 'success' | 'failed' | 'unsupported'
   analysis_json: FileAnalysis | null
@@ -149,12 +152,17 @@ function inLocale(analysis: FileAnalysis, locale: ParticipantLocale) {
 // changed nothing the class could see. Polled rather than pushed because it
 // arrives when the teacher decides to press the button, which may be minutes
 // after the upload or not at all.
-function MyUploadMarking({ sessionId, questionId, participantId, participantToken, locale }: {
+export function MyUploadMarking({ sessionId, questionId, participantId, participantToken, locale, poll = true }: {
   sessionId: string
   questionId: string
   participantId: string
   participantToken: string
   locale: ParticipantLocale
+  // Live, the marking arrives whenever the teacher presses the button, so this
+  // watches for it. In the review list the question is long over and one read
+  // is the whole story — polling every open item would be asking the same
+  // settled question of the server for the rest of the lesson.
+  poll?: boolean
 }) {
   const [responses, setResponses] = useState<MyResponse[]>([])
 
@@ -168,10 +176,17 @@ function MyUploadMarking({ sessionId, questionId, participantId, participantToke
       if (active) setResponses((data?.responses || []) as MyResponse[])
     }
     void load()
+    if (!poll) return () => { active = false }
     const timer = window.setInterval(() => void load(), 8000)
     return () => { active = false; window.clearInterval(timer) }
-  }, [sessionId, questionId, participantId, participantToken])
+  }, [sessionId, questionId, participantId, participantToken, poll])
 
+  return <MyUploadList locale={locale} responses={responses} />
+}
+
+// Just the drawing of it, so what a student sees can be looked at without a
+// class, a server and a marked upload to hand.
+export function MyUploadList({ responses, locale }: { responses: MyResponse[]; locale: ParticipantLocale }) {
   if (!responses.length) return null
 
   return (
@@ -179,12 +194,24 @@ function MyUploadMarking({ sessionId, questionId, participantId, participantToke
       <h3><Sparkle size={15} />{participantText(locale, 'myUploads')}</h3>
       {responses.map((response) => {
         const analysis = response.analysis_status === 'success' ? response.analysis_json : null
+        const picture = response.storage_path && isImageFile(response.mime_type, response.name)
+          ? publicFileUrl(response.storage_path)
+          : ''
         const text = analysis ? inLocale(analysis, locale) : null
         const verdict = analysis?.verdict
         return (
           <article className="my-upload-row" key={response.id}>
+            {/* The picture, not the name it was stored under. A student
+                handing in a photograph gets back a filename like
+                32e3eaca-23a9-4cae-aab7-3192a3445168.png, which tells them
+                nothing about which photograph it was — and the whole point of
+                looking at this panel afterwards is to see their own work
+                beside the marking of it. */}
+            {picture && (
+              <img alt={response.caption || participantText(locale, 'myUploads')} className="my-upload-thumb" src={picture} />
+            )}
             <div className="my-upload-head">
-              <strong>{response.name}</strong>
+              {!picture && <strong>{response.name}</strong>}
               {verdict && <span className={`file-verdict is-${verdict}`}>{participantText(locale, verdictKeys[verdict])}</span>}
               {typeof analysis?.score === 'number' && (
                 <span className="upload-score">{analysis.score} {participantText(locale, 'points')}</span>

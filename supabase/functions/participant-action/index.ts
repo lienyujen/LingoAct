@@ -888,10 +888,15 @@ Deno.serve(async (req) => {
       if (!question || !['file_upload', 'drawing'].includes(question.type)) return jsonResponse({ message: '找不到上傳題目。' }, 404)
 
       const { data: rows, error } = await supabase.from('file_responses')
-        .select('id, question_id, name, mime_type, file_size, caption, analysis_status, analysis_json, error_message, submitted_at, analyzed_at')
+        .select('id, question_id, name, mime_type, file_size, caption, analysis_status, analysis_json, error_message, submitted_at, analyzed_at, storage_path')
         .eq('question_id', questionId).eq('participant_id', participantId)
         .order('submitted_at')
       if (error) throw error
+      // storage_path travels so the student can be shown the picture they
+      // sent rather than the name it was stored under, which is a UUID and
+      // says nothing about which photograph it was. The URL is built on the
+      // page, against the backend that page actually joined — see fileLinks.ts
+      // — and the bucket is public, so there is no token to go stale.
       return jsonResponse({ responses: rows || [] })
     }
     if (['prepare_recording_upload', 'submit_recording', 'get_recording_result', 'discard_recording'].includes(action)) {

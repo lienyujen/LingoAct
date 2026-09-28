@@ -5376,6 +5376,18 @@ h2 {
   gap: 6px;
   padding: 11px 13px;
 }
+/* What the student handed in, shown at a size they can recognise their own
+   work at without it taking over the marking underneath. */
+.my-upload-thumb {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: block;
+  max-height: 210px;
+  max-width: 100%;
+  object-fit: contain;
+}
 .my-upload-head {
   align-items: center;
   display: flex;

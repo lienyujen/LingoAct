@@ -5,6 +5,7 @@ import { participantText } from '../lib/participantI18n'
 import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, QuestionAnalysis, ReadingPassage, Screenshot } from '../types'
 import { ReadingPassageView } from './ReadingPassageView'
+import { MyUploadMarking } from './ParticipantFilePanel'
 import { ParticipantFlashcards } from './ParticipantFlashcards'
 import { ListeningPlayer } from './ListeningPlayer'
 import { ParticipantTeachingContext } from './ParticipantTeachingContext'
@@ -141,6 +142,22 @@ export function ParticipantQuestionHistory({ analyses,
                         imageUrl={screenshot?.public_url || null}
                         locale={locale}
                         passage={passage}
+                      />
+                    )}
+                    {/* What this student handed in, with the marking of it.
+                        The upload panel belongs to the question the class is
+                        on, so the moment the teacher moved to the next one a
+                        student lost the picture they sent and everything the
+                        AI said about it — which is the part worth going back
+                        to. */}
+                    {(question.type === 'file_upload' || question.type === 'drawing') && teachingCredentials && (
+                      <MyUploadMarking
+                        locale={locale}
+                        participantId={teachingCredentials.participantId}
+                        participantToken={teachingCredentials.participantToken}
+                        poll={false}
+                        questionId={question.id}
+                        sessionId={teachingCredentials.sessionId}
                       />
                     )}
                     {loading && <p className="muted"><Clock size={16} />{participantText(locale, 'loadingYourAnswer')}</p>}

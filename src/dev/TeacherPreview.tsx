@@ -17,6 +17,7 @@ import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
+import { MyUploadList } from '../components/ParticipantFilePanel'
 import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import { Coffee } from '@phosphor-icons/react'
 import { ExitTicketForm } from '../components/ExitTicketForm'
@@ -94,6 +95,10 @@ export function Preview() {
   if (location.hash === '#history') return <HistoryPreview />
   // The signed URL churn that stopped a recording a few seconds in.
   if (location.hash === '#signed-urls') return <SignedUrlPreview />
+  // What a student gets back after handing in a photograph: the picture, not
+  // the UUID it was stored under.
+  if (location.hash === '#my-uploads') return <main className="participant-page"><section className="panel">
+    <MyUploadList locale="zh-TW" responses={sampleUploads} /></section></main>
   // 朗讀 and 聽力 showing the transcript with the same 正詞法 pinyin the
   // passage reader uses, the switch that puts it away, and a play button that
   // pauses.
@@ -339,6 +344,38 @@ function SignedUrlPreview() {
     </main>
   )
 }
+
+// A marked photograph and a marked PDF, so both halves of the row can be seen:
+// the picture stands in for its own filename, a file that cannot be shown
+// keeps the name.
+const sampleUploads = [
+  {
+    id: 'u1',
+    name: '32e3eaca-23a9-4cae-aab7-3192a3445168.png',
+    mime_type: 'image/png',
+    storage_path: 'preview/desk.png',
+    caption: '我的桌面上有一個全美中文學校聯合總會的標誌。',
+    analysis_status: 'success' as const,
+    analysis_json: {
+      verdict: 'correct' as const, score: 100,
+      summary_zh_tw: '學生說明他的桌面上有一個全美中文學校聯合總會的標誌，內容與所提供的圖片相符。',
+      strengths_zh_tw: ['語句結構完整且表達清晰流暢。', '能準確說出組織名稱與圖案內容。'],
+      improvements_zh_tw: ['可以嘗試將英文「logo」替換成中文詞彙「標誌」。', '可以多補充顏色或外觀細節。'],
+      summary_en: '', strengths_en: [], improvements_en: [],
+    },
+    error_message: null,
+  },
+  {
+    id: 'u2',
+    name: '週末作業.pdf',
+    mime_type: 'application/pdf',
+    storage_path: 'preview/homework.pdf',
+    caption: null,
+    analysis_status: 'pending' as const,
+    analysis_json: null,
+    error_message: null,
+  },
+]
 
 function CloudPreview() {
   const base = Date.now() - 20 * 60_000

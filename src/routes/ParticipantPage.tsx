@@ -1035,10 +1035,12 @@ export function ParticipantPage() {
         />
       )}
 
-      {/* A reading shows its own capture above the passage, where it belongs —
-          so this must not show it a second time underneath. Both were loading
-          the same screenshot from the same question and both were drawing it. */}
-      {screenshot && !passage && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && (
+      {/* Some activities draw the capture themselves, in the place it belongs
+          to — above a passage, behind a board, under the pins. This is for the
+          ones that do not, and it has to stay out of their way: every type
+          listed here was drawing the same screenshot from the same question
+          twice, once by its own component and once here. */}
+      {screenshot && !passage && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && question?.type !== 'board' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}
       {listeningClip && question && !passage && (
@@ -1057,7 +1059,12 @@ export function ParticipantPage() {
           locale={locale}
         />
       )}
-      {question?.teaching_mode === 'pair' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
+      {/* A board is its own panel. It draws the teacher's topic and the
+          capture already, so a question panel above it repeats both — and
+          repeats the topic in the language it was written in rather than the
+          one this student is reading, because the board heading is translated
+          and a stored title is not. */}
+      {question?.teaching_mode === 'pair' || question?.type === 'board' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
         quizData.quiz.requested_type === 'flashcard'
           ? <ParticipantFlashcards key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />

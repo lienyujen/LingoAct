@@ -26,6 +26,15 @@ const fileVerdictLabels: Record<string, string> = {
   unscored: '未評分',
 }
 
+const boardKindLabels = {
+  text: '文字',
+  link: '連結',
+  image: '圖片',
+  file: '檔案',
+  audio: '錄音',
+  drawing: '手寫',
+}
+
 const questionTypeLabels = {
   send_screen: '派送畫面',
   poll: '投票題',
@@ -286,6 +295,12 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
   data.questions.forEach((question, index) => {
     const questionAnswers = data.answers.filter((answer) => answer.question_id === question.id)
     const assessed = questionAnswers.filter((answer) => answer.is_correct !== null)
+    // A 討論板 is answered by posting to it, and nothing about that reaches the
+    // answers table — so this row said 0 about a board the class had filled.
+    // Counted in people rather than posts, like every other row here.
+    const boardResponders = question.type === 'board'
+      ? new Set(data.boardPosts.filter((post) => post.question_id === question.id && !post.deleted_at).map((post) => post.participant_id)).size
+      : 0
     const questionAnalysis = analysisMap.get(question.id)
     const quiz = quizByQuestion.get(question.id)
     if (quiz) {
@@ -328,8 +343,10 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
       status: question.status,
       options: question.options.join('、'),
       correctAnswer: question.correct_answers?.length ? question.correct_answers.join('、') : question.correct_answer || '',
-      answerCount: questionAnswers.length,
-      responseRate: data.participants.length ? questionAnswers.length / data.participants.length : 0,
+      answerCount: question.type === 'board' ? boardResponders : questionAnswers.length,
+      responseRate: data.participants.length
+        ? (question.type === 'board' ? boardResponders : questionAnswers.length) / data.participants.length
+        : 0,
       correctRate: assessed.length ? assessed.filter((answer) => answer.is_correct).length / assessed.length : '',
       analysis: questionAnalysis?.response_analysis.understanding_summary || '',
       misconceptions: questionAnalysis?.response_analysis.misconceptions.join('\n') || '',
@@ -520,6 +537,42 @@ export async function exportSessionReport(data: SessionReportData, analysis: Ses
   fileResponses.getColumn('submittedAt').numFmt = 'yyyy-mm-dd hh:mm:ss'
   fileResponses.getColumn('analyzedAt').numFmt = 'yyyy-mm-dd hh:mm:ss'
   styleTableSheet(fileResponses)
+
+  // The discussion, in the order it happened, with replies pointing at what
+  // they answer. This is student writing and it was in no export before.
+  const boardPosts = workbook.addWorksheet('討論板')
+  boardPosts.columns = [
+    { header: '發表時間', key: 'createdAt', width: 22 },
+    { header: '討論板題目', key: 'question', width: 34 },
+    { header: '姓名', key: 'participantName', width: 20 },
+    { header: '顯示模式', key: 'displayMode', width: 14 },
+    { header: '形式', key: 'kind', width: 10 },
+    { header: '內容', key: 'body', width: 80 },
+    { header: '連結或檔案', key: 'url', width: 46 },
+    { header: '回覆對象', key: 'replyTo', width: 20 },
+    { header: '狀態', key: 'state', width: 14 },
+  ]
+  // A card the student took back down is not part of what they wrote. One the
+  // teacher hid is — they hid it, and this is their record — so it travels with
+  // a note rather than disappearing.
+  const keptBoardPosts = data.boardPosts.filter((post) => !post.deleted_at)
+  const boardQuestionTitles = new Map(data.questions.map((question) => [question.id, question.prompt_text || question.title || '']))
+  const boardAuthors = new Map(data.boardPosts.map((post) => [post.id, post.participant_name]))
+  for (const post of keptBoardPosts) {
+    boardPosts.addRow({
+      createdAt: formatDate(post.created_at),
+      question: boardQuestionTitles.get(post.question_id) || '',
+      participantName: post.participant_name,
+      displayMode: post.anonymous_at_display ? '匿名' : '具名',
+      kind: boardKindLabels[post.kind] || post.kind,
+      body: post.body || '',
+      url: post.url || '',
+      replyTo: post.reply_to ? (boardAuthors.get(post.reply_to) || '已刪除的發表') : '',
+      state: post.hidden_at ? '教師已隱藏' : '',
+    })
+  }
+  boardPosts.getColumn('createdAt').numFmt = 'yyyy-mm-dd hh:mm:ss'
+  styleTableSheet(boardPosts)
 
   const messages = workbook.addWorksheet('彈幕')
   messages.columns = [

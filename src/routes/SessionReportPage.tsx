@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowsClockwise, BookOpen, ChartLineUp, ChatText, CircleNotc
 import { getPresenterToken } from '../lib/presenterAuth'
 import { useSessionReportBack } from '../lib/sessionReportNavigation'
 import { requireSupabase } from '../lib/supabase'
-import type { AiSummary, Answer, AudioResponse, CaptionSegment, ExitTicket, Message, Participant, Question, Screenshot, Session, SessionAnalysis, SessionCustomQuizResults, SessionMetrics, SessionEvent, SessionReportData, SharedContent, FileResponse } from '../types'
+import type { AiSummary, Answer, AudioResponse, BoardPost, CaptionSegment, ExitTicket, Message, Participant, Question, Screenshot, Session, SessionAnalysis, SessionCustomQuizResults, SessionMetrics, SessionEvent, SessionReportData, SharedContent, FileResponse } from '../types'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { PresenterLocaleContext, presenterLocaleFor, presenterLookup, usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey, PresenterT } from '../lib/presenterI18n'
@@ -134,7 +134,7 @@ export function SessionReportPage() {
 
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) throw new Error(t('noRightsForRecordings'))
-    const [recordingResult, customQuizResult, fileResult] = await Promise.all([
+    const [recordingResult, customQuizResult, fileResult, boardResult] = await Promise.all([
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_session_recording_results', sessionId, presenterToken },
       }),
@@ -145,6 +145,11 @@ export function SessionReportPage() {
       // has to carry whatever was analysed by the time the class ended.
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_file_responses', sessionId, presenterToken },
+      }),
+      // Every board in the session, revealed or not. This is the class's own
+      // writing and belongs in the record of the lesson.
+      supabase.functions.invoke('presenter-action', {
+        body: { action: 'get_session_board_posts', sessionId, presenterToken },
       }),
     ])
     if (recordingResult.error) throw new Error(await edgeFunctionMessage(recordingResult.error, t))
@@ -161,6 +166,7 @@ export function SessionReportPage() {
       answers,
       audioResponses: (recordingResult.data?.responses || []) as AudioResponse[],
       fileResponses: (fileResult.data?.responses || []) as FileResponse[],
+      boardPosts: (boardResult.data?.posts || []) as BoardPost[],
       customQuizResults: customQuizResult.data as SessionCustomQuizResults,
       aiSummaries,
       exitTickets,

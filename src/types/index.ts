@@ -634,6 +634,10 @@ export type SessionReportData = {
   answers: Answer[]
   audioResponses: AudioResponse[]
   fileResponses: FileResponse[]
+  // Read through presenter-action rather than from the table: a browser may
+  // only see a board the teacher revealed, and an export that quietly dropped
+  // the discussions they kept to themselves would be worse than none.
+  boardPosts: BoardPost[]
   buzzerEvents: SessionEvent[]
   customQuizResults: SessionCustomQuizResults
   aiSummaries: AiSummary[]

@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       supabase.from('participants').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
       // 討論板 answers live in their own table, so a summary built only from
       // answers reports an empty discussion as if nobody joined in.
-      supabase.from('board_posts').select('question_id, participant_id, body, kind').eq('session_id', sessionId).order('created_at').limit(5000),
+      supabase.from('board_posts').select('question_id, participant_id, body, kind').eq('session_id', sessionId).is('deleted_at', null).order('created_at').limit(5000),
     ])
     for (const result of [questionResult, answerResult, messageResult, screenshotResult, analysisResult, participantResult, boardPostResult]) {
       if (result.error) throw result.error

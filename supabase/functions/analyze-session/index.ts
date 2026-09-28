@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
       // said 作答率 0% about a board the whole class had written on, and the
       // discussion itself — often the most quotable thing in the lesson — was
       // not in front of the model at all.
-      supabase.from('board_posts').select('question_id, participant_id, participant_name, kind, body, url, created_at').eq('session_id', sessionId).order('created_at').limit(5000),
+      supabase.from('board_posts').select('question_id, participant_id, participant_name, kind, body, url, created_at').eq('session_id', sessionId).is('deleted_at', null).order('created_at').limit(5000),
     ])
 
     for (const result of [participantResult, messageResult, sharedContentResult, captionResult, questionResult, answerResult, audioResponseResult, fileResponseResult, questionAnalysisResult, exitTicketResult, boardPostResult]) {

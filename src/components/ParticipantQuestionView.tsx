@@ -29,10 +29,15 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
   const [pins, setPins] = useState<Array<{ x: number; y: number }>>([])
   const [textAnswer, setTextAnswer] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
+  // A read-aloud line comes with its reading shown, because seeing how a word
+  // sounds is the point of the exercise — but a learner practising without the
+  // crutch has to be able to put it away, the same as in a passage.
+  const [showReading, setShowReading] = useState(true)
 
   useEffect(() => {
     setTextAnswer('')
     setSelectedOptions([])
+    setShowReading(true)
   }, [question?.id])
 
   // Above the early return below: a hook that runs only on some renders changes
@@ -63,6 +68,8 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
   const typeKey = typeTitles[question.type]
   const fallbackTitle = question.title || (typeKey ? participantText(locale, typeKey) : '')
   const prompt = translation?.prompt_text || translation?.title || question.prompt_text || fallbackTitle || participantText(locale, 'interactiveQuestion')
+  // Something to put away: 注音 set into the font, or 拼音 above the line.
+  const hasReading = Boolean(readingFamily || question.reading_words?.length || question.reading_ruby?.length)
   const translatedOptions = translation?.options?.length === question.options.length ? translation.options : question.options
   const displayAnswer = (value: string) => {
     const index = question.options.indexOf(value)
@@ -79,11 +86,17 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
     <section className="panel participant-question">
       {/* Three ways a read-aloud line can be shown, and only one applies at a
           time: 注音 inside the font, 拼音 above the characters, or plain. */}
-      {readingFamily
+      {readingFamily && showReading
         ? <h2 className="reading-text" style={{ fontFamily: readingFamily }}>{prompt}</h2>
-        : question.reading_ruby?.length
-          ? <h2 className="reading-text reading-ruby"><RubyText ruby={question.reading_ruby} text={prompt} /></h2>
+        : (question.reading_words?.length || question.reading_ruby?.length) && showReading
+          ? <h2 className="reading-text reading-ruby"><RubyText ruby={question.reading_ruby || []} text={prompt} words={question.reading_words} /></h2>
           : <h2>{prompt}</h2>}
+      {hasReading && (
+        <label className="listening-transcript-toggle">
+          <input checked={!showReading} type="checkbox" onChange={(event) => setShowReading(!event.target.checked)} />
+          <span>{participantText(locale, readingFamily ? 'listeningHideZhuyin' : 'listeningHidePinyin')}</span>
+        </label>
+      )}
       {question.status !== 'active' && <p className="muted">{participantText(locale, 'questionEnded')}</p>}
       {question.status === 'active' && secondsLeft !== null && !answer && (
         <p className={timeUp ? 'answer-countdown spent' : 'answer-countdown'} aria-live="off">

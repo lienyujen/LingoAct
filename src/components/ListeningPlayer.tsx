@@ -4,7 +4,7 @@ import { participantText } from '../lib/participantI18n'
 import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { playsUsed, recordPlay } from '../lib/listening'
-import type { KaraokeCue, ListeningClip } from '../types'
+import type { KaraokeCue, ListeningClip, ReadingWord } from '../types'
 
 type Props = {
   clip: ListeningClip
@@ -13,6 +13,10 @@ type Props = {
   prompt?: string | null
   readingFontUrl?: string | null
   readingRuby?: string[] | null
+  // The same reading spelled as words, per 正詞法. Preferred over readingRuby
+  // wherever it exists, so 星期六 reads xīngqīliù rather than xīng qí liù and
+  // a name keeps its capital.
+  readingWords?: ReadingWord[] | null
   karaokeCues?: KaraokeCue[] | null
   // 'inline' is the passage reader's row, where the player is two buttons
   // beside the annotation switches rather than a panel of its own.
@@ -25,7 +29,7 @@ type Props = {
 
 const SLOW_RATE = 0.75
 
-export function ListeningPlayer({ clip, questionId, replayLimit, prompt, readingFontUrl, readingRuby, karaokeCues, variant = 'listening', locale, onActiveCue }: Props) {
+export function ListeningPlayer({ clip, questionId, replayLimit, prompt, readingFontUrl, readingRuby, readingWords, karaokeCues, variant = 'listening', locale, onActiveCue }: Props) {
   const isModel = variant === 'model'
   const isInline = variant === 'inline'
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -172,7 +176,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
         ref={audioRef}
         preload="auto"
         src={clip.public_url}
-        onEnded={() => { setPlaying(false); setActiveCue(-1) }}
+        onEnded={() => { setPlaying(false); setHeld(false); setActiveCue(-1) }}
         onError={() => setFailed(true)}
       />
 
@@ -180,11 +184,23 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
       <p className="muted">{participantText(locale, failed ? 'listeningFailed' : isModel ? 'modelAudioHint' : 'listeningHint')}</p>
 
       <div className="listening-controls">
-        <button className="listening-play" disabled={exhausted || playing || failed} type="button" onClick={start}>
-          <Play size={20} />
-          <span>{playing
-            ? participantText(locale, 'listeningPlaying')
-            : participantText(locale, used > 0 ? 'listeningReplay' : 'listeningPlay')}</span>
+        {/* Stop and carry on, the same as the passage reader's row. A learner
+            shadowing a model recording pauses constantly, and until now this
+            button could only be started: their one option was to let it run to
+            the end. Where there IS a replay allowance the button stays a plain
+            play, because holding it would be a way to stop the clock. */}
+        <button
+          className="listening-play"
+          disabled={exhausted || failed || (playing && !canHold)}
+          type="button"
+          onClick={toggle}
+        >
+          {playing && canHold ? <Pause size={20} /> : <Play size={20} />}
+          <span>{participantText(locale, playing
+            ? canHold ? 'listeningPause' : 'listeningPlaying'
+            : held
+              ? 'listeningResume'
+              : used > 0 ? 'listeningReplay' : 'listeningPlay')}</span>
         </button>
 
         <button
@@ -205,10 +221,10 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
               <input checked={showTranscript} type="checkbox" onChange={(event) => setShowTranscript(event.target.checked)} />
               <span>{participantText(locale, 'listeningShowText')}</span>
             </label>
-            {showTranscript && Boolean(readingFontUrl || readingRuby?.length) && (
+            {showTranscript && Boolean(readingFontUrl || readingRuby?.length || readingWords?.length) && (
               <label className="listening-transcript-toggle">
                 <input checked={plainText} type="checkbox" onChange={(event) => setPlainText(event.target.checked)} />
-                <span>{participantText(locale, readingRuby?.length ? 'listeningHidePinyin' : 'listeningHideZhuyin')}</span>
+                <span>{participantText(locale, readingRuby?.length || readingWords?.length ? 'listeningHidePinyin' : 'listeningHideZhuyin')}</span>
               </label>
             )}
           </div>
@@ -219,6 +235,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
               fontFamily={plainText ? null : readingFamily}
               ruby={plainText ? [] : readingRuby || []}
               text={plainText ? stripReadingSelectors(prompt) : prompt}
+              words={plainText ? null : readingWords || null}
             />
           )}
         </div>
@@ -241,12 +258,13 @@ function stripReadingSelectors(text: string) {
   return text.replace(/[\u{E0100}-\u{E01EF}]/gu, '')
 }
 
-function KaraokeText({ activeCue, cues, fontFamily, ruby, text }: {
+function KaraokeText({ activeCue, cues, fontFamily, ruby, text, words }: {
   activeCue: number
   cues: KaraokeCue[]
   fontFamily: string | null
   ruby: string[]
   text: string
+  words: ReadingWord[] | null
 }) {
   // A zhuyin variation selector belongs to the character before it. Grouping
   // them keeps the saved cue indexes aligned with the unannotated transcript.
@@ -256,6 +274,32 @@ function KaraokeText({ activeCue, cues, fontFamily, ruby, text }: {
     else units.push(character)
   }
   const alignedRuby = ruby.length === units.length ? ruby : []
+
+  // 正詞法 spells a word, so the ruby has to span one. The cues still count
+  // characters, so the highlight is applied to each character inside the word
+  // rather than to the word as a whole — a word half-spoken looks half-lit,
+  // which is what karaoke is.
+  const wordRuns = words?.length && words.map((word) => word.text).join('') === units.join('') ? words : null
+  if (wordRuns) {
+    const lit = (index: number) => activeCue >= 0
+      && index >= cues[activeCue]?.start_index
+      && index < cues[activeCue]?.end_index
+    let at = 0
+    return (
+      <p className="listening-karaoke reading-ruby" style={fontFamily ? { fontFamily } : undefined} aria-live="off">
+        {wordRuns.map((word, index) => {
+          const from = at
+          const body = [...word.text].map((character, offset) => (
+            <span className={lit(from + offset) ? 'karaoke-character active' : 'karaoke-character'} key={offset}>{character}</span>
+          ))
+          at += [...word.text].length
+          return word.pinyin
+            ? <ruby key={index}>{body}<rt>{word.pinyin}</rt></ruby>
+            : <span key={index}>{body}</span>
+        })}
+      </p>
+    )
+  }
 
   return (
     <p className={alignedRuby.length ? 'listening-karaoke reading-ruby' : 'listening-karaoke'} style={fontFamily ? { fontFamily } : undefined} aria-live="off">

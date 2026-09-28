@@ -176,6 +176,8 @@ export type ListeningClip = {
 export type PresenterListeningClip = ListeningClip & {
   annotation: 'none' | 'zhuyin' | 'pinyin'
   annotation_text: string | null
+  // The same reading spelled as words. 拼音 only; 注音 has it in the glyphs.
+  annotation_words?: ReadingWord[] | null
   font_url: string | null
   screenshot_id: string | null
   source: 'screenshot' | 'text'
@@ -267,6 +269,10 @@ export type Question = {
   // 拼音 only: one syllable per character of prompt_text, rendered as ruby.
   // 注音 leaves this null — its reading is inside the font above.
   reading_ruby?: string[] | null
+  // The same reading spelled as words rather than syllables, which is what the
+  // transcript is rendered from when it is there. reading_ruby stays for decks
+  // and for clips annotated before this existed.
+  reading_words?: ReadingWord[] | null
   // Audio-only listening carries these with its visible-on-request transcript.
   // The spans use character indexes in the unannotated text.
   karaoke_cues?: KaraokeCue[]
@@ -697,6 +703,13 @@ export type ReadingGrammar = {
   note: Record<string, string>
 }
 
+// Chinese text cut into words, each with its 《漢語拼音正詞法基本規則》
+// (GB/T 16159) spelling: 星期六 is one word spelled xīngqīliù, 小明 is a name
+// spelled Xiǎo Míng, and punctuation is a word with no reading at all. A
+// passage, a read-aloud sentence and a listening transcript all use this, so a
+// learner meets one spelling of a word wherever it appears.
+export type ReadingWord = { text: string; pinyin: string }
+
 export type ReadingPassage = {
   id: string
   session_id: string
@@ -707,7 +720,7 @@ export type ReadingPassage = {
   // The passage cut into words, each with its 漢語拼音正詞法 spelling. 拼音 is
   // written per word — zīliàojiā, not zī liào jiā — so the ruby is grouped by
   // word rather than by character.
-  words?: Array<{ text: string; pinyin: string }>
+  words?: ReadingWord[]
   vocabulary: ReadingVocabulary[]
   grammar: ReadingGrammar[]
   listening_clip_id: string | null

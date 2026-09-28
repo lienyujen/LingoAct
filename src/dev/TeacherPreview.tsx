@@ -16,6 +16,7 @@ import { BackendSetup } from '../components/BackendSetup'
 import { WordCloudCanvas } from '../components/WordCloudCanvas'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
+import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { Coffee } from '@phosphor-icons/react'
 import { ExitTicketForm } from '../components/ExitTicketForm'
 import { participantText } from '../lib/participantI18n'
@@ -90,6 +91,22 @@ export function Preview() {
   // vocabulary have to survive into history, because reviewing them is the
   // whole point of a reading.
   if (location.hash === '#history') return <HistoryPreview />
+  // 朗讀 and 聽力 showing the transcript with the same 正詞法 pinyin the
+  // passage reader uses, the switch that puts it away, and a play button that
+  // pauses.
+  // 朗讀: the sentence with its 正詞法 reading, the switch that hides it, and
+  // the model recording underneath.
+  if (location.hash === '#read-aloud') return <main className="participant-page"><ParticipantQuestionView
+    question={{ ...practiceQuestion, id: 'ra', type: 'pronunciation' as const, status: 'active' as const,
+      title: '朗讀發音', prompt_text: '星期六早上，我跟小明去了學校附近的市場。',
+      reading_words: readingSample.words.slice(0, readingSample.words.findIndex((word) => word.text.trim() === '')) }}
+    answer={null} audioBusy={false} audioResponse={null} locale="zh-TW"
+    onSubmit={() => {}} onSubmitAudio={async () => {}} onDiscardAudio={async () => {}}
+  /></main>
+  if (location.hash === '#listening-pinyin') return <main className="participant-page"><ListeningPlayer
+    clip={audiblePreviewClip} locale="zh-TW" questionId="q" replayLimit={null} variant="listening"
+    prompt={readingSample.body} readingWords={readingSample.words} karaokeCues={previewCues}
+  /></main>
   if (location.hash === '#reading-locked') return <main className="participant-page"><ReadingPassageView locale="zh-TW" locked passage={readingSample} /></main>
   if (location.hash === '#reading') return <main className="participant-page"><ReadingPassageView imageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%23ddd'/%3E%3C/svg%3E" locale="en" passage={readingSample} player={previewPlayer()} /></main>
   if (location.hash === '#cloud') return <CloudPreview />
@@ -184,6 +201,27 @@ const previewClip = {
   id: 'c', session_id: 'preview', kind: 'passage' as const, language: 'zh-tw',
   duration_ms: 4000, public_url: '', created_at: '',
 }
+
+// Twenty seconds of silence, built here rather than fetched, so the player
+// previews can actually be played — which is the only way to see whether the
+// button pauses and resumes rather than merely whether it is drawn.
+function silentWav(seconds: number) {
+  const rate = 8000
+  const samples = rate * seconds
+  const bytes = new Uint8Array(44 + samples * 2)
+  const view = new DataView(bytes.buffer)
+  const ascii = (at: number, text: string) => [...text].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)))
+  ascii(0, 'RIFF'); view.setUint32(4, 36 + samples * 2, true); ascii(8, 'WAVEfmt ')
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true)
+  view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true)
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true)
+  ascii(36, 'data'); view.setUint32(40, samples * 2, true)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return `data:audio/wav;base64,${btoa(binary)}`
+}
+
+const audiblePreviewClip = { ...previewClip, duration_ms: 20000, public_url: silentWav(20) }
 
 function previewPlayer() {
   return <ListeningPlayer clip={previewClip} locale="zh-TW" questionId="q" replayLimit={null} variant="inline" />

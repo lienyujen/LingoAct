@@ -10,11 +10,32 @@ type Props = {
   // One entry per character of text. Empty where there is nothing to read —
   // punctuation, spaces, digits — which is most of what makes a sentence.
   ruby: string[]
+  // The same reading spelled as words, per 《漢語拼音正詞法基本規則》. Preferred
+  // over `ruby` wherever it is available, because a reading is spelled per word
+  // — 星期六 is xīngqīliù, and 小明 is a name that keeps its capital — and a
+  // learner should not meet one convention in a passage and another here.
+  words?: { text: string; pinyin: string }[] | null
   className?: string
 }
 
-export function RubyText({ text, ruby, className }: Props) {
+export function RubyText({ text, ruby, words, className }: Props) {
   const characters = [...text]
+
+  // Same rule as the per-character list: a segmentation that does not join
+  // back into this exact text would put the readings over the wrong words, so
+  // it is not used at all rather than used wrongly.
+  if (words?.length && words.map((word) => word.text).join('') === text) {
+    return (
+      <span className={className}>
+        {words.map((word, index) => (
+          word.pinyin
+            ? <ruby key={index}>{word.text}<rt>{word.pinyin}</rt></ruby>
+            : <span key={index}>{word.text}</span>
+        ))}
+      </span>
+    )
+  }
+
   // A list that does not line up would put every syllable over the wrong
   // character, so it is not used at all rather than used wrongly.
   if (ruby.length !== characters.length) return <span className={className}>{text}</span>

@@ -2,7 +2,7 @@ import { resolveTrack } from './teachingTracks'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
-import type { ListeningClip, ListeningKind, PresenterListeningClip } from '../types'
+import type { ListeningClip, ListeningKind, PresenterListeningClip, ReadingWord } from '../types'
 
 // Everything a student may be told about a clip. Spelled out rather than '*'
 // because the anon role holds column-level grants: asking for '*' is refused
@@ -163,7 +163,9 @@ export async function annotateReading(input: {
 }) {
   const { data, error } = await requireSupabase().functions.invoke('annotate-reading', { body: input })
   if (error) throw error
-  return data as { mode: string; annotationText: string; polyphonic?: number; decided?: number }
+  // words is the 正詞法 segmentation, present for pinyin and empty for 注音,
+  // which carries its reading inside the glyphs instead.
+  return data as { mode: string; annotationText: string; words?: ReadingWord[]; polyphonic?: number; decided?: number }
 }
 
 // Zhuyin needs a font the student's browser can load, and it is cut here rather
@@ -175,6 +177,7 @@ export async function applyAnnotation(input: {
   clipId: string
   mode: AnnotationMode
   annotationText: string
+  annotationWords?: ReadingWord[]
 }, t: PresenterT = presenterLookup('zh-TW')) {
   let fontBase64 = ''
   if (input.mode === 'zhuyin') {
@@ -193,6 +196,7 @@ export async function applyAnnotation(input: {
       listeningClipId: input.clipId,
       annotation: input.mode,
       annotationText: input.mode === 'none' ? '' : input.annotationText,
+      annotationWords: input.mode === 'pinyin' ? input.annotationWords || [] : [],
       fontBase64,
     },
   })

@@ -14,7 +14,7 @@ import { classLevelInstruction, resolveFramework, resolveTrack, teachingTrackIds
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
-import { comprehensionInstruction, generateReadingPassage, writeMissingGrammarNotes } from '../_shared/reading.ts'
+import { comprehensionInstruction, generateReadingPassage, settleWords, writeMissingGrammarNotes } from '../_shared/reading.ts'
 
 type ParticipantRecord = { id: string; name: string }
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -1784,11 +1784,20 @@ Deno.serve(async (req) => {
 
       const { data: clip } = await supabase
         .from('listening_clips')
-        .select('id, content_hash')
+        .select('id, content_hash, transcript')
         .eq('id', clipId)
         .eq('session_id', sessionId)
         .maybeSingle()
       if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+
+      // Checked here rather than trusted: this arrives from the teacher's
+      // browser, and a segmentation that does not join back into the
+      // transcript would put every reading over the wrong word. It is checked
+      // against the transcript, not against annotationText, which for pinyin
+      // is the per-character syllable list rather than the text itself.
+      const annotationWords = annotation === 'pinyin'
+        ? settleWords(input.annotationWords, String(clip.transcript || ''))
+        : []
 
       if (annotation === 'zhuyin' && !fontBase64) {
         return jsonResponse({ message: '注音標記需要一併提供字型子集。' }, 400)
@@ -1815,6 +1824,7 @@ Deno.serve(async (req) => {
         .update({
           annotation,
           annotation_text: annotation === 'none' ? null : annotationText,
+          annotation_words: annotationWords.length ? annotationWords : null,
           font_path: fontPath,
           font_url: fontUrl,
         })
@@ -1850,7 +1860,7 @@ Deno.serve(async (req) => {
 
       const { data: clip } = await supabase
         .from('listening_clips')
-        .select('id, transcript, annotation, annotation_text, font_url, karaoke_cues')
+        .select('id, transcript, annotation, annotation_text, annotation_words, font_url, karaoke_cues')
         .eq('id', clipId)
         .eq('session_id', sessionId)
         .maybeSingle()
@@ -1899,6 +1909,16 @@ Deno.serve(async (req) => {
           // still goes out, just without the pinyin above it.
         }
       }
+      // The 正詞法 spelling of the same sentence, which is what the student
+      // page renders when it is there: 星期六 as xīngqīliù rather than three
+      // loose syllables, and 小明 capitalised. It only travels with the modes
+      // that deliberately show the words, exactly like reading_ruby, and it
+      // has to be a segmentation OF the text being shown — a 注音 item shows
+      // the annotated text instead, which these words would not line up with.
+      const readingWords = (readAloud || audioOnly) && !zhuyin && Array.isArray(clip.annotation_words)
+        ? settleWords(clip.annotation_words, promptText)
+        : []
+
       const title = readAloud ? '朗讀發音' : '聽力'
       let translations = {}
       // The audio-only prompt is the exact script being spoken, not guidance
@@ -1937,6 +1957,7 @@ Deno.serve(async (req) => {
           // characters themselves would reveal its source passage.
           reading_font_url: (readAloud || audioOnly) && zhuyin ? clip.font_url : null,
           reading_ruby: readingRuby,
+          reading_words: readingWords.length ? readingWords : null,
           karaoke_cues: audioOnly && Array.isArray(clip.karaoke_cues) ? clip.karaoke_cues : [],
           prepare_seconds: prepareSeconds,
           answer_seconds: answerSeconds,

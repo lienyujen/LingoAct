@@ -213,6 +213,50 @@ export type ReadingInput = {
 
 export type ReadingWord = { text: string; pinyin: string }
 
+// 正詞法, written once.
+//
+// A passage, a read-aloud sentence and a listening transcript are all Chinese
+// text that has to be spelled as words rather than as syllables, and a learner
+// who sees 星期六 as "xīng qí liù" in one place and "xīngqīliù" in another has
+// been taught that the rule is arbitrary. `field` is only the name of the
+// property holding the text in that particular schema.
+export function orthographyRules(field: string) {
+  return [
+    `words: 把 ${field} 逐詞切開放進 words，順序與原文相同。所有 text 接起來必須和 ${field} 完全一樣，包含標點；標點自成一項，pinyin 留空字串。`,
+    '每個詞的 pinyin 依《漢語拼音正詞法基本規則》(GB/T 16159) 書寫，不是逐字注音：',
+    '一、一個 text 放一個詞，不是一個詞組。詞和詞之間要分開放，不可以併成一項。',
+    '   「每天早上」是兩個詞：每天 (měitiān)、早上 (zǎoshang)，不可以寫成一項 měitiānzǎoshang。',
+    '   「以後都」是兩個詞：以後 (yǐhòu)、都 (dōu)。一個 text 很少超過三個漢字，超過就要再想想是不是兩個詞。',
+    '二、一個詞的內部連寫，不留空格：zīliàojiā（資料夾）、jīntiān（今天）、dǎkāi（打開）、shuāyá（刷牙）。',
+    '三、專有名詞首字母大寫；人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。句首大寫由系統處理，你不用管。',
+    '四、動詞與賓語分寫（kàn xìn、chī fàn）；動詞與動態助詞連寫（kànzhe、kànle、kànguò）。',
+    '五、數詞與量詞分寫（qī gè）；11 到 99 的整數連寫（shíwǔ）。',
+    '六、結構助詞的、地、得分寫；語氣詞嗎、呢、吧分寫。',
+    "七、a、o、e 開頭的音節接在別的音節後面時，前面加隔音符號：dàng'àn（檔案）、Xī'ān（西安）。",
+    '八、聲調一律用調號標出，不用數字。阿拉伯數字與外文照原樣留在 text，pinyin 留空字串。',
+  ]
+}
+
+// The segmentation has to be OF this text. Joining the pieces back together
+// must give it again, or the readings would sit over the wrong words — better
+// no pinyin than pinyin on the wrong syllables. Whitespace is excused because
+// a model reflows line breaks and that changes nothing about the reading.
+export function settleWords(raw: unknown, text: string): ReadingWord[] {
+  const segmented = (Array.isArray(raw) ? raw : [])
+    .map((entry) => {
+      const word = entry as Record<string, unknown>
+      return { text: String(word.text || ''), pinyin: String(word.pinyin || '').trim() }
+    })
+    .filter((entry) => entry.text)
+  const rejoined = segmented.map((entry) => entry.text).join('')
+  if (!segmented.length) return []
+  if (rejoined.replace(/s/g, '') !== text.replace(/s/g, '')) {
+    console.warn(`Word segmentation did not reassemble: ${rejoined.slice(0, 80)}`)
+    return []
+  }
+  return applyOrthography(segmented)
+}
+
 // 正詞法 rules a program can apply itself, applied after the model answers.
 //
 // Capitalising the first word of a sentence needs no Chinese at all: it needs
@@ -356,18 +400,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     input.image
       ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
       : '',
-    'words: 把 body 逐詞切開放進 words，順序與原文相同。所有 text 接起來必須和 body 完全一樣，包含標點；標點自成一項，pinyin 留空字串。',
-    '每個詞的 pinyin 依《漢語拼音正詞法基本規則》(GB/T 16159) 書寫，不是逐字注音：',
-    '一、一個 text 放一個詞，不是一個詞組。詞和詞之間要分開放，不可以併成一項。',
-    '   「每天早上」是兩個詞：每天 (měitiān)、早上 (zǎoshang)，不可以寫成一項 měitiānzǎoshang。',
-    '   「以後都」是兩個詞：以後 (yǐhòu)、都 (dōu)。一個 text 很少超過三個漢字，超過就要再想想是不是兩個詞。',
-    '二、一個詞的內部連寫，不留空格：zīliàojiā（資料夾）、jīntiān（今天）、dǎkāi（打開）、shuāyá（刷牙）。',
-    '三、專有名詞首字母大寫；人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。句首大寫由系統處理，你不用管。',
-    '四、動詞與賓語分寫（kàn xìn、chī fàn）；動詞與動態助詞連寫（kànzhe、kànle、kànguò）。',
-    '五、數詞與量詞分寫（qī gè）；11 到 99 的整數連寫（shíwǔ）。',
-    '六、結構助詞的、地、得分寫；語氣詞嗎、呢、吧分寫。',
-    "七、a、o、e 開頭的音節接在別的音節後面時，前面加隔音符號：dàng'àn（檔案）、Xī'ān（西安）。",
-    '八、聲調一律用調號標出，不用數字。阿拉伯數字與外文照原樣留在 text，pinyin 留空字串。',
+    ...orthographyRules('body'),
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
     'Do not invent a grammar point that is not on the list, and do not attribute a pattern to a sentence that does not contain it.',
@@ -415,19 +448,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   // sentence-ordering chunks are: joining the pieces must give the body back.
   // A list that does not reassemble would put the readings over the wrong
   // words and mark words the passage does not contain.
-  const segmented = (Array.isArray(output.words) ? output.words : [])
-    .map((raw) => {
-      const entry = raw as Record<string, unknown>
-      return { text: String(entry.text || ''), pinyin: String(entry.pinyin || '').trim() }
-    })
-    .filter((entry) => entry.text)
-  const rejoined = segmented.map((entry) => entry.text).join('')
-  const words = rejoined.replace(/\s/g, '') === body.replace(/\s/g, '')
-    ? applyOrthography(segmented)
-    : []
-  if (segmented.length && !words.length) {
-    console.warn(`Reading segmentation did not reassemble: ${rejoined.slice(0, 80)}`)
-  }
+  const words = settleWords(output.words, body)
 
   // 國教院's list decides which of them are new, and a second call says what
   // they mean. Without a usable segmentation there is nothing to judge, so the

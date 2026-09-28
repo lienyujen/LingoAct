@@ -823,6 +823,11 @@ alter table public.questions
 alter table public.questions
   add column if not exists reading_ruby jsonb null;
 
+-- The word-level version of the same reading, copied from the clip when it is
+-- dispatched so the student page needs only the question row.
+alter table public.questions
+  add column if not exists reading_words jsonb null;
+
 -- AI寫作教練, the scaffolded version. Every round a student asks for is kept:
 -- 寫作歷程 is what the teacher reads afterwards, and a first draft plus the
 -- question that moved it says more than the finished paragraph does. Keyed on
@@ -964,6 +969,13 @@ alter table public.listening_clips
 -- re-annotate without losing their wording.
 alter table public.listening_clips
   add column if not exists annotation_text text null;
+
+-- The same text cut into words, each with its 正詞法 spelling. annotation_text
+-- above is one syllable per character, which is what a flashcard wants; a
+-- reader wants words, so that 星期六 is xīngqīliù rather than xīng qí liù and
+-- 小明 is capitalised. Both come back from one annotate-reading call.
+alter table public.listening_clips
+  add column if not exists annotation_words jsonb null;
 
 -- The subset built for exactly this clip's characters. Null for pinyin, which
 -- needs no font at all.

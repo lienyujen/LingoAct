@@ -2,6 +2,7 @@ import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/a
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { applyRegionalPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
+import { orthographyRules, settleWords } from '../_shared/reading.ts'
 
 // Deciding how each character should be read, and saying so in a way the font
 // understands.
@@ -32,13 +33,31 @@ const zhuyinSchema = {
   required: ['choices'],
 }
 
+// Two alignments of the same text, because two different things read them.
+//
+// syllables is one entry per character, which is what a flashcard needs: it
+// shows one character and the sound that character makes. words is the text
+// cut into words with 正詞法 spelling, which is what a reader needs — 星期六 is
+// xīngqīliù, one word, not three syllables standing next to each other.
+// Asking for both in one response keeps 標音 to a single call; each is checked
+// separately below, and either can come back unusable without costing the
+// other.
 const pinyinSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
     syllables: { type: 'array', items: { type: 'string' } },
+    words: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { text: { type: 'string' }, pinyin: { type: 'string' } },
+        required: ['text', 'pinyin'],
+      },
+    },
   },
-  required: ['syllables'],
+  required: ['syllables', 'words'],
 }
 
 Deno.serve(async (req) => {
@@ -75,11 +94,12 @@ Deno.serve(async (req) => {
       // per character, blank for anything that is not a Han character.
       const result = await callAiJson(
         [
-          'Give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
+          'syllables: give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
           'Use tone marks (nǐ hǎo), not tone numbers. Choose the reading the character takes in THIS context.',
           regionalPronunciationInstruction(text, accent),
           'For anything that is not a Han character — punctuation, spaces, Latin letters, digits, newlines — return an empty string in its slot.',
-          'The array must contain exactly as many entries as the character count given.',
+          'The syllables array must contain exactly as many entries as the character count given.',
+          ...orthographyRules('text'),
         ].join('\n'),
         { text, character_count: characters.length },
         pinyinSchema,
@@ -97,7 +117,10 @@ Deno.serve(async (req) => {
         characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : '')),
         accent,
       )
-      return jsonResponse({ mode, annotationText: JSON.stringify(aligned) })
+      // The same 正詞法 treatment the passage reader already gives a reading,
+      // so a learner meets one spelling of 星期六 wherever it appears.
+      const words = settleWords((result.output as { words?: unknown })?.words, text)
+      return jsonResponse({ mode, annotationText: JSON.stringify(aligned), words })
     }
 
     const codepoints = [...new Set(characters.map((character) => character.codePointAt(0) as number))]

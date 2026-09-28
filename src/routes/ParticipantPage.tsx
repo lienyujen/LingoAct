@@ -1026,6 +1026,7 @@ export function ParticipantPage() {
               questionId={question.id}
               readingFontUrl={question.reading_font_url}
               readingRuby={question.reading_ruby}
+              readingWords={question.reading_words}
               replayLimit={question.replay_limit}
               variant="inline"
               onActiveCue={setReadingCue}
@@ -1051,6 +1052,7 @@ export function ParticipantPage() {
             : localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
           readingFontUrl={question.reading_font_url}
           readingRuby={question.reading_ruby}
+          readingWords={question.reading_words}
           karaokeCues={question.karaoke_cues}
           locale={locale}
         />

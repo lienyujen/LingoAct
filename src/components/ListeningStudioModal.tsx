@@ -338,6 +338,7 @@ export function ListeningStudioModal({
               sessionId, presenterToken, clipId: clip.id,
               mode: readingAnnotation as 'zhuyin' | 'pinyin',
               annotationText: marked.annotationText,
+              annotationWords: marked.words,
             }, t)
           } catch (caught) {
             // Losing the annotation is a shame; losing the activity is worse.

@@ -16,6 +16,14 @@ type Props = {
   onUpdateAnswer: (itemId: string, acceptedAnswers: string[]) => Promise<void>
   // 寫作教練 only: read one student's writing and leave feedback on it.
   onReviewWriting: (attemptId: string, force: boolean) => Promise<void>
+  // The teacher's final word on the mark and feedback, whether or not they
+  // asked the AI to take a first pass.
+  onSaveWritingReview: (input: {
+    attemptId: string
+    score: number | null
+    overall: string
+    fields: Array<{ itemId: string; text: string }>
+  }) => Promise<void>
   // 單字卡 only: drop a card, or ask for more from the same screenshot.
   onEditDeck: (input: { removeItemId?: string; addCount?: number }) => Promise<void>
   onActivateQuestion: (questionId: string) => Promise<void>
@@ -127,12 +135,19 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
   )
 }
 
-export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onEditDeck, onActivateQuestion, onStopQuestion, onResumeQuestion }: Props) {
+export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onSaveWritingReview, onEditDeck, onActivateQuestion, onStopQuestion, onResumeQuestion }: Props) {
   const t = usePresenterText()
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [busyItemId, setBusyItemId] = useState('')
   const [reviewingId, setReviewingId] = useState('')
+  const [savingReviewId, setSavingReviewId] = useState('')
+  const [reviewDraft, setReviewDraft] = useState<{
+    attemptId: string
+    score: string
+    overall: string
+    fields: Record<string, string>
+  } | null>(null)
   const [reviewProgress, setReviewProgress] = useState({ done: 0, total: 0 })
   const [deckBusy, setDeckBusy] = useState('')
   const [deckError, setDeckError] = useState('')
@@ -180,15 +195,15 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   if (!results.quiz) {
     return <section className="panel result-panel"><p className="muted">{t('quizGenerating')}</p></section>
   }
-  // 寫作教練 is not marked, so a missing score means there was never one to
-  // wait for. Everything below that reads as scoring is switched off rather
-  // than left showing dashes and a stuck "評分中" count.
+  // 寫作教練 is marked only when the teacher asks for it, so an empty score is
+  // still a valid submitted piece rather than one stuck waiting in a grading
+  // queue. Its own controls below handle the optional mark.
   const flashcard = results.quiz.requested_type === 'flashcard'
   const pictureOrdering = results.quiz.requested_type === 'picture_ordering'
   const pictureWriting = results.quiz.requested_type === 'picture_writing'
   const coaching = results.quiz.coaching === true
   const coachTurns = results.coachTurns || []
-  const unreviewed = results.attempts.filter((attempt) => !attempt.feedback?.zh_tw)
+  const unreviewed = results.attempts.filter((attempt) => !attempt.feedback?.zh_tw && attempt.total_score === null)
 
   async function reviewOne(attemptId: string, force: boolean) {
     setReviewingId(attemptId)
@@ -218,6 +233,46 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     }
     setReviewProgress({ done: 0, total: 0 })
     setReviewingId('')
+  }
+
+  function editWritingReview(attemptId: string) {
+    if (!results) return
+    const attempt = results.attempts.find((value) => value.id === attemptId)
+    if (!attempt) return
+    setReviewDraft({
+      attemptId,
+      score: attempt.total_score === null ? '' : String(attempt.total_score),
+      overall: attempt.feedback?.zh_tw || '',
+      fields: Object.fromEntries((answersByAttempt.get(attemptId) || []).map((answer) => [answer.item_id, answer.feedback?.zh_tw || ''])),
+    })
+  }
+
+  async function saveWritingReview() {
+    if (!reviewDraft) return
+    const scoreText = reviewDraft.score.trim()
+    const score = scoreText === '' ? null : Number(scoreText)
+    if (score !== null && (!Number.isFinite(score) || score < 0 || score > 100)) {
+      setError(t('writingScoreInvalid'))
+      return
+    }
+    setSavingReviewId(reviewDraft.attemptId)
+    setError('')
+    try {
+      await onSaveWritingReview({
+        attemptId: reviewDraft.attemptId,
+        score,
+        overall: reviewDraft.overall,
+        fields: (answersByAttempt.get(reviewDraft.attemptId) || []).map((answer) => ({
+          itemId: answer.item_id,
+          text: reviewDraft.fields[answer.item_id] || '',
+        })),
+      })
+      setReviewDraft(null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t('reviewSaveFailed'))
+    } finally {
+      setSavingReviewId('')
+    }
   }
   // Sorted by round rather than by insert order: the history is only legible
   // read forwards, first draft first.
@@ -440,9 +495,9 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
         </div>
       )}
       {!writing && grading.length > 0 && <p className="quiz-grading-note"><Clock size={16} />{t('gradingNote')}</p>}
-      {/* 寫作教練 is unscored by design, so this gives feedback rather than a
-          mark — a first pass the teacher can skim, correct and ignore. Already
-          reviewed students are skipped, so a second press costs nothing. */}
+      {/* AI is a first pass, never the last word. Already reviewed students are
+          skipped, so a second press costs nothing; the teacher can also mark a
+          piece themselves without spending a call. */}
       {writing && results.attempts.length > 0 && (
         <div className="writing-review-bar">
           <button disabled={Boolean(reviewingId) || !unreviewed.length} type="button" onClick={() => void reviewAll()}>
@@ -461,7 +516,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               <span>{flashcard
                 ? t('firstTryRight', { right: firstTryRight(attempt.id), total: results.items.length })
                 : writing
-                ? coaching ? t('submittedWithCoach', { n: roundsFor(attempt.participant_id) }) : t('submitted')
+                ? `${coaching ? t('submittedWithCoach', { n: roundsFor(attempt.participant_id) }) : t('submitted')}${attempt.total_score === null ? '' : ` · ${attempt.total_score}/100`}`
                 : attempt.status === 'graded'
                   ? `${attempt.total_score}/${attempt.max_score}`
                   : attempt.status === 'failed' ? t('gradeFailed') : t('grading')}</span>
@@ -499,7 +554,18 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                     <div className="quiz-written-answer" key={answer.id}>
                       <span>{itemPosition.get(answer.item_id)}. {itemPrompt.get(answer.item_id)}</span>
                       <p>{answer.answer_text}</p>
-                      {answer.feedback?.zh_tw && (
+                      {reviewDraft?.attemptId === attempt.id ? (
+                        <label className="writing-review-field-editor">
+                          <span>{t('fieldFeedbackLabel')}</span>
+                          <textarea
+                            value={reviewDraft.fields[answer.item_id] || ''}
+                            onChange={(event) => setReviewDraft((current) => current && current.attemptId === attempt.id ? {
+                              ...current,
+                              fields: { ...current.fields, [answer.item_id]: event.target.value },
+                            } : current)}
+                          />
+                        </label>
+                      ) : answer.feedback?.zh_tw && (
                         <p className="quiz-written-feedback"><Sparkle size={14} />{answer.feedback.zh_tw}</p>
                       )}
                       {/* 寫作歷程: what this field looked like before, and what
@@ -524,17 +590,54 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
             )}
             {writing && (
               <div className="writing-review-row">
-                {attempt.feedback?.zh_tw && <p className="writing-review-overall">{attempt.feedback.zh_tw}</p>}
-                <button
-                  className="ghost-button"
-                  disabled={reviewingId === attempt.id}
-                  type="button"
-                  onClick={() => void reviewOne(attempt.id, Boolean(attempt.feedback?.zh_tw))}
-                >
-                  {reviewingId === attempt.id
-                    ? <><CircleNotch className="spin" size={15} />{t('markingOne')}</>
-                    : <><Sparkle size={15} />{attempt.feedback?.zh_tw ? t('markAgain') : t('aiMark')}</>}
-                </button>
+                {reviewDraft?.attemptId === attempt.id ? (
+                  <div className="writing-review-editor">
+                    <label className="writing-review-score-editor">
+                      <span>{t('scoreOutOf100')}</span>
+                      <input
+                        inputMode="numeric"
+                        max="100"
+                        min="0"
+                        type="number"
+                        value={reviewDraft.score}
+                        onChange={(event) => setReviewDraft((current) => current && current.attemptId === attempt.id ? { ...current, score: event.target.value } : current)}
+                      />
+                    </label>
+                    <label>
+                      <span>{t('overallFeedbackLabel')}</span>
+                      <textarea
+                        value={reviewDraft.overall}
+                        onChange={(event) => setReviewDraft((current) => current && current.attemptId === attempt.id ? { ...current, overall: event.target.value } : current)}
+                      />
+                    </label>
+                    <div className="writing-review-editor-actions">
+                      <button className="ghost-button" disabled={savingReviewId === attempt.id} type="button" onClick={() => setReviewDraft(null)}>{t('cancel')}</button>
+                      <button disabled={savingReviewId === attempt.id} type="button" onClick={() => void saveWritingReview()}>
+                        {savingReviewId === attempt.id ? <CircleNotch className="spin" size={15} /> : <FloppyDisk size={15} />}
+                        {savingReviewId === attempt.id ? t('savingReview') : t('saveReview')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {attempt.feedback?.zh_tw && <p className="writing-review-overall">{attempt.feedback.zh_tw}</p>}
+                    <div className="writing-review-actions">
+                      <button className="ghost-button" disabled={reviewingId === attempt.id || Boolean(reviewDraft)} type="button" onClick={() => editWritingReview(attempt.id)}>
+                        <FloppyDisk size={15} />{attempt.feedback?.zh_tw || attempt.total_score !== null ? t('adjustReview') : t('markMyself')}
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={reviewingId === attempt.id || Boolean(reviewDraft)}
+                        type="button"
+                        onClick={() => void reviewOne(attempt.id, Boolean(attempt.feedback?.zh_tw) || attempt.total_score !== null)}
+                      >
+                        {reviewingId === attempt.id
+                          ? <><CircleNotch className="spin" size={15} />{t('markingOne')}</>
+                          : <><Sparkle size={15} />{attempt.feedback?.zh_tw ? t('markAgain') : t('aiMark')}</>}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {!writing && attempt.feedback?.zh_tw && <p>{attempt.feedback.zh_tw}</p>}

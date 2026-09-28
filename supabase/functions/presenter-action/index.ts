@@ -1411,9 +1411,9 @@ Deno.serve(async (req) => {
       const { error: overallError } = await supabase.from('quiz_attempts')
         .update({
           feedback: { zh_tw: review.overall.zhTw, en: review.overall.en },
-          // A mark out of 100, which the teacher may overwrite before releasing
-          // it. status stays where it is: marking is not releasing, and the
-          // class sees nothing until the teacher sends it.
+          // A mark out of 100, which the teacher may overwrite. Status stays
+          // where it is so the corrected article remains on the learner's
+          // submitted-work page; the touch below wakes that page immediately.
           total_score: review.score,
           max_score: 100,
           // The corrected article, which the student's own page diffs against
@@ -1427,6 +1427,68 @@ Deno.serve(async (req) => {
       const { data: refreshed } = await supabase.from('quiz_item_answers')
         .select('*').eq('attempt_id', attemptId)
       return jsonResponse({ answers: refreshed || [], overall: review.overall, revision: review.revision, score: review.score, maxScore: 100 })
+    }
+
+    // The teacher's own marking of a piece of writing, which overwrites
+    // whatever is there — the AI's, or an earlier pass of their own. It is
+    // also how a piece gets marked at all when the teacher never ran the AI.
+    //
+    // The corrected article is deliberately NOT editable. The learner reads it
+    // against their own text with the differences marked, so every word of it
+    // is presented to them as something they got wrong; a teacher rewriting it
+    // by hand would change that comparison in ways neither of them can see.
+    // What the teacher wants to say goes in the overall comment, which is
+    // theirs to write freely.
+    if (action === 'save_writing_review') {
+      const attemptId = input.attemptId
+      if (!validUuid(attemptId)) return jsonResponse({ message: '作答資料不正確。' }, 400)
+      const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts')
+        .select('id, quiz_id, participant_id, question_id').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
+      if (attemptError) throw attemptError
+      if (!attempt) return jsonResponse({ message: '找不到這份作答。' }, 404)
+
+      const { data: quiz } = await supabase.from('quizzes').select('graded').eq('id', attempt.quiz_id).maybeSingle()
+      if (quiz?.graded !== false) return jsonResponse({ message: '這不是寫作教練，請用原本的評分。' }, 400)
+
+      // Out of 100, or cleared back to unmarked. Anything else is a typo.
+      let totalScore: number | null = null
+      if (input.score !== null && input.score !== undefined && input.score !== '') {
+        const parsed = Number(input.score)
+        if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+          return jsonResponse({ message: '分數請填 0 到 100。' }, 400)
+        }
+        totalScore = Math.round(parsed)
+      }
+
+      const overall = typeof input.overall === 'string' ? input.overall.trim().slice(0, 2000) : ''
+      // The teacher writes in one language. Putting it in both slots is what
+      // stops a learner reading in the other one from being shown the AI's
+      // original text, which the teacher has just overruled.
+      const overallFeedback = overall ? { zh_tw: overall, en: overall } : null
+
+      const { error: attemptWriteError } = await supabase.from('quiz_attempts').update({
+        total_score: totalScore,
+        max_score: totalScore === null ? null : 100,
+        feedback: overallFeedback,
+      }).eq('id', attemptId)
+      if (attemptWriteError) throw attemptWriteError
+
+      const fields = Array.isArray(input.fields) ? input.fields : []
+      for (const raw of fields.slice(0, 50)) {
+        const field = raw as { itemId?: unknown; text?: unknown }
+        if (typeof field.itemId !== 'string' || !validUuid(field.itemId)) continue
+        const text = typeof field.text === 'string' ? field.text.trim().slice(0, 2000) : ''
+        const { error } = await supabase.from('quiz_item_answers')
+          .update({ feedback: text ? { zh_tw: text, en: text } : null })
+          .eq('attempt_id', attemptId).eq('item_id', field.itemId)
+        if (error) throw error
+      }
+
+      await touchWritingAnswer(supabase, attempt.question_id as string, attempt.participant_id as string)
+
+      const { data: saved } = await supabase.from('quiz_attempts')
+        .select('id, total_score, max_score, feedback').eq('id', attemptId).maybeSingle()
+      return jsonResponse({ attempt: saved })
     }
 
     // 單字卡 標音. The readings arrive already chosen and the font already cut:

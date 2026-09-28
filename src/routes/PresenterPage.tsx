@@ -1466,6 +1466,22 @@ export function PresenterPage() {
     await loadAll()
   }
 
+  async function saveWritingReview(input: {
+    attemptId: string
+    score: number | null
+    overall: string
+    fields: Array<{ itemId: string; text: string }>
+  }) {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error(t('noRightsRejoin'))
+    const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'save_writing_review', sessionId, presenterToken, ...input },
+    })
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, t('reviewSaveFailed')))
+    if (!data?.attempt) throw new Error(data?.message || t('reviewSaveFailed'))
+    await loadAll()
+  }
+
   async function updateCustomQuizAnswer(itemId: string, acceptedAnswers: string[]) {
     if (!question || question.type !== 'custom_quiz') return
     const presenterToken = getPresenterToken(sessionId)
@@ -2201,6 +2217,7 @@ export function PresenterPage() {
             onEditDeck={editDeck}
             onActivateQuestion={activateQuestion}
             onReviewWriting={reviewWritingAttempt}
+            onSaveWritingReview={saveWritingReview}
             onStopQuestion={stopQuestion}
             onResumeQuestion={resumeQuestion}
           />

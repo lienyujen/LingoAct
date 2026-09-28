@@ -508,7 +508,7 @@ export type QuizAttempt = {
   participant_name: string
   status: QuizAttemptStatus
   total_score: number | null
-  max_score: number
+  max_score: number | null
   feedback: { zh_tw?: string; en?: string } | null
   // 寫作教練 only: the fields joined into one article by the student, which is
   // the piece of writing the exercise exists to produce.

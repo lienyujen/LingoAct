@@ -5672,7 +5672,8 @@ h2 {
   ruby-align: center;
 }
 
-/* AI 批改 for 寫作教練: feedback, never a mark. */
+/* AI gives the teacher a first pass on writing; the teacher owns the mark and
+   every word that finally reaches the learner. */
 .writing-review-bar {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   margin-bottom: 10px; padding: 10px 12px;
@@ -5688,11 +5689,24 @@ h2 {
 .writing-review-bar span { font-size: 11.5px; }
 .writing-review-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
 .writing-review-row button { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.writing-review-actions,
+.writing-review-editor-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .writing-review-overall {
   flex-grow: 1; margin: 0; padding: 8px 11px;
   border-radius: var(--radius-sm); background: var(--primary-soft);
   font-size: 12.5px; line-height: 1.75;
 }
+.writing-review-editor { display: grid; gap: 10px; width: 100%; }
+.writing-review-editor label,
+.writing-review-field-editor { display: grid; gap: 5px; }
+.writing-review-editor label > span,
+.writing-review-field-editor > span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.writing-review-editor textarea,
+.writing-review-field-editor textarea { line-height: 1.65; min-height: 78px; resize: vertical; width: 100%; }
+.writing-review-score-editor { align-items: center; grid-template-columns: minmax(0, 1fr) 92px; }
+.writing-review-score-editor input { text-align: center; width: 92px; }
+.writing-review-field-editor { margin-top: 7px; }
+.writing-review-editor-actions button:last-child { background: var(--primary); border-color: var(--primary); color: #fff; }
 .quiz-written-feedback {
   display: flex; align-items: flex-start; gap: 6px;
   margin: 6px 0 0; padding: 7px 10px;
@@ -5700,6 +5714,14 @@ h2 {
   font-size: 12.5px; line-height: 1.75; color: var(--muted);
 }
 .quiz-written-feedback svg { flex-shrink: 0; margin-top: 3px; color: var(--primary); }
+
+@media (max-width: 560px) {
+  .writing-review-row { flex-direction: column; }
+  .writing-review-actions,
+  .writing-review-editor-actions { margin-left: 0; width: 100%; }
+  .writing-review-actions button,
+  .writing-review-editor-actions button { flex: 1; justify-content: center; }
+}
 
 /* AI寫作教練 with the scaffolding on, student side. Sits under the field it is
    about, and reads as someone talking to them rather than as a mark. */

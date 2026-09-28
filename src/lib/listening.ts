@@ -160,6 +160,12 @@ export async function annotateReading(input: {
   text: string
   mode: Exclude<AnnotationMode, 'none'>
   accent?: ListeningAccent
+  // 'words' asks for the 正詞法 segmentation instead of one syllable per
+  // character. Only what a learner reads as prose wants it; a flashcard shows
+  // one character at a time, and a passage already carries the words its own
+  // generator produced. Asking for both at once put 標音 over the realtime
+  // timeout on a full-length article.
+  granularity?: 'characters' | 'words'
 }) {
   const { data, error } = await requireSupabase().functions.invoke('annotate-reading', { body: input })
   if (error) throw error

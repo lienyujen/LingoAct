@@ -333,6 +333,9 @@ export function ListeningStudioModal({
               sessionId, presenterToken, text: clip.transcript,
               mode: readingAnnotation as 'zhuyin' | 'pinyin',
               accent,
+              // 朗讀 and 聽力 show the sentence as prose, so it is spelled as
+              // words the way a passage is.
+              granularity: readingAnnotation === 'pinyin' ? 'words' : 'characters',
             })
             await applyAnnotation({
               sessionId, presenterToken, clipId: clip.id,

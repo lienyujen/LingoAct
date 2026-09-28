@@ -33,20 +33,25 @@ const zhuyinSchema = {
   required: ['choices'],
 }
 
-// Two alignments of the same text, because two different things read them.
+// Two ways to align a reading, and a caller asks for exactly one.
 //
 // syllables is one entry per character, which is what a flashcard needs: it
-// shows one character and the sound that character makes. words is the text
-// cut into words with 正詞法 spelling, which is what a reader needs — 星期六 is
-// xīngqīliù, one word, not three syllables standing next to each other.
-// Asking for both in one response keeps 標音 to a single call; each is checked
-// separately below, and either can come back unusable without costing the
-// other.
-const pinyinSchema = {
+// shows a single character and the sound that character makes. words is the
+// text cut into words with 正詞法 spelling, which is what a reader needs —
+// 星期六 is xīngqīliù, one word, not three syllables side by side.
+const syllableSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
     syllables: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['syllables'],
+}
+
+const wordSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
     words: {
       type: 'array',
       items: {
@@ -57,7 +62,7 @@ const pinyinSchema = {
       },
     },
   },
-  required: ['syllables', 'words'],
+  required: ['words'],
 }
 
 Deno.serve(async (req) => {
@@ -70,6 +75,9 @@ Deno.serve(async (req) => {
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const text = typeof input.text === 'string' ? input.text.trim() : ''
     const mode = input.mode === 'pinyin' ? 'pinyin' : 'zhuyin'
+    // Defaults to characters, which is what every caller wanted before 朗讀 and
+    // 聽力 began spelling their readings as words.
+    const granularity = input.granularity === 'words' ? 'words' : 'characters'
     const accent: MandarinAccent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
       ? input.accent
       : 'standard_guoyu'
@@ -88,21 +96,44 @@ Deno.serve(async (req) => {
 
     const characters = [...text]
 
+    // Words for prose a learner reads, characters for a flashcard. Asking for
+    // both in one response is what broke 標音 on a full-length article: it
+    // roughly doubles the output, and this runs on the realtime profile with a
+    // twelve second budget, so the call timed out and the teacher was told
+    // 標音失敗 about an article that had already gone out. Each caller needs
+    // one of the two anyway.
+    if (mode === 'pinyin' && granularity === 'words') {
+      const result = await callAiJson(
+        [
+          'Cut the text into words and give each word its Hanyu Pinyin reading.',
+          regionalPronunciationInstruction(text, accent),
+          ...orthographyRules('text'),
+        ].join('\n'),
+        { text },
+        wordSchema,
+        null,
+        'realtime',
+      )
+      if (result.status !== 'success') throw new Error('AI 標音沒有回應。')
+      const words = settleWords((result.output as { words?: unknown })?.words, text)
+      if (!words.length) throw new Error('AI 標音的分詞對不上原文。')
+      return jsonResponse({ mode, annotationText: '', words })
+    }
+
     if (mode === 'pinyin') {
       // Pinyin needs no font, so there is no fixed list to choose from and the
       // model writes the syllables itself. Alignment is what matters: one entry
       // per character, blank for anything that is not a Han character.
       const result = await callAiJson(
         [
-          'syllables: give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
+          'Give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
           'Use tone marks (nǐ hǎo), not tone numbers. Choose the reading the character takes in THIS context.',
           regionalPronunciationInstruction(text, accent),
           'For anything that is not a Han character — punctuation, spaces, Latin letters, digits, newlines — return an empty string in its slot.',
-          'The syllables array must contain exactly as many entries as the character count given.',
-          ...orthographyRules('text'),
+          'The array must contain exactly as many entries as the character count given.',
         ].join('\n'),
         { text, character_count: characters.length },
-        pinyinSchema,
+        syllableSchema,
         null,
         'realtime',
       )
@@ -117,10 +148,7 @@ Deno.serve(async (req) => {
         characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : '')),
         accent,
       )
-      // The same 正詞法 treatment the passage reader already gives a reading,
-      // so a learner meets one spelling of 星期六 wherever it appears.
-      const words = settleWords((result.output as { words?: unknown })?.words, text)
-      return jsonResponse({ mode, annotationText: JSON.stringify(aligned), words })
+      return jsonResponse({ mode, annotationText: JSON.stringify(aligned), words: [] })
     }
 
     const codepoints = [...new Set(characters.map((character) => character.codePointAt(0) as number))]

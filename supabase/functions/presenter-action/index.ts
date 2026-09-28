@@ -261,6 +261,32 @@ function stopActiveQuestions(supabase: ReturnType<typeof getAdminClient>, sessio
     .eq('session_id', sessionId).eq('status', 'active').neq('type', 'board')
 }
 
+// Tells one learner's page that their marking has changed.
+//
+// The marking lives in quiz_attempts, which the class cannot read: it holds
+// every student's score, so it is deliberately not published for realtime and
+// has no policy for the anon role — the page asks for its own copy through
+// participant-action instead. That left the student with no way to find out
+// anything had happened, so an AI review sat there until they thought to
+// reload the page, which is not something a learner thinks to do.
+//
+// Their own answers row IS theirs to watch, and their page already subscribes
+// to it. Touching it wakes that subscription, the page re-asks for its quiz
+// data through the same guarded route as always, and the marking appears. No
+// score travels over the wire that was not already allowed to.
+async function touchWritingAnswer(
+  supabase: ReturnType<typeof getAdminClient>,
+  questionId: string,
+  participantId: string,
+) {
+  const { error } = await supabase.from('answers')
+    .update({ answer_text: '[寫作已批改]' })
+    .eq('question_id', questionId).eq('participant_id', participantId)
+  // A learner who has marking but no answers row is not worth failing the
+  // teacher's marking over; they will see it on their next load.
+  if (error) console.warn('could not wake the writing page', error.message)
+}
+
 function withFileUrl<T extends { storage_path?: string }>(row: T) {
   const base = Deno.env.get('SUPABASE_URL') || ''
   if (!row?.storage_path || !base) return row
@@ -1328,7 +1354,7 @@ Deno.serve(async (req) => {
       const attemptId = input.attemptId
       if (!validUuid(attemptId)) return jsonResponse({ message: '作答資料不正確。' }, 400)
       const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts')
-        .select('id, quiz_id, session_id, composition').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
+        .select('id, quiz_id, session_id, composition, participant_id, question_id').eq('id', attemptId).eq('session_id', sessionId).maybeSingle()
       if (attemptError) throw attemptError
       if (!attempt) return jsonResponse({ message: '找不到這份作答。' }, 404)
 
@@ -1395,6 +1421,8 @@ Deno.serve(async (req) => {
           revision: review.revision ? { zh_tw: review.revision.zhTw, notes: review.revision.notes } : null,
         }).eq('id', attemptId)
       if (overallError) throw overallError
+
+      await touchWritingAnswer(supabase, attempt.question_id as string, attempt.participant_id as string)
 
       const { data: refreshed } = await supabase.from('quiz_item_answers')
         .select('*').eq('attempt_id', attemptId)

@@ -91,6 +91,10 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
     const graded = data.attempt.status === 'graded'
     const failed = data.attempt.status === 'failed'
     const submitted = data.attempt.status === 'submitted'
+    // 寫作教練 keeps its attempt on 'submitted' even after it has been marked,
+    // because that status is also what keeps the corrected article on the page.
+    // So the mark is what says a piece has been read, not the status.
+    const marked = data.attempt.total_score !== null && data.attempt.total_score !== undefined
     const pictureAnswer = pictureWriting ? data.answers.find((answer) => answer.item_id === data.items[0]?.id) : null
     let pictureSegments: Array<{ panelId: string; text: string }> = []
     try { pictureSegments = JSON.parse(pictureAnswer?.answer_text || '[]') } catch { pictureSegments = [] }
@@ -101,10 +105,10 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
           <div>
             <h2>{data.quiz.title}</h2>
             <p>{participantText(locale, submitted
-              ? data.quiz.interaction_mode ? 'submittedAnswer' : 'writingSubmitted'
+              ? data.quiz.interaction_mode ? 'submittedAnswer' : marked ? 'gradingCompleted' : 'writingSubmitted'
               : graded ? 'gradingCompleted' : failed ? 'gradingInterrupted' : usesAiGrading ? 'gradingInBackground' : 'calculatingScore')}</p>
           </div>
-          {graded && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
+          {(graded || marked) && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
         </div>
         {data.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(data.attempt.feedback, locale)}</p>}
         {pictureWriting && pictureSegments.length > 0 && (

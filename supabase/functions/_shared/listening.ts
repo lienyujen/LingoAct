@@ -316,7 +316,12 @@ function alignWordInfo(payload: unknown, transcript: string, language: string, t
   const haystack = searchable(transcript)
   // Speech is not evenly paced, so this has to tolerate real drift while still
   // rejecting a repeat a few lines away.
-  const tolerance = Math.max(24, Math.round(haystack.value.length * 0.15))
+  // Tight on purpose. A rejected anchor costs precision — the stretch is
+  // interpolated between its neighbours instead of measured — and a wrong one
+  // costs the whole rest of the passage, because the highlight races to it and
+  // then stalls. 8% of a 200-character passage is sixteen characters, about
+  // half a line, which is far more drift than speech actually has.
+  const tolerance = Math.max(12, Math.round(haystack.value.length * 0.08))
   let cursor = 0
   const cues: KaraokeCue[] = []
   for (const word of collectWordInfo(payload)) {
@@ -392,23 +397,30 @@ function isSpeakerLabel(text: string, start: number, length: number) {
 // timestamps are still the best anchors available, but a KTV line with dark
 // holes is worse than an interpolated syllable. Fill only those holes between
 // neighbouring real timestamps; recognised words keep their measured times.
-function inTimeOrder(cues: KaraokeCue[]) {
-  const kept: KaraokeCue[] = []
-  let last = -1
-  for (const cue of cues) {
-    if (cue.start_ms < last) continue
-    kept.push(cue)
-    last = cue.start_ms
-  }
-  return kept
-}
-
 function completeCues(input: KaraokeCue[], transcript: string, totalMs: number, language: string) {
-  const measured = inTimeOrder(input)
-  if (!measured.length) return fallbackCues(transcript, totalMs, language)
+  if (!input.length) return fallbackCues(transcript, totalMs, language)
   const expected = fallbackCues(transcript, totalMs, language)
-  const bySpan = new Map(measured.map((cue) => [`${cue.start_index}:${cue.end_index}`, cue]))
+  const bySpan = new Map(input.map((cue) => [`${cue.start_index}:${cue.end_index}`, cue]))
   const result: Array<KaraokeCue | null> = expected.map((cue) => bySpan.get(`${cue.start_index}:${cue.end_index}`) || null)
+
+  // Anchors have to run forward in POSITION and in TIME together.
+  //
+  // The last attempt checked them in the order the transcriber returned
+  // them, which is time order — so they always looked fine. What matters is
+  // this array, which is in reading order: a word matched to the wrong place
+  // sits at an index whose time belongs somewhere else, and the player,
+  // which takes the first cue whose window holds the current moment, jumps
+  // to it. Dropping the anchor leaves a gap the interpolation below fills —
+  // a small error where the voice actually is, instead of a large one lines
+  // away.
+  let lastAnchor = -1
+  for (let index = 0; index < result.length; index += 1) {
+    const cue = result[index]
+    if (!cue) continue
+    if (cue.start_ms < lastAnchor) { result[index] = null; continue }
+    lastAnchor = cue.start_ms
+  }
+  if (!result.some(Boolean)) return expected
 
   for (let start = 0; start < result.length;) {
     if (result[start]) { start += 1; continue }
@@ -426,7 +438,17 @@ function completeCues(input: KaraokeCue[], transcript: string, totalMs: number, 
     }
     start = end
   }
-  return result.filter((cue): cue is KaraokeCue => Boolean(cue))
+
+  // Whatever happened above, the finished timeline only moves forward. The
+  // player walks it with findIndex, so one cue out of order is one jump.
+  const cues = result.filter((cue): cue is KaraokeCue => Boolean(cue))
+  let floor = 0
+  for (const cue of cues) {
+    cue.start_ms = Math.max(cue.start_ms, floor)
+    cue.end_ms = Math.max(cue.end_ms, cue.start_ms)
+    floor = cue.start_ms
+  }
+  return cues
 }
 
 // Identical words in identical voices produce identical audio, so the hash is

@@ -786,6 +786,18 @@ export function QuestionResult(props: Props) {
     )
   }
 
+  if (question.type === 'listening') {
+    return (
+      <section className="panel result-panel">
+        <div className="panel-heading">
+          <h2>{question.title}</h2>
+          <QuestionActivityStatus question={question} />
+        </div>
+        <p className="muted">{t('listeningOnly')}</p>
+      </section>
+    )
+  }
+
   if (question.type === 'short_answer') {
     return (
       <>

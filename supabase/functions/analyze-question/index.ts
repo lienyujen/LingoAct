@@ -1,5 +1,5 @@
 import { corsHeaders, geminiModels, jsonResponse, errorDetail } from '../_shared/ai.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 
 const analysisSchema = {
   type: 'object',
@@ -112,18 +112,12 @@ Deno.serve(async (req) => {
     sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     questionId = typeof input.questionId === 'string' ? input.questionId : ''
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
-    if (!sessionId || !questionId || !presenterToken) return jsonResponse({ message: '缺少分析所需資料。' }, 400)
+    if (!sessionId || !questionId) return jsonResponse({ message: '缺少分析所需資料。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const { data: keyRecord } = await supabase
-      .from('presenter_session_keys')
-      .select('session_id')
-      .eq('session_id', sessionId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle()
-
-    if (!keyRecord) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
+      return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    }
 
     const { data: question, error: questionError } = await supabase
       .from('questions')

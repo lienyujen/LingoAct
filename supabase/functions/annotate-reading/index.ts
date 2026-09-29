@@ -1,5 +1,5 @@
 import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
 import { orthographyRules, settleWords } from '../_shared/reading.ts'
@@ -81,18 +81,13 @@ Deno.serve(async (req) => {
     const accent: MandarinAccent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
       ? input.accent
       : 'standard_guoyu'
-    if (!sessionId || !presenterToken || !text) return jsonResponse({ message: '缺少標音所需資料。' }, 400)
+    if (!sessionId || !text) return jsonResponse({ message: '缺少標音所需資料。' }, 400)
     if (text.length > 4000) return jsonResponse({ message: '文字過長，請分段標音。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const { data: keyRecord } = await supabase
-      .from('presenter_session_keys')
-      .select('session_id')
-      .eq('session_id', sessionId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle()
-    if (!keyRecord) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
+      return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    }
 
     const characters = [...text]
 

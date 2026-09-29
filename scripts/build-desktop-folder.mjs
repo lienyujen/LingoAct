@@ -30,13 +30,17 @@ const target = path.join(root, productName)
 // directory long enough for the rename to fail with EPERM. Temp is on the same
 // volume, so moving the finished folder into place is still a rename.
 const staging = path.join(os.tmpdir(), 'lingoact-desktop-build')
-
-const run = (command, args, env = process.env) => execFileSync(command, args, { cwd: root, env, stdio: 'inherit', shell: process.platform === 'win32' })
+const runNode = (entry, args, env = process.env) => execFileSync(process.execPath, [path.join(root, entry), ...args], {
+  cwd: root,
+  env,
+  stdio: 'inherit',
+})
 
 fs.rmSync(staging, { recursive: true, force: true })
-run('pnpm', ['build'], { ...process.env, VITE_APP_PROFILE: profileId })
+runNode('node_modules/typescript/bin/tsc', ['-b'])
+runNode('node_modules/vite/bin/vite.js', ['build'], { ...process.env, VITE_APP_PROFILE: profileId })
 // --dir stops at the unpacked folder: no portable exe, no zip, no installer.
-run('npx', ['electron-builder', '--win', '--x64', '--dir', '-c.directories.output', staging], { ...process.env, APP_PROFILE: profileId })
+runNode('node_modules/electron-builder/cli.js', ['--win', '--x64', '--dir', '-c.directories.output', staging], { ...process.env, APP_PROFILE: profileId })
 
 const unpacked = path.join(staging, 'win-unpacked')
 if (!fs.existsSync(unpacked)) throw new Error(`electron-builder produced no ${unpacked}`)

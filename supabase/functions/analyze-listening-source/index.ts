@@ -1,7 +1,7 @@
 import { corsHeaders, errorDetail, geminiThinkingConfig, jsonResponse, requestGemini } from '../_shared/ai.ts'
 import { levelInstruction, resolveLevel, tbclLevelOf } from '../_shared/proficiency.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from '../_shared/tbcl-check.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { resolveTrack, trackInstruction } from '../_shared/teaching.ts'
 
 // Reading the teacher's source and shaping it for this particular class.
@@ -49,17 +49,12 @@ Deno.serve(async (req) => {
     const levelCode = typeof input.levelCode === 'string' ? input.levelCode : null
     const track = resolveTrack(teachingTrack)
     const resolvedLevel = resolveLevel(levelFramework, levelCode)
-    if (!sessionId || !presenterToken || !screenshotId) return jsonResponse({ message: '缺少辨識所需資料。' }, 400)
+    if (!sessionId || !screenshotId) return jsonResponse({ message: '缺少辨識所需資料。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const { data: keyRecord } = await supabase
-      .from('presenter_session_keys')
-      .select('session_id')
-      .eq('session_id', sessionId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle()
-    if (!keyRecord) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
+      return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    }
 
     const { data: screenshot } = await supabase
       .from('screenshots')

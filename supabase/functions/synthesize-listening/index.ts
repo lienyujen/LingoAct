@@ -1,5 +1,5 @@
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { buildVoicePlan, contentHash, durationMs, karaokeCues, synthesize, wavFromPcm } from '../_shared/listening.ts'
 import type { ChineseAccent, ChineseScript, ClipKind, SpeakerGender } from '../_shared/listening.ts'
 
@@ -38,18 +38,13 @@ Deno.serve(async (req) => {
       ? input.speakerGenders.slice(0, 2).map((gender: unknown) => ['male', 'female', 'boy', 'girl'].includes(String(gender)) ? gender as SpeakerGender : 'unknown')
       : []
 
-    if (!sessionId || !presenterToken || !transcript) return jsonResponse({ message: '缺少語音合成所需資料。' }, 400)
+    if (!sessionId || !transcript) return jsonResponse({ message: '缺少語音合成所需資料。' }, 400)
     if (transcript.length > 4000) return jsonResponse({ message: '文字超過 4000 字，請分段轉換。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const { data: keyRecord } = await supabase
-      .from('presenter_session_keys')
-      .select('session_id')
-      .eq('session_id', sessionId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle()
-    if (!keyRecord) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
+      return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    }
 
     // Asking for the same words twice is the common case: a teacher tweaks a
     // question, not the passage. Returning the clip already paid for keeps the

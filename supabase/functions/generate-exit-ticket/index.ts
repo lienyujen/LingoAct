@@ -1,5 +1,5 @@
 import { corsHeaders, geminiThinkingConfig, jsonResponse, requestGemini, errorDetail } from '../_shared/ai.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { levelInstruction } from '../_shared/proficiency.ts'
 import { trackInstruction } from '../_shared/teaching.ts'
 
@@ -45,17 +45,12 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const lessonGoal = typeof input.lessonGoal === 'string' ? input.lessonGoal.trim().slice(0, 200) : ''
-    if (!sessionId || !presenterToken) return jsonResponse({ message: '缺少 Exit Ticket 所需資料。' }, 400)
+    if (!sessionId) return jsonResponse({ message: '缺少 Exit Ticket 所需資料。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const { data: keyRecord } = await supabase
-      .from('presenter_session_keys')
-      .select('session_id')
-      .eq('session_id', sessionId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle()
-    if (!keyRecord) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
+      return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    }
 
     const { data: session } = await supabase.from('sessions').select('*').eq('id', sessionId).single()
     if (!session) return jsonResponse({ message: '找不到場次。' }, 404)

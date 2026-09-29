@@ -3,10 +3,10 @@ import { useParams } from 'react-router-dom'
 import { CheckCircle, ClipboardText, Hand, HandPointing, Plus, SortDescending, UserMinus, Users, X } from '@phosphor-icons/react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { RosterManager } from '../components/RosterManager'
-import { getPresenterToken } from '../lib/presenterAuth'
+import { getPresenterCredential } from '../lib/presenterAuth'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
-import { buzzerWinsFrom, participationRows } from '../lib/participation'
+import { answerableQuestions, buzzerWinsFrom, participationRows, questionExpectsAnswer } from '../lib/participation'
 import { getRoster, getSessionRosterId, matchRoster } from '../lib/classRoster'
 import type { ClassRoster } from '../lib/classRoster'
 import type { ParticipationRow } from '../lib/participation'
@@ -134,8 +134,8 @@ export function RosterPage() {
     // Quiz attempts, marked uploads and board cards only come back through the
     // presenter action — file_responses is private to the presenter — and the
     // score would be wrong without them.
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) return
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) return
     const [quizResult, uploadResult, boardResult] = await Promise.all([
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_session_custom_quiz_results', sessionId, presenterToken },
@@ -222,10 +222,10 @@ export function RosterPage() {
     const current = session?.current_question_id
       ? questions.find((question) => question.id === session.current_question_id && question.status === 'active')
       : null
-    if (current) return current
+    if (current && questionExpectsAnswer(current)) return current
     // Nothing current, or it has been stopped: fall back to an open question
     // that is not the board, and only then to the board itself.
-    const openOnes = questions.filter((question) => question.status === 'active')
+    const openOnes = answerableQuestions(questions.filter((question) => question.status === 'active'))
     return openOnes.find((question) => question.type !== 'board') || openOnes[0] || null
   }, [questions, session?.current_question_id])
 
@@ -331,8 +331,8 @@ export function RosterPage() {
   const joinedCount = participants.length
 
   async function callPresenter(body: Record<string, unknown>, failure: string) {
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) { setError(t('rosterNoRights')); return false }
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) { setError(t('rosterNoRights')); return false }
     try {
       const { data, error: callError } = await requireSupabase().functions.invoke('presenter-action', {
         body: { ...body, sessionId, presenterToken },

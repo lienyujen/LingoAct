@@ -1,5 +1,5 @@
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, hashPresenterToken, presenterAuthorized } from '../_shared/supabase.ts'
 
 const supportedLanguages = new Set(['zh-tw', 'zh-cn', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'th', 'vi', 'id'])
 
@@ -14,15 +14,16 @@ Deno.serve(async (req) => {
     const mode = input.mode === 'translation' ? 'translation' : 'transcription'
     const targetLanguage = typeof input.targetLanguage === 'string' ? input.targetLanguage : ''
     const sdp = typeof input.sdp === 'string' ? input.sdp : ''
-    if (!sessionId || !presenterToken || (mode === 'translation' && !sdp)) return jsonResponse({ message: '缺少講師字幕權限資料。' }, 400)
+    if (!sessionId || (mode === 'translation' && !sdp)) return jsonResponse({ message: '缺少講師字幕權限資料。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const [{ data: keyRecord }, { data: session }] = await Promise.all([
-      supabase.from('presenter_session_keys').select('session_id').eq('session_id', sessionId).eq('token_hash', tokenHash).maybeSingle(),
+    const [authorized, { data: session }] = await Promise.all([
+      presenterAuthorized(supabase, input, sessionId, presenterToken),
       supabase.from('sessions').select('status, recording_enabled, caption_source_language, caption_display_language, interpretation_enabled, interpretation_languages').eq('id', sessionId).maybeSingle(),
     ])
-    if (!keyRecord) return jsonResponse({ message: '講師權限驗證失敗。' }, 403)
+    if (!authorized) return jsonResponse({ message: '講師權限驗證失敗。' }, 403)
+    const credential = presenterToken || (typeof input.ownerKey === 'string' ? input.ownerKey : '')
+    const tokenHash = await hashPresenterToken(credential)
     if (!session || session.status !== 'active') return jsonResponse({ message: '場次已結束，無法開啟字幕。' }, 409)
     if (!session.recording_enabled) return jsonResponse({ message: '課程錄製尚未開啟。' }, 409)
 

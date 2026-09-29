@@ -2,6 +2,7 @@ import { resolveTrack } from './teachingTracks'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
+import { edgeFunctionErrorMessage } from './edgeError'
 import type { ListeningClip, ListeningKind, PresenterListeningClip, ReadingWord } from '../types'
 
 // Everything a student may be told about a clip. Spelled out rather than '*'
@@ -33,7 +34,7 @@ export async function analyzeListeningSource(input: {
   levelCode: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('analyze-listening-source', { body: input })
-  if (error) throw error
+  if (error) throw new Error(await edgeFunctionErrorMessage(error, '聽力內容辨識失敗。'))
   return data as ListeningAnalysis
 }
 
@@ -50,7 +51,7 @@ export async function synthesizeListening(input: {
   screenshotId?: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('synthesize-listening', { body: input })
-  if (error) throw error
+  if (error) throw new Error(await edgeFunctionErrorMessage(error, '語音合成失敗。'))
   return data as { clip: PresenterListeningClip; reused: boolean }
 }
 
@@ -168,7 +169,7 @@ export async function annotateReading(input: {
   granularity?: 'characters' | 'words'
 }) {
   const { data, error } = await requireSupabase().functions.invoke('annotate-reading', { body: input })
-  if (error) throw error
+  if (error) throw new Error(await edgeFunctionErrorMessage(error, '標音失敗。'))
   // words is the 正詞法 segmentation, present for pinyin and empty for 注音,
   // which carries its reading inside the glyphs instead.
   return data as { mode: string; annotationText: string; words?: ReadingWord[]; polyphonic?: number; decided?: number }

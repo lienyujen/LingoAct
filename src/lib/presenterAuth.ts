@@ -1,3 +1,5 @@
+import { hasOwnerKey } from './ownerKey'
+
 const TOKEN_PREFIX = 'lingoact:presenter-token:'
 
 export type PresenterCredential = {
@@ -11,6 +13,15 @@ export function savePresenterToken(sessionId: string, token: string) {
 
 export function getPresenterToken(sessionId: string) {
   return window.localStorage.getItem(`${TOKEN_PREFIX}${sessionId}`)
+}
+
+// A self-hosted presenter is allowed to control an existing class with the
+// project owner key even when this Windows profile never created that class and
+// therefore has no per-session token. The empty string is intentional: the
+// Supabase invoke wrapper adds the owner key, while callers can still tell a
+// genuinely unauthorised browser apart by the null return value.
+export function getPresenterCredential(sessionId: string): string | null {
+  return getPresenterToken(sessionId) || (hasOwnerKey() ? '' : null)
 }
 
 export function removePresenterToken(sessionId: string) {

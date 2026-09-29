@@ -1,5 +1,5 @@
 import { corsHeaders, jsonResponse } from '../_shared/ai.ts'
-import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
+import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -10,17 +10,12 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const longUrl = typeof input.url === 'string' ? input.url : ''
-    if (!sessionId || !presenterToken || !longUrl) return jsonResponse({ message: '缺少縮網址資料。' }, 400)
+    if (!sessionId || !longUrl) return jsonResponse({ message: '缺少縮網址資料。' }, 400)
 
     const supabase = getAdminClient()
-    const tokenHash = await hashPresenterToken(presenterToken)
-    const { data: keyRecord } = await supabase
-      .from('presenter_session_keys')
-      .select('session_id')
-      .eq('session_id', sessionId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle()
-    if (!keyRecord) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
+      return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
+    }
 
     const { data: session, error: sessionError } = await supabase
       .from('sessions')

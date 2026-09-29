@@ -64,8 +64,12 @@ type Input = {
 // pushed out asks nothing, so counting it would punish everyone equally.
 const answerableTypes = new Set(['poll', 'multiple_choice', 'true_false', 'short_answer', 'pronunciation', 'oral_response', 'custom_quiz', 'file_upload'])
 
+export function questionExpectsAnswer(question: Question) {
+  return answerableTypes.has(question.type)
+}
+
 export function answerableQuestions(questions: Question[]) {
-  return questions.filter((question) => answerableTypes.has(question.type))
+  return questions.filter(questionExpectsAnswer)
 }
 
 // The badge wording is prose about a student, so it takes the teacher's own

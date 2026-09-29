@@ -6,7 +6,7 @@ import { InteractionResults } from '../components/InteractionResults'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ReadingPassageView } from '../components/ReadingPassageView'
 import type { QuizReviewProps } from '../components/CustomQuizResult'
-import { getPresenterToken } from '../lib/presenterAuth'
+import { getPresenterCredential } from '../lib/presenterAuth'
 import { PresenterLocaleContext, presenterLookup, storedPresenterLocale } from '../lib/presenterI18n'
 import { requireSupabase } from '../lib/supabase'
 import type { PresenterQuizResults, WritingReviewSaveInput } from '../types'
@@ -66,8 +66,8 @@ export function CustomQuizReviewPage() {
   const [showWritingNames, setShowWritingNames] = useState<boolean | null>(null)
 
   const loadQuiz = useCallback(async (): Promise<PresenterQuizResults | null> => {
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) {
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) {
       setError(t('noPresenterRightsHere'))
       return null
     }
@@ -91,8 +91,8 @@ export function CustomQuizReviewPage() {
   }, [loadQuiz])
 
   async function updateAnswer(itemId: string, acceptedAnswers: string[]) {
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error(t('noPresenterRights'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) throw new Error(t('noPresenterRights'))
     setBusyItemId(itemId)
     setError('')
     try {
@@ -191,8 +191,8 @@ export function CustomQuizReviewPage() {
   async function runAiReview() {
     const input = currentWritingInput()
     if (!input) return
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) return setError(t('noPresenterRights'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) return setError(t('noPresenterRights'))
     setWritingBusy('ai')
     setSaved(false)
     setError('')
@@ -220,8 +220,8 @@ export function CustomQuizReviewPage() {
   async function saveWritingReview() {
     const input = currentWritingInput()
     if (!input) return
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) return setError(t('noPresenterRights'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) return setError(t('noPresenterRights'))
     setWritingBusy('save')
     setSaved(false)
     setError('')

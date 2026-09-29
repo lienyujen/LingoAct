@@ -40,7 +40,8 @@ import type { SentenceWallComposition } from '../lib/sentenceWall'
 import { FileTransferModal } from '../components/FileTransferModal'
 import { finalizeLottery } from '../lib/lottery'
 import { classAnnotation } from '../lib/listening'
-import { getPresenterToken } from '../lib/presenterAuth'
+import { getPresenterCredential, getPresenterToken } from '../lib/presenterAuth'
+import { hasOwnerKey } from '../lib/ownerKey'
 import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import { endManagedSession } from '../lib/presenterSessions'
 import { isBuzzerPending } from '../lib/buzzer'
@@ -340,13 +341,14 @@ export function PresenterPage() {
     if (!isSupabaseConfigured || !sessionId) return
 
     const supabase = requireSupabase()
-    const presenterToken = getPresenterToken(sessionId)
+    const presenterToken = getPresenterToken(sessionId) || ''
+    const canPresent = Boolean(presenterToken || hasOwnerKey())
     const [{ data: sessionData }, { data: participantData }, { data: questionListData }, { data: answerQuestionData }, { data: boardPostData }, { data: exitTicketData }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', sessionId).single(),
       supabase.from('participants').select('*').eq('session_id', sessionId).order('joined_at'),
       supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at'),
       supabase.from('answers').select('question_id').eq('session_id', sessionId),
-      presenterToken
+      canPresent
         ? supabase.functions.invoke('presenter-action', {
           body: { action: 'get_session_board_posts', sessionId, presenterToken },
         })
@@ -423,8 +425,8 @@ export function PresenterPage() {
       setWallComposition(((wallData as AiSummary | null)?.output_json as SentenceWallComposition | undefined) || null)
       const loadedQuestion = questionData as Question | null
       if (loadedQuestion?.type === 'hotspot') {
-        const presenterToken = getPresenterToken(sessionId)
-        if (presenterToken) {
+        const presenterToken = getPresenterToken(sessionId) || ''
+        if (presenterToken || hasOwnerKey()) {
           const { data: hotspotData } = await supabase.functions.invoke('presenter-action', {
             body: { action: 'get_hotspot_result', sessionId, presenterToken, questionId: targetQuestionId },
           })
@@ -432,8 +434,8 @@ export function PresenterPage() {
         }
         setAudioResponses([])
       } else if (loadedQuestion?.type === 'custom_quiz') {
-        const presenterToken = getPresenterToken(sessionId)
-        if (presenterToken) {
+        const presenterToken = getPresenterToken(sessionId) || ''
+        if (presenterToken || hasOwnerKey()) {
           const { data: quizData } = await supabase.functions.invoke('presenter-action', {
             body: { action: 'get_custom_quiz_results', sessionId, presenterToken, questionId: targetQuestionId },
           })
@@ -442,8 +444,8 @@ export function PresenterPage() {
         setAudioResponses([])
       } else if (loadedQuestion && ['pronunciation', 'oral_response'].includes(loadedQuestion.type) && loadedQuestion.status !== 'active') {
         setQuizResults(null)
-        const presenterToken = getPresenterToken(sessionId)
-        if (presenterToken) {
+        const presenterToken = getPresenterToken(sessionId) || ''
+        if (presenterToken || hasOwnerKey()) {
           const { data: recordingData } = await supabase.functions.invoke('presenter-action', {
             body: { action: 'get_recording_results', sessionId, presenterToken, questionId: targetQuestionId },
           })
@@ -483,6 +485,17 @@ export function PresenterPage() {
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  // Reading quizzes become current before their items finish generating. The
+  // quiz tables are intentionally not in the public Realtime publication, so
+  // there is no insert event to wake the presenter after its first empty read.
+  // Keep asking while the current custom quiz has no quiz row; once it exists,
+  // ordinary answer events drive the usual reloads.
+  useEffect(() => {
+    if (question?.type !== 'custom_quiz' || quizResults?.quiz) return
+    const timer = window.setTimeout(() => void loadAll(), 1_500)
+    return () => window.clearTimeout(timer)
+  }, [loadAll, question?.id, question?.type, quizResults?.quiz])
 
   // 自訂測驗檢視 opens as its own desktop window with its own React root, and it
   // never loads the session row. Leaving the locale where that window can find
@@ -1293,8 +1306,8 @@ export function PresenterPage() {
 
   async function stopQuestion() {
     if (!session?.current_question_id) return
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error(t('noRightsRejoin'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: {
         action: 'stop_question',
@@ -1313,8 +1326,8 @@ export function PresenterPage() {
 
   async function resumeQuestion() {
     if (!session?.current_question_id) return
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error(t('noRightsRejoin'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: {
         action: 'resume_question',
@@ -1332,8 +1345,8 @@ export function PresenterPage() {
   }
 
   async function activateQuestion(questionId: string) {
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error(t('noRightsRejoin'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) throw new Error(t('noRightsRejoin'))
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action: 'activate_question', sessionId, presenterToken, questionId },
     })
@@ -1816,8 +1829,8 @@ export function PresenterPage() {
   }, [questions])
 
   function requirePresenterToken() {
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) throw new Error(t('oldSessionNoControl'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) throw new Error(t('oldSessionNoControl'))
     return presenterToken
   }
 
@@ -2404,6 +2417,7 @@ export function PresenterPage() {
           setListeningCapture(null)
           setListeningOpen(false)
           setWorkspaceView('current')
+          void loadAll()
         }}
       />
       <PictureStudioModal

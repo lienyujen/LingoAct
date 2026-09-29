@@ -138,7 +138,11 @@ jobs:
           archs=$(lipo -archs "$app/Contents/MacOS/$PRODUCT")
           echo "$archs"
           [[ "$archs" == *x86_64* && "$archs" == *arm64* ]]
-          "$app/Contents/MacOS/$PRODUCT" --version
+          # An Electron app owns --version itself and may enter its GUI loop.
+          # Node mode still makes macOS load this exact universal Mach-O, then
+          # exits deterministically after proving the embedded runtime starts.
+          ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/$PRODUCT" -e \
+            'console.log(`Electron runtime: ${process.versions.electron}; arch: ${process.arch}`)'
           hdiutil verify "$dmg"
           # Without these two strings macOS denies the microphone and the screen
           # outright, and the app looks broken rather than unapproved.

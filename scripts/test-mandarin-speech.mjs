@@ -11,7 +11,7 @@ if (!project || !token) throw new Error('Set LINGOACT_TEST_PROJECT and SUPABASE_
 const sessionId = randomUUID()
 const presenterToken = randomUUID() + randomUUID()
 const hash = (value) => createHash('sha256').update(value).digest('hex')
-const text = '我和你一起去。'
+const text = '中和的得和路得和永和的福和路接著，我和你暫時不會走錯路。'
 
 async function sql(query) {
   const response = await fetch(`https://api.supabase.com/v1/projects/${project}/database/query`, {
@@ -40,23 +40,32 @@ try {
     insert into sessions(id,title,code) values('${sessionId}','Mandarin speech integration fixture','${sessionId}');
     insert into presenter_session_keys(session_id,token_hash) values('${sessionId}','${hash(presenterToken)}');
   `)
-  const standard = await invoke('synthesize-listening', {
-    sessionId, presenterToken, transcript: text, kind: 'passage', language: 'zh-tw', accent: 'standard_guoyu',
-  })
-  assert.equal(standard.reused, false)
-  assert.match(standard.clip.voices.instruction, /hàn/)
-  assert.ok(standard.clip.public_url)
-  assert.ok(standard.clip.duration_ms > 0)
+  const clips = new Map()
+  for (const accent of ['standard_guoyu', 'putonghua', 'taiwanese']) {
+    const result = await invoke('synthesize-listening', {
+      sessionId, presenterToken, transcript: text, kind: 'passage', language: 'zh-tw', accent,
+    })
+    assert.equal(result.reused, false)
+    assert.ok(result.clip.public_url)
+    assert.ok(result.clip.duration_ms > 0)
+    assert.ok(result.clip.karaoke_cues.length >= 25, `${accent} returned too few spoken-character cues`)
+    clips.set(accent, result.clip)
+  }
+  assert.match(clips.get('standard_guoyu').voices.instruction, /hàn/)
+  assert.match(clips.get('standard_guoyu').voices.instruction, /zhàn/)
+  assert.match(clips.get('putonghua').voices.instruction, /hé/)
+  assert.match(clips.get('putonghua').voices.instruction, /zàn/)
+  assert.match(clips.get('taiwanese').voices.instruction, /unmistakably Taiwanese cadence/)
 
   const repeated = await invoke('synthesize-listening', {
     sessionId, presenterToken, transcript: text, kind: 'passage', language: 'zh-tw', accent: 'standard_guoyu',
   })
   assert.equal(repeated.reused, true)
-  assert.equal(repeated.clip.id, standard.clip.id)
+  assert.equal(repeated.clip.id, clips.get('standard_guoyu').id)
 
   await invoke('presenter-action', { action: 'delete_session', sessionId, presenterToken })
   removed = true
-  console.log('Mandarin speech live fixture passed with a fresh stored WAV and the new cache key.')
+  console.log('All three Mandarin speech plans passed with complete audio, KTV cues and the new cache key.')
 } finally {
   if (!removed) await sql(`delete from sessions where id='${sessionId}'`)
 }

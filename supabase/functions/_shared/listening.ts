@@ -10,6 +10,7 @@ import { regionalPronunciationInstruction, regionalSpeechText } from './mandarin
 const SAMPLE_RATE = 24000
 const CHANNELS = 1
 const BITS = 16
+const SPEECH_RECIPE_VERSION = 'gemini-3.8-regional-mandarin-v1'
 
 export type ClipKind = 'passage' | 'dialogue' | 'scene'
 export type ChineseScript = 'traditional' | 'simplified'
@@ -29,6 +30,8 @@ export type KaraokeCue = {
   start_ms: number
   end_ms: number
 }
+
+class IncompleteSpeechError extends Error {}
 
 // Two voices is the API's ceiling for a multi-speaker request, and also about
 // the point where a learner stops being able to tell characters apart by ear.
@@ -57,7 +60,7 @@ function accentFor(language: string, accent: ChineseAccent | null) {
       return 'standard Putonghua (普通話) as defined and taught in Mainland China, with neutral standard pronunciation, accurate retroflex initials and erhua only where standard Putonghua calls for it; do not use Taiwanese Mandarin pronunciation or vocabulary'
     }
     if (accent === 'taiwanese') {
-      return 'natural contemporary Taiwanese Mandarin as spoken in Taiwan, with a light, warm Taiwan cadence and phrasing while keeping official Taiwan Ministry of Education lexical readings and tones; do not exaggerate the accent, imitate Taiwanese Hokkien, use slang, or turn it into a caricature'
+      return 'authentic contemporary Taiwanese Mandarin as naturally spoken in Taiwan, with unmistakably Taiwanese cadence, rhythm, phrasing and intonation, while keeping official Taiwan Ministry of Education lexical readings and tones'
     }
     return 'Standard Guoyu (標準國語) as taught and used in formal broadcasting in Taiwan, with neutral careful diction and accurate tones; avoid strongly local Taiwanese Mandarin pronunciation, slang or exaggerated Taiwan-style intonation'
   }
@@ -127,52 +130,73 @@ export function buildVoicePlan(
 function speechConfig(plan: VoicePlan) {
   if (plan.speakers.length >= 2) {
     return {
-      multiSpeakerVoiceConfig: {
-        speakerVoiceConfigs: plan.speakers.map((speaker, index) => ({
-          speaker,
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: plan.voiceNames[index] } },
-        })),
-      },
+      mode: 'conversational',
+      speakers: plan.speakers.map((speaker, index) => ({ speaker, voice: plan.voiceNames[index] })),
     }
   }
-  return { voiceConfig: { prebuiltVoiceConfig: { voiceName: NARRATION_VOICE } } }
+  return [{ voice: NARRATION_VOICE }]
 }
 
 function ttsModels() {
-  const primary = Deno.env.get('GEMINI_TTS_MODEL') || 'gemini-3.1-flash-tts-preview'
-  const fallback = Deno.env.get('GEMINI_TTS_FALLBACK_MODEL') || 'gemini-2.5-flash-preview-tts'
+  const primary = Deno.env.get('GEMINI_TTS_MODEL') || 'gemini-3.8-flash-tts'
+  const fallback = Deno.env.get('GEMINI_TTS_FALLBACK_MODEL') || 'gemini-3.8-flash-lite-tts'
   return [primary, fallback]
+}
+
+function interactionContent(plan: VoicePlan, fallbackText: string) {
+  const speechText = plan.speechText || fallbackText
+  if (plan.speakers.length < 2) {
+    return [{
+      type: 'text',
+      text: speechText,
+      annotations: [{ type: 'speech_metadata', style: plan.instruction }],
+    }]
+  }
+
+  const speakerLookup = new Map(plan.speakers.map((speaker) => [speaker.trim(), speaker]))
+  let alternate = 0
+  return speechText.split(/\r?\n/u).filter((line) => line.trim()).map((line) => {
+    const match = line.match(/^\s*([^：:]{1,30})\s*[：:]\s*(.*)$/u)
+    const named = match ? speakerLookup.get(match[1].trim()) : undefined
+    const speaker = named || plan.speakers[alternate++ % plan.speakers.length]
+    return {
+      type: 'text',
+      // Speaker labels are metadata, not words in the recording. Gemini 3.8
+      // treats every character in this field as a verbatim transcript.
+      text: match?.[2]?.trim() || line.trim(),
+      annotations: [{ type: 'speech_metadata', speaker, style: plan.instruction }],
+    }
+  })
 }
 
 export async function synthesize(text: string, plan: VoicePlan) {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured.')
 
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: `${plan.instruction}\n\n${plan.speechText || text}` }] }],
-    generationConfig: { responseModalities: ['AUDIO'], speechConfig: speechConfig(plan) },
-  })
-
   let failure = 'Speech synthesis failed.'
   for (const [index, model] of ttsModels().entries()) {
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
           method: 'POST',
           headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
-          body,
+          body: JSON.stringify({
+            model,
+            input: [{ type: 'user_input', content: interactionContent(plan, text) }],
+            response_format: { type: 'audio', mime_type: 'audio/l16', sample_rate: SAMPLE_RATE },
+            generation_config: { speech_config: speechConfig(plan) },
+          }),
           // Synthesis is slower than a text turn and the gateway kills the whole
           // function at roughly 76 seconds, so the first attempt gets the larger
           // share and the fallback only what is left.
           signal: AbortSignal.timeout(index === 0 ? 45_000 : 20_000),
-        },
-      )
+        })
       if (response.ok) {
         const payload = await response.json()
-        const inline = payload?.candidates?.[0]?.content?.parts?.find((part: { inlineData?: unknown }) => part.inlineData)?.inlineData
-        if (!inline?.data) throw new Error('The model returned no audio.')
-        return decodeBase64(inline.data as string)
+        const audio = (payload?.steps || []).flatMap((step: { content?: unknown[] }) => step.content || [])
+          .filter((part: { type?: string; data?: string }) => part.type === 'audio' && part.data)
+          .at(-1)
+        if (!audio?.data) throw new Error('The model returned no audio.')
+        return decodeBase64(audio.data as string)
       }
       failure = (await response.text()).slice(0, 500) || `Speech synthesis failed with status ${response.status}.`
     } catch (error) {
@@ -225,7 +249,14 @@ export function durationMs(pcmLength: number) {
 // read the saved cue list, so replaying — including after class — spends no AI
 // quota. If timestamping is unavailable, the recording still ships with a
 // conservative duration-based alignment instead of making synthesis fail.
-export async function karaokeCues(wav: Uint8Array, transcript: string, language: string, totalMs: number): Promise<KaraokeCue[]> {
+export async function karaokeCues(
+  wav: Uint8Array,
+  transcript: string,
+  language: string,
+  totalMs: number,
+  spokenTranscript = transcript,
+  speakers: string[] = [],
+): Promise<KaraokeCue[]> {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (apiKey) {
     try {
@@ -245,10 +276,29 @@ export async function karaokeCues(wav: Uint8Array, transcript: string, language:
         signal: AbortSignal.timeout(10_000),
       })
       if (!response.ok) throw new Error((await response.text()).slice(0, 400))
-      const aligned = alignWordInfo(await response.json(), transcript, language, totalMs)
-      const completed = completeCues(aligned, transcript, totalMs, language)
+      const payload = await response.json()
+      const words = collectWordInfo(payload)
+      if (words.length) {
+        const labels = new Set(speakers.map((speaker) => speaker.trim()))
+        const expectedText = spokenTranscript.split(/\r?\n/u).map((line) => {
+          const match = line.match(/^\s*([^：:]{1,30})\s*[：:]\s*(.*)$/u)
+          return match && labels.has(match[1].trim()) ? match[2] : line
+        }).join('\n')
+        const expected = searchable(expectedText).value.length
+        const heard = words.reduce((length, word) => length + searchable(word.text).value.length, 0)
+        // A successful transcription that is shorter than the requested copy
+        // means the voice skipped text. Do not disguise that omission with
+        // interpolated KTV timestamps and publish a clip the learner cannot
+        // trust. A total transcription outage still uses the safe fallback.
+        if (expected && heard / expected < 0.98) {
+          throw new IncompleteSpeechError(`Generated speech covered ${heard} of ${expected} spoken characters.`)
+        }
+      }
+      const aligned = alignWordInfo(payload, spokenTranscript, language, totalMs)
+      const completed = completeCues(aligned, spokenTranscript, totalMs, language)
       if (completed.length) return completed
     } catch (error) {
+      if (error instanceof IncompleteSpeechError) throw error
       console.warn('word timestamping unavailable; using duration alignment', error instanceof Error ? error.message : error)
     }
   }
@@ -497,13 +547,11 @@ export async function contentHash(
   speakers: string[] = [],
   speakerGenders: SpeakerGender[] = [],
 ) {
-  const parts = [kind, language, accent || '', speakers.join('|'), speakerGenders.join('|'), text]
-  const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accent) : ''
-  const speechText = language.startsWith('zh') ? regionalSpeechText(text, accent) : text
-  // Only recordings affected by a pronunciation rule get a new cache key. An
-  // unrelated clip should remain reusable instead of costing another AI call.
-  if (pronunciation) parts.push(pronunciation)
-  if (speechText !== text) parts.push(speechText)
+  const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, text)
+  const parts = [
+    SPEECH_RECIPE_VERSION, kind, language, accent || '', speakers.join('|'),
+    speakerGenders.join('|'), text, plan.instruction, plan.speechText,
+  ]
   const digest = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(parts.join('\u0000')),

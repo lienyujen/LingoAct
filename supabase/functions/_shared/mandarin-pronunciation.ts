@@ -8,6 +8,96 @@
 
 export type MandarinAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
 
+// The displayed reading follows the sound the learner actually hears. This is
+// deliberately different from ordinary Hanyu Pinyin publishing practice,
+// which normally keeps the dictionary tones on 一 and 不: this is a language
+// teaching player whose ruby is followed by a karaoke cursor, so bù above a
+// syllable that is audibly bú teaches the wrong correspondence.
+const SANDHI_BASES: Record<string, string[]> = {
+  '一': ['yī', 'yí', 'yǐ', 'yì', 'yi'],
+  '不': ['bū', 'bú', 'bǔ', 'bù', 'bu'],
+  '七': ['qī', 'qí', 'qǐ', 'qì', 'qi'],
+  '八': ['bā', 'bá', 'bǎ', 'bà', 'ba'],
+}
+
+const PHRASE_BREAK = /[，,。．.!！?？；;：:\n\r]/u
+
+const MARKED_VOWELS: Record<string, [string, number]> = {
+  ā: ['a', 1], á: ['a', 2], ǎ: ['a', 3], à: ['a', 4],
+  ē: ['e', 1], é: ['e', 2], ě: ['e', 3], è: ['e', 4],
+  ī: ['i', 1], í: ['i', 2], ǐ: ['i', 3], ì: ['i', 4],
+  ō: ['o', 1], ó: ['o', 2], ǒ: ['o', 3], ò: ['o', 4],
+  ū: ['u', 1], ú: ['u', 2], ǔ: ['u', 3], ù: ['u', 4],
+  ǖ: ['ü', 1], ǘ: ['ü', 2], ǚ: ['ü', 3], ǜ: ['ü', 4],
+}
+
+const VOWEL_MARKS: Record<string, string[]> = {
+  a: ['a', 'ā', 'á', 'ǎ', 'à'], e: ['e', 'ē', 'é', 'ě', 'è'],
+  i: ['i', 'ī', 'í', 'ǐ', 'ì'], o: ['o', 'ō', 'ó', 'ǒ', 'ò'],
+  u: ['u', 'ū', 'ú', 'ǔ', 'ù'], ü: ['ü', 'ǖ', 'ǘ', 'ǚ', 'ǜ'],
+}
+
+function toneOf(value: string) {
+  for (const character of value.toLocaleLowerCase()) {
+    const marked = MARKED_VOWELS[character]
+    if (marked) return marked[1]
+  }
+  return 5
+}
+
+function withTone(value: string, tone: number) {
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]
+    const lower = character.toLocaleLowerCase()
+    const marked = MARKED_VOWELS[lower]
+    if (!marked) continue
+    const replacement = VOWEL_MARKS[marked[0]][tone] || marked[0]
+    const cased = character === character.toLocaleUpperCase() ? replacement.toLocaleUpperCase() : replacement
+    return `${value.slice(0, index)}${cased}${value.slice(index + 1)}`
+  }
+  return value
+}
+
+function sandhiTone(character: string, nextTone: number, accent: MandarinAccent | null) {
+  if (character === '一') return nextTone === 4 ? 2 : nextTone >= 1 && nextTone <= 3 ? 4 : 1
+  if (character === '不') return nextTone === 4 ? 2 : 4
+  if (!usesMainlandStandard(accent) && (character === '七' || character === '八')) {
+    return nextTone === 4 ? 2 : nextTone >= 1 && nextTone <= 3 ? 4 : 1
+  }
+  return null
+}
+
+function applyCharacterSandhi(text: string, input: string[], accent: MandarinAccent | null) {
+  const characters = [...text]
+  const output = [...input]
+  const nextReading = (from: number) => {
+    for (let index = from; index < characters.length; index += 1) {
+      if (PHRASE_BREAK.test(characters[index])) return null
+      if (output[index]) return output[index]
+    }
+    return null
+  }
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index]
+    if (character === '一' && index > 0 && characters[index - 1] === characters[index + 1]) {
+      output[index] = withTone(output[index], 5)
+      continue
+    }
+    if (!SANDHI_BASES[character] || !output[index]) continue
+    const next = nextReading(index + 1)
+    if (!next) continue
+    const wanted = sandhiTone(character, toneOf(next), accent)
+    if (wanted) output[index] = withTone(output[index], wanted)
+  }
+  // In an uninterrupted third-tone group, every syllable except the last is
+  // realised with a rising tone. Punctuation ends the group.
+  for (let index = 0; index < output.length - 1; index += 1) {
+    if (PHRASE_BREAK.test(characters[index]) || PHRASE_BREAK.test(characters[index + 1])) continue
+    if (toneOf(output[index]) === 3 && toneOf(output[index + 1]) === 3) output[index] = withTone(output[index], 2)
+  }
+  return output
+}
+
 type RuleSpec = { terms: string[]; offsets: number[]; taiwan: string; mainland: string }
 type Rule = RuleSpec & { scope: 'character' | 'phrase' }
 type TaiwanRuleSpec = Omit<RuleSpec, 'mainland'>
@@ -173,8 +263,8 @@ export function usesMainlandStandard(accent: MandarinAccent | null) {
 
 export function regionalStandardInstruction(accent: MandarinAccent | null) {
   return usesMainlandStandard(accent)
-    ? 'Use the official Mainland China Putonghua dictionary reading of every word, including region-specific initials, finals, tones, neutral tones and polyphonic-word choices. When 和 is a standalone conjunction or preposition meaning “and / with”, pronounce it hé. Do not substitute Taiwan Guoyu readings.'
-    : 'Use the official Taiwan Ministry of Education Guoyu dictionary reading of every word, including region-specific initials, finals, tones and polyphonic-word choices. When 和 is a standalone conjunction or preposition meaning 「and / with」, pronounce it hàn. Do not substitute Mainland Putonghua readings.'
+    ? 'Use the official Mainland China Putonghua dictionary reading of every word, including region-specific initials, finals, tones, neutral tones and polyphonic-word choices. Realise connected-speech tone sandhi naturally: 一 and 不 change before the following tone, a non-final third tone rises before another third tone, and 七 and 八 keep qī and bā. When 和 is a standalone conjunction or preposition meaning “and / with”, pronounce it hé. Do not substitute Taiwan Guoyu readings.'
+    : 'Use the official Taiwan Ministry of Education Guoyu dictionary reading of every word, including region-specific initials, finals, tones and polyphonic-word choices. Realise connected-speech tone sandhi naturally: 一、七、八、不 change before the following tone and a non-final third tone rises before another third tone. When 和 is a standalone conjunction or preposition meaning 「and / with」, pronounce it hàn. Do not substitute Mainland Putonghua readings.'
 }
 
 function matchingRules(text: string, accent: MandarinAccent | null) {
@@ -218,6 +308,8 @@ const SPEECH_SURROGATES: Record<string, string> = {
   hàn: '漢',
   xìng: '姓',
   fǎ: '髮',
+  zhàn: '站',
+  zàn: '讚',
 }
 
 // 和 is a standalone conjunction in far more sentences than a phrase table can
@@ -232,13 +324,12 @@ const NON_CONJUNCTION_HE_TERMS = [
   '飽和', '饱和', '柔和', '溫和', '温和', '親和', '亲和', '祥和', '隨和',
   '随和', '不和', '違和', '违和', '和煦', '和藹', '和蔼', '和悅', '和悦',
   '和美', '和順', '和顺', '和樂', '和乐', '和衷共濟', '和衷共济',
-  '和顏悅色', '和颜悦色', '和盤托出', '和盘托出', '大和', '和子',
+  '和顏悅色', '和颜悦色', '和盤托出', '和盘托出', '大和', '和子', '永和',
 ]
 
-export function regionalSpeechText(text: string, accent: MandarinAccent | null) {
-  const characters = [...text]
-  const mainland = usesMainlandStandard(accent)
+function heContextIndexes(text: string) {
   const protectedHe = new Set<number>()
+  const forcedHe = new Set<number>()
   for (const term of NON_CONJUNCTION_HE_TERMS) {
     let from = 0
     while (from <= text.length) {
@@ -251,6 +342,38 @@ export function regionalSpeechText(text: string, accent: MandarinAccent | null) 
       from = found + term.length
     }
   }
+  // Place and road names are open-ended proper nouns, so a finite compound
+  // list can never cover them. The suffix supplies enough context to protect
+  // 得和路、福和路 and future names without protecting a neighbouring 和 used
+  // as “and”.
+  for (const match of text.matchAll(/[\p{Script=Han}]{1,4}和(?:路|街|巷|大道)/gu)) {
+    const start = [...text.slice(0, match.index || 0)].length
+    const offset = [...match[0]].map((character, index) => character === '和' ? index : -1)
+      .filter((index) => index >= 0).at(-1)
+    if (offset !== undefined) {
+      protectedHe.add(start + offset)
+      forcedHe.add(start + offset)
+    }
+  }
+  for (const term of ['中和', '永和']) {
+    let from = 0
+    while (from <= text.length) {
+      const found = text.indexOf(term, from)
+      if (found < 0) break
+      forcedHe.add([...text.slice(0, found)].length + 1)
+      from = found + term.length
+    }
+  }
+  return { protectedHe, forcedHe }
+}
+
+export function regionalSpeechText(text: string, accent: MandarinAccent | null) {
+  const characters = [...text]
+  const mainland = usesMainlandStandard(accent)
+  const { protectedHe, forcedHe } = heContextIndexes(text)
+  // The private copy may use a homophone to give the TTS engine a phoneme
+  // contract. This never changes the transcript shown to learners.
+  forcedHe.forEach((index) => { characters[index] = '河' })
 
   for (const entry of matchingRules(text, accent)) {
     let from = 0
@@ -277,6 +400,7 @@ export function regionalSpeechText(text: string, accent: MandarinAccent | null) 
 
 export function applyRegionalPinyin(text: string, syllables: string[], accent: MandarinAccent | null) {
   const output = [...syllables]
+  const characters = [...text]
   const mainland = usesMainlandStandard(accent)
   for (const entry of matchingRules(text, accent)) {
     let from = 0
@@ -288,7 +412,92 @@ export function applyRegionalPinyin(text: string, syllables: string[], accent: M
       from = found + entry.term.length
     }
   }
+  const { protectedHe } = heContextIndexes(text)
+  characters.forEach((character, index) => {
+    if (character === '和' && !protectedHe.has(index)) output[index] = mainland ? 'hé' : 'hàn'
+  })
+  return applyCharacterSandhi(text, output, accent)
+}
+
+function markedToneOffsets(value: string) {
+  const output: Array<{ at: number; tone: number }> = []
+  for (let at = 0; at < value.length; at += 1) {
+    const marked = MARKED_VOWELS[value[at].toLocaleLowerCase()]
+    if (marked) output.push({ at, tone: marked[1] })
+  }
   return output
+}
+
+function changeMarkedVowel(value: string, at: number, tone: number) {
+  const character = value[at]
+  const marked = MARKED_VOWELS[character.toLocaleLowerCase()]
+  if (!marked) return value
+  const replacement = VOWEL_MARKS[marked[0]][tone] || marked[0]
+  const cased = character === character.toLocaleUpperCase() ? replacement.toLocaleUpperCase() : replacement
+  return `${value.slice(0, at)}${cased}${value.slice(at + 1)}`
+}
+
+function applyWordSandhi<T extends { text: string; pinyin: string }>(input: T[], accent: MandarinAccent | null): T[] {
+  const words = input.map((word) => ({ ...word }))
+  const nextTone = (wordIndex: number, after: number) => {
+    const own = markedToneOffsets(words[wordIndex].pinyin).find((mark) => mark.at > after)
+    if (own) return own.tone
+    for (let index = wordIndex + 1; index < words.length; index += 1) {
+      if (PHRASE_BREAK.test(words[index].text)) return 5
+      const first = markedToneOffsets(words[index].pinyin)[0]
+      if (first) return first.tone
+    }
+    return 5
+  }
+
+  for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
+    const word = words[wordIndex]
+    let searchFrom = 0
+    for (let characterIndex = 0; characterIndex < [...word.text].length; characterIndex += 1) {
+      const character = [...word.text][characterIndex]
+      const candidates = SANDHI_BASES[character]
+      if (!candidates) continue
+      const lower = word.pinyin.toLocaleLowerCase()
+      const found = candidates
+        .map((candidate) => ({ candidate, at: lower.indexOf(candidate, searchFrom) }))
+        .filter((match) => match.at >= 0)
+        .sort((left, right) => left.at - right.at)[0]
+      if (!found) continue
+      const original = word.pinyin.slice(found.at, found.at + found.candidate.length)
+      const repeatedVerb = character === '一'
+        && characterIndex > 0
+        && [...word.text][characterIndex - 1] === [...word.text][characterIndex + 1]
+      const wanted = repeatedVerb ? 5 : sandhiTone(character, nextTone(wordIndex, found.at + found.candidate.length - 1), accent)
+      if (wanted) {
+        const replacement = withTone(original, wanted)
+        word.pinyin = `${word.pinyin.slice(0, found.at)}${replacement}${word.pinyin.slice(found.at + found.candidate.length)}`
+      }
+      searchFrom = found.at + found.candidate.length
+    }
+  }
+
+  // First settle groups within each orthographic word. Across word boundaries,
+  // bridge only adjacent one-character words: longer words form their own
+  // prosodic group, and flattening 展覽館很好 into one five-syllable chain would
+  // be less accurate than preserving the segmentation the language model gave.
+  for (const word of words) {
+    const marks = markedToneOffsets(word.pinyin)
+    for (let index = 0; index < marks.length - 1; index += 1) {
+      if (marks[index].tone === 3 && marks[index + 1].tone === 3) {
+        word.pinyin = changeMarkedVowel(word.pinyin, marks[index].at, 2)
+      }
+    }
+  }
+  for (let index = 0; index < words.length - 1; index += 1) {
+    if (PHRASE_BREAK.test(words[index].text) || PHRASE_BREAK.test(words[index + 1].text)) continue
+    if ([...words[index].text].length !== 1 || [...words[index + 1].text].length !== 1) continue
+    const current = markedToneOffsets(words[index].pinyin)
+    const following = markedToneOffsets(words[index + 1].pinyin)
+    const last = current[current.length - 1]
+    const first = following[0]
+    if (last?.tone === 3 && first?.tone === 3) words[index].pinyin = changeMarkedVowel(words[index].pinyin, last.at, 2)
+  }
+  return words.map((word, index) => word.pinyin === input[index].pinyin ? input[index] : word as T)
 }
 
 // 正詞法 output already tells us where a word begins and ends. That makes the
@@ -315,7 +524,7 @@ export function applyRegionalWordPinyin<T extends { text: string; pinyin: string
   }
 
   let cursor = 0
-  return words.map((word) => {
+  const regional = words.map((word) => {
     const length = [...word.text].length
     let pinyin = word.pinyin
     // Segmentation settles the ambiguous conjunction without guessing: 和 is
@@ -346,6 +555,7 @@ export function applyRegionalWordPinyin<T extends { text: string; pinyin: string
     cursor += length
     return pinyin === word.pinyin ? word : { ...word, pinyin }
   })
+  return applyWordSandhi(regional, accent)
 }
 
 export function regionalPinyinOverrides(text: string, accent: MandarinAccent | null) {

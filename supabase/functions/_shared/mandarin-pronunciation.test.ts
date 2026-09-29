@@ -96,12 +96,12 @@ Deno.test('standalone conjunction 和 follows the selected regional standard in 
   assertEquals(applyRegionalWordPinyin('和平溫和', compounds, 'standard_guoyu'), compounds)
 })
 
-Deno.test('Taiwan accent keeps MOE readings but has a distinct restrained cadence prompt', () => {
+Deno.test('Taiwan accent keeps MOE readings and asks for an unmistakable natural Taiwan cadence', () => {
   const standard = buildVoicePlan('passage', 'zh-tw', 'standard_guoyu', [], [], '我和你').instruction
   const taiwanese = buildVoicePlan('passage', 'zh-tw', 'taiwanese', [], [], '我和你').instruction
   const mainland = buildVoicePlan('passage', 'zh-tw', 'putonghua', [], [], '我和你').instruction
   if (!standard.includes('formal broadcasting in Taiwan') || !standard.includes('hàn')) throw new Error(standard)
-  if (!taiwanese.includes('light, warm Taiwan cadence') || !taiwanese.includes('do not exaggerate') || !taiwanese.includes('hàn')) throw new Error(taiwanese)
+  if (!taiwanese.includes('unmistakably Taiwanese cadence') || taiwanese.includes('do not exaggerate') || !taiwanese.includes('hàn')) throw new Error(taiwanese)
   if (!mainland.includes('Mainland China') || !mainland.includes('hé')) throw new Error(mainland)
   if (standard === taiwanese) throw new Error('Standard Guoyu and Taiwanese prompts must stay distinct.')
 })
@@ -118,4 +118,73 @@ Deno.test('speech copy does not mistake lexical 和 compounds for conjunctions',
   const text = '他個性溫和，喜歡和平，也會和家人商量。'
   assertEquals(regionalSpeechText(text, 'standard_guoyu'), '他個性溫和，喜歡和平，也會漢家人商量。')
   assertEquals(regionalSpeechText('今天要和麵，也要攪和一下。', 'standard_guoyu'), '今天要和麵，也要攪和一下。')
+})
+
+Deno.test('the reported road-name sentence has one pronunciation plan in annotation and speech', () => {
+  const text = '中和的得和路得和永和的福和路接著，我和你暫時不會走錯路。'
+  const words = [
+    { text: '中和', pinyin: 'Zhōnghé' }, { text: '的', pinyin: 'de' },
+    { text: '得和路', pinyin: 'Déhé Lù' }, { text: '得', pinyin: 'děi' },
+    { text: '和', pinyin: 'hé' }, { text: '永和', pinyin: 'Yǒnghé' },
+    { text: '的', pinyin: 'de' }, { text: '福和路', pinyin: 'Fúhé Lù' },
+    { text: '接著', pinyin: 'jiēzhe' }, { text: '，', pinyin: '' },
+    { text: '我', pinyin: 'wǒ' }, { text: '和', pinyin: 'hé' },
+    { text: '你', pinyin: 'nǐ' }, { text: '暫時', pinyin: 'zànshí' },
+    { text: '不會', pinyin: 'bùhuì' }, { text: '走', pinyin: 'zǒu' },
+    { text: '錯路', pinyin: 'cuòlù' }, { text: '。', pinyin: '' },
+  ]
+  const pinyin = (accent: 'standard_guoyu' | 'putonghua' | 'taiwanese') => (
+    applyRegionalWordPinyin(text, words, accent).map((word) => word.pinyin)
+  )
+  const taiwan = pinyin('standard_guoyu')
+  const taiwanese = pinyin('taiwanese')
+  const mainland = pinyin('putonghua')
+  assertEquals(taiwan[2], 'Déhé Lù')
+  assertEquals(taiwan[4], 'hàn')
+  assertEquals(taiwan[11], 'hàn')
+  assertEquals(taiwan[13], 'zhànshí')
+  assertEquals(taiwan[14], 'búhuì')
+  assertEquals(taiwanese, taiwan)
+  assertEquals(mainland[4], 'hé')
+  assertEquals(mainland[11], 'hé')
+  assertEquals(mainland[13], 'zànshí')
+  assertEquals(mainland[14], 'búhuì')
+
+  const characterPinyin = [...text].map((character) => character === '和' ? 'hé' : '')
+  assertEquals(
+    [...text].flatMap((character, at) => character === '和'
+      ? [applyRegionalPinyin(text, characterPinyin, 'standard_guoyu')[at]] : []),
+    ['hé', 'hé', 'hàn', 'hé', 'hé', 'hàn'],
+  )
+
+  assertEquals(
+    regionalSpeechText(text, 'standard_guoyu'),
+    '中河的得河路得漢永河的福河路接著，我漢你站時不會走錯路。',
+  )
+  assertEquals(
+    regionalSpeechText(text, 'putonghua'),
+    '中河的得河路得和永河的福河路接著，我和你讚時不會走錯路。',
+  )
+})
+
+Deno.test('surface-tone annotation follows each regional sandhi standard', () => {
+  const text = '一杯一個七天七次八本八號不會很好展覽館'
+  const base = ['yī', 'bēi', 'yī', 'gè', 'qī', 'tiān', 'qī', 'cì', 'bā', 'běn', 'bā', 'hào', 'bù', 'huì', 'hěn', 'hǎo', 'zhǎn', 'lǎn', 'guǎn']
+  assertEquals(
+    applyRegionalPinyin(text, base, 'standard_guoyu'),
+    ['yì', 'bēi', 'yí', 'gè', 'qì', 'tiān', 'qí', 'cì', 'bà', 'běn', 'bá', 'hào', 'bú', 'huì', 'hén', 'háo', 'zhán', 'lán', 'guǎn'],
+  )
+  assertEquals(
+    applyRegionalPinyin(text, base, 'putonghua'),
+    ['yì', 'bēi', 'yí', 'gè', 'qī', 'tiān', 'qī', 'cì', 'bā', 'běn', 'bā', 'hào', 'bú', 'huì', 'hén', 'háo', 'zhán', 'lán', 'guǎn'],
+  )
+  assertEquals(
+    applyRegionalWordPinyin('展覽館很好勇敢', [
+      { text: '展覽館', pinyin: 'zhǎnlǎnguǎn' },
+      { text: '很', pinyin: 'hěn' },
+      { text: '好', pinyin: 'hǎo' },
+      { text: '勇敢', pinyin: 'yǒnggǎn' },
+    ], 'standard_guoyu').map((word) => word.pinyin),
+    ['zhánlánguǎn', 'hén', 'hǎo', 'yónggǎn'],
+  )
 })

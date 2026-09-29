@@ -86,6 +86,12 @@ Deno.serve(async (req) => {
     if (wav.length > MAX_BYTES) {
       return jsonResponse({ message: '這段內容太長，語音超過 10MB。請分成兩段再轉換。' }, 413)
     }
+    // Verify the model actually spoke the requested copy before publishing
+    // anything. This catches the short-word omission that used to shift every
+    // later KTV highlight while leaving no orphaned Storage object behind.
+    const cues = await karaokeCues(
+      wav, transcript, language, clipDurationMs, plan.speechText, plan.speakers,
+    )
 
     const storagePath = `${sessionId}/${hash}.wav`
     const { error: uploadError } = await supabase.storage
@@ -94,7 +100,6 @@ Deno.serve(async (req) => {
     if (uploadError) throw uploadError
 
     const { data: publicUrl } = supabase.storage.from('lingoact-listening').getPublicUrl(storagePath)
-    const cues = await karaokeCues(wav, transcript, language, clipDurationMs)
 
     const { data: clip, error: insertError } = await supabase
       .from('listening_clips')

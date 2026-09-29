@@ -3,6 +3,7 @@ import {
   applyRegionalWordPinyin,
   pinyinToBopomofo,
   regionalPronunciationInstruction,
+  regionalSpeechText,
 } from './mandarin-pronunciation.ts'
 import { buildVoicePlan } from './listening.ts'
 
@@ -103,4 +104,18 @@ Deno.test('Taiwan accent keeps MOE readings but has a distinct restrained cadenc
   if (!taiwanese.includes('light, warm Taiwan cadence') || !taiwanese.includes('do not exaggerate') || !taiwanese.includes('hàn')) throw new Error(taiwanese)
   if (!mainland.includes('Mainland China') || !mainland.includes('hé')) throw new Error(mainland)
   if (standard === taiwanese) throw new Error('Standard Guoyu and Taiwanese prompts must stay distinct.')
+})
+
+Deno.test('speech copy forces reported Taiwan readings without changing the learner transcript', () => {
+  const sentence = '他希望每天都能和家人朋友在一起玩。'
+  assertEquals(regionalSpeechText(sentence, 'standard_guoyu'), '他希望每天都能漢家人朋友在一起玩。')
+  assertEquals(regionalSpeechText(sentence, 'taiwanese'), '他希望每天都能漢家人朋友在一起玩。')
+  assertEquals(regionalSpeechText(sentence, 'putonghua'), sentence)
+  assertEquals(regionalSpeechText('他的品行很好，也去過法國。', 'standard_guoyu'), '他的品姓很好，也去過髮國。')
+})
+
+Deno.test('speech copy does not mistake lexical 和 compounds for conjunctions', () => {
+  const text = '他個性溫和，喜歡和平，也會和家人商量。'
+  assertEquals(regionalSpeechText(text, 'standard_guoyu'), '他個性溫和，喜歡和平，也會漢家人商量。')
+  assertEquals(regionalSpeechText('今天要和麵，也要攪和一下。', 'standard_guoyu'), '今天要和麵，也要攪和一下。')
 })

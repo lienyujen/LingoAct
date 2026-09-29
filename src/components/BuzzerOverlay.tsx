@@ -21,9 +21,11 @@ export function BuzzerOverlay({ event, participantId, busy = false, onClose, onS
   const t = usePresenterText()
   const [visible, setVisible] = useState(false)
   const [pressed, setPressed] = useState(false)
+  const [closing, setClosing] = useState(false)
 
   useEffect(() => {
     setPressed(false)
+    setClosing(false)
     if (!event || event.payload.cancelled) {
       setVisible(false)
       return
@@ -79,6 +81,20 @@ export function BuzzerOverlay({ event, participantId, busy = false, onClose, onS
     }
   }
 
+  async function close() {
+    if (!onClose || closing) return
+    // Hide immediately. Waiting for Realtime before removing a full-screen
+    // overlay lets its close target move underneath the pointer mid-click.
+    setClosing(true)
+    setVisible(false)
+    try {
+      await onClose()
+    } catch {
+      setClosing(false)
+      setVisible(true)
+    }
+  }
+
   return (
     <div className={`buzzer-overlay${finalized ? ' revealed' : ' active'}`} aria-live="assertive">
       {/* Top centre, not the top-right corner. The overlay fills the screen, and
@@ -91,7 +107,8 @@ export function BuzzerOverlay({ event, participantId, busy = false, onClose, onS
           className="buzzer-close"
           title={t('closeBuzzer')}
           type="button"
-          onClick={() => void onClose()}
+          disabled={closing}
+          onClick={() => void close()}
         >
           <X size={22} />
         </button>

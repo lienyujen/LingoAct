@@ -1750,13 +1750,14 @@ Deno.serve(async (req) => {
           .select('teaching_language').eq('id', sessionId).maybeSingle()
         await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
       }
-      const [{ data: items, error: itemError }, { data: attempts, error: attemptError }, { data: question, error: questionError }, { data: readingPassage, error: passageError }] = await Promise.all([
+      const [{ data: items, error: itemError }, { data: attempts, error: attemptError }, { data: question, error: questionError }, { data: readingPassage, error: passageError }, { data: sessionView, error: sessionViewError }] = await Promise.all([
         supabase.from('quiz_items').select('*').eq('quiz_id', quiz.id).order('position'),
         supabase.from('quiz_attempts').select('*').eq('quiz_id', quiz.id).order('submitted_at'),
         supabase.from('questions').select('screenshot_id, share_screenshot, karaoke_cues').eq('id', questionId).eq('session_id', sessionId).single(),
         supabase.from('reading_passages').select('*').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle(),
+        supabase.from('sessions').select('anonymous_enabled').eq('id', sessionId).single(),
       ])
-      if (itemError || attemptError || questionError || passageError) throw itemError || attemptError || questionError || passageError
+      if (itemError || attemptError || questionError || passageError || sessionViewError) throw itemError || attemptError || questionError || passageError || sessionViewError
       const itemIds = (items || []).map((item) => item.id)
       const attemptIds = (attempts || []).map((attempt) => attempt.id)
       const [{ data: keys, error: keyError }, { data: answers, error: answerError }, { data: screenshot, error: screenshotError }, { data: tries }] = await Promise.all([
@@ -1787,6 +1788,7 @@ Deno.serve(async (req) => {
         : { data: null, error: null }
       if (readingClipError) throw readingClipError
       return jsonResponse({
+        anonymousEnabled: Boolean(sessionView?.anonymous_enabled),
         quiz,
         items: items || [],
         attempts: attempts || [],

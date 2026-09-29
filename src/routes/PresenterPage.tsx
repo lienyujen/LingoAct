@@ -340,11 +340,17 @@ export function PresenterPage() {
     if (!isSupabaseConfigured || !sessionId) return
 
     const supabase = requireSupabase()
-    const [{ data: sessionData }, { data: participantData }, { data: questionListData }, { data: answerQuestionData }, { data: exitTicketData }] = await Promise.all([
+    const presenterToken = getPresenterToken(sessionId)
+    const [{ data: sessionData }, { data: participantData }, { data: questionListData }, { data: answerQuestionData }, { data: boardPostData }, { data: exitTicketData }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', sessionId).single(),
       supabase.from('participants').select('*').eq('session_id', sessionId).order('joined_at'),
       supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at'),
       supabase.from('answers').select('question_id').eq('session_id', sessionId),
+      presenterToken
+        ? supabase.functions.invoke('presenter-action', {
+          body: { action: 'get_session_board_posts', sessionId, presenterToken },
+        })
+        : Promise.resolve({ data: { posts: [] }, error: null }),
       supabase.from('exit_tickets').select('*').eq('session_id', sessionId).order('submitted_at'),
     ])
 
@@ -354,10 +360,21 @@ export function PresenterPage() {
     setParticipants((participantData || []) as Participant[])
     setQuestions(nextQuestions)
     setExitTickets((exitTicketData || []) as ExitTicket[])
-    setAnswerCounts((answerQuestionData || []).reduce<Record<string, number>>((counts, answer) => {
+    const nextAnswerCounts = (answerQuestionData || []).reduce<Record<string, number>>((counts, answer) => {
       counts[answer.question_id] = (counts[answer.question_id] || 0) + 1
       return counts
-    }, {}))
+    }, {})
+    // A board post is the discussion activity's answer. Count people rather
+    // than cards so one enthusiastic student replying three times is still one
+    // respondent, exactly like the live board tally.
+    const boardResponders = new Map<string, Set<string>>()
+    for (const post of (boardPostData?.posts || []).filter((item: { deleted_at?: string | null }) => !item.deleted_at)) {
+      const responders = boardResponders.get(post.question_id) || new Set<string>()
+      responders.add(post.participant_id)
+      boardResponders.set(post.question_id, responders)
+    }
+    for (const [questionId, responders] of boardResponders) nextAnswerCounts[questionId] = responders.size
+    setAnswerCounts(nextAnswerCounts)
 
     // A dispatch changes the class's current question. Keep a history selection
     // only while that current id has not changed; otherwise the old selection
@@ -544,6 +561,7 @@ export function PresenterPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `session_id=eq.${sessionId}` }, applyParticipantChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `session_id=eq.${sessionId}` }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts', filter: `session_id=eq.${sessionId}` }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `session_id=eq.${sessionId}` }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` }, (payload) => {

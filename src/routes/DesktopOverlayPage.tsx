@@ -219,7 +219,10 @@ export function DesktopOverlayPage() {
   useEffect(() => {
     const interactive = Boolean(
       (lotteryEvent && lotteryEvent.payload.finalized === false)
-      || (isBuzzerPending(buzzerEvent) && !isBuzzerAccepting(buzzerEvent)),
+      // The presenter owns the close button for the whole round. Once the
+      // buzzer opened this window used to become click-through, so the X was
+      // still visible but could no longer receive a click.
+      || isBuzzerPending(buzzerEvent),
     )
     void window.lingoActDesktop?.setLotteryInteraction(interactive)
     return () => {

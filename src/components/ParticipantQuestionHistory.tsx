@@ -81,24 +81,41 @@ export function ParticipantQuestionHistory({ analyses,
   const [sectionExpanded, setSectionExpanded] = useState(true)
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const requestedDetails = useRef(new Set<string>())
+  const previousQuizData = useRef(quizData)
   const newestId = history[0]?.id || ''
+  const loadDetailsRef = useRef(onLoadDetails)
+
+  useEffect(() => {
+    loadDetailsRef.current = onLoadDetails
+  }, [onLoadDetails])
 
   useEffect(() => {
     if (!newestId) return
     const visible = defaultExpandAll ? history : history.slice(0, 1)
     setOpenIds(new Set(visible.map((question) => question.id)))
     for (const question of visible) {
-      // A teacher edit invalidates this entry in ParticipantPage. Let that
-      // missing value through even if this question was loaded before, so the
-      // corrected article and comments arrive without a student reload.
-      if (question.type === 'custom_quiz' && quizData[question.id] === undefined) {
-        requestedDetails.current.delete(question.id)
-      }
       if (requestedDetails.current.has(question.id)) continue
       requestedDetails.current.add(question.id)
-      void onLoadDetails(question)
+      void loadDetailsRef.current(question)
     }
-  }, [defaultExpandAll, history, newestId, onLoadDetails, quizData])
+  // Detail payloads arrive after the row opens. They must not reset openIds:
+  // that was why an unanswered read-aloud flashed "loading" and immediately
+  // folded itself before the model recording could be played.
+  }, [defaultExpandAll, history, newestId])
+
+  useEffect(() => {
+    for (const question of history) {
+      if (question.type !== 'custom_quiz' || !openIds.has(question.id)) continue
+      // A teacher save deliberately removes this one cached payload in the
+      // parent. Only a defined -> missing transition is an invalidation; the
+      // initial missing state is already handled by opening the row.
+      if (!(question.id in previousQuizData.current) || quizData[question.id] !== undefined) continue
+      requestedDetails.current.delete(question.id)
+      requestedDetails.current.add(question.id)
+      void loadDetailsRef.current(question)
+    }
+    previousQuizData.current = quizData
+  }, [history, openIds, quizData])
 
   if (!history.length) return null
 
@@ -110,7 +127,10 @@ export function ParticipantQuestionHistory({ analyses,
       else next.delete(question.id)
       return next
     })
-    if (opening) await onLoadDetails(question)
+    if (opening && !requestedDetails.current.has(question.id)) {
+      requestedDetails.current.add(question.id)
+      await onLoadDetails(question)
+    }
   }
 
   return (

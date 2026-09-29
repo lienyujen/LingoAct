@@ -596,6 +596,10 @@ export type QuizItemTry = {
 }
 
 export type PresenterQuizResults = ParticipantQuizData & {
+  // Snapshot of the presenter workspace's name display when this review data
+  // was loaded. The enlarged window may override it locally without changing
+  // the class-wide setting.
+  anonymousEnabled: boolean
   attempts: QuizAttempt[]
   answers: QuizItemAnswer[]
   tries: QuizItemTry[]

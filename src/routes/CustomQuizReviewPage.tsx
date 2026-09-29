@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Brain, CaretLeft, CaretRight, CircleNotch, FloppyDisk, Sparkle, X } from '@phosphor-icons/react'
+import { Brain, CaretLeft, CaretRight, CircleNotch, Eye, EyeSlash, FloppyDisk, Sparkle, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
 import { QuizAnswerEditor } from '../components/CustomQuizResult'
 import { InteractionResults } from '../components/InteractionResults'
@@ -63,6 +63,7 @@ export function CustomQuizReviewPage() {
   const [saved, setSaved] = useState(false)
   const [readingCue, setReadingCue] = useState(-1)
   const [error, setError] = useState('')
+  const [showWritingNames, setShowWritingNames] = useState<boolean | null>(null)
 
   const loadQuiz = useCallback(async (): Promise<PresenterQuizResults | null> => {
     const presenterToken = getPresenterToken(sessionId)
@@ -126,6 +127,13 @@ export function CustomQuizReviewPage() {
   }
 
   const attempts = useMemo(() => results?.attempts || [], [results])
+  // Null means "follow the main presenter setting". The first local press
+  // becomes an override for this window only; polling never writes it back to
+  // the class and never resets the teacher's choice here.
+  const writingNamesVisible = showWritingNames ?? !results?.anonymousEnabled
+  const attemptName = (attempt: PresenterQuizResults['attempts'][number] | undefined, index: number) => (
+    !attempt ? '' : writingNamesVisible ? attempt.participant_name : t('anonymousStudent', { n: index + 1 })
+  )
   useEffect(() => {
     if ((!pictureWriting && !writing) || !attempts.length) return
     setSelectedAttemptId((current) => attempts.some((attempt) => attempt.id === current) ? current : attempts[0].id)
@@ -281,9 +289,16 @@ export function CustomQuizReviewPage() {
         ) : results && writing ? (
           <div className="writing-review-native">
             <aside aria-label={t('writingStudentList')}>
-              {attempts.map((attempt) => (
+              <div className="writing-review-name-toggle">
+                <strong>{t('writingStudentList')}</strong>
+                <button type="button" onClick={() => setShowWritingNames((current) => !(current ?? !results.anonymousEnabled))}>
+                  {writingNamesVisible ? <EyeSlash size={16} /> : <Eye size={16} />}
+                  {writingNamesVisible ? t('hideStudentNames') : t('showStudentNames')}
+                </button>
+              </div>
+              {attempts.map((attempt, index) => (
                 <button className={selectedAttemptId === attempt.id ? 'is-on' : ''} key={attempt.id} type="button" onClick={() => setSelectedAttemptId(attempt.id)}>
-                  <strong>{attempt.participant_name}</strong>
+                  <strong>{attemptName(attempt, index)}</strong>
                   <small>{attempt.total_score === null ? t('statusPending') : `${attempt.total_score}/100`}</small>
                 </button>
               ))}
@@ -294,7 +309,7 @@ export function CustomQuizReviewPage() {
                 <>
                   <div className="writing-review-native-heading">
                     <button aria-label={t('reviewPrevious')} className="icon-button" disabled={attempts.length < 2} title={t('reviewPrevious')} type="button" onClick={() => stepAttempt(-1)}><CaretLeft size={24} /></button>
-                    <span><strong>{attempts[attemptIndex]?.participant_name}</strong><small>{attemptIndex + 1} / {attempts.length}</small></span>
+                    <span><strong>{attemptName(attempts[attemptIndex], attemptIndex)}</strong><small>{attemptIndex + 1} / {attempts.length}</small></span>
                     <button aria-label={t('reviewNext')} className="icon-button" disabled={attempts.length < 2} title={t('reviewNext')} type="button" onClick={() => stepAttempt(1)}><CaretRight size={24} /></button>
                     <button className="writing-review-ai" disabled={Boolean(writingBusy)} type="button" onClick={() => void runAiReview()}>{writingBusy === 'ai' ? <CircleNotch className="spin" size={17} /> : <Sparkle size={17} />}{t('aiReviewWriting')}</button>
                   </div>
@@ -325,6 +340,7 @@ export function CustomQuizReviewPage() {
                 <ReadingPassageView
                   activeCue={readingCue}
                   cues={results.readingCues}
+                  fontControls
                   imageUrl={results.readingImageUrl}
                   locale={locale}
                   passage={results.readingPassage}

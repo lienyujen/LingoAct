@@ -674,6 +674,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                   <ReadingPassageView
                     activeCue={readingCue}
                     cues={results.readingCues}
+                    fontControls
                     imageUrl={results.readingImageUrl}
                     locale={locale}
                     passage={results.readingPassage}

@@ -28,7 +28,7 @@ async function sql(query) {
 
 try {
   await sql(`
-    insert into sessions(id,title,code) values('${sessionId}','Reading review integration fixture','${sessionId}');
+    insert into sessions(id,title,code,anonymous_enabled) values('${sessionId}','Reading review integration fixture','${sessionId}',true);
     insert into presenter_session_keys(session_id,token_hash) values('${sessionId}','${hash(presenterToken)}');
     insert into questions(id,session_id,type,status,title,prompt_text,karaoke_cues)
       values('${questionId}','${sessionId}','custom_quiz','active','A day at school','Read and answer.',
@@ -62,6 +62,7 @@ try {
   assert.equal(result.readingClip?.id, clipId)
   assert.equal(result.readingCues?.length, 1)
   assert.equal(result.readingImageUrl, null)
+  assert.equal(result.anonymousEnabled, true)
   console.log('Reading review live fixture passed.')
 } finally {
   await sql(`delete from sessions where id='${sessionId}'`)

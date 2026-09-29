@@ -207,6 +207,74 @@ export function regionalPronunciationInstruction(text: string, accent: MandarinA
   return details.length ? `${standard} Mandatory readings for this text: ${[...new Set(details)].join(' ')}` : standard
 }
 
+// Gemini's style prompt is not a phoneme contract. It can repeat the requested
+// pinyin in metadata and still fall back to its Mainland lexicon when it sees
+// the original polyphonic character. The learner-facing transcript must remain
+// untouched, but an unambiguous homophone in the private speech copy makes the
+// audible syllable deterministic. Keep this list deliberately small: a
+// surrogate is warranted only after the model has demonstrably ignored a
+// regional reading, because changing too many characters can flatten phrasing.
+const SPEECH_SURROGATES: Record<string, string> = {
+  hàn: '漢',
+  xìng: '姓',
+  fǎ: '髮',
+}
+
+// 和 is a standalone conjunction in far more sentences than a phrase table can
+// enumerate. Protect its common lexical compounds first, then the remaining 和
+// can safely follow the selected regional standard.
+const NON_CONJUNCTION_HE_TERMS = [
+  '和平', '和氣', '和气', '和善', '和睦', '和諧', '和谐', '和解', '和談', '和谈',
+  '和約', '和约', '和好', '和尚', '和服', '和風', '和风', '和室', '和食', '和歌',
+  '和棋', '和聲', '和声', '和弦', '和音', '和麵', '和面', '和稀泥', '攪和', '搅和',
+  '暖和', '附和', '應和', '应和', '唱和', '曲高和寡', '共和', '講和', '讲和',
+  '媾和', '求和', '議和', '议和', '緩和', '缓和', '調和', '调和', '中和',
+  '飽和', '饱和', '柔和', '溫和', '温和', '親和', '亲和', '祥和', '隨和',
+  '随和', '不和', '違和', '违和', '和煦', '和藹', '和蔼', '和悅', '和悦',
+  '和美', '和順', '和顺', '和樂', '和乐', '和衷共濟', '和衷共济',
+  '和顏悅色', '和颜悦色', '和盤托出', '和盘托出', '大和', '和子',
+]
+
+export function regionalSpeechText(text: string, accent: MandarinAccent | null) {
+  const characters = [...text]
+  const mainland = usesMainlandStandard(accent)
+  const protectedHe = new Set<number>()
+  for (const term of NON_CONJUNCTION_HE_TERMS) {
+    let from = 0
+    while (from <= text.length) {
+      const found = text.indexOf(term, from)
+      if (found < 0) break
+      const start = [...text.slice(0, found)].length
+      ;[...term].forEach((character, offset) => {
+        if (character === '和') protectedHe.add(start + offset)
+      })
+      from = found + term.length
+    }
+  }
+
+  for (const entry of matchingRules(text, accent)) {
+    let from = 0
+    while (from <= text.length) {
+      const found = text.indexOf(entry.term, from)
+      if (found < 0) break
+      const start = [...text.slice(0, found)].length
+      for (const offset of entry.offsets) {
+        const reading = mainland ? entry.mainland : entry.taiwan
+        const surrogate = SPEECH_SURROGATES[reading]
+        if (surrogate) characters[start + offset] = surrogate
+      }
+      from = found + entry.term.length
+    }
+  }
+
+  if (!mainland) {
+    characters.forEach((character, index) => {
+      if (character === '和' && !protectedHe.has(index)) characters[index] = SPEECH_SURROGATES.hàn
+    })
+  }
+  return characters.join('')
+}
+
 export function applyRegionalPinyin(text: string, syllables: string[], accent: MandarinAccent | null) {
   const output = [...syllables]
   const mainland = usesMainlandStandard(accent)

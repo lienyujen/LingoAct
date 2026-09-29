@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (!regenerate && cached?.input_json?.analysis_version === 10) {
+    if (!regenerate && cached?.input_json?.analysis_version === 11) {
       return jsonResponse({ analysis: cached.output_json, metrics: cached.input_json?.metrics, cached: true })
     }
 
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
     const durationEnd = new Date(endedAt).getTime()
     const durationMinutes = Math.max(0, Math.round((durationEnd - new Date(session.created_at).getTime()) / 60000))
     const averageResponseRate = participants.length && interactiveQuestions.length
-      ? roundPercent(((answers.length + submittedQuizAttempts.length + boardResponders) / (participants.length * interactiveQuestions.length)) * 100)
+      ? roundPercent(((answers.length + submittedQuizAttempts.length + boardResponders + audioResponses.length) / (participants.length * interactiveQuestions.length)) * 100)
       : 0
 
     const analysisByQuestion = new Map(questionAnalyses.map((item) => [item.question_id, item.output_json]))
@@ -282,7 +282,9 @@ Deno.serve(async (req) => {
         ? questionQuizAttempts.length
         : question.type === 'board'
           ? new Set(questionBoardPosts.map((post) => post.participant_id)).size
-          : questionAnswers.length
+          : question.type === 'pronunciation' || question.type === 'oral_response'
+            ? questionAudioResponses.length
+            : questionAnswers.length
 
       return {
         question_id: question.id,
@@ -342,7 +344,7 @@ Deno.serve(async (req) => {
       active_message_participants: new Set(messages.map((message) => message.participant_id)).size,
       question_count: questions.length,
       interactive_question_count: interactiveQuestions.length,
-      answer_count: answers.length + submittedQuizAttempts.length + boardResponders,
+      answer_count: answers.length + submittedQuizAttempts.length + boardResponders + audioResponses.length,
       average_response_rate: averageResponseRate,
       assessed_answer_count: assessedAnswers.length + scoredQuizItemAnswers.length,
       correct_answer_count: correctAnswers.length + correctQuizItemAnswers.length,
@@ -367,7 +369,7 @@ Deno.serve(async (req) => {
     }
 
     summaryInput = {
-      analysis_version: 10,
+      analysis_version: 11,
       session: {
         title: session.title,
         created_at: session.created_at,

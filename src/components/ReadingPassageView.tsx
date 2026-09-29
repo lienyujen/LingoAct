@@ -27,6 +27,10 @@ type Props = {
   // — and that is this component, not the player.
   cues?: KaraokeCue[] | null
   activeCue?: number
+  // The teacher's enlarged review starts at twice the learner-page type size
+  // and lets the teacher tune only this article. The question column beside it
+  // deliberately keeps its own fixed scale.
+  fontControls?: boolean
 }
 
 // Where the readings come from, one entry per character of the body.
@@ -197,7 +201,7 @@ function glossFor(gloss: Record<string, string> | undefined, locale: Participant
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
 }
 
-export function ReadingPassageView({ passage, locale, imageUrl, player, locked = false, cues, activeCue = -1 }: Props) {
+export function ReadingPassageView({ passage, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false }: Props) {
   // The student's own switches, separate from the teacher's. A teacher who
   // turned the grammar on wants it available; a reader who finds it busy can
   // put it away without losing the vocabulary colouring, and the other way
@@ -207,6 +211,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   const [showWords, setShowWords] = useState(!locked)
   const [showRuby, setShowRuby] = useState(false)
   const [open, setOpen] = useState<Mark | null>(null)
+  const [fontScale, setFontScale] = useState(() => fontControls ? 2 : 1)
   const hasGrammar = (passage.grammar || []).length > 0
   const hasWords = (passage.vocabulary || []).length > 0
 
@@ -342,6 +347,12 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
             </button>
           )}
           {player}
+          {fontControls && (
+            <span className="reading-font-controls" aria-label="文章字級">
+              <button aria-label="縮小文章文字" disabled={fontScale <= 1} title="A−" type="button" onClick={() => setFontScale((current) => Math.max(1, current - 0.25))}>A−</button>
+              <button aria-label="放大文章文字" disabled={fontScale >= 3} title="A+" type="button" onClick={() => setFontScale((current) => Math.min(3, current + 0.25))}>A+</button>
+            </span>
+          )}
         </div>
       </header>
 
@@ -354,7 +365,10 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
 
       <p
         className={`reading-passage-body${showGlyphs && hasWords ? ' is-annotated' : ''}${showRubyText && hasWords ? ' reading-ruby is-ruby' : ''}`}
-        style={showGlyphs && family ? { fontFamily: family } : undefined}
+        style={{
+          ...(showGlyphs && family ? { fontFamily: family } : {}),
+          ...(fontControls ? { fontSize: `${19 * fontScale}px` } : {}),
+        }}
       >
         {runs.map((run) => {
           const words = run.words.map((word, at) => (word.entry && !wordsOn ? (

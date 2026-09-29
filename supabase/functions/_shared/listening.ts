@@ -1,4 +1,4 @@
-import { regionalPronunciationInstruction } from './mandarin-pronunciation.ts'
+import { regionalPronunciationInstruction, regionalSpeechText } from './mandarin-pronunciation.ts'
 
 // Turning a passage into something a class can listen to.
 //
@@ -20,6 +20,7 @@ export type VoicePlan = {
   instruction: string
   speakers: string[]
   voiceNames: string[]
+  speechText: string
 }
 
 export type KaraokeCue = {
@@ -84,6 +85,7 @@ export function buildVoicePlan(
 ): VoicePlan {
   const accent = accentFor(language, accentChoice)
   const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accentChoice) : ''
+  const speechText = language.startsWith('zh') ? regionalSpeechText(text, accentChoice) : text
   if (kind === 'dialogue' && speakers.length >= 2) {
     const used = { female: 0, male: 0, boy: 0, girl: 0 }
     const assignments = speakers.slice(0, 2).map((speaker, index) => {
@@ -103,6 +105,7 @@ export function buildVoicePlan(
       ].filter(Boolean).join(' '),
       speakers: assignments.map(({ speaker }) => speaker),
       voiceNames: assignments.map(({ voiceName }) => voiceName),
+      speechText,
     }
   }
   if (kind === 'scene') {
@@ -110,12 +113,14 @@ export function buildVoicePlan(
       instruction: [`Describe this in ${accent}, in the warm, clear voice of a teacher introducing a picture to the class. Speak in complete sentences at a pace a learner can follow.`, pronunciation].filter(Boolean).join(' '),
       speakers: [],
       voiceNames: [],
+      speechText,
     }
   }
   return {
     instruction: [`Read this passage aloud in ${accent}, clearly and at a pace a language learner can follow, with the phrasing and emphasis a native speaker would use.`, pronunciation].filter(Boolean).join(' '),
     speakers: [],
     voiceNames: [],
+    speechText,
   }
 }
 
@@ -144,7 +149,7 @@ export async function synthesize(text: string, plan: VoicePlan) {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured.')
 
   const body = JSON.stringify({
-    contents: [{ parts: [{ text: `${plan.instruction}\n\n${text}` }] }],
+    contents: [{ parts: [{ text: `${plan.instruction}\n\n${plan.speechText || text}` }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: speechConfig(plan) },
   })
 
@@ -494,9 +499,11 @@ export async function contentHash(
 ) {
   const parts = [kind, language, accent || '', speakers.join('|'), speakerGenders.join('|'), text]
   const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accent) : ''
+  const speechText = language.startsWith('zh') ? regionalSpeechText(text, accent) : text
   // Only recordings affected by a pronunciation rule get a new cache key. An
   // unrelated clip should remain reusable instead of costing another AI call.
   if (pronunciation) parts.push(pronunciation)
+  if (speechText !== text) parts.push(speechText)
   const digest = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(parts.join('\u0000')),

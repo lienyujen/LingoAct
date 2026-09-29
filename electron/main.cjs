@@ -55,6 +55,7 @@ process.on('unhandledRejection', (reason) => logFatalError('unhandledRejection',
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 
 const isDesktopDev = process.env.LINGOACT_DESKTOP_DEV === '1'
+const isSmokeTest = process.argv.includes('--smoke-test')
 const APP_USER_MODEL_ID = APP_PROFILE.appId
 const APP_WINDOW_ICON_PATH = isDesktopDev
   ? path.join(__dirname, '..', 'build', 'icon.ico')
@@ -71,6 +72,21 @@ const OVERLAY_RELATIVE_LEVEL = 2
 const WORD_CLOUD_RELATIVE_LEVEL = 4
 const QUIZ_REVIEW_RELATIVE_LEVEL = 5
 const ROSTER_RELATIVE_LEVEL = 5
+
+// setAppDetails is Windows-only. On macOS the method does not exist at all, so
+// calling it takes down window creation before anything is shown. What it sets
+// — taskbar identity and portable-app relaunch details — has no macOS
+// counterpart because the app there is an application bundle.
+function applyTaskbarIdentity(window) {
+  if (process.platform !== 'win32') return
+  window.setAppDetails({
+    appId: APP_USER_MODEL_ID,
+    appIconPath: APP_RELAUNCH_ICON_PATH,
+    appIconIndex: 0,
+    relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
+    relaunchDisplayName: APP_PROFILE.displayName,
+  })
+}
 
 app.setAppUserModelId(APP_USER_MODEL_ID)
 
@@ -148,15 +164,11 @@ function createWindow() {
     },
   })
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
-
-  mainWindow.setAppDetails({
-    appId: APP_USER_MODEL_ID,
-    appIconPath: APP_RELAUNCH_ICON_PATH,
-    appIconIndex: 0,
-    relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
-    relaunchDisplayName: APP_PROFILE.displayName,
+  mainWindow.once('ready-to-show', () => {
+    if (!isSmokeTest) mainWindow?.show()
   })
+
+  applyTaskbarIdentity(mainWindow)
   configureWebContents(mainWindow)
 
   loadAppRoute(mainWindow, '/presenter/new')
@@ -372,13 +384,7 @@ function createReportWindow(sessionId, generate = false) {
     },
   })
 
-  reportWindow.setAppDetails({
-    appId: APP_USER_MODEL_ID,
-    appIconPath: APP_RELAUNCH_ICON_PATH,
-    appIconIndex: 0,
-    relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
-    relaunchDisplayName: 'LingoAct',
-  })
+  applyTaskbarIdentity(reportWindow)
   configureWebContents(reportWindow)
 
   loadAppRoute(reportWindow, `/session-report/${sessionId}${generate ? '?generate=1' : ''}`)
@@ -450,13 +456,7 @@ function createRosterWindow(sessionId) {
     },
   })
 
-  rosterWindow.setAppDetails({
-    appId: APP_USER_MODEL_ID,
-    appIconPath: APP_RELAUNCH_ICON_PATH,
-    appIconIndex: 0,
-    relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
-    relaunchDisplayName: 'LingoAct',
-  })
+  applyTaskbarIdentity(rosterWindow)
   configureWebContents(rosterWindow)
   rosterWindow.setAlwaysOnTop(true, TOPMOST_LEVEL, ROSTER_RELATIVE_LEVEL)
 
@@ -509,13 +509,7 @@ function createWordCloudWindow(sessionId) {
     },
   })
 
-  wordCloudWindow.setAppDetails({
-    appId: APP_USER_MODEL_ID,
-    appIconPath: APP_RELAUNCH_ICON_PATH,
-    appIconIndex: 0,
-    relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
-    relaunchDisplayName: 'LingoAct',
-  })
+  applyTaskbarIdentity(wordCloudWindow)
   configureWebContents(wordCloudWindow)
   wordCloudWindow.setAlwaysOnTop(true, TOPMOST_LEVEL, WORD_CLOUD_RELATIVE_LEVEL)
 
@@ -587,13 +581,7 @@ function createCustomQuizReviewWindow(sessionId, questionId, route = 'custom-qui
     },
   })
   quizReviewWindow = nextQuizReviewWindow
-  nextQuizReviewWindow.setAppDetails({
-    appId: APP_USER_MODEL_ID,
-    appIconPath: APP_RELAUNCH_ICON_PATH,
-    appIconIndex: 0,
-    relaunchCommand: `"${APP_EXECUTABLE_PATH}"`,
-    relaunchDisplayName: 'LingoAct',
-  })
+  applyTaskbarIdentity(nextQuizReviewWindow)
   configureWebContents(nextQuizReviewWindow)
   nextQuizReviewWindow.setAlwaysOnTop(true, TOPMOST_LEVEL, QUIZ_REVIEW_RELATIVE_LEVEL)
   loadAppRoute(nextQuizReviewWindow, `/${route}/${sessionId}/${questionId}`)
@@ -897,6 +885,19 @@ ipcMain.handle('capture:finish-selection', (_event, expanded = true) => {
 app.whenReady().then(() => {
   createWindow()
 
+  if (isSmokeTest) {
+    const timeout = setTimeout(() => {
+      console.error('LingoAct smoke test timed out before the presenter loaded.')
+      app.exit(1)
+    }, 15_000)
+    mainWindow.webContents.once('did-finish-load', () => {
+      clearTimeout(timeout)
+      console.log(`LINGOACT_SMOKE_TEST_OK platform=${process.platform} profile=${APP_PROFILE_ID}`)
+      app.quit()
+    })
+    return
+  }
+
   for (const eventName of ['display-added', 'display-removed', 'display-metrics-changed']) {
     screen.on(eventName, () => {
       // A screen that has just appeared, gone, or changed resolution can leave
@@ -916,6 +917,9 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+}).catch((error) => {
+  logFatalError('startup', error)
+  app.exit(1)
 })
 
 app.on('before-quit', () => {

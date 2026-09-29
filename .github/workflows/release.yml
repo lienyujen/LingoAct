@@ -143,6 +143,11 @@ jobs:
           # exits deterministically after proving the embedded runtime starts.
           ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/$PRODUCT" -e \
             'console.log(`Electron runtime: ${process.versions.electron}; arch: ${process.arch}`)'
+          # Node mode proves the Mach-O starts but deliberately skips
+          # electron/main.cjs. Launch the packaged application as Electron too:
+          # this caught the Windows-only BrowserWindow.setAppDetails call that
+          # made both v1.0.5 DMGs pass packaging and then crash on a real Mac.
+          "$app/Contents/MacOS/$PRODUCT" --smoke-test
           hdiutil verify "$dmg"
           # Without these two strings macOS denies the microphone and the screen
           # outright, and the app looks broken rather than unapproved.

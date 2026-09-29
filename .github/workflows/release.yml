@@ -27,12 +27,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: Windows
+          - label: Windows Huayu
             os: windows-latest
-            artifact: '*.zip'
-          - label: macOS
+            profile: huayu
+            product: LingoAct-Huayu
+            target: --win zip --x64
+            artifact: LingoAct-Huayu.zip
+          - label: Windows NCACLS
+            os: windows-latest
+            profile: ncacls
+            product: LingoAct-NCACLS
+            target: --win zip --x64
+            artifact: LingoAct-NCACLS.zip
+          - label: macOS Huayu
             os: macos-latest
-            artifact: '*.dmg'
+            profile: huayu
+            product: LingoAct-Huayu
+            target: --mac dmg --universal
+            artifact: LingoAct-Huayu.dmg
+          - label: macOS NCACLS
+            os: macos-latest
+            profile: ncacls
+            product: LingoAct-NCACLS
+            target: --mac dmg --universal
+            artifact: LingoAct-NCACLS.dmg
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,36 +108,38 @@ jobs:
           fi
           echo "No Supabase project embedded."
 
-      # The public classroom downloads. The full build remains the developer's
-      # local workbench; English and 國語文 are not part of this release. Each
-      # pass rebuilds the renderer because the profile is compiled into it.
-      - name: Package Huayu and NCACLS
+      # One profile per job, as in InterAct's known-good Mac build. Building
+      # Huayu and then NCACLS in the same release/mac-universal directory meant
+      # only the second app was ever inspected; a bad Huayu DMG could therefore
+      # be published beside a perfectly valid NCACLS one.
+      - name: Package ${{ matrix.product }}
         shell: bash
         env:
-          # Zip only on Windows. The single-file portable build re-extracts its
-          # whole payload to a temp folder on every launch, so it starts slowly
-          # and was never the one to recommend; shipping both only invited
-          # people to pick the worse one.
-          TARGET: ${{ matrix.os == 'macos-latest' && '--mac dmg --universal' || '--win zip --x64' }}
+          APP_PROFILE: ${{ matrix.profile }}
+          TARGET: ${{ matrix.target }}
+          VITE_APP_PROFILE: ${{ matrix.profile }}
         run: |
-          for profile in huayu ncacls; do
-            echo "::group::$profile"
-            VITE_APP_PROFILE="$profile" pnpm build
-            APP_PROFILE="$profile" pnpm exec electron-builder $TARGET --publish never
-            echo "::endgroup::"
-          done
+          pnpm build
+          pnpm exec electron-builder $TARGET --publish never
 
-      # identity: '-' is easy to set and easy to have silently ignored, and the
-      # difference only shows up as an app that will not open on an Apple Silicon
-      # Mac. Read the signature back off a built app instead of assuming it.
-      - name: Verify the Mac app is signed and universal
+      # Check the exact app and image this job uploads. Besides the signature,
+      # invoking --version makes macOS load the universal executable; lipo by
+      # itself only proves both slices exist, not that the kernel accepts them.
+      - name: Verify the Mac app and DMG
         if: matrix.os == 'macos-latest'
+        env:
+          PRODUCT: ${{ matrix.product }}
         run: |
-          app="release/mac-universal/LingoAct-NCACLS.app"
+          app="release/mac-universal/$PRODUCT.app"
+          dmg="release/$PRODUCT.dmg"
           codesign --display --verbose=2 "$app"
           codesign --verify --deep --strict --verbose=2 "$app"
           echo "Architectures:"
-          lipo -archs "$app/Contents/MacOS/LingoAct-NCACLS"
+          archs=$(lipo -archs "$app/Contents/MacOS/$PRODUCT")
+          echo "$archs"
+          [[ "$archs" == *x86_64* && "$archs" == *arm64* ]]
+          "$app/Contents/MacOS/$PRODUCT" --version
+          hdiutil verify "$dmg"
           # Without these two strings macOS denies the microphone and the screen
           # outright, and the app looks broken rather than unapproved.
           # PlistBuddy exits non-zero on a missing key, so a dropped extendInfo

@@ -13,6 +13,13 @@ on:
         description: 'Publish to the release page (off = build only, so a Mac build can be opened before it goes public)'
         type: boolean
         default: false
+      platform:
+        description: 'Build every platform, or refresh only the two macOS downloads'
+        type: choice
+        options:
+          - all
+          - mac
+        default: all
 
 permissions:
   contents: write
@@ -53,11 +60,13 @@ jobs:
             artifact: LingoAct-NCACLS.dmg
     steps:
       - name: Checkout
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup pnpm
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           # In step with the workflows and Cloudflare Pages: this repository's
@@ -65,18 +74,21 @@ jobs:
           version: 11.7.0
 
       - name: Setup Node
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install dependencies
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         run: pnpm install --frozen-lockfile
 
       # 17 MB of binary deliberately kept out of git, and named in
       # extraResources — so without this the packaging step fails outright
       # looking for resources/fonts, and it is the注音 every Chinese class uses.
       - name: Fetch the Bopomofo font
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         run: node scripts/fetch-bopomofo-font.mjs
 
       # pnpm lint starts with tsc -b and runs the schema checks. The schema ones
@@ -85,18 +97,21 @@ jobs:
       # this with a project that has no tables and a setup screen that only says
       # 建立資料表失敗.
       - name: Lint, typecheck and check the schema
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         run: pnpm lint
 
       # Deliberately built with no Supabase project configured: whoever downloads
       # this enters their own on first launch. Baking one in would send every
       # class to that project and bill its owner for everyone's AI usage.
       - name: Build
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         run: pnpm build
 
       # The build above is only credential-free because no .env reaches the runner.
       # Check the bundle rather than trust that, so a committed .env fails the
       # release instead of shipping one person's project to everyone who downloads it.
       - name: Verify no project is baked in
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         shell: bash
         run: |
           # Matches a real key, not the setup screen's own placeholder and
@@ -113,6 +128,7 @@ jobs:
       # only the second app was ever inspected; a bad Huayu DMG could therefore
       # be published beside a perfectly valid NCACLS one.
       - name: Package ${{ matrix.product }}
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         shell: bash
         env:
           APP_PROFILE: ${{ matrix.profile }}
@@ -126,7 +142,7 @@ jobs:
       # invoking --version makes macOS load the universal executable; lipo by
       # itself only proves both slices exist, not that the kernel accepts them.
       - name: Verify the Mac app and DMG
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'mac')
         env:
           PRODUCT: ${{ matrix.product }}
         run: |
@@ -158,6 +174,7 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSScreenCaptureUsageDescription' "$app/Contents/Info.plist"
 
       - name: Upload build
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.label }}
@@ -216,8 +233,13 @@ jobs:
           授權說明請見公開下載頁。
           MD
           )
-          gh release create "$TAG" \
-            --title "LingoAct $TAG" \
-            --notes "$notes" \
-            builds/*.zip \
-            builds/*.dmg
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # A same-version rebuild is intentional: replace only the assets
+            # produced by this run and leave the other platform untouched.
+            gh release upload "$TAG" builds/* --clobber
+          else
+            gh release create "$TAG" \
+              --title "LingoAct $TAG" \
+              --notes "$notes" \
+              builds/*
+          fi

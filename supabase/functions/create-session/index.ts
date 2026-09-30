@@ -19,7 +19,9 @@ function createCode() {
 }
 
 function isDesktopOrigin(req: Request) {
-  if (req.headers.get('x-lingoact-client') !== 'windows-app') return false
+  // desktop-app is shared by Windows and macOS. The two old names remain only
+  // so a teacher can redeploy the backend before replacing every presenter.
+  if (!['desktop-app', 'windows-app', 'macos-app'].includes(req.headers.get('x-lingoact-client') || '')) return false
 
   const origin = req.headers.get('origin')
   if (origin === 'null' || origin === 'file://') return true
@@ -36,7 +38,7 @@ function isDesktopOrigin(req: Request) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse({ message: 'Method not allowed.' }, 405)
-  if (!isDesktopOrigin(req)) return jsonResponse({ message: '請使用 LingoAct Windows App 建立場次。' }, 403)
+  if (!isDesktopOrigin(req)) return jsonResponse({ message: '請使用 LingoAct 桌面版建立場次。' }, 403)
 
   try {
     const input = await req.json()

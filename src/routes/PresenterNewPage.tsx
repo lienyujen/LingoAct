@@ -25,7 +25,16 @@ async function getFunctionErrorMessage(error: unknown) {
 
   try {
     const body = await response.clone().json()
-    if (typeof body?.message === 'string') return body.message
+    if (typeof body?.message === 'string') {
+      // This sentence can only come from InterAct's create-session function.
+      // Showing it unchanged makes a Mac build look Windows-only, when the
+      // actual problem is that this installation was pointed at the other
+      // product's Supabase project.
+      if (/InterAct Windows App/i.test(body.message)) {
+        return '目前連到的是 InterAct 後端，不是 LingoAct。請在系統設定改用 LingoAct 的 Supabase 專案與 publishable key，再重新部署後端。'
+      }
+      return body.message
+    }
   } catch {
     // Fall back to the SDK message when the response is not JSON.
   }
@@ -101,7 +110,7 @@ export function PresenterNewPage() {
           levelCode: levelCode || null,
           readingAnnotation,
         },
-        headers: { 'x-lingoact-client': 'windows-app' },
+        headers: { 'x-lingoact-client': 'desktop-app' },
       })
 
       if (createError) throw createError

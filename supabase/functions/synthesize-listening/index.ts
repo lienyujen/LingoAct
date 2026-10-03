@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
           const audioResponse = await fetch(existing.public_url, { signal: AbortSignal.timeout(8_000) })
           if (!audioResponse.ok) throw new Error(`Stored audio returned ${audioResponse.status}.`)
           const storedWav = new Uint8Array(await audioResponse.arrayBuffer())
-          const cues = await karaokeCues(storedWav, transcript, language, existing.duration_ms || 0)
+          const cachedPlan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, transcript)
+          const cues = await karaokeCues(storedWav, transcript, language, existing.duration_ms || 0, cachedPlan.speechText, cachedPlan.speakers)
           const { data: aligned, error: alignError } = await supabase.from('listening_clips')
             .update({ karaoke_cues: cues }).eq('id', existing.id).select('*').single()
           if (alignError) throw alignError

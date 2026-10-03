@@ -256,11 +256,29 @@ export function settleWords(raw: unknown, text: string): ReadingWord[] {
     .filter((entry) => entry.text)
   const rejoined = segmented.map((entry) => entry.text).join('')
   if (!segmented.length) return []
-  if (rejoined.replace(/s/g, '') !== text.replace(/s/g, '')) {
+  if (rejoined.replace(/\s/g, '') !== text.replace(/\s/g, '')) {
     console.warn(`Word segmentation did not reassemble: ${rejoined.slice(0, 80)}`)
     return []
   }
-  return applyOrthography(segmented)
+  // Keep the passage's own whitespace so the reader can index these words
+  // against its body, even when the model flattened paragraph breaks.
+  const aligned: ReadingWord[] = []
+  let cursor = 0
+  for (const word of segmented) {
+    const letters = [...word.text.replace(/\s/g, '')]
+    if (!letters.length) continue
+    const whitespaceStart = cursor
+    while (cursor < text.length && /\s/u.test(text[cursor])) cursor += 1
+    if (cursor > whitespaceStart) aligned.push({ text: text.slice(whitespaceStart, cursor), pinyin: '' })
+    const start = cursor
+    for (const letter of letters) {
+      while (cursor < text.length && /\s/u.test(text[cursor])) cursor += 1
+      cursor += letter.length
+    }
+    aligned.push({ text: text.slice(start, cursor), pinyin: word.pinyin })
+  }
+  if (cursor < text.length) aligned.push({ text: text.slice(cursor), pinyin: '' })
+  return applyOrthography(aligned)
 }
 
 // 正詞法 rules a program can apply itself, applied after the model answers.

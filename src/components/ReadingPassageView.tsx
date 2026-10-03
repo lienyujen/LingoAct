@@ -334,7 +334,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
               {participantText(locale, 'readingGrammar')}
             </button>
           )}
-          {(hasReadings || Boolean(byWord)) && hasWords && (
+          {(hasReadings || Boolean(byWord)) && (
             <button
               aria-pressed={rubyOn}
               className={`reading-toggle${rubyOn ? ' is-on' : ''}`}
@@ -364,7 +364,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
       )}
 
       <p
-        className={`reading-passage-body${showGlyphs && hasWords ? ' is-annotated' : ''}${showRubyText && hasWords ? ' reading-ruby is-ruby' : ''}`}
+        className={`reading-passage-body${showGlyphs ? ' is-annotated' : ''}${showRubyText ? ' reading-ruby is-ruby' : ''}`}
         style={{
           ...(showGlyphs && family ? { fontFamily: family } : {}),
           ...(fontControls ? { fontSize: `${19 * fontScale}px` } : {}),

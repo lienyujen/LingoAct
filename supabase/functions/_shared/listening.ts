@@ -10,7 +10,7 @@ import { regionalPronunciationInstruction, regionalSpeechText } from './mandarin
 const SAMPLE_RATE = 24000
 const CHANNELS = 1
 const BITS = 16
-const SPEECH_RECIPE_VERSION = 'gemini-3.8-regional-mandarin-v1'
+const SPEECH_RECIPE_VERSION = 'gemini-3.8-regional-mandarin-v2'
 
 export type ClipKind = 'passage' | 'dialogue' | 'scene'
 export type ChineseScript = 'traditional' | 'simplified'
@@ -88,8 +88,19 @@ export function buildVoicePlan(
 ): VoicePlan {
   const accent = accentFor(language, accentChoice)
   const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accentChoice) : ''
-  const speechText = language.startsWith('zh') ? regionalSpeechText(text, accentChoice) : text
+  let speechText = language.startsWith('zh') ? regionalSpeechText(text, accentChoice) : text
   if (kind === 'dialogue' && speakers.length >= 2) {
+    if (language.startsWith('zh')) {
+      const labels = new Set(speakers.slice(0, 2).map((speaker) => speaker.trim()))
+      // Pronunciation substitutes belong only to speech. Changing a name in
+      // the silent label would stop it matching its assigned voice.
+      speechText = text.replace(/[^\r\n]+/gu, (line) => {
+        const match = line.match(/^(\s*([^：:]{1,30})[：:]\s*)(.*)$/u)
+        return match && labels.has(match[2].trim())
+          ? match[1] + regionalSpeechText(match[3], accentChoice)
+          : regionalSpeechText(line, accentChoice)
+      })
+    }
     const used = { female: 0, male: 0, boy: 0, girl: 0 }
     const assignments = speakers.slice(0, 2).map((speaker, index) => {
       const gender = assignedGender(speakerGenders[index], index)
@@ -143,6 +154,24 @@ function ttsModels() {
   return [primary, fallback]
 }
 
+export function dialogueTurns(text: string, speakers: string[]) {
+  const labels = new Set(speakers.map((speaker) => speaker.trim()))
+  return text.split(/\r?\n/u).map((line) => {
+    const match = line.match(/^\s*([^：:]{1,30})\s*[：:]\s*(.*)$/u)
+    const speaker = match && labels.has(match[1].trim()) ? match[1].trim() : null
+    return { speaker, text: speaker ? match![2].trim() : line.trim() }
+  })
+}
+
+function withoutSpeakerLabels(text: string, speakers: string[]) {
+  const labels = new Set(speakers.map((speaker) => speaker.trim()))
+  // Spaces preserve character offsets for the displayed script. Only the
+  // recognised label is silent; the same name inside a turn is spoken.
+  return text.replace(/^([^\S\r\n]*)([^：:\r\n]{1,30})[：:]/gmu, (label, _space, name) => (
+    labels.has(name.trim()) ? ' '.repeat([...label].length) : label
+  ))
+}
+
 function interactionContent(plan: VoicePlan, fallbackText: string) {
   const speechText = plan.speechText || fallbackText
   if (plan.speakers.length < 2) {
@@ -155,15 +184,14 @@ function interactionContent(plan: VoicePlan, fallbackText: string) {
 
   const speakerLookup = new Map(plan.speakers.map((speaker) => [speaker.trim(), speaker]))
   let alternate = 0
-  return speechText.split(/\r?\n/u).filter((line) => line.trim()).map((line) => {
-    const match = line.match(/^\s*([^：:]{1,30})\s*[：:]\s*(.*)$/u)
-    const named = match ? speakerLookup.get(match[1].trim()) : undefined
+  return dialogueTurns(speechText, plan.speakers).filter((turn) => turn.text).map((turn) => {
+    const named = turn.speaker ? speakerLookup.get(turn.speaker) : undefined
     const speaker = named || plan.speakers[alternate++ % plan.speakers.length]
     return {
       type: 'text',
       // Speaker labels are metadata, not words in the recording. Gemini 3.8
       // treats every character in this field as a verbatim transcript.
-      text: match?.[2]?.trim() || line.trim(),
+      text: turn.text,
       annotations: [{ type: 'speech_metadata', speaker, style: plan.instruction }],
     }
   })
@@ -279,30 +307,32 @@ export async function karaokeCues(
       const payload = await response.json()
       const words = collectWordInfo(payload)
       if (words.length) {
-        const labels = new Set(speakers.map((speaker) => speaker.trim()))
-        const expectedText = spokenTranscript.split(/\r?\n/u).map((line) => {
-          const match = line.match(/^\s*([^：:]{1,30})\s*[：:]\s*(.*)$/u)
-          return match && labels.has(match[1].trim()) ? match[2] : line
-        }).join('\n')
+        const expectedText = dialogueTurns(spokenTranscript, speakers).map((turn) => turn.text).join('\n')
         const expected = searchable(expectedText).value.length
         const heard = words.reduce((length, word) => length + searchable(word.text).value.length, 0)
-        // A successful transcription that is shorter than the requested copy
-        // means the voice skipped text. Do not disguise that omission with
-        // interpolated KTV timestamps and publish a clip the learner cannot
-        // trust. A total transcription outage still uses the safe fallback.
+        // Keep the passage completeness check. Dialogue ASR is less reliable:
+        // a name can change spelling and character count without being omitted.
         if (expected && heard / expected < 0.98) {
-          throw new IncompleteSpeechError(`Generated speech covered ${heard} of ${expected} spoken characters.`)
+          // Names in dialogue are often transcribed as a shorter homophone or
+          // an English spelling. ASR character counts cannot prove omission
+          // there; its timestamps can still anchor the original, intact text.
+          if (speakers.length >= 2) {
+            console.warn(`Dialogue transcription covered ${heard} of ${expected} characters; retaining the requested names.`)
+          } else {
+            throw new IncompleteSpeechError(`Generated speech covered ${heard} of ${expected} spoken characters.`)
+          }
         }
       }
-      const aligned = alignWordInfo(payload, spokenTranscript, language, totalMs)
-      const completed = completeCues(aligned, spokenTranscript, totalMs, language)
+      const cueTranscript = withoutSpeakerLabels(spokenTranscript, speakers)
+      const aligned = alignWordInfo(payload, cueTranscript, language, totalMs)
+      const completed = completeCues(aligned, cueTranscript, totalMs, language)
       if (completed.length) return completed
     } catch (error) {
       if (error instanceof IncompleteSpeechError) throw error
       console.warn('word timestamping unavailable; using duration alignment', error instanceof Error ? error.message : error)
     }
   }
-  return fallbackCues(transcript, totalMs, language)
+  return fallbackCues(withoutSpeakerLabels(transcript, speakers), totalMs, language)
 }
 
 function encodeBase64(bytes: Uint8Array) {
@@ -433,7 +463,7 @@ function fallbackCues(transcript: string, totalMs: number, language: string) {
   const matcher = language.toLowerCase().startsWith('zh')
     ? /[\p{L}\p{N}]/gu
     : /[\p{L}\p{N}]+/gu
-  const tokens = [...transcript.matchAll(matcher)].filter((token) => !isSpeakerLabel(transcript, token.index, token[0].length))
+  const tokens = [...transcript.matchAll(matcher)]
   if (!tokens.length) return []
   const startPad = Math.min(350, totalMs * .04)
   const usable = Math.max(totalMs - startPad - Math.min(450, totalMs * .05), tokens.length * 40)
@@ -451,12 +481,6 @@ function fallbackCues(transcript: string, totalMs: number, language: string) {
     elapsed += span
     return cue
   })
-}
-
-function isSpeakerLabel(text: string, start: number, length: number) {
-  const lineStart = Math.max(text.lastIndexOf('\n', start - 1) + 1, 0)
-  if (text.slice(lineStart, start).trim()) return false
-  return /^\s*[:：]/u.test(text.slice(start + length))
 }
 
 // ASR occasionally omits a short particle or recognises a homophone. Its

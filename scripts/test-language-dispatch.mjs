@@ -22,6 +22,21 @@ test('reading words preserve original Windows line breaks and reject changed con
   assert.deepEqual(settleWords([{ text: 'James', pinyin: '' }], 'Jame'), [])
 })
 
+test('dialogue and quoted sentence starts after colons are capitalised without changing lists or names', () => {
+  const cases = [
+    ['王小姐：我喜歡這裡。', ['王小姐', '：', '我', '喜歡', '這裡', '。'], ['Wáng xiǎojie', '', 'wǒ', 'xǐhuān', 'zhèlǐ', ''], '我', 'Wǒ'],
+    ['魯迅說：我們要說真話。', ['魯迅', '說', '：', '我們', '要', '說', '真話', '。'], ['Lǔ Xùn', 'shuō', '', 'wǒmen', 'yào', 'shuō', 'zhēnhuà', ''], '我們', 'Wǒmen'],
+    ['他喜歡三種動物：狗、貓和兔子。', ['他', '喜歡', '三', '種', '動物', '：', '狗', '、', '貓', '和', '兔子', '。'], ['tā', 'xǐhuān', 'sān', 'zhǒng', 'dòngwù', '', 'gǒu', '', 'māo', 'hé', 'tùzi', ''], '狗', 'gǒu'],
+    ['保人是：王芳。', ['保人', '是', '：', '王芳', '。'], ['bǎorén', 'shì', '', 'Wáng Fāng', ''], '王芳', 'Wáng Fāng'],
+    ['小明：你好。\n小華：你早。\n小明：謝謝。', ['小明', '：', '你', '好', '。', '\n', '小華', '：', '你', '早', '。', '\n', '小明', '：', '謝謝', '。'], ['Xiǎo Míng', '', 'nǐ', 'hǎo', '', '', 'Xiǎo Huá', '', 'nǐ', 'zǎo', '', '', 'Xiǎo Míng', '', 'xièxie', ''], '謝謝', 'Xièxie'],
+  ]
+  for (const [text, pieces, readings, target, expected] of cases) {
+    const result = settleWords(pieces.map((word, at) => ({ text: word, pinyin: readings[at] })), text)
+    assert.equal(result.map((word) => word.text).join(''), text)
+    assert.equal(result.find((word) => word.text === target)?.pinyin, expected)
+  }
+})
+
 test('pinyin control remains available when the passage has no new vocabulary', () => {
   const require = createRequire(import.meta.url)
   const source = readFileSync(new URL('../src/components/ReadingPassageView.tsx', import.meta.url), 'utf8')
@@ -41,6 +56,32 @@ test('pinyin control remains available when the passage has no new vocabulary', 
   }))
   assert.match(html, /readingPinyin/)
   assert.doesNotMatch(html, /readingWords/)
+})
+
+test('zhuyin passages use IVS readings for new words and never fall back to pinyin', () => {
+  const require = createRequire(import.meta.url)
+  const source = readFileSync(new URL('../src/components/ReadingPassageView.tsx', import.meta.url), 'utf8')
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText
+  const reading = '聲調' + String.fromCodePoint(0xE01E1)
+  for (const all of [false, true]) {
+    const exports = {}
+    let state = 0
+    new Function('require', 'exports', compiled)((name) => {
+      if (name === 'react') return { ...require(name), useState: (initial) => [state++ === 2 ? all : typeof initial === 'function' ? initial() : initial, () => {}] }
+      if (name === '@phosphor-icons/react') return { BookOpen: () => null, Translate: () => null, X: () => null }
+      if (name === '../lib/readingFont') return { useReadingFont: () => 'CorrectSubset' }
+      if (name === '../lib/participantI18n') return { participantText: (_locale, key) => key, contentLocaleKey: (locale) => locale }
+      return require(name)
+    }, exports)
+    const html = renderToStaticMarkup(createElement(exports.ReadingPassageView, {
+      passage: { title: '課文', body: '聲調好', annotation: 'zhuyin', annotation_text: reading + '好', font_url: 'subset.woff2', vocabulary: [{ word: '聲調', level: 2 }], grammar: [], words: [{ text: '聲調', pinyin: 'shēngdiào' }, { text: '好', pinyin: 'hǎo' }] },
+      locale: 'zh-TW',
+    }))
+    assert.match(html, /readingZhuyin/)
+    assert.ok(html.includes(String.fromCodePoint(0xE01E1)))
+    assert.doesNotMatch(html, /<ruby|shēngdiào|hǎo/)
+    assert.equal((html.match(/font-family:CorrectSubset/g) || []).length, all ? 3 : 2)
+  }
 })
 
 test('only configured line-start speaker labels are removed; names in dialogue remain', () => {
@@ -113,4 +154,46 @@ test('passage transcription at 109 of 112 characters still produces complete cue
     globalThis.fetch = originalFetch
     globalThis.Deno = originalDeno
   }
+})
+
+test('self-deploy schema seeds the font-ordered polyphonic dictionary idempotently', () => {
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8')
+  const seed = schema.split('-- BEGIN GENERATED BOPOMOFO READINGS')[1].split('-- END GENERATED BOPOMOFO READINGS')[0]
+  const entries = [...seed.matchAll(/^  \((\d+), array\[([^\]]+)\]\)/gm)]
+  assert.equal(entries.length, 18636)
+  assert.equal(new Set(entries.map((entry) => entry[1])).size, entries.length)
+  assert.match(seed, /on conflict \(codepoint\) do update set readings = excluded.readings/)
+  assert.match(seed, /\(35519, array\['ㄊㄧㄠˊ','ㄉㄧㄠˋ'\]\)/)
+  assert.match(seed, /\(21644, array\['ㄏㄜˊ','ㄏㄢˋ'/)
+})
+
+test('font subsetting retains the IVS glyphs for 調 and 和', async () => {
+  const require = createRequire(import.meta.url)
+  const subsetFont = require('subset-font')
+  const fontverter = createRequire(require.resolve('subset-font'))('fontverter')
+  const input = readFileSync(new URL('../resources/fonts/BpmfZihiKaiStd-Regular.ttf', import.meta.url))
+  const selector = String.fromCodePoint(0xE01E1)
+  const subset = await subsetFont(input, `聲調${selector}和${selector}`, { targetFormat: 'woff2' })
+  const ttf = await fontverter.convert(subset, 'truetype')
+  let cmap
+  for (let n = 0; n < ttf.readUInt16BE(4); n++) {
+    const record = 12 + 16 * n
+    if (ttf.toString('ascii', record, record + 4) === 'cmap') cmap = ttf.readUInt32BE(record + 8)
+  }
+  assert.ok(cmap)
+  let variations
+  for (let n = 0; n < ttf.readUInt16BE(cmap + 2); n++) {
+    const offset = cmap + ttf.readUInt32BE(cmap + 8 + 8 * n)
+    if (ttf.readUInt16BE(offset) === 14) variations = offset
+  }
+  assert.ok(variations, 'Subset dropped the variation-selector cmap')
+  const supported = new Set()
+  for (let n = 0; n < ttf.readUInt32BE(variations + 6); n++) {
+    const record = variations + 10 + 11 * n
+    if (ttf.readUIntBE(record, 3) !== 0xE01E1) continue
+    const offset = variations + ttf.readUInt32BE(record + 7)
+    for (let i = 0; i < ttf.readUInt32BE(offset); i++) supported.add(ttf.readUIntBE(offset + 4 + 5 * i, 3))
+  }
+  assert.ok(supported.has('調'.codePointAt(0)))
+  assert.ok(supported.has('和'.codePointAt(0)))
 })

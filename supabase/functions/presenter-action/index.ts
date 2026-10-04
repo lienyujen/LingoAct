@@ -1940,7 +1940,7 @@ Deno.serve(async (req) => {
         if (bytes.length > 2 * 1024 * 1024) {
           return jsonResponse({ message: '字型子集過大，請縮短文字。' }, 413)
         }
-        fontPath = `${sessionId}/${clip.content_hash}.woff2`
+        fontPath = `${sessionId}/${clip.content_hash}-${crypto.randomUUID()}.woff2`
         const { error: uploadError } = await supabase.storage
           .from('lingoact-listening')
           .upload(fontPath, bytes, { contentType: 'font/woff2', upsert: true })
@@ -2972,7 +2972,7 @@ Deno.serve(async (req) => {
         if (bytes.length > 2 * 1024 * 1024) {
           return jsonResponse({ message: '字型子集過大，請縮短文章。' }, 413)
         }
-        const fontPath = `${sessionId}/reading-${questionId}.woff2`
+        const fontPath = `${sessionId}/reading-${questionId}-${crypto.randomUUID()}.woff2`
         const { error: uploadError } = await supabase.storage
           .from('lingoact-listening')
           .upload(fontPath, bytes, { contentType: 'font/woff2', upsert: true })

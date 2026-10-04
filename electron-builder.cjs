@@ -42,6 +42,7 @@ module.exports = {
   files: [
     'dist/**/*',
     'electron/**/*',
+    'supabase/licenses/**/*',
     'package.json',
     // package.json's dependencies are renderer-only libraries already
     // bundled into dist/**/*.js by Vite, so none of them needs shipping.

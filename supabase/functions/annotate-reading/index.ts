@@ -152,6 +152,11 @@ Deno.serve(async (req) => {
       .select('codepoint, readings')
       .in('codepoint', codepoints)
     if (readingsError) throw readingsError
+    // A fresh deployment used to create the table without its dictionary.
+    // Returning the unmarked text then silently selected every default glyph.
+    if (!rows?.length && characters.some((character) => /\p{Script=Han}/u.test(character))) {
+      throw new Error('注音讀音表缺少資料，請使用新版重新部署後端。')
+    }
 
     const readingsBy = new Map<number, string[]>()
     for (const row of rows || []) readingsBy.set(row.codepoint, row.readings)

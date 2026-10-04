@@ -217,6 +217,7 @@ export async function verifyBackend(ref: string, token: string) {
           )) as tables,
        (select count(*) from storage.buckets
           where id in ('lingoact-screenshots','lingoact-recordings','lingoact-files')) as buckets,
+       (select count(*) from public.bopomofo_readings) as readings,
        (select count(*) from information_schema.columns
           where table_schema = 'public'
             and (table_name, column_name) in (
@@ -235,10 +236,10 @@ export async function verifyBackend(ref: string, token: string) {
   const first = (() => {
     try {
       const parsed = JSON.parse(body) as unknown
-      if (Array.isArray(parsed)) return parsed[0] as { tables?: number; buckets?: number; columns?: number }
+      if (Array.isArray(parsed)) return parsed[0] as { tables?: number; buckets?: number; columns?: number; readings?: number }
       const wrapped = parsed as { rows?: unknown[]; result?: unknown[]; data?: unknown[] }
       const rows = wrapped.rows || wrapped.result || wrapped.data
-      return rows?.[0] as { tables?: number; buckets?: number; columns?: number } | undefined
+      return rows?.[0] as { tables?: number; buckets?: number; columns?: number; readings?: number } | undefined
     } catch {
       return undefined
     }
@@ -246,6 +247,9 @@ export async function verifyBackend(ref: string, token: string) {
 
   if (!first) throw new Error('無法讀取部署結果，請到 Supabase 後台確認資料表與 Storage 是否建立。')
   if (Number(first.tables) < 7) throw new Error(`資料表未建立完整（找到 ${first.tables ?? 0}/7），請重新執行部署。`)
+  if (!(Number(first.readings) >= 18636)) {
+    throw new Error(`注音讀音資料未建立完整（找到 ${first.readings ?? 0}/18636），請使用新版重新部署。`)
+  }
   if (Number(first.columns) < 8) {
     throw new Error(`資料表缺少必要欄位（找到 ${first.columns ?? 0}/8）。這通常表示專案是用舊版建立的 —— 再按一次自動部署即可補齊。`)
   }

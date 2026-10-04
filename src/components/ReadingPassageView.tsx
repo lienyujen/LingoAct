@@ -229,15 +229,15 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
   const readings = useMemo(() => perCharacter(passage), [passage])
   // 拼音 is written per word; 注音 is written per character and stays that way,
   // because that is how 注音 is written.
-  const byWord = useMemo(() => wordReadings(passage), [passage])
+  const byWord = useMemo(() => passage.annotation === 'zhuyin' ? null : wordReadings(passage), [passage])
   const glyphs = useMemo(() => byOffset(passage.body, readings.glyphs), [passage.body, readings.glyphs])
   const ruby = useMemo(() => byOffset(passage.body, readings.ruby), [passage.body, readings.ruby])
   const hasReadings = Boolean(glyphs || ruby)
   // 注音 is set into the glyphs, so the subset the teacher cut has to load
   // before the passage can show it; 拼音 needs no font.
-  const family = useReadingFont(readings.glyphs && rubyOn ? passage.font_url : null)
-  const overLevelReadings = Boolean(byWord || ruby)
-  const showGlyphs = Boolean(glyphs && rubyOn && family)
+  const family = useReadingFont(readings.glyphs && (rubyOn || hasWords) ? passage.font_url : null)
+  const overLevelReadings = Boolean(byWord || ruby || (glyphs && family))
+  const showGlyphs = Boolean(glyphs && family)
   const showRubyText = Boolean((byWord || ruby) && rubyOn)
 
   const charAt = useMemo(() => characterIndexes(passage.body), [passage.body])
@@ -253,7 +253,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
     // 小明 or 資料夾 is pronounced, and a learner who cannot say the word
     // cannot read the sentence it sits in. The rest of the passage waits for
     // the switch, which waits for the questions to be finished.
-    const marks = showGlyphs || showRubyText || (overLevelReadings && isNewWord)
+    const marks = (rubyOn && (showGlyphs || showRubyText)) || (overLevelReadings && isNewWord)
     if (!marks && !spoken) return text
 
     if (byWord && !showGlyphs) {
@@ -284,7 +284,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
       const lit = Boolean(spoken) && position >= (spoken as KaraokeCue).start_index && position < (spoken as KaraokeCue).end_index
       const className = lit ? 'karaoke-character active' : undefined
       if (marks && showGlyphs) {
-        out.push(<span className={className} key={key}>{glyphs?.get(key) || character}</span>)
+        out.push(<span className={className} style={{ fontFamily: family as string }} key={key}>{glyphs?.get(key) || character}</span>)
       } else {
         const reading = marks ? ruby?.get(key) : ''
         const body = <span className={className}>{character}</span>
@@ -366,7 +366,6 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
       <p
         className={`reading-passage-body${showGlyphs ? ' is-annotated' : ''}${showRubyText ? ' reading-ruby is-ruby' : ''}`}
         style={{
-          ...(showGlyphs && family ? { fontFamily: family } : {}),
           ...(fontControls ? { fontSize: `${19 * fontScale}px` } : {}),
         }}
       >

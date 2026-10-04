@@ -234,7 +234,7 @@ export function orthographyRules(field: string) {
     '   「每天早上」是兩個詞：每天 (měitiān)、早上 (zǎoshang)，不可以寫成一項 měitiānzǎoshang。',
     '   「以後都」是兩個詞：以後 (yǐhòu)、都 (dōu)。一個 text 很少超過三個漢字，超過就要再想想是不是兩個詞。',
     '二、一個詞的內部連寫，不留空格：zīliàojiā（資料夾）、jīntiān（今天）、dǎkāi（打開）、shuāyá（刷牙）。',
-    '三、專有名詞首字母大寫；人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。句首大寫由系統處理，你不用管。',
+    '三、專有名詞首字母大寫；人名姓與名分寫且各自大寫：Xiǎo Míng（小明）、Běijīng（北京）。一般句首大寫由系統處理。冒號後若是完整獨立句子或直接引語，第一個詞首字母也必須大寫；對話「王小姐：我喜歡這裡。」的我寫 Wǒ。冒號後只是列舉或解釋片語則保持小寫，例如「三種動物：狗、貓和兔子」的狗寫 gǒu；專有名詞仍保留大寫。',
     '四、動詞與賓語分寫（kàn xìn、chī fàn）；動詞與動態助詞連寫（kànzhe、kànle、kànguò）。',
     '五、數詞與量詞分寫（qī gè）；11 到 99 的整數連寫（shíwǔ）。',
     '六、結構助詞的、地、得分寫；語氣詞嗎、呢、吧分寫。',
@@ -291,18 +291,40 @@ export function settleWords(raw: unknown, text: string): ReadingWord[] {
 const SENTENCE_END = /[。．！!？?…]/
 
 function applyOrthography(words: ReadingWord[]) {
+  const text = words.map((word) => word.text).join('')
+  const starts = new Set<number>()
+  const labels = [...text.matchAll(/(?:^|\n)([^\n：:。！？!?]{1,24})[：:]/gu)]
+    .map((match) => match[1].trim())
+  const speakerTitle = /(?:先生|小姐|女士|老師|老师|同學|同学|學生|学生|醫師|医师|醫生|医生|教授)$/u
+  const dialogue = labels.some((label) => speakerTitle.test(label)
+    || (label.length <= 12 && labels.filter((other) => other === label).length > 1))
+  // A dialogue label starts a new utterance, even when the previous label was
+  // itself the first word of the sentence. A colon introducing a list does not.
+  for (const match of text.matchAll(/[：:]/gu)) {
+    const at = match.index as number
+    const prefix = text.slice(0, at).split(/[\n。！？!?]/u).at(-1)?.trim() || ''
+    const quoted = /^\s*[「“"『]/u.test(text.slice(at + 1))
+    const speaker = speakerTitle.test(prefix) || (dialogue && prefix.length <= 12 && labels.includes(prefix))
+    const reported = /(?:說|说|問|问|回答|答道|表示|喊道|寫道|写道)$/u.test(prefix)
+    if (quoted || speaker || reported) starts.add(at + 1)
+  }
   let atSentenceStart = true
+  let offset = 0
   return words.map((word) => {
+    const end = offset + word.text.length
+    if (starts.has(offset)) atSentenceStart = true
     if (!word.pinyin) {
       // Punctuation carries no reading, but it does say where the next
       // sentence begins.
-      if (SENTENCE_END.test(word.text)) atSentenceStart = true
+      if (SENTENCE_END.test(word.text) || [...starts].some((at) => at > offset && at <= end)) atSentenceStart = true
+      offset = end
       return word
     }
     const pinyin = atSentenceStart
       ? word.pinyin.charAt(0).toLocaleUpperCase() + word.pinyin.slice(1)
       : word.pinyin
     atSentenceStart = SENTENCE_END.test(word.text)
+    offset = end
     return { ...word, pinyin }
   })
 }

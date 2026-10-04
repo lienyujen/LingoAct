@@ -5,7 +5,9 @@ import { test } from 'node:test'
 import ts from 'typescript'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
-import { settleWords } from '../supabase/functions/_shared/reading.ts'
+import { newWords, settleWords } from '../supabase/functions/_shared/reading.ts'
+import { wordLevel } from '../supabase/functions/_shared/tbcl-levels.generated.ts'
+import { tbclLevelOf } from '../supabase/functions/_shared/proficiency.ts'
 import { buildVoicePlan, dialogueTurns, karaokeCues, synthesize } from '../supabase/functions/_shared/listening.ts'
 
 test('reading words preserve original Windows line breaks and reject changed content', () => {
@@ -76,11 +78,37 @@ test('dialogue synthesis sends names verbatim and ASR differences do not block i
     const labelled = new Set([0, 1, [...transcript.slice(0, transcript.indexOf('\n') + 1)].length, [...transcript.slice(0, transcript.indexOf('\n') + 1)].length + 1])
     assert.ok(cues.every((cue) => !labelled.has(cue.start_index)))
     assert.ok(cues.some((cue) => cue.start_index === [...transcript.slice(0, transcript.indexOf('王小美'))].length))
-    // Passage omission protection stays in force.
-    await assert.rejects(karaokeCues(new Uint8Array(), '請完整讀出這一篇文章。', 'zh-tw', 5000), /Generated speech covered/)
+    const passageCues = await karaokeCues(new Uint8Array(), '請完整讀出這一篇文章。', 'zh-tw', 5000)
+    assert.ok(passageCues.length)
     globalThis.Deno = { env: { get: () => undefined } }
     const fallback = await karaokeCues(new Uint8Array(), transcript, 'zh-tw', 5000, transcript, plan.speakers)
     assert.ok(fallback.every((cue) => !labelled.has(cue.start_index)))
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.Deno = originalDeno
+  }
+})
+
+test('TOCFL A2 marks current-level words, higher words and unlisted words', () => {
+  const words = ['拍', '享受', '秋季', '資料夾', '的'].map((text) => ({ text, pinyin: '' }))
+  const level = tbclLevelOf('tocfl', 'level2')
+  assert.equal(level, 3)
+  const marked = newWords(words, level)
+  for (const { text } of words) {
+    assert.equal(marked.some((entry) => entry.word === text), !wordLevel(text) || wordLevel(text) >= level)
+  }
+  assert.ok(words.some(({ text }) => wordLevel(text) === level))
+})
+
+test('passage transcription at 109 of 112 characters still produces complete cues', async () => {
+  const originalFetch = globalThis.fetch
+  const originalDeno = globalThis.Deno
+  globalThis.Deno = { env: { get: () => 'test-key' } }
+  globalThis.fetch = async () => Response.json({ steps: [{ content: [{ type: 'word_info', text: '秋'.repeat(109), start_offset: '0s', end_offset: '9s' }] }] })
+  try {
+    const cues = await karaokeCues(new Uint8Array(), '秋'.repeat(112), 'zh-tw', 10000)
+    assert.ok(cues.length)
+    assert.equal(cues.at(-1).end_index, 112)
   } finally {
     globalThis.fetch = originalFetch
     globalThis.Deno = originalDeno

@@ -383,13 +383,6 @@ Deno.serve(async (req) => {
             if (!raced) throw new Error('找不到作答紀錄。')
             attemptId = raced.id
           }
-          await supabase.from('answers').insert({
-            session_id: sessionId,
-            question_id: questionId,
-            participant_id: participantId,
-            participant_name: participant.name,
-            answer_text: '[單字卡練習中]',
-          })
         }
 
         const { error: tryError } = await supabase.from('quiz_item_tries').insert({
@@ -410,6 +403,18 @@ Deno.serve(async (req) => {
           score: correct ? 1 : 0,
         }, { onConflict: 'attempt_id,item_id' })
         if (answerError) throw answerError
+
+        // The private tries are not published to Realtime. Wake the presenter's
+        // existing answer subscription after every saved try, including retries;
+        // inserting this before the try made the first refresh read zero misses.
+        const { error: progressError } = await supabase.from('answers').upsert({
+          session_id: sessionId,
+          question_id: questionId,
+          participant_id: participantId,
+          participant_name: participant.name,
+          answer_text: '[單字卡練習中]',
+        }, { onConflict: 'question_id,participant_id' })
+        if (progressError) throw progressError
 
         // Showing the right answer after a wrong try is what a flashcard IS —
         // you turn it over. It reveals one card, to a student who has already

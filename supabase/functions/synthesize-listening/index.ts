@@ -82,9 +82,8 @@ Deno.serve(async (req) => {
     if (wav.length > MAX_BYTES) {
       return jsonResponse({ message: '這段內容太長，語音超過 10MB。請分成兩段再轉換。' }, 413)
     }
-    // Verify the model actually spoke the requested copy before publishing
-    // anything. This catches the short-word omission that used to shift every
-    // later KTV highlight while leaving no orphaned Storage object behind.
+    // Timestamping follows the requested copy. Recognition differences may
+    // reduce its precision, but must not discard a playable recording.
     const cues = await karaokeCues(
       wav, transcript, language, clipDurationMs, plan.speechText, plan.speakers,
     )

@@ -10,7 +10,7 @@ import { regionalPronunciationInstruction, regionalSpeechText } from './mandarin
 const SAMPLE_RATE = 24000
 const CHANNELS = 1
 const BITS = 16
-const SPEECH_RECIPE_VERSION = 'gemini-3.8-regional-mandarin-v2'
+const SPEECH_RECIPE_VERSION = 'gemini-3.8-regional-mandarin-v3'
 
 export type ClipKind = 'passage' | 'dialogue' | 'scene'
 export type ChineseScript = 'traditional' | 'simplified'
@@ -30,8 +30,6 @@ export type KaraokeCue = {
   start_ms: number
   end_ms: number
 }
-
-class IncompleteSpeechError extends Error {}
 
 // Two voices is the API's ceiling for a multi-speaker request, and also about
 // the point where a learner stops being able to tell characters apart by ear.
@@ -310,17 +308,11 @@ export async function karaokeCues(
         const expectedText = dialogueTurns(spokenTranscript, speakers).map((turn) => turn.text).join('\n')
         const expected = searchable(expectedText).value.length
         const heard = words.reduce((length, word) => length + searchable(word.text).value.length, 0)
-        // Keep the passage completeness check. Dialogue ASR is less reliable:
-        // a name can change spelling and character count without being omitted.
+        // ASR may contract words or spell names differently even when the
+        // recording is intact. Timestamping cannot veto already-created audio.
         if (expected && heard / expected < 0.98) {
-          // Names in dialogue are often transcribed as a shorter homophone or
-          // an English spelling. ASR character counts cannot prove omission
-          // there; its timestamps can still anchor the original, intact text.
-          if (speakers.length >= 2) {
-            console.warn(`Dialogue transcription covered ${heard} of ${expected} characters; retaining the requested names.`)
-          } else {
-            throw new IncompleteSpeechError(`Generated speech covered ${heard} of ${expected} spoken characters.`)
-          }
+          console.warn(`Speech transcription covered ${heard} of ${expected} characters; retaining the requested text.`)
+          if (heard / expected < 0.5) return fallbackCues(withoutSpeakerLabels(transcript, speakers), totalMs, language)
         }
       }
       const cueTranscript = withoutSpeakerLabels(spokenTranscript, speakers)
@@ -328,7 +320,6 @@ export async function karaokeCues(
       const completed = completeCues(aligned, cueTranscript, totalMs, language)
       if (completed.length) return completed
     } catch (error) {
-      if (error instanceof IncompleteSpeechError) throw error
       console.warn('word timestamping unavailable; using duration alignment', error instanceof Error ? error.message : error)
     }
   }

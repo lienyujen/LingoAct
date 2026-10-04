@@ -320,7 +320,7 @@ function overJoined(words: ReadingWord[]) {
     .map((word) => `${word.text}（${word.pinyin}）`)
 }
 
-// Which of the passage's words the class has not met.
+// The words this class is learning, including its current level.
 //
 // 國教院's list decides, not the model. A word listed above the class is 超綱
 // and keeps its level so the colour can say how far above; a word on no list
@@ -328,14 +328,14 @@ function overJoined(words: ReadingWord[]) {
 // loanword, a compound the benchmark never covered. 閱讀是讀詞不是讀字, so an
 // unlisted word counts as new even when every character in it is easy: 資料夾
 // is not 資料 + 夾 to someone meeting it for the first time.
-function newWords(words: ReadingWord[], classLevel: number) {
+export function newWords(words: ReadingWord[], classLevel: number) {
   const seen = new Set<string>()
   const out: Array<{ word: string; level: number }> = []
   for (const { text } of words) {
     const word = (text || '').trim()
     if (!word || seen.has(word) || !HAN_WORD.test(word)) continue
     const level = wordLevel(word)
-    if (level && level <= classLevel) continue
+    if (level && level < classLevel) continue
     seen.add(word)
     out.push({ word, level })
   }

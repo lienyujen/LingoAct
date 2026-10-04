@@ -415,7 +415,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
               {resumable ? t('resumeAnswering') : t('stopAnswering')}
             </button>
           )}
-          <button aria-label={t('expandQuiz')} className="icon-button" title={t('expandQuiz')} type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>
+          {!flashcard && <button aria-label={t('expandQuiz')} className="icon-button" title={t('expandQuiz')} type="button" onClick={openExpandedReview}><ArrowsOut size={20} /></button>}
         </div>
       </div>
       <div className="quiz-result-stats">

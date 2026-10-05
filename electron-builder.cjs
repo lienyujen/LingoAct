@@ -63,7 +63,12 @@ module.exports = {
   // The UI only ships zh-TW and en-US strings; without this, electron-builder
   // bundles all ~55 Chromium locale .pak files (~49MB of unused languages).
   electronLanguages: ['en-US', 'zh-TW'],
-  extraFiles: [{ from: '.env.example', to: '.env.example' }, { from: 'PORTABLE-SETTINGS.txt', to: 'PORTABLE-SETTINGS.txt' }],
+  // macOS signs Contents as code; editable examples belong in Resources.
+  // On Windows they are beside the executable, ready to rename and fill in.
+  extraFiles: [
+    { from: '.env.example', to: process.platform === 'darwin' ? 'Resources/.env.example' : '.env.example' },
+    { from: 'PORTABLE-SETTINGS.txt', to: process.platform === 'darwin' ? 'Resources/PORTABLE-SETTINGS.txt' : 'PORTABLE-SETTINGS.txt' },
+  ],
   extraResources: [
     {
       from: iconPath,

@@ -2106,21 +2106,24 @@ export function PresenterPage() {
   async function closeSessionAndApp() {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
-      setCloseConfirmOpen(false)
-      setAnalysisError(t('noRightsCannotEnd'))
+      await window.lingoActDesktop?.close()
       return
     }
 
     setClosingSession(true)
     setAnalysisError('')
     try {
-      if (captionConnectionsRef.current.length) await stopCourseRecording()
-      await endManagedSession(sessionId, presenterToken, t)
+      await Promise.race([
+        (async () => {
+          if (captionConnectionsRef.current.length) await stopCourseRecording()
+          await endManagedSession(sessionId, presenterToken, t)
+        })(),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 4000)),
+      ])
       await window.lingoActDesktop?.close()
     } catch (error) {
-      setCloseConfirmOpen(false)
-      setAnalysisError(error instanceof Error ? error.message : t('endClassFailed'))
-      setClosingSession(false)
+      logDiagnostic('close_backend_failed', { message: error instanceof Error ? error.message : 'End class failed' })
+      await window.lingoActDesktop?.close()
     }
   }
 
@@ -2128,12 +2131,13 @@ export function PresenterPage() {
     setClosingSession(true)
     setAnalysisError('')
     try {
-      if (captionConnectionsRef.current.length) await stopCourseRecording()
+      if (captionConnectionsRef.current.length) {
+        await Promise.race([stopCourseRecording(), new Promise<void>((resolve) => window.setTimeout(resolve, 4000))])
+      }
       await window.lingoActDesktop?.close()
     } catch (error) {
-      setCloseConfirmOpen(false)
-      setAnalysisError(error instanceof Error ? error.message : t('suspendFailed'))
-      setClosingSession(false)
+      logDiagnostic('close_recording_failed', { message: error instanceof Error ? error.message : 'Recording stop failed' })
+      await window.lingoActDesktop?.close()
     }
   }
 

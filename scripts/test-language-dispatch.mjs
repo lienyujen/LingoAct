@@ -9,6 +9,32 @@ import { newWords, settleWords } from '../supabase/functions/_shared/reading.ts'
 import { wordLevel } from '../supabase/functions/_shared/tbcl-levels.generated.ts'
 import { tbclLevelOf } from '../supabase/functions/_shared/proficiency.ts'
 import { buildVoicePlan, dialogueTurns, karaokeCues, synthesize } from '../supabase/functions/_shared/listening.ts'
+import { createClient } from '@supabase/supabase-js'
+import { guardRealtimeTables, matchesRealtimeFilter } from '../src/lib/realtimeGuard.ts'
+
+test('Realtime callbacks reject other tables and classrooms, including partial deletes', () => {
+  const filter = { event: '*', schema: 'public', table: 'participants', filter: 'session_id=eq.class-1' }
+  const change = { eventType: 'INSERT', schema: 'public', table: 'participants', new: { id: 'student', session_id: 'class-1', name: 'Student' }, old: {} }
+  assert.equal(matchesRealtimeFilter(filter, change), true)
+  for (const table of ['questions', 'screenshots', 'sessions', 'answers']) assert.equal(matchesRealtimeFilter(filter, { ...change, table }), false)
+  assert.equal(matchesRealtimeFilter(filter, { ...change, new: { ...change.new, session_id: 'class-2' } }), false)
+  assert.equal(matchesRealtimeFilter(filter, { ...change, eventType: 'DELETE', new: {}, old: { id: 'student' } }), true)
+  assert.equal(matchesRealtimeFilter(filter, { ...change, new: { id: 'student' } }), false)
+})
+
+test('missing SDK binding IDs cannot turn a student heartbeat into a class-wide reload', () => {
+  for (const guarded of [false, true]) {
+    const client = createClient('https://example.supabase.co', 'public-test-key')
+    if (guarded) guardRealtimeTables(client)
+    const calls = []
+    const channel = client.channel('classroom-regression')
+    for (const table of ['sessions', 'participants', 'questions']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => calls.push(table))
+    channel.channelAdapter.getChannel().trigger('postgres_changes', {
+      ids: [1], data: { schema: 'public', table: 'participants', type: 'UPDATE', columns: [], record: { id: 'student', session_id: 'class-1' }, old_record: {} },
+    })
+    assert.deepEqual(calls, guarded ? ['participants'] : ['sessions', 'participants', 'questions'])
+  }
+})
 
 test('reading words preserve original Windows line breaks and reject changed content', () => {
   const raw = [{ text: '小明', pinyin: 'xiǎomíng' }, { text: '去', pinyin: 'qù' }, { text: '學校', pinyin: 'xuéxiào' }, { text: '。', pinyin: '' }]

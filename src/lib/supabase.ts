@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { getOwnerKey } from './ownerKey'
+import { guardRealtimeTables } from './realtimeGuard'
 
 const STORAGE_KEY = 'lingoact:backend'
 
@@ -70,9 +71,9 @@ export const backendConfig = config
 export const isSupabaseConfigured = Boolean(config)
 
 export const supabase = config
-  ? createClient(config.url, config.key, {
+  ? guardRealtimeTables(createClient(config.url, config.key, {
       realtime: { params: { eventsPerSecond: 20 } },
-    })
+    }))
   : null
 
 // Functions that act on the teacher's behalf rather than a student's.

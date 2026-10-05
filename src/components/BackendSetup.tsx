@@ -21,7 +21,7 @@ export function BackendSetup({ onCancel }: Props) {
   const [appUrl, setAppUrl] = useState(backendConfig?.appUrl || '')
   const [testing, setTesting] = useState(false)
   const [tested, setTested] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(window.lingoActDesktop?.portableBackend?.error || '')
   const [notice, setNotice] = useState('')
   const [token, setToken] = useState('')
   const [geminiKey, setGeminiKey] = useState('')
@@ -198,7 +198,8 @@ export function BackendSetup({ onCancel }: Props) {
   }
 
   function reset() {
-    clearBackendConfig()
+    const result = clearBackendConfig()
+    if (!result.ok) { setError(result.message); return }
     window.location.reload()
   }
 
@@ -219,6 +220,7 @@ export function BackendSetup({ onCancel }: Props) {
           LingoAct 使用你自己的 Supabase 專案存放課堂資料，資料不會經過其他人。
           填入專案資訊後即可開始使用。
         </p>
+        {window.lingoActDesktop?.portableBackend?.enabled && <p className="notice">隨身設定已啟用：公開連線設定會儲存在程式同資料夾的 .env，搬移整個資料夾即可沿用。</p>}
         {/* The way out for someone who has no project at all. Until now the only
             link to Supabase sat inside the collapsed 自動部署 section further
             down, which is closed on arrival — so this screen asked for a

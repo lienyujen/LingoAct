@@ -63,6 +63,7 @@ module.exports = {
   // The UI only ships zh-TW and en-US strings; without this, electron-builder
   // bundles all ~55 Chromium locale .pak files (~49MB of unused languages).
   electronLanguages: ['en-US', 'zh-TW'],
+  extraFiles: [{ from: '.env.example', to: '.env.example' }, { from: 'PORTABLE-SETTINGS.txt', to: 'PORTABLE-SETTINGS.txt' }],
   extraResources: [
     {
       from: iconPath,

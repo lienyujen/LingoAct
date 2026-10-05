@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Camera, CircleNotch, DownloadSimple, FileArrowUp, PencilLine, Sparkle, UploadSimple } from '@phosphor-icons/react'
 import { BoardDrawing } from './BoardDrawing'
 import { requireSupabase } from '../lib/supabase'
+import { usePageVisibility } from '../lib/usePageVisibility'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { downloadHref, publicFileUrl } from '../lib/fileLinks'
@@ -12,6 +13,7 @@ import type { FileAnalysis, SharedFile } from '../types'
 type Props = {
   sessionId: string
   locale: ParticipantLocale
+  live?: boolean
 }
 
 function formatSize(bytes: number) {
@@ -21,11 +23,12 @@ function formatSize(bytes: number) {
 }
 
 
-export function ParticipantSharedFiles({ sessionId, locale }: Props) {
+export function ParticipantSharedFiles({ sessionId, locale, live = true }: Props) {
   const [files, setFiles] = useState<SharedFile[]>([])
+  const visible = usePageVisibility()
 
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || !visible) return
     const supabase = requireSupabase()
     let active = true
 
@@ -36,11 +39,11 @@ export function ParticipantSharedFiles({ sessionId, locale }: Props) {
     }
     void load()
 
-    const channel = supabase.channel(`shared-files:${sessionId}`)
+    const channel = live ? supabase.channel(`shared-files:${sessionId}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'shared_files', filter: `session_id=eq.${sessionId}`,
       }, () => void load())
-      .subscribe()
+      .subscribe() : null
 
     // A phone suspends the socket as soon as the browser goes to the background,
     // so every change made while the screen was off is missed. Without this the
@@ -54,9 +57,9 @@ export function ParticipantSharedFiles({ sessionId, locale }: Props) {
       active = false
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', onVisible)
-      void supabase.removeChannel(channel)
+      if (channel) void supabase.removeChannel(channel)
     }
-  }, [sessionId])
+  }, [live, sessionId, visible])
 
   if (!files.length) return null
 

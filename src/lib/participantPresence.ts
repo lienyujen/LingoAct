@@ -19,6 +19,8 @@ export function trackParticipantPresence({ sessionId, participantId, participant
   let hiddenSince = document.visibilityState === 'hidden' ? Date.now() : 0
   let unreportedMs = 0
   let stopped = false
+  let sending = false
+  let finalPending = false
   // Restarts whenever they leave, so it measures one unbroken stretch of
   // attention rather than the total time they happened to be present.
   let focusedSince = document.visibilityState === 'visible' ? Date.now() : 0
@@ -30,12 +32,18 @@ export function trackParticipantPresence({ sessionId, participantId, participant
   }
 
   const send = async (keepalive = false) => {
+    if (sending) {
+      if (keepalive) finalPending = true
+      return
+    }
+    sending = true
     settle()
     const unfocusedMs = unreportedMs
     unreportedMs = 0
     const focusStreakMs = focusedSince ? Date.now() - focusedSince : 0
     try {
       const { error } = await requireSupabase().functions.invoke('participant-action', {
+        timeout: 10_000,
         body: { action: 'heartbeat', sessionId, participantId, participantToken, unfocusedMs, focusStreakMs, locale: locale() },
         ...(keepalive ? { headers: { 'keep-alive': 'true' } } : {}),
       })
@@ -44,8 +52,11 @@ export function trackParticipantPresence({ sessionId, participantId, participant
       if (error) unreportedMs += unfocusedMs
     } catch {
       unreportedMs += unfocusedMs
+    } finally {
+      sending = false
     }
     if (document.visibilityState === 'hidden' && !hiddenSince) hiddenSince = Date.now()
+    if (finalPending) { finalPending = false; void send(true) }
   }
 
   const onVisibility = () => {
@@ -61,15 +72,17 @@ export function trackParticipantPresence({ sessionId, participantId, participant
     void send()
   }
 
-  const timer = window.setInterval(() => { if (!stopped) void send() }, HEARTBEAT_MS)
+  const timer = window.setInterval(() => { if (!stopped && document.visibilityState !== 'hidden') void send() }, HEARTBEAT_MS)
+  const onPageHide = () => { if (!stopped) void send(true) }
   document.addEventListener('visibilitychange', onVisibility)
-  window.addEventListener('pagehide', () => void send(true))
-  void send()
+  window.addEventListener('pagehide', onPageHide)
+  if (document.visibilityState !== 'hidden') void send()
 
   return () => {
     stopped = true
     window.clearInterval(timer)
     document.removeEventListener('visibilitychange', onVisibility)
+    window.removeEventListener('pagehide', onPageHide)
     void send(true)
   }
 }

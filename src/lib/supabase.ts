@@ -65,7 +65,8 @@ if (linked) remember(linked)
 // A join link always wins: it is how a student reaches a project this build was
 // never configured for. Otherwise fall back to the last one used, then to the
 // values baked in at build time.
-const config = linked || fromStorage() || fromBuild()
+const portable = typeof window === 'undefined' ? undefined : window.lingoActDesktop?.portableBackend
+const config = linked || (portable?.enabled ? portable.config : fromStorage() || fromBuild())
 
 export const backendConfig = config
 export const isSupabaseConfigured = Boolean(config)
@@ -144,6 +145,11 @@ export function saveBackendConfig(input: { ref: string; key: string; appUrl?: st
     return { ok: false, message: '學員端網址必須以 https:// 開頭。' }
   }
 
+  if (portable?.enabled) {
+    return window.lingoActDesktop?.savePortableBackend?.({ ref, key, appUrl })
+      || { ok: false, message: '無法寫入隨身設定，請重新啟動程式。' }
+  }
+
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ref, key, appUrl: appUrl || undefined }))
   } catch {
@@ -153,11 +159,16 @@ export function saveBackendConfig(input: { ref: string; key: string; appUrl?: st
 }
 
 export function clearBackendConfig() {
+  if (portable?.enabled) {
+    const result = window.lingoActDesktop?.savePortableBackend?.(null)
+    if (!result?.ok) return result || { ok: false as const, message: '無法清除隨身設定。' }
+  }
   try {
     window.localStorage.removeItem(STORAGE_KEY)
   } catch {
     // Nothing to clear if storage is unavailable.
   }
+  return { ok: true as const }
 }
 
 // Checks the project answers before the presenter commits to it, so a typo is

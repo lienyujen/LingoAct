@@ -34,6 +34,7 @@ import {
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
 import { trackParticipantPresence } from '../lib/participantPresence'
+import { usePageVisibility } from '../lib/usePageVisibility'
 import { contentLocaleKey, localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
 import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
@@ -93,7 +94,9 @@ export function ParticipantPage() {
   const [message, setMessage] = useState('')
   // One line, sent by the presenter's window. No queries from the class — see
   // the note in lib/standings.
-  const standing = useMyStanding(sessionId, participant?.id || null)
+  const pageVisible = usePageVisibility()
+  const liveSessionId = pageVisible && session?.status === 'active' ? sessionId : ''
+  const standing = useMyStanding(liveSessionId, participant?.id || null)
   const [handBusy, setHandBusy] = useState(false)
   // Keyed by question id, so it survives every reload and every new question.
   const [questionAnalyses, setQuestionAnalyses] = useState<Record<string, QuestionAnalysis>>({})
@@ -110,7 +113,7 @@ export function ParticipantPage() {
   const navigate = useNavigate()
   const location = useLocation()
   // Also tells the class whether anyone is at the front of the room.
-  const { presenterOnline } = useSessionPresence(sessionId, {
+  const { presenterOnline } = useSessionPresence(liveSessionId, {
     role: 'participant',
     participant: session?.status === 'active' ? participant : null,
   })
@@ -445,20 +448,22 @@ export function ParticipantPage() {
   }, [location.search, navigate, participantId, sessionId])
 
   useEffect(() => {
-    loadAll()
-  }, [loadAll])
+    if (!pageVisible) return
+    const timer = window.setTimeout(() => void loadAll(), Math.random() * 600)
+    return () => window.clearTimeout(timer)
+  }, [loadAll, pageVisible])
 
   useEffect(() => {
-    if (quizData?.attempt?.status !== 'grading') return
+    if (!pageVisible || quizData?.attempt?.status !== 'grading') return
     const timer = window.setInterval(() => void loadAll(), 2000)
     return () => window.clearInterval(timer)
-  }, [loadAll, quizData?.attempt?.status])
+  }, [loadAll, pageVisible, quizData?.attempt?.status])
 
   useEffect(() => {
-    if (question?.type !== 'custom_quiz' || quizData || quizLoadError) return
+    if (!liveSessionId || question?.type !== 'custom_quiz' || quizData || quizLoadError) return
     const timer = window.setInterval(() => void loadAll(), 1500)
     return () => window.clearInterval(timer)
-  }, [loadAll, question?.type, quizData, quizLoadError])
+  }, [liveSessionId, loadAll, question?.type, quizData, quizLoadError])
 
   // Dispatching one question writes a screenshot, a question and the session
   // row, so every student page used to run its queries three times over. In a
@@ -481,7 +486,7 @@ export function ParticipantPage() {
   }, [])
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !sessionId || !participantId) return
+    if (!isSupabaseConfigured || !liveSessionId || !participantId) return
     const supabase = requireSupabase()
     const channel = supabase
       .channel(`participant:${sessionId}:${participantId}`)
@@ -532,7 +537,7 @@ export function ParticipantPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loadAll, participantId, scheduleLoad, sessionId])
+  }, [liveSessionId, loadAll, participantId, scheduleLoad, sessionId])
 
   useEffect(() => {
     if (session?.status !== 'ended') return
@@ -877,7 +882,7 @@ export function ParticipantPage() {
           </section>
         )}
         {/* Files stay downloadable after class until the presenter deletes the session. */}
-        <ParticipantSharedFiles locale={locale} sessionId={sessionId} />
+        <ParticipantSharedFiles locale={locale} sessionId={sessionId} live={false} />
         <ParticipantQuestionHistory
           analyses={questionAnalyses}
           teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}

@@ -66,7 +66,7 @@ const relativeFiles = (dir, prefix = '') => fs.readdirSync(dir, { withFileTypes:
 
 if (fs.existsSync(target)) {
   const built = new Set(relativeFiles(unpacked))
-  const stale = relativeFiles(target).filter((file) => !built.has(file))
+  const stale = relativeFiles(target).filter((file) => file !== '.env' && !built.has(file))
   for (const file of stale) fs.rmSync(path.join(target, file), { force: true })
   if (stale.length) console.log(`removed ${stale.length} stale file(s) from the previous build`)
 } else {

@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('lingoActDesktop', {
   isDesktop: true,
   platform: process.platform,
+  portableBackend: ipcRenderer.sendSync('config:portable-read'),
+  savePortableBackend: (config) => ipcRenderer.sendSync('config:portable-save', config),
   enterPresenterMode: (sessionId) => ipcRenderer.invoke('window:presenter-mode', sessionId),
   setPresenterExpanded: (expanded, settingsOpen = false, interactiveOpen = false) => ipcRenderer.invoke('window:set-expanded', expanded, settingsOpen, interactiveOpen),
   setLotteryInteraction: (enabled) => ipcRenderer.invoke('lottery:set-interactive', enabled),

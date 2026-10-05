@@ -17,6 +17,8 @@ declare global {
     lingoActDesktop?: {
       isDesktop: boolean
       platform: string
+      portableBackend?: { enabled: boolean; config: { ref: string; url: string; key: string; appUrl?: string } | null; path?: string; error?: string }
+      savePortableBackend?: (config: { ref: string; key: string; appUrl?: string } | null) => { ok: true } | { ok: false; message: string }
       enterPresenterMode: (sessionId: string) => Promise<void>
       setPresenterExpanded: (expanded: boolean, settingsOpen?: boolean, interactiveOpen?: boolean) => Promise<void>
       setLotteryInteraction: (enabled: boolean) => Promise<void>

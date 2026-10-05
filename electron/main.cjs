@@ -3,6 +3,7 @@ const path = require('node:path')
 const fs = require('node:fs')
 const { fitAndCentre, overlayBoundsFor } = require('./windowPlacement.cjs')
 const packageMetadata = require('../package.json')
+const { configDirectory, readPortableConfig, savePortableConfig } = require('./portableConfig.cjs')
 
 const APP_PROFILES = {
   full: { appId: 'tw.lingoact.presenter.desktop', displayName: 'LingoAct' },
@@ -61,6 +62,9 @@ const APP_WINDOW_ICON_PATH = isDesktopDev
   ? path.join(__dirname, '..', 'build', 'icon.ico')
   : path.join(process.resourcesPath, 'icon.ico')
 const APP_EXECUTABLE_PATH = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
+const PORTABLE_CONFIG_DIRECTORY = configDirectory(APP_EXECUTABLE_PATH, process.platform, isDesktopDev ? path.resolve(__dirname, '..') : undefined)
+ipcMain.on('config:portable-read', (event) => { event.returnValue = readPortableConfig(PORTABLE_CONFIG_DIRECTORY) })
+ipcMain.on('config:portable-save', (event, config) => { event.returnValue = savePortableConfig(PORTABLE_CONFIG_DIRECTORY, config) })
 const APP_RELAUNCH_ICON_PATH = isDesktopDev ? APP_WINDOW_ICON_PATH : APP_EXECUTABLE_PATH
 const CONTROL_COLLAPSED = { width: 194, height: 282 }
 const CONTROL_EXPANDED = { width: 420, height: 760 }
@@ -890,10 +894,19 @@ app.whenReady().then(() => {
       console.error('LingoAct smoke test timed out before the presenter loaded.')
       app.exit(1)
     }, 15_000)
-    mainWindow.webContents.once('did-finish-load', () => {
-      clearTimeout(timeout)
-      console.log(`LINGOACT_SMOKE_TEST_OK platform=${process.platform} profile=${APP_PROFILE_ID}`)
-      app.quit()
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const portable = await mainWindow.webContents.executeJavaScript('window.lingoActDesktop?.portableBackend')
+        const expected = readPortableConfig(PORTABLE_CONFIG_DIRECTORY)
+        if (!portable || JSON.stringify(portable) !== JSON.stringify(expected)) throw new Error('Portable configuration did not reach the renderer.')
+        clearTimeout(timeout)
+        console.log(`LINGOACT_SMOKE_TEST_OK platform=${process.platform} profile=${APP_PROFILE_ID} portable=${portable.enabled} project=${portable.config?.ref || 'none'}`)
+        app.quit()
+      } catch (error) {
+        clearTimeout(timeout)
+        logFatalError('smoke-test', error)
+        app.exit(1)
+      }
     })
     return
   }

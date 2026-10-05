@@ -3,6 +3,7 @@ import { BoardDrawing } from './BoardDrawing'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { boardFileName, isImageCard } from '../lib/boardCards'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
+import { usePageVisibility } from '../lib/usePageVisibility'
 import { participantText } from '../lib/participantI18n'
 // The bucket the server signs board uploads for. It was written out by hand
 // here as interact-files — the name it has in the app this file was copied
@@ -54,6 +55,7 @@ const kindIcons: Record<BoardPostKind, typeof TextT> = {
 }
 
 export function ParticipantBoard({ locale, locked, participant, participantToken, question, session, imageUrl }: Props) {
+  const pageVisible = usePageVisibility()
   const [mine, setMine] = useState<BoardPost[]>([])
   const [wall, setWall] = useState<BoardPost[]>([])
   const [reactions, setReactions] = useState<BoardReaction[]>([])
@@ -118,10 +120,10 @@ export function ParticipantBoard({ locale, locked, participant, participantToken
   }, [question.id, revealed])
 
   useEffect(() => { void loadMine() }, [loadMine])
-  useEffect(() => { void loadWall() }, [loadWall])
+  useEffect(() => { if (pageVisible) void loadWall() }, [loadWall, pageVisible])
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !revealed) return
+    if (!isSupabaseConfigured || !revealed || !pageVisible || session.status !== 'active') return
     const supabase = requireSupabase()
     const channel = supabase
       .channel(`board:${question.id}`)
@@ -129,7 +131,7 @@ export function ParticipantBoard({ locale, locked, participant, participantToken
       .on('postgres_changes', { event: '*', schema: 'public', table: 'board_reactions', filter: `session_id=eq.${session.id}` }, () => { void loadWall() })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [loadWall, question.id, revealed, session.id])
+  }, [loadWall, pageVisible, question.id, revealed, session.id, session.status])
 
   // A card is written straight to the table, the way a danmaku message is, so
   // it is on the wall the moment it is sent rather than after a round trip

@@ -4,7 +4,7 @@ import { APP_PROFILE } from '../lib/appProfiles'
 import { TEACHING_TRACKS, resolveFramework, resolveTrack } from '../lib/teachingTracks'
 import { frameworkById } from '../lib/proficiency'
 import { usePresenterText } from '../lib/presenterI18n'
-import { isScProfile, useScSystemLanguage } from '../lib/scSystemLanguage'
+import { supportsChineseSystemLanguage, useScSystemLanguage } from '../lib/scSystemLanguage'
 import { scFrameworkChoices } from '../lib/scTeachingMode'
 import type { ScSystemLanguage } from '../lib/scTeachingMode'
 import { uiText } from '../lib/uiText'
@@ -51,12 +51,12 @@ export function LanguagePairFields({
   const track = resolveTrack(teachingTrack)
   const activeId = resolveFramework(teachingTrack, levelFramework)
   const framework = frameworkById(activeId)
-  const choices = (isScProfile ? scFrameworkChoices(systemLanguage) : track.frameworks).map((id) => frameworkById(id)).filter(Boolean)
+  const choices = (supportsChineseSystemLanguage ? scFrameworkChoices(systemLanguage) : track.frameworks).map((id) => frameworkById(id)).filter(Boolean)
   const availableTracks = TEACHING_TRACKS.filter((option) => APP_PROFILE.allowedTracks.includes(option.id))
 
   return (
     <div className="language-pair">
-      {!isScProfile && availableTracks.length > 1 && <div className="language-pair-field">
+      {!supportsChineseSystemLanguage && availableTracks.length > 1 && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainTeachingLanguage')}</span>
         <p className="language-pair-hint">{t('mainTeachingHint')}</p>
         <div className="language-pair-options">
@@ -151,7 +151,7 @@ export function LanguagePairFields({
         </div>
       )}
 
-      {!isScProfile && <div className="language-pair-field">
+      {!supportsChineseSystemLanguage && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainGuidanceLanguage')}</span>
         <p className="language-pair-hint">{t('mainGuidanceHint')}</p>
         <div className="language-pair-options">

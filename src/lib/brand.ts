@@ -13,18 +13,18 @@ import { APP_PROFILE } from './appProfiles'
 // JoinPage forwards the whole query string to the participant page, and this
 // reads it at runtime. The default costs nothing: no parameter means the
 // ordinary LingoAct page, so every existing link keeps working.
-export type BrandId = 'ncacls' | 'sc'
+export type BrandId = 'ncacls' | 'sc' | 'huayu'
 
 export const BRAND_PARAM = 'b'
 
 // True in the NCACLS desktop build itself, which is the fallback for the
 // presenter's own preview of the student page — there is no join URL there to
 // read the parameter from.
-export const buildBrand: BrandId | null = APP_PROFILE.id === 'ncacls' ? 'ncacls' : APP_PROFILE.id === 'sc' ? 'sc' : null
+export const buildBrand: BrandId | null = ['ncacls', 'sc', 'huayu'].includes(APP_PROFILE.id) ? APP_PROFILE.id as BrandId : null
 
 export function brandFromSearch(search: URLSearchParams): BrandId | null {
   const value = search.get(BRAND_PARAM)
-  return value === 'ncacls' || value === 'sc' ? value : buildBrand
+  return value === 'ncacls' || value === 'sc' || value === 'huayu' ? value : buildBrand
 }
 
 // Which guidance languages an edition offers a student. NCACLS teach Chinese
@@ -38,6 +38,7 @@ export function brandFromSearch(search: URLSearchParams): BrandId | null {
 // arrives on a locale the edition does not offer is moved to its first one
 // rather than left on a language whose entry is not in the picker.
 const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
+  huayu: ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
   sc: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
   ncacls: ['zh-TW', 'en', 'es'],
 }

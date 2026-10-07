@@ -18,7 +18,7 @@ import { BackendSetup } from './components/BackendSetup'
 import { isSupabaseConfigured } from './lib/supabase'
 import { useSessionReportBack } from './lib/sessionReportNavigation'
 import { PresenterLocaleContext, presenterLocaleFor } from './lib/presenterI18n'
-import { isScProfile, useScSystemLanguage } from './lib/scSystemLanguage'
+import { supportsChineseSystemLanguage, useScSystemLanguage } from './lib/scSystemLanguage'
 import { setUiLanguage, useUiLanguage } from './lib/uiText'
 import { useEffect } from 'react'
 import { APP_PROFILE } from './lib/appProfiles'
@@ -27,7 +27,7 @@ function AppRoutes() {
   const systemLanguage = useScSystemLanguage()
   const location = useLocation()
   useEffect(() => {
-    if (isScProfile && (location.pathname === '/' || location.pathname === '/presenter/new' || !isSupabaseConfigured)) setUiLanguage(systemLanguage)
+    if (supportsChineseSystemLanguage && (location.pathname === '/' || location.pathname === '/presenter/new' || !isSupabaseConfigured)) setUiLanguage(systemLanguage)
   }, [systemLanguage, location.pathname])
   const returnFromSessionReport = useSessionReportBack()
   const isDesktop = Boolean(window.lingoActDesktop)
@@ -85,11 +85,11 @@ export function App() {
   const systemLanguage = useScSystemLanguage()
   useEffect(() => {
     document.documentElement.lang = uiLanguage
-    if (isScProfile) document.title = APP_PROFILE.productName
+    if (supportsChineseSystemLanguage) document.title = APP_PROFILE.productName
   }, [uiLanguage])
   return (
     <HashRouter>
-      <PresenterLocaleContext.Provider value={isScProfile ? systemLanguage : presenterLocaleFor(APP_PROFILE.defaultTrack)}>
+      <PresenterLocaleContext.Provider value={supportsChineseSystemLanguage ? systemLanguage : presenterLocaleFor(APP_PROFILE.defaultTrack)}>
       <ErrorBoundary>
         <AppRoutes />
       </ErrorBoundary>

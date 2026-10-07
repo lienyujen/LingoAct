@@ -36,7 +36,7 @@ const profiles: Record<AppProfileId, AppProfile> = {
     productName: 'LingoAct 華語教學版',
     shortName: '華語教學版',
     defaultTrack: 'huayu',
-    allowedTracks: ['huayu'],
+    allowedTracks: ['huayu', 'putonghua'],
     defaultSkill: 'listen',
   },
   english: {

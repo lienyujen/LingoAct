@@ -18,7 +18,7 @@ import type { CoursePreset } from '../lib/coursePresets'
 import { LessonPlan } from '../components/LessonPlan'
 import { APP_PROFILE } from '../lib/appProfiles'
 import { SystemLanguageSelector } from '../components/SystemLanguageSelector'
-import { isScProfile, useScSystemLanguage } from '../lib/scSystemLanguage'
+import { supportsChineseSystemLanguage, setScSystemLanguage, useScSystemLanguage } from '../lib/scSystemLanguage'
 import { scTeachingMode } from '../lib/scTeachingMode'
 import { usePresenterText } from '../lib/presenterI18n'
 
@@ -62,7 +62,7 @@ export function PresenterNewPage() {
   const [levelCode, setLevelCode] = useState(initialCourse.levelCode)
   const [readingAnnotation, setReadingAnnotation] = useState(initialCourse.readingAnnotation)
   useEffect(() => {
-    if (!isScProfile) return
+    if (!supportsChineseSystemLanguage) return
     const mode = scTeachingMode(systemLanguage, levelFramework)
     setTeachingTrack(mode.teachingTrack)
     if (mode.framework !== levelFramework) {
@@ -70,13 +70,14 @@ export function PresenterNewPage() {
       setLevelCode('')
     }
     setGuidanceLanguage(systemLanguage)
-    if (mode.simplified) setReadingAnnotation('pinyin')
-  }, [systemLanguage, levelFramework])
+    if (mode.simplified || mode.teachingTrack !== teachingTrack) setReadingAnnotation(mode.annotation)
+  }, [systemLanguage, levelFramework, teachingTrack])
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(!courses.length)
   const [courseNotice, setCourseNotice] = useState('')
   const course = { title: title.trim(), teachingTrack, guidanceLanguage, levelFramework, levelCode, readingAnnotation }
 
   function chooseCourse(value: CoursePreset) {
+    if (supportsChineseSystemLanguage) setScSystemLanguage(value.guidanceLanguage === 'en' ? 'en' : value.teachingTrack === 'putonghua' ? 'zh-CN' : 'zh-TW')
     setTitle(value.title)
     setTeachingTrack(value.teachingTrack)
     setGuidanceLanguage(value.guidanceLanguage)
@@ -133,7 +134,7 @@ export function PresenterNewPage() {
           levelFramework,
           levelCode: levelCode || null,
           readingAnnotation,
-          ...(isScProfile ? { systemLanguage, appProfile: 'sc' } : {}),
+          ...(supportsChineseSystemLanguage ? { systemLanguage, appProfile: APP_PROFILE.id } : {}),
         },
         headers: { 'x-lingoact-client': 'desktop-app' },
       })
@@ -246,7 +247,8 @@ export function PresenterNewPage() {
       <SetupNotice />
       <form className="panel form-panel" onSubmit={createSession}>
         <span className="form-heading-icon"><Sparkle size={24} /></span>
-        <h1>{uiText(isScProfile ? "讓學生愛上中文" : "今天，讓學生愛上互動")}</h1>
+        <h1>{uiText(supportsChineseSystemLanguage ? "讓學生愛上中文" : "今天，讓學生愛上互動")}</h1>
+        <SystemLanguageSelector />
         <p className="muted">{APP_PROFILE.id === 'full' ? uiText("華語教學的 AI 助教。") : uiFormat(APP_PROFILE.id === 'english' ? "{0}・英語教學的 AI 助教。" : "{0}・華語教學的 AI 助教。", [uiText(APP_PROFILE.productName)])}</p>
         {courses.length > 0 && <label>{uiText("最近的課程")}<select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
             const selected = courses.find((item) => item.title === event.target.value)
@@ -272,7 +274,7 @@ export function PresenterNewPage() {
           onAnnotationChange={setReadingAnnotation}
           onFrameworkChange={(id) => {
             setLevelFramework(id)
-            if (isScProfile) {
+            if (supportsChineseSystemLanguage) {
               const mode = scTeachingMode(systemLanguage, id)
               setTeachingTrack(mode.teachingTrack)
               setReadingAnnotation(mode.annotation)
@@ -293,7 +295,6 @@ export function PresenterNewPage() {
           }}
         />
         </details>
-        <SystemLanguageSelector />
         <button className="ghost-button" type="button" onClick={rememberCourse}>{uiText("記住這個課程設定")}</button>
         {courseNotice && <p className="muted" role="status">{uiText(courseNotice)}</p>}
         {title.trim() && <LessonPlan key={title.trim()} courseName={title.trim()} />}

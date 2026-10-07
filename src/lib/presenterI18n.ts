@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { generatedPresenterLocales } from './presenterLocales.generated'
 import { resolveTrack } from './teachingTracks'
 import { scPresenterMessages } from './scLocales.generated'
-import { isScProfile, scSystemLanguage } from './scSystemLanguage'
+import { supportsChineseSystemLanguage, scSystemLanguage } from './scSystemLanguage'
 import { setUiLanguage } from './uiText'
 
 // The teacher's own interface, in the language of the class they are teaching.
@@ -1084,7 +1084,7 @@ const presenterLocales: readonly string[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko',
 // renaming either side keeps rows already written valid.
 export function presenterLocaleFor(teachingLanguage: string | null | undefined, systemLanguage?: string | null): PresenterLocale {
   if (systemLanguage && presenterLocales.includes(systemLanguage)) return systemLanguage as PresenterLocale
-  if (isScProfile) return scSystemLanguage()
+  if (supportsChineseSystemLanguage && !teachingLanguage) return scSystemLanguage()
   const language = resolveTrack(teachingLanguage).language
   const normalised = language === 'zh-tw' ? 'zh-TW' : language === 'zh-cn' ? 'zh-CN' : language
   return (presenterLocales.includes(normalised) ? normalised : 'zh-TW') as PresenterLocale

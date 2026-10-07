@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import { uiLocales } from './uiLocales.generated'
 import { APP_PROFILE } from './appProfiles'
-import { scSystemLanguage } from './scSystemLanguage'
+import { scSystemLanguage, supportsChineseSystemLanguage } from './scSystemLanguage'
 
-let language: string = APP_PROFILE.id === 'sc' ? scSystemLanguage() : APP_PROFILE.defaultTrack === 'en' ? 'en' : 'zh-TW'
+let language: string = supportsChineseSystemLanguage ? scSystemLanguage() : APP_PROFILE.defaultTrack === 'en' ? 'en' : 'zh-TW'
 const listeners = new Set<() => void>()
 export function setUiLanguage(value: string) {
   if (language === value) return

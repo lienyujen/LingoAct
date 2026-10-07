@@ -1,3 +1,4 @@
+import { uiText, uiFormat } from '../lib/uiText'
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ncaclsMark from '../assets/ncacls-mark.png'
@@ -61,10 +62,10 @@ export function StudentSocialLinks() {
   const links = brandFromSearch(searchParams) === 'ncacls' ? ncaclsLinks : socialLinks
 
   return (
-    <nav aria-label="社群連結" className="student-social-links">
+    <nav aria-label={uiText("社群連結")} className="student-social-links">
       {links.map((link) => (
         <a
-          aria-label={`在新分頁開啟${link.title || link.label}`}
+          aria-label={uiFormat("在新分頁開啟{0}", [link.title || link.label])}
           className={`student-social-link ${link.label.toLowerCase()}`}
           href={link.href}
           key={link.label}

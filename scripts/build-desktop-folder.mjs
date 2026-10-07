@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const profiles = {
+  sc: 'LingoAct-SC',
   full: 'LingoAct',
   huayu: 'LingoAct-Huayu',
   english: 'LingoAct-English',
@@ -30,6 +31,11 @@ const target = path.join(root, productName)
 // directory long enough for the rename to fail with EPERM. Temp is on the same
 // volume, so moving the finished folder into place is still a rename.
 const staging = path.join(os.tmpdir(), 'lingoact-desktop-build')
+if (path.resolve(staging) !== path.resolve(os.tmpdir(), 'lingoact-desktop-build')
+  || path.dirname(path.resolve(target)) !== root
+  || !Object.values(profiles).includes(path.basename(target))) {
+  throw new Error('Desktop build paths are outside the intended build directories.')
+}
 const runNode = (entry, args, env = process.env) => execFileSync(process.execPath, [path.join(root, entry), ...args], {
   cwd: root,
   env,
@@ -75,4 +81,4 @@ if (fs.existsSync(target)) {
 fs.cpSync(unpacked, target, { recursive: true, force: true })
 fs.rmSync(staging, { recursive: true, force: true })
 
-console.log(`\nready: ${path.join(target, `${productName}.exe`)}`)
+console.log(`\nready: ${path.join(target, `${profileId === 'sc' ? 'LingoAct' : productName}.exe`)}`)

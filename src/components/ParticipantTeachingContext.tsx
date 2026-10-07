@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
 import type { Question } from '../types'
@@ -37,29 +38,29 @@ export function ParticipantTeachingContext({ question, sessionId, participantId,
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
   }
   return <section className="panel participant-teaching-context">
-    {question.learning_focus && <p><strong>{zh ? '這一輪的重點' : 'This round’s focus'}</strong><br />{question.learning_focus}</p>}
+    {question.learning_focus && <p><strong>{zh ? uiText("這一輪的重點") : 'This round’s focus'}</strong><br />{question.learning_focus}</p>}
     {(question.discussion_samples || []).map(sample => <article key={sample.label}>
-      <strong>{zh ? '作品' : 'Work'} {sample.label}</strong><p>{sample.text}</p>
+      <strong>{zh ? uiText("作品") : 'Work'} {sample.label}</strong><p>{sample.text}</p>
       {sample.images.map((image, i) => <img key={i} src={image} alt="" />)}
     </article>)}
     {context?.previous && (context.previous.text || context.previous.audioUrl) && <details>
-      <summary>{zh ? '看看／聽聽自己的上一輪' : 'Read / listen to your previous round'}</summary>
+      <summary>{zh ? uiText("看看／聽聽自己的上一輪") : "Review your previous response"}</summary>
       <p>{context.previous.text}</p>{context.previous.audioUrl && <audio controls src={context.previous.audioUrl} />}
     </details>}
     {question.teaching_mode === 'pair' && <>
-      {!context && <p>{zh ? '載入分組資料…' : 'Loading your pair…'}</p>}
-      {context?.waiting && <p>{zh ? '本輪尚未分組，請告訴老師。' : 'You are not assigned to a pair this round. Please tell your teacher.'}</p>}
+      {!context && <p>{zh ? uiText("載入分組資料…") : 'Loading your pair…'}</p>}
+      {context?.waiting && <p>{zh ? uiText("本輪尚未分組，請告訴老師。") : 'You are not assigned to a pair this round. Please tell your teacher.'}</p>}
       {context?.role && <>
-        <h2>{context.role} · {zh ? '同伴' : 'Partner'}: {context.partner}</h2>
+        <h2>{context.role} · {zh ? uiText("同伴") : 'Partner'}: {context.partner}</h2>
         <p>{context.material}</p>
-        {context.result ? <article><strong>{zh ? '共同結果（已送出）' : 'Shared result (submitted)'}</strong><p>{context.result}</p></article> : <>
-          <label>{zh ? '先和同伴討論，再由其中一人送出共同結果。' : 'Talk with your partner, then either of you can submit your shared result.'}
+        {context.result ? <article><strong>{zh ? uiText("共同結果（已送出）") : "Shared response submitted"}</strong><p>{context.result}</p></article> : <>
+          <label>{zh ? uiText("先和同伴討論，再由其中一人送出共同結果。") : "Discuss the task with your partner. One of you should submit your shared response."}
             <textarea maxLength={4000} value={result} onChange={e => setResult(e.target.value)} disabled={!active || busy} />
           </label>
-          <button type="button" disabled={!active || busy || !result.trim()} onClick={() => void submit()}>{zh ? '送出共同結果' : 'Submit shared result'}</button>
+          <button type="button" disabled={!active || busy || !result.trim()} onClick={() => void submit()}>{zh ? uiText("送出共同結果") : "Submit shared response"}</button>
         </>}
       </>}
     </>}
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <p className="error" role="alert">{uiText(error)}</p>}
   </section>
 }

@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { DownloadSimple, Image, Link, Microphone, Paperclip, Pencil, PencilLine, Square, TextT, Trash } from '@phosphor-icons/react'
 import { BoardDrawing } from './BoardDrawing'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -330,7 +331,7 @@ export function ParticipantBoard({ locale, locked, participant, participantToken
       )}
       {!open && !locked && <p className="muted">{participantText(locale, 'boardClosed')}</p>}
       {open && !revealed && <p className="muted">{participantText(locale, 'boardYoursOnly')}</p>}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
 
       {open && !full && (
         <div className="board-composer">
@@ -785,7 +786,7 @@ function BoardRecorder({ busy, locale, onRecorded }: {
 
   return (
     <div className="board-composer-body board-recorder">
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
       {recording ? (
         <button className="is-recording" type="button" onClick={() => recorderRef.current?.stop()}>
           <Square size={16} />{participantText(locale, 'boardStop')} · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}

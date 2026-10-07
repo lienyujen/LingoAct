@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Brain, CaretLeft, CaretRight, CircleNotch, Eye, EyeSlash, FloppyDisk, Sparkle, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
@@ -7,7 +8,7 @@ import { ListeningPlayer } from '../components/ListeningPlayer'
 import { ReadingPassageView } from '../components/ReadingPassageView'
 import type { QuizReviewProps } from '../components/CustomQuizResult'
 import { getPresenterCredential } from '../lib/presenterAuth'
-import { PresenterLocaleContext, presenterLookup, storedPresenterLocale } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLookup, storedPresenterLocale } from '../lib/presenterI18n'
 import { requireSupabase } from '../lib/supabase'
 import type { PresenterQuizResults, WritingReviewSaveInput } from '../types'
 
@@ -252,7 +253,7 @@ export function CustomQuizReviewPage() {
   } : null
 
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
       <main className="custom-quiz-native-page">
         <header>
           <div>
@@ -261,7 +262,7 @@ export function CustomQuizReviewPage() {
           </div>
           <button aria-label={t('closeQuizWindow')} className="icon-button" title={t('close')} type="button" onClick={() => window.lingoActDesktop?.close()}><X size={24} /></button>
         </header>
-        {error && <p className="error custom-quiz-native-error">{error}</p>}
+        {error && <p className="error custom-quiz-native-error">{uiText(error)}</p>}
         {results?.quiz.interaction_mode ? <InteractionResults results={results} anonymousEnabled /> : results && pictureWriting ? (
           <div className="picture-writing-expanded picture-writing-native">
             <aside>
@@ -366,6 +367,6 @@ export function CustomQuizReviewPage() {
           </div>
         ) : !error ? <p className="muted custom-quiz-native-loading">{t('loadingQuizAndShot')}</p> : null}
       </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

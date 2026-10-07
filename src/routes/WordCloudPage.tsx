@@ -7,7 +7,7 @@ import { DanmakuTimeline } from '../components/DanmakuTimeline'
 import { currentBurst } from '../lib/danmakuBursts'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import type { Message, Session } from '../types'
-import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
 
 
 export function WordCloudPage() {
@@ -15,7 +15,7 @@ export function WordCloudPage() {
   const [session, setSession] = useState<Session | null>(null)
   // Its own window, so it reads the class's teaching language itself rather
   // than inheriting a provider from the presenter page.
-  const locale = presenterLocaleFor(session?.teaching_language)
+  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language)
   const t = presenterLookup(locale)
   const [messages, setMessages] = useState<Message[]>([])
   // The presenter's own words, kept on this computer beside the class lists. A
@@ -171,7 +171,7 @@ export function WordCloudPage() {
   )
 
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
     <main className="word-cloud-page">
       <header className="word-cloud-header">
         <div>
@@ -249,6 +249,6 @@ export function WordCloudPage() {
       )}
       <WordCloudCanvas customTerms={customTerms} messages={visibleMessages} />
     </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

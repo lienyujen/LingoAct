@@ -4,8 +4,13 @@ import { APP_PROFILE } from '../lib/appProfiles'
 import { TEACHING_TRACKS, resolveFramework, resolveTrack } from '../lib/teachingTracks'
 import { frameworkById } from '../lib/proficiency'
 import { usePresenterText } from '../lib/presenterI18n'
+import { isScProfile, useScSystemLanguage } from '../lib/scSystemLanguage'
+import { scFrameworkChoices } from '../lib/scTeachingMode'
+import type { ScSystemLanguage } from '../lib/scTeachingMode'
+import { uiText } from '../lib/uiText'
 
 type Props = {
+  systemLanguage?: ScSystemLanguage | null
   teachingTrack: string
   guidanceLanguage: string
   levelFramework: string
@@ -28,6 +33,7 @@ type Props = {
 // are offered and nothing else. Being shown every framework in the world beside
 // every audio clip was the mistake this replaces.
 export function LanguagePairFields({
+  systemLanguage: suppliedLanguage,
   teachingTrack,
   guidanceLanguage,
   levelFramework,
@@ -40,15 +46,17 @@ export function LanguagePairFields({
   onAnnotationChange,
 }: Props) {
   const t = usePresenterText()
+  const savedLanguage = useScSystemLanguage()
+  const systemLanguage = suppliedLanguage || savedLanguage
   const track = resolveTrack(teachingTrack)
   const activeId = resolveFramework(teachingTrack, levelFramework)
   const framework = frameworkById(activeId)
-  const choices = track.frameworks.map((id) => frameworkById(id)).filter(Boolean)
+  const choices = (isScProfile ? scFrameworkChoices(systemLanguage) : track.frameworks).map((id) => frameworkById(id)).filter(Boolean)
   const availableTracks = TEACHING_TRACKS.filter((option) => APP_PROFILE.allowedTracks.includes(option.id))
 
   return (
     <div className="language-pair">
-      {availableTracks.length > 1 && <div className="language-pair-field">
+      {!isScProfile && availableTracks.length > 1 && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainTeachingLanguage')}</span>
         <p className="language-pair-hint">{t('mainTeachingHint')}</p>
         <div className="language-pair-options">
@@ -60,8 +68,8 @@ export function LanguagePairFields({
               type="button"
               onClick={() => onTrackChange(option.id)}
             >
-              <strong>{option.label}</strong>
-              <small>{option.note}</small>
+              <strong>{uiText(option.label)}</strong>
+              <small>{uiText(option.note)}</small>
             </button>
           ))}
         </div>
@@ -80,7 +88,7 @@ export function LanguagePairFields({
                 onClick={() => onFrameworkChange(option!.id)}
               >
                 <strong>{option!.short}</strong>
-                <small>{option!.name}</small>
+                <small>{uiText(option!.name)}</small>
               </button>
             ))}
           </div>
@@ -91,17 +99,17 @@ export function LanguagePairFields({
         <div className="language-pair-field">
           <span className="language-pair-label">
             {t('levelLabel')}
-            {choices.length > 1 ? <em>{framework.name}</em> : <em>{t('levelFromTrack', { name: framework.name })}</em>}
+            {choices.length > 1 ? <em>{uiText(framework.name)}</em> : <em>{t('levelFromTrack', { name: uiText(framework.name) })}</em>}
           </span>
           <div className="language-pair-options">
-            <button
+            {activeId !== 'hsk' && <button
               aria-pressed={!levelCode}
               className={!levelCode ? 'language-chip selected' : 'language-chip'}
               type="button"
               onClick={() => onLevelChange('')}
             >
               <strong>{t('levelUnset')}</strong>
-            </button>
+            </button>}
             {framework.levels.map((level) => (
               <button
                 aria-pressed={levelCode === level.code}
@@ -110,7 +118,7 @@ export function LanguagePairFields({
                 type="button"
                 onClick={() => onLevelChange(level.code)}
               >
-                <strong>{level.label}</strong>
+                <strong>{uiText(level.label)}</strong>
               </button>
             ))}
           </div>
@@ -143,7 +151,7 @@ export function LanguagePairFields({
         </div>
       )}
 
-      <div className="language-pair-field">
+      {!isScProfile && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainGuidanceLanguage')}</span>
         <p className="language-pair-hint">{t('mainGuidanceHint')}</p>
         <div className="language-pair-options">
@@ -159,7 +167,7 @@ export function LanguagePairFields({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -113,7 +113,7 @@ export async function reviewWriting(input: {
   const systemPrompt = [
     RULES,
     trackInstruction(input.trackId),
-    levelInstruction(input.framework, input.levelCode),
+    levelInstruction(input.framework, input.levelCode, input.direction),
   ].join('\n\n')
 
   const result = await callAiJson(

@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { ArrowCounterClockwise, Microphone, StopCircle } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { recordingToWav } from '../lib/audio'
@@ -207,7 +208,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
               ? participantText(locale, 'preparing')
               : participantText(locale, prepareSeconds ? 'prepareStart' : 'startRecording')}</span>
       </button>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useRef, useState } from 'react'
 import { Camera, CircleNotch, DownloadSimple, FileArrowUp, PencilLine, Sparkle, UploadSimple } from '@phosphor-icons/react'
 import { BoardDrawing } from './BoardDrawing'
@@ -380,7 +381,7 @@ export function ParticipantFileUpload({
               : <p className="muted">{participantText(locale, 'uploadClosed')}</p>}
           </>
         )}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <MyUploadMarking
           locale={locale}
           participantId={participantId}
@@ -435,7 +436,7 @@ export function ParticipantFileUpload({
           />
         </>
       ) : <p className="muted">{participantText(locale, 'uploadClosed')}</p>}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
       <MyUploadMarking
         locale={locale}
         participantId={participantId}

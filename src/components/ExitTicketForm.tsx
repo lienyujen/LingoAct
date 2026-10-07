@@ -31,7 +31,7 @@ export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, local
   return (
     <section className="panel exit-ticket-panel">
       <div className="exit-ticket-heading">
-        <h2>Exit Ticket</h2>
+        <h2>Exit ticket</h2>
         <span>{participantText(locale, ({ lesson_summary: 'lessonSummary', learning_assessment: 'learningAssessment', course_satisfaction: 'courseSatisfaction', student_question: 'studentQuestion' } as const)[category])}</span>
       </div>
       {ticket ? (

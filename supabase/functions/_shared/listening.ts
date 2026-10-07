@@ -84,11 +84,13 @@ export function buildVoicePlan(
   speakerGenders: SpeakerGender[] = [],
   text = '',
 ): VoicePlan {
+  if (language === 'zh-cn') accentChoice = 'putonghua'
   const accent = accentFor(language, accentChoice)
-  const pronunciation = language.startsWith('zh') ? regionalPronunciationInstruction(text, accentChoice) : ''
-  let speechText = language.startsWith('zh') ? regionalSpeechText(text, accentChoice) : text
+  const pronunciation = language === 'zh-cn' ? 'Use standard Mainland Putonghua. Do not use Taiwan pronunciation or cross-strait vocabulary substitutions.'
+    : language.startsWith('zh') ? regionalPronunciationInstruction(text, accentChoice) : ''
+  let speechText = language.startsWith('zh') && language !== 'zh-cn' ? regionalSpeechText(text, accentChoice) : text
   if (kind === 'dialogue' && speakers.length >= 2) {
-    if (language.startsWith('zh')) {
+    if (language.startsWith('zh') && language !== 'zh-cn') {
       const labels = new Set(speakers.slice(0, 2).map((speaker) => speaker.trim()))
       // Pronunciation substitutes belong only to speech. Changing a name in
       // the silent label would stop it matching its assigned voice.

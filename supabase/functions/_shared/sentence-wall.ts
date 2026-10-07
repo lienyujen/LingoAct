@@ -68,7 +68,7 @@ export async function composeSentenceWall(input: {
   const systemPrompt = [
     RULES,
     trackInstruction(input.trackId),
-    levelInstruction(input.framework, input.levelCode),
+    levelInstruction(input.framework, input.levelCode, input.prompt),
   ].join('\n\n')
 
   const result = await callAiJson(

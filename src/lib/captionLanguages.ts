@@ -1,4 +1,5 @@
 export const CAPTION_LANGUAGES = [
+  { code: 'zh-cn', label: '简体中文' },
   { code: 'zh-tw', label: '繁體中文' },
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
@@ -16,7 +17,7 @@ export const CAPTION_LANGUAGES = [
 // while this was a general classroom tool; a tool for language teachers has to
 // let a Japanese or French class be the subject rather than the translation.
 export const TEACHING_LANGUAGES = CAPTION_LANGUAGES.filter((language) => (
-  ['zh-tw', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi'].includes(language.code)
+  ['zh-cn', 'zh-tw', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi'].includes(language.code)
 ))
 
 /** @deprecated Use TEACHING_LANGUAGES — the speaker is not the point, the subject is. */
@@ -27,7 +28,7 @@ export const SPEAKER_LANGUAGES = TEACHING_LANGUAGES
 export const SOURCE_CAPTION_LANGUAGE = 'source'
 
 export const CAPTION_DISPLAY_LANGUAGES = [
-  ...CAPTION_LANGUAGES.filter((language) => ['zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'].includes(language.code)),
+  ...CAPTION_LANGUAGES.filter((language) => ['zh-cn', 'zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'].includes(language.code)),
   // The only entry here that is a description rather than a language name, so
   // it is the only one the teacher's own locale has anything to say about.
   { code: SOURCE_CAPTION_LANGUAGE, label: '原始語言（不改寫用詞）', labelKey: 'captionSourceLanguage' },

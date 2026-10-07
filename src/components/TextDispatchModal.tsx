@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { Link, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -70,7 +71,7 @@ export function TextDispatchModal({ busy, error, initialBody = '', initialUrl = 
             onChange={(event) => setUrl(event.target.value)}
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>{t('cancel')}</button>
           <button disabled={busy || (!body.trim() && !url.trim())} type="submit">

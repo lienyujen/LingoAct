@@ -2,7 +2,7 @@ import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/a
 import { attachBoardUrls, BOARD_KINDS } from '../_shared/board.ts'
 const boardKinds = new Set<string>(BOARD_KINDS)
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
-import { levelInstruction } from '../_shared/proficiency.ts'
+import { dispatchLevelCode, levelInstruction } from '../_shared/proficiency.ts'
 import { describePictureSource, drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
 import { composeSentenceWall } from '../_shared/sentence-wall.ts'
 import { reviewWriting } from '../_shared/writing-review.ts'
@@ -34,10 +34,10 @@ function timingSeconds(value: unknown, max: number) {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 5 || value > max) return undefined
   return value
 }
-const speakerLanguages = new Set(['zh-tw', 'en'])
+const speakerLanguages = new Set(['zh-cn', 'zh-tw', 'en'])
 // 'source' is the presenter asking for the transcript unaltered.
-const captionDisplayLanguages = new Set(['zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr', 'source'])
-const interpretationLanguagesSupported = new Set(['zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'])
+const captionDisplayLanguages = new Set(['zh-cn', 'zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr', 'source'])
+const interpretationLanguagesSupported = new Set(['zh-cn', 'zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'])
 const questionTranslationSchema = {
   type: 'object',
   additionalProperties: false,
@@ -437,6 +437,22 @@ Deno.serve(async (req) => {
 
     if (action === 'update_session') {
       const values: Record<string, boolean | number | string | string[] | null> = {}
+      const { data: sessionMode, error: modeError } = await supabase.from('sessions')
+        .select('system_language, teaching_language, level_framework, level_code').eq('id', sessionId).single()
+      if (modeError) throw modeError
+      if (sessionMode.system_language) {
+        const allowed = sessionMode.system_language === 'zh-CN' ? ['hsk']
+          : sessionMode.system_language === 'zh-TW' ? ['tbcl', 'tocfl'] : ['hsk', 'tocfl', 'tbcl']
+        const framework = allowed.includes(input.levelFramework) ? input.levelFramework : sessionMode.level_framework
+        if (typeof input.teachingLanguage === 'string') {
+          input.teachingLanguage = framework === 'hsk' ? 'putonghua' : 'huayu'
+          input.levelFramework = framework
+          if (framework === 'hsk') input.readingAnnotation = 'pinyin'
+        }
+        input.guidanceLanguage = sessionMode.system_language
+      } else if (input.teachingLanguage === 'putonghua' || sessionMode.teaching_language === 'putonghua') {
+        input.readingAnnotation = 'pinyin'
+      }
       // The two axes a language class runs on. Rejected rather than ignored:
       // these pick the listening voice, the reading annotation and the
       // proficiency ladder, so a value silently dropped here would surface much
@@ -462,6 +478,12 @@ Deno.serve(async (req) => {
       if (typeof input.guidanceLanguage === 'string') {
         if (!guidanceLanguages.has(input.guidanceLanguage)) return jsonResponse({ message: '不支援這個導引語。' }, 400)
         values.guidance_language = input.guidanceLanguage
+      }
+      if ((values.level_framework || sessionMode.level_framework) === 'hsk') {
+        const code = 'level_code' in values ? values.level_code : sessionMode.level_code
+        if (typeof code !== 'string' || !/^(?:[1-6]|7-9)$/.test(code)) {
+          return jsonResponse({ message: '请选择 HSK 级别。 / Choose an HSK level.' }, 400)
+        }
       }
       if (typeof input.sentenceWallEnabled === 'boolean') values.sentence_wall_enabled = input.sentenceWallEnabled
       if (typeof input.danmakuEnabled === 'boolean') values.danmaku_enabled = input.danmakuEnabled
@@ -1140,7 +1162,7 @@ Deno.serve(async (req) => {
         .select('teaching_language, guidance_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
       const classInstruction = [
         trackInstruction(classRow?.teaching_language),
-        levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
+        levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null, direction),
       ].join('\n')
       // A quiz can be built from a screenshot or from a file the teacher shared;
       // the two differ only in where the source comes from and whether a
@@ -3100,6 +3122,8 @@ Deno.serve(async (req) => {
         .select('teaching_language, guidance_language, level_framework, level_code')
         .eq('id', sessionId).maybeSingle()
 
+      if (classRow) classRow.level_code = dispatchLevelCode(classRow.level_framework, classRow.level_code, direction)
+
       // The languages the annotations have to exist in: the two that are always
       // hand-written in the app, plus whatever this class's students can pick.
       const locales = [...new Set(['zh_tw', 'en', String(classRow?.guidance_language || 'en').toLowerCase().replace('-', '_')])]
@@ -3183,14 +3207,16 @@ Deno.serve(async (req) => {
         // because the passage is the readable version of it.
         share_screenshot: shareScreenshot,
         status: 'active',
-        title: passage.title || '閱讀',
-        prompt_text: withQuiz ? '讀完後回答下面的問題。' : '',
+        title: passage.title || (classRow?.level_framework === 'hsk' ? '阅读' : '閱讀'),
+        prompt_text: withQuiz ? (classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : '',
         options: [],
         allow_multiple: false,
       }).select('*').single()
       if (questionError) throw questionError
 
       const { data: passageRow, error: passageError } = await supabase.from('reading_passages').insert({
+        level_framework: classRow?.level_framework ?? null,
+        level_code: classRow?.level_code ?? null,
         session_id: sessionId,
         question_id: questionId,
         title: passage.title || null,

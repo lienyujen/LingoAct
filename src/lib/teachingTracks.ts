@@ -41,6 +41,10 @@ export type TeachingTrack = {
 
 export const TEACHING_TRACKS: TeachingTrack[] = [
   {
+    id: 'putonghua', label: '汉语', note: '第二语言・新版 HSK・普通话',
+    language: 'zh-cn', frameworks: ['hsk'], annotation: 'pinyin', annotationChoice: false,
+  },
+  {
     id: 'huayu',
     label: '華語文',
     note: '第二語言・TBCL・華測',

@@ -19,15 +19,15 @@ Deno.serve(async (req) => {
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const transcript = typeof input.transcript === 'string' ? input.transcript.trim() : ''
     const kind = KINDS.includes(input.kind) ? input.kind as ClipKind : 'passage'
-    const language = (typeof input.language === 'string' ? input.language : 'zh-tw').toLowerCase()
-    const accent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+    let language = (typeof input.language === 'string' ? input.language : 'zh-tw').toLowerCase()
+    let accent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
       ? input.accent as ChineseAccent
       : input.script === 'simplified' ? 'putonghua'
         : input.script === 'traditional' ? 'taiwanese' : null
     // Kept in the legacy script column so existing deployments need no schema
     // migration. Speech generation reads accent directly; this value is only a
     // durable marker for old presenter views.
-    const script: ChineseScript | null = accent === 'putonghua'
+    let script: ChineseScript | null = accent === 'putonghua'
       ? 'simplified'
       : accent === 'taiwanese' ? 'traditional' : null
     const screenshotId = typeof input.screenshotId === 'string' ? input.screenshotId : null
@@ -45,6 +45,9 @@ Deno.serve(async (req) => {
     if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
       return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
     }
+    const { data: classroom, error: classError } = await supabase.from('sessions').select('level_framework').eq('id', sessionId).single()
+    if (classError) throw classError
+    if (classroom.level_framework === 'hsk') { language = 'zh-cn'; accent = 'putonghua'; script = 'simplified' }
 
     // Asking for the same words twice is the common case: a teacher tweaks a
     // question, not the passage. Returning the clip already paid for keeps the

@@ -1,3 +1,4 @@
+import { uiText } from './lib/uiText'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { logDiagnostic } from './lib/diagnostics'
 
@@ -39,11 +40,11 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div style={{ background: '#fff', color: '#c0392b', padding: 16, fontSize: 13, fontFamily: 'monospace' }}>
-          <p>畫面發生錯誤：{this.state.error.message}</p>
-          {this.state.where && <p>發生在：{this.state.where}</p>}
+          <p>{uiText("畫面發生錯誤：")}{this.state.error.message}</p>
+          {this.state.where && <p>{uiText("發生在：")}{this.state.where}</p>}
           <p style={{ color: '#687386' }}>{window.location.hash || window.location.pathname}</p>
-          <button type="button" onClick={() => window.location.reload()}>重新載入畫面</button>
-          {window.lingoActDesktop && <button type="button" onClick={() => { void window.lingoActDesktop?.close() }}>關閉程式</button>}
+          <button type="button" onClick={() => window.location.reload()}>{uiText("重新載入畫面")}</button>
+          {window.lingoActDesktop && <button type="button" onClick={() => { void window.lingoActDesktop?.close() }}>{uiText("關閉程式")}</button>}
         </div>
       )
     }

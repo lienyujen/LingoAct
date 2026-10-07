@@ -4,9 +4,14 @@
 // supabase/functions/_shared/proficiency.ts and stays there: it is prompt
 // material, the client never needs it, and one copy cannot drift from itself.
 
-export type Framework = 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
 
 export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: { code: string; label: string }[] }[] = [
+  {
+    id: 'hsk', name: '汉语水平考试 HSK（新版大纲）', short: 'HSK',
+    levels: [1, 2, 3, 4, 5, 6].map((level) => ({ code: String(level), label: `HSK ${level}` }))
+      .concat([{ code: '7-9', label: 'HSK 7–9' }]),
+  },
   {
     // 國語文 under the 108 curriculum: 國語 in 國小, 國文 from 國中 up. The pupils
     // already speak the language, so what moves year to year is what they can
@@ -164,5 +169,6 @@ export function levelLabel(frameworkId: string | null, code: string | null) {
   if (framework.id === 'guoyu108' || framework.id === 'en108' || framework.id === 'toeic') return level.label
   if (framework.id === 'tbcl') return `TBCL ${level.label.split('・')[0]}`
   if (framework.id === 'tocfl') return `TOCFL ${level.label.split('・')[0]}`
+  if (framework.id === 'hsk') return level.label
   return `${framework.short} ${level.label}`
 }

@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { IconContext } from '@phosphor-icons/react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import '@fontsource-variable/noto-sans-sc'
+import '@fontsource-variable/noto-sans-tc'
 import App from './App.tsx'
 
 window.addEventListener('error', (event) => {

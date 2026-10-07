@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle, SpeakerHigh, SpinnerGap, XCircle } from '@phosphor-icons/react'
 import { participantText } from '../lib/participantI18n'
@@ -196,7 +197,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
             </span>
           </button>
         </div>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <div className="flashcard-review-controls">
           <button className="ghost-button" disabled={reviewIndex === 0} type="button" onClick={() => { setReviewIndex((value) => value - 1); setFlipped(false) }}>
             <ArrowLeft size={17} />{participantText(locale, 'flashcardPrevious')}
@@ -246,7 +247,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
           )
         })}
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
       {verdict && (
         <div className="flashcard-verdict">
           <p className={verdict.correct ? 'success' : 'muted'}>{participantText(locale, verdict.correct ? 'flashcardRight' : 'flashcardWrong')}</p>

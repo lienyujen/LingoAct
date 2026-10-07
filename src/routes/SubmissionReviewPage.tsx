@@ -1,10 +1,11 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CaretLeft, CaretRight, PencilSimpleLine, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
 import { isImageFile } from '../lib/fileKinds'
 import { FileTypeIcon } from '../components/FileTypeIcon'
 import { getPresenterToken } from '../lib/presenterAuth'
-import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
 import { requireSupabase } from '../lib/supabase'
 import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import type { FileResponse, Question } from '../types'
@@ -45,7 +46,7 @@ export function SubmissionReviewPage() {
     }
     const supabase = requireSupabase()
     const [{ data: sessionRow }, { data: questionRow }, { data, error: loadError }] = await Promise.all([
-      supabase.from('sessions').select('teaching_language').eq('id', sessionId).maybeSingle(),
+      supabase.from('sessions').select('system_language, teaching_language').eq('id', sessionId).maybeSingle(),
       supabase.from('questions').select('*').eq('id', questionId).maybeSingle(),
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_file_responses', sessionId, presenterToken, questionId },
@@ -55,7 +56,7 @@ export function SubmissionReviewPage() {
       setError(data?.message || t('reviewLoadFailed'))
       return
     }
-    setLocale(presenterLocaleFor((sessionRow as { teaching_language?: string } | null)?.teaching_language || null))
+    setLocale(presenterLocaleFor(sessionRow?.teaching_language || null, sessionRow?.system_language))
     if (questionRow) setQuestion(questionRow as Question)
     setRawResponses((data?.responses || []) as FileResponse[])
     setError('')
@@ -121,7 +122,7 @@ export function SubmissionReviewPage() {
   const analysis = current?.analysis || null
 
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
     <main className="submission-review-window">
       <header>
         <div>
@@ -137,7 +138,7 @@ export function SubmissionReviewPage() {
         </button>
       </header>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
       {!error && !total && <p className="muted">{t('reviewNothingYet')}</p>}
 
       {current && (
@@ -230,6 +231,6 @@ export function SubmissionReviewPage() {
         </nav>
       )}
     </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

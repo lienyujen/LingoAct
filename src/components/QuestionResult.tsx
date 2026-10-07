@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { ArrowCounterClockwise, ArrowsOut, CaretLeft, CaretRight, CheckCircle, CircleNotch, DiceFive, DownloadSimple, Eye, EyeSlash, Faders, FileArrowUp, Play, Sparkle, Square, Waveform, X, XSquare } from '@phosphor-icons/react'
 import { createPortal } from 'react-dom'
 import { BoardWall } from './BoardWall'
@@ -191,7 +192,7 @@ function AiAnalysisPanel({
             : t('allMarkedNote')}
         </p>
       )}
-      {analysisError && <p className="error">{analysisError}</p>}
+      {analysisError && <p className="error">{uiText(analysisError)}</p>}
       {analysis && (
         <div className="analysis-content">
           <section>
@@ -419,7 +420,7 @@ function UploadResults({
           {zipping ? t('zipping', { done: zipDone, total: totalFiles }) : t('downloadAll', { n: totalFiles })}
         </button>
       </div>
-      {zipError && <p className="error">{zipError}</p>}
+      {zipError && <p className="error">{uiText(zipError)}</p>}
       <ul className="file-list upload-answer-list">
         {submissions.map((files, index) => {
           const lead = files[0]
@@ -693,7 +694,7 @@ function BoardResults(props: Props & { question: Question }) {
         {t('boardTally', { cards: cards.filter((post) => !post.deleted_at).length, people: contributors })}
         {maxPosts === null ? t('boardCapNone') : t('boardCapSome', { n: maxPosts })}
       </p>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
 
       <div className="board-results-actions">
         {/* Both ways. A presenter may want the class to think alone and then

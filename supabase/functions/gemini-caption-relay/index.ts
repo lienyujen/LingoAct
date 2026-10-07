@@ -13,6 +13,7 @@ const LIVE_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativ
 // Matches the caption languages the app offers. Traditional Chinese is spelled
 // out because the model otherwise answers in Simplified.
 const languageNames: Record<string, string> = {
+  'zh-cn': 'Simplified Chinese as written in Mainland China (规范简体中文，标准普通话，用词不转换为台湾词汇)',
   'zh-tw': 'Traditional Chinese as written in Taiwan (臺灣正體, never Simplified characters)',
   en: 'English',
   es: 'Spanish',
@@ -29,6 +30,7 @@ const languageNames: Record<string, string> = {
 // left to detect the language itself the model answers in Simplified, which is
 // wrong for a Taiwanese classroom.
 const bcp47: Record<string, string> = {
+  'zh-cn': 'cmn-Hans-CN',
   'zh-tw': 'cmn-Hant-TW',
   en: 'en-US',
   es: 'es-ES',

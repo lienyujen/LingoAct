@@ -1,8 +1,9 @@
 import { corsHeaders, errorDetail, geminiThinkingConfig, jsonResponse, requestGemini } from '../_shared/ai.ts'
-import { levelInstruction, resolveLevel, tbclLevelOf } from '../_shared/proficiency.ts'
+import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from '../_shared/proficiency.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from '../_shared/tbcl-check.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { resolveTrack, trackInstruction } from '../_shared/teaching.ts'
+import { hskLevelOf, hskOverLevelWords, hskOverLevelComplaint } from '../_shared/hsk.ts'
 
 // Reading the teacher's source and shaping it for this particular class.
 //
@@ -43,18 +44,24 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const screenshotId = typeof input.screenshotId === 'string' ? input.screenshotId : ''
-    const teachingTrack = typeof input.teachingTrack === 'string' ? input.teachingTrack : 'huayu'
+    let teachingTrack = typeof input.teachingTrack === 'string' ? input.teachingTrack : 'huayu'
     const requestedKind = input.requestedKind === 'dialogue' ? 'dialogue' : 'passage'
-    const levelFramework = typeof input.levelFramework === 'string' ? input.levelFramework : null
-    const levelCode = typeof input.levelCode === 'string' ? input.levelCode : null
-    const track = resolveTrack(teachingTrack)
-    const resolvedLevel = resolveLevel(levelFramework, levelCode)
+    let levelFramework = typeof input.levelFramework === 'string' ? input.levelFramework : null
+    let levelCode = typeof input.levelCode === 'string' ? input.levelCode : null
     if (!sessionId || !screenshotId) return jsonResponse({ message: '缺少辨識所需資料。' }, 400)
 
     const supabase = getAdminClient()
     if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
       return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
     }
+    const { data: classroom, error: classError } = await supabase.from('sessions')
+      .select('teaching_language, level_framework, level_code').eq('id', sessionId).single()
+    if (classError) throw classError
+    teachingTrack = classroom.teaching_language
+    levelFramework = classroom.level_framework
+    levelCode = dispatchLevelCode(levelFramework, classroom.level_code, typeof input.direction === 'string' ? input.direction : '')
+    const track = resolveTrack(teachingTrack)
+    const resolvedLevel = resolveLevel(levelFramework, levelCode)
 
     const { data: screenshot } = await supabase
       .from('screenshots')
@@ -118,10 +125,13 @@ Deno.serve(async (req) => {
     // loop the reading passage runs. Material students only hear is the case
     // where an unmet word does the most damage, because there is nothing on
     // screen to work it out from.
-    const tbcl = tbclLevelOf(levelFramework, levelCode)
+    const hsk = levelFramework === 'hsk'
+    const tbcl = hsk ? hskLevelOf(levelFramework, levelCode) : tbclLevelOf(levelFramework, levelCode)
+    const checkVocabulary = hsk ? hskOverLevelWords : overLevelWords
+    const vocabularyComplaint = hsk ? hskOverLevelComplaint : overLevelComplaint
     const ceiling = tbcl ? ceilingFor(tbcl, 0) : 0
     if (ceiling && resolvedLevel) {
-      const above = overLevelWords(transcript, ceiling)
+      const above = checkVocabulary(transcript, ceiling)
       if (above.length > 3) {
         console.warn(`Listening material used ${above.length} words above ${resolvedLevel.level.label}: ${above.slice(0, 12).map((entry) => entry.word).join(' ')}`)
         try {
@@ -130,7 +140,7 @@ Deno.serve(async (req) => {
               systemInstruction: {
                 parts: [
                   { text: instruction },
-                  { text: overLevelComplaint(above, resolvedLevel.level.label, ceiling) },
+                  { text: vocabularyComplaint(above, resolvedLevel.level.label, ceiling) },
                 ],
               },
               contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: image } }] }],
@@ -148,7 +158,7 @@ Deno.serve(async (req) => {
           const retriedText = (retried?.transcript || '').trim()
           // Kept only if it is actually better. A retry that traded one set of
           // hard words for another is not worth the wait or the call.
-          if (retriedText && overLevelWords(retriedText, ceiling).length < above.length) {
+          if (retriedText && checkVocabulary(retriedText, ceiling).length < above.length) {
             transcript = retriedText
             result = retried as typeof result
           }

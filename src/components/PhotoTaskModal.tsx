@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { Camera, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import { usePresenterText } from '../lib/presenterI18n'
@@ -52,7 +53,7 @@ export function PhotoTaskModal({ busy, error, open, onCancel, onOpen, initialPro
           />
         </label>
         <p className="muted photo-task-hint">{t('photoTaskHint')}</p>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>{t('cancel')}</button>
           <button disabled={busy || !promptText.trim()} type="submit">

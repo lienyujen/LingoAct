@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useState } from 'react'
 import { CheckCircle, ChatCircleDots, CircleNotch, Question, WarningCircle } from '@phosphor-icons/react'
 import { participantText } from '../lib/participantI18n'
@@ -80,7 +81,7 @@ export function WritingCoachPanel({ turns, draft, locale, maxRounds, onAsk }: Pr
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
 
       <button
         className="coach-ask"

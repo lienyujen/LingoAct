@@ -34,6 +34,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - label: Windows SC
+            os: windows-latest
+            profile: sc
+            product: LingoAct
+            target: --win zip --x64
+            artifact: LingoAct.zip
+          - label: macOS SC
+            os: macos-latest
+            profile: sc
+            product: LingoAct
+            target: --mac dmg --universal
+            artifact: LingoAct.dmg
           - label: Windows Huayu
             os: windows-latest
             profile: huayu
@@ -208,6 +220,7 @@ jobs:
 
           | 版本 | Windows | macOS |
           |---|---|---|
+          | LingoAct（HSK／TOCFL／TBCL，多语言界面） | `LingoAct.zip` | `LingoAct.dmg` |
           | 華語教學版（TBCL／TOCFL、注音／拼音） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
           | 全美中文學校聯合總會版 | `LingoAct-NCACLS.zip` | `LingoAct-NCACLS.dmg` |
 

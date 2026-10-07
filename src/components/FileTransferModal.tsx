@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { DragEvent } from 'react'
@@ -141,7 +142,7 @@ export function FileTransferModal({
           </button>
         </div>
 
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
 
         {tab === 'share' ? (
           <div className="file-transfer-body">

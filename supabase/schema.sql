@@ -798,8 +798,11 @@ alter table public.sessions drop constraint if exists sessions_level_framework_c
 alter table public.sessions
   add constraint sessions_level_framework_check
   check (level_framework is null or level_framework in (
-    'tbcl', 'tocfl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'topik', 'ivpt'
+    'hsk', 'tbcl', 'tocfl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'topik', 'ivpt'
   ));
+
+alter table public.sessions add column if not exists system_language text null
+  check (system_language is null or system_language in ('zh-CN', 'zh-TW', 'en'));
 
 -- 注音 or 拼音, where that is a real question: fixed for 國語, chosen by a
 -- 華語文 teacher whose class may come from either, irrelevant to the rest.
@@ -20275,6 +20278,8 @@ create table if not exists public.reading_passages (
 
 -- For projects deployed before the readings were put on the passage itself.
 alter table public.reading_passages
+  add column if not exists level_framework text null,
+  add column if not exists level_code text null,
   add column if not exists words jsonb not null default '[]'::jsonb,
   add column if not exists annotation text not null default 'none',
   add column if not exists annotation_text text null,

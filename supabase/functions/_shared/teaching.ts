@@ -46,6 +46,11 @@ export type TeachingTrack = {
 }
 
 export const TEACHING_TRACKS: Record<string, TeachingTrack> = {
+  putonghua: {
+    id: 'putonghua', frameworks: ['hsk'], language: 'zh-cn',
+    promptLanguage: 'Simplified Chinese as written in Mainland China (中国大陆规范简体中文)',
+    audience: 'The learners study Chinese as a second or foreign language using the latest HSK syllabus. Use standard Mainland Putonghua pronunciation, Hanyu Pinyin orthography and Mainland vocabulary. Never use Taiwan regional pronunciation, cross-strait substitutions, traditional characters or Bopomofo. Vocabulary and grammar must follow the official HSK syllabus, not TBCL or TOCFL.',
+  },
   huayu: {
     id: 'huayu',
     // TBCL is the benchmark the teaching is written against; TOCFL is the test

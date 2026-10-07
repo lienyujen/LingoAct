@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsOut, Brain, Check, CircleNotch, Clock, FloppyDisk, Play, Plus, Sparkle, Square, Trash, X } from '@phosphor-icons/react'
@@ -394,7 +395,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
     </div></div>
     <InteractionResults results={results} anonymousEnabled={anonymousEnabled} />
     {expanded && createPortal(<div className="modal-backdrop"><div className="modal"><button type="button" onClick={() => setExpanded(false)}>{t('close')}</button><InteractionResults results={results} anonymousEnabled={anonymousEnabled} /></div></div>, document.body)}
-    {error && <p className="error">{error}</p>}
+    {error && <p className="error">{uiText(error)}</p>}
   </section>
   return (
     <section className="panel result-panel custom-quiz-result">
@@ -433,7 +434,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
           {t('showAnswersToggle')}
         </label>
       )}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
       {!flashcard && !pictureWriting && <div className="presenter-quiz-inline-review"><QuizAnswerEditor {...reviewProps} /></div>}
       {/* The deck the AI produced is a first draft; the teacher is the one who
           knows which words this class actually needs. Removing is immediate,
@@ -462,7 +463,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
           </div>
         </div>
       )}
-      {deckError && <p className="error">{deckError}</p>}
+      {deckError && <p className="error">{uiText(deckError)}</p>}
       {flashcard && (
         <div className="flashcard-card-list">
           {[...results.items]
@@ -705,7 +706,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                     {t('showAnswersToggle')}
                   </label>
                 )}
-                {error && <p className="error">{error}</p>}
+                {error && <p className="error">{uiText(error)}</p>}
                 <QuizAnswerEditor {...reviewProps} />
               </div>
             </div>}

@@ -1,4 +1,6 @@
+import { uiText } from '../lib/uiText'
 import { useState } from 'react'
+import { SystemLanguageSelector } from './SystemLanguageSelector'
 import { ArrowSquareOut, CheckCircle, CircleDashed, CircleNotch, FloppyDisk, HardDrives, Key, Rocket, XCircle } from '@phosphor-icons/react'
 import { backendConfig, clearBackendConfig, requireSupabase, saveBackendConfig, testBackendConfig } from '../lib/supabase'
 import { canDeployBackend, checkToken, deployableFunctions, deployFunction, runSchema, setOwnerKey, setSecrets, verifyBackend, verifyPublicAccess } from '../lib/backendDeploy'
@@ -214,35 +216,32 @@ export function BackendSetup({ onCancel }: Props) {
 
   const panel = (
     <section className="panel backend-setup">
+        <SystemLanguageSelector />
         <span className="form-heading-icon"><HardDrives size={24} /></span>
-        <h1>{embedded ? '系統設定' : '連接你的 Supabase 專案'}</h1>
+        <h1>{embedded ? uiText("系統設定") : uiText("連接你的 Supabase 專案")}</h1>
         <p className="muted">
-          LingoAct 使用你自己的 Supabase 專案存放課堂資料，資料不會經過其他人。
-          填入專案資訊後即可開始使用。
-        </p>
-        {window.lingoActDesktop?.portableBackend?.enabled && <p className="notice">隨身設定已啟用：公開連線設定會儲存在程式同資料夾的 .env，搬移整個資料夾即可沿用。</p>}
+          {uiText("LingoAct 使用你自己的 Supabase 專案存放課堂資料，資料不會經過其他人。 填入專案資訊後即可開始使用。")}</p>
+        {window.lingoActDesktop?.portableBackend?.enabled && <p className="notice">{uiText("隨身設定已啟用：公開連線設定會儲存在程式同資料夾的 .env，搬移整個資料夾即可沿用。")}</p>}
         {/* The way out for someone who has no project at all. Until now the only
             link to Supabase sat inside the collapsed 自動部署 section further
             down, which is closed on arrival — so this screen asked for a
             Project ID and said nothing about where one comes from. */}
         <p className="muted">
-          還沒有 Supabase 專案？到 <a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
+          {uiText("還沒有 Supabase 專案？到 ")}<a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
             Supabase <ArrowSquareOut size={12} />
-          </a> 註冊並免費建立一個，再回來填入下面兩欄。
-        </p>
+          </a> {uiText("註冊並免費建立一個，再回來填入下面兩欄。")}</p>
 
         <label>
-          專案識別碼或網址
-          <input
+          {uiText("專案識別碼或網址")}<input
             autoFocus
-            placeholder="abcdefghijklmnopqrst 或 https://abcdefghijklmnopqrst.supabase.co"
+            placeholder={uiText("abcdefghijklmnopqrst 或 https://abcdefghijklmnopqrst.supabase.co")}
             value={ref}
             onChange={(event) => { setRef(event.target.value); setTested(false) }}
           />
         </label>
         <p className="field-hint">
           <a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
-            Supabase 後台 <ArrowSquareOut size={11} />
+            {uiText("Supabase 後台 ")}<ArrowSquareOut size={11} />
           </a> → Project Settings → General → Project ID
         </p>
 
@@ -256,76 +255,67 @@ export function BackendSetup({ onCancel }: Props) {
         </label>
         <p className="field-hint">
           <a href="https://supabase.com/dashboard/projects" rel="noreferrer" target="_blank">
-            Supabase 後台 <ArrowSquareOut size={11} />
-          </a> → Project Settings → API Keys。這把金鑰設計上就是公開的，由資料庫權限規則保護；
-          <strong>請不要填 service_role 或 secret key</strong>。
+            {uiText("Supabase 後台 ")}<ArrowSquareOut size={11} />
+          </a> {uiText("→ Project Settings → API Keys。這把金鑰設計上就是公開的，由資料庫權限規則保護；")}<strong>{uiText("請不要填 service_role 或 secret key")}</strong>。
         </p>
 
         <label>
-          學員端網址（選填）
-          <input
-            placeholder="不填則使用共用學員端"
+          {uiText("學員端網址（選填）")}<input
+            placeholder={uiText("不填則使用共用學員端")}
             value={appUrl}
             onChange={(event) => setAppUrl(event.target.value)}
           />
         </label>
         <p className="field-hint">
-          留空即可 —— QR Code 會指向共用學員端，並自動帶上你的專案，學生資料仍然只進你的 Supabase。
-          商業使用者請自行託管並填入自己的網址。
-        </p>
+          {uiText("留空即可 —— QR Code 會指向共用學員端，並自動帶上你的專案，學生資料仍然只進你的 Supabase。 商業使用者請自行託管並填入自己的網址。")}</p>
 
         {/* What separates this machine from any other holding the same publishable
             key. Shown rather than hidden: the presenter has to carry it to their
             other computers, and knowing its value is how they notice it is
             missing on one. */}
         <label>
-          管理金鑰
-          <input
-            placeholder="部署時自動產生，或貼上另一台電腦的金鑰"
+          {uiText("管理金鑰")}<input
+            placeholder={uiText("部署時自動產生，或貼上另一台電腦的金鑰")}
             value={ownerKey}
             onChange={(event) => { setOwnerKeyState(event.target.value); setOwnerNotice('') }}
             onBlur={() => void checkOwnerKey(ownerKey)}
           />
         </label>
         <p className="field-hint">
-          開課與管理場次都需要它，學生端不需要。換一台電腦時貼上同一組即可。
-          {ownerKey && (
+          {uiText("開課與管理場次都需要它，學生端不需要。換一台電腦時貼上同一組即可。")}{ownerKey && (
             <>
               {' '}
               <button className="link-button" type="button" onClick={() => { void navigator.clipboard?.writeText(ownerKey); setOwnerNotice('已複製。') }}>
-                複製
-              </button>
+                {uiText("複製")}</button>
             </>
           )}
         </p>
-        {ownerNotice && <p className="success"><CheckCircle size={15} /> {ownerNotice}</p>}
+        {ownerNotice && <p className="success"><CheckCircle size={15} /> {uiText(ownerNotice)}</p>}
 
-        {error && <p className="error">{error}</p>}
-        {notice && <p className="success"><CheckCircle size={15} /> {notice}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
+        {notice && <p className="success"><CheckCircle size={15} /> {uiText(notice)}</p>}
 
         <div className="backend-setup-actions">
           <button className="ghost-button" disabled={testing} type="button" onClick={() => void runTest()}>
             {testing ? <CircleNotch className="spin" size={17} /> : <Key size={17} />}
-            {testing ? '測試中...' : '測試連線'}
+            {testing ? uiText("測試中...") : uiText("測試連線")}
           </button>
           <button disabled={testing} type="button" onClick={save}>
-            <FloppyDisk size={17} />{tested ? '儲存並開始使用' : '直接儲存'}
+            <FloppyDisk size={17} />{tested ? uiText("儲存並開始使用") : uiText("直接儲存")}
           </button>
         </div>
 
         <details className="backend-setup-help">
-          <summary>還沒建立後端？讓 LingoAct 幫你部署</summary>
+          <summary>{uiText("還沒建立後端？讓 LingoAct 幫你部署")}</summary>
           <p className="muted">
-            在 <a href="https://supabase.com/dashboard" rel="noreferrer" target="_blank">
-              Supabase 後台 <ArrowSquareOut size={12} />
-            </a> 免費建立專案後，到 <a href="https://supabase.com/dashboard/account/tokens" rel="noreferrer" target="_blank">
+            {uiText("在 ")}<a href="https://supabase.com/dashboard" rel="noreferrer" target="_blank">
+              {uiText("Supabase 後台 ")}<ArrowSquareOut size={12} />
+            </a> {uiText("免費建立專案後，到 ")}<a href="https://supabase.com/dashboard/account/tokens" rel="noreferrer" target="_blank">
               Access Tokens <ArrowSquareOut size={12} />
-            </a> 產生一組權杖貼在下方，LingoAct 會自動建立資料表、部署後端函式並設定金鑰。
-          </p>
+            </a> {uiText("產生一組權杖貼在下方，LingoAct 會自動建立資料表、部署後端函式並設定金鑰。")}</p>
 
           <label>
-            Supabase 存取權杖
-            <input
+            {uiText("Supabase 存取權杖")}<input
               placeholder="sbp_..."
               type="password"
               value={token}
@@ -333,46 +323,39 @@ export function BackendSetup({ onCancel }: Props) {
             />
           </label>
           <p className="field-hint">
-            建議建立 fine-grained token 並只勾選這個專案的 <strong>Edge Functions 寫入</strong>與<strong>資料庫查詢</strong>權限。
-            權杖只在部署當下使用，不會被儲存。
-          </p>
+            {uiText("建議建立 fine-grained token 並只勾選這個專案的 ")}<strong>{uiText("Edge Functions 寫入")}</strong>{uiText("與")}<strong>{uiText("資料庫查詢")}</strong>{uiText("權限。 權杖只在部署當下使用，不會被儲存。")}</p>
 
           <label>
             Gemini API key
-            <input placeholder="AI 分析用" type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} />
+            <input placeholder={uiText("AI 分析用")} type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} />
           </label>
           <p className="field-hint">
-            課堂報告、題目分析與測驗批改都需要它。前往 <a href="https://aistudio.google.com/apikey" rel="noreferrer" target="_blank">
+            {uiText("課堂報告、題目分析與測驗批改都需要它。前往 ")}<a href="https://aistudio.google.com/apikey" rel="noreferrer" target="_blank">
               Google AI Studio <ArrowSquareOut size={12} />
-            </a> 免費建立，有免費額度可用。
-          </p>
+            </a> {uiText("免費建立，有免費額度可用。")}</p>
 
           <label>
-            OpenAI API key（選填）
-            <input placeholder="即時字幕與同步口譯" type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} />
+            {uiText("OpenAI API key（選填）")}<input placeholder={uiText("即時字幕與同步口譯")} type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} />
           </label>
           <p className="field-hint">
-            如需使用即時口譯與多語字幕才要填。前往 <a href="https://platform.openai.com/api-keys" rel="noreferrer" target="_blank">
+            {uiText("如需使用即時口譯與多語字幕才要填。前往 ")}<a href="https://platform.openai.com/api-keys" rel="noreferrer" target="_blank">
               OpenAI Platform <ArrowSquareOut size={12} />
-            </a> 取得。<strong>依音訊時長計費</strong>，每種口譯語言各建立一條連線，需付費帳號且用量等級要足夠。
-          </p>
+            </a> {uiText("取得。")}<strong>{uiText("依音訊時長計費")}</strong>{uiText("，每種口譯語言各建立一條連線，需付費帳號且用量等級要足夠。")}</p>
 
           <label>
-            Reurl API key（選填）
-            <input placeholder="QR Code 短網址" type="password" value={reurlKey} onChange={(e) => setReurlKey(e.target.value)} />
+            {uiText("Reurl API key（選填）")}<input placeholder={uiText("QR Code 短網址")} type="password" value={reurlKey} onChange={(e) => setReurlKey(e.target.value)} />
           </label>
           <p className="field-hint">
-            讓 QR Code 的網址變短、比較好掃。前往 <a href="https://reurl.cc" rel="noreferrer" target="_blank">
+            {uiText("讓 QR Code 的網址變短、比較好掃。前往 ")}<a href="https://reurl.cc" rel="noreferrer" target="_blank">
               reurl.cc <ArrowSquareOut size={12} />
-            </a> 免費註冊並取得縮網址 API key。不填也能用，只是網址較長。
-          </p>
+            </a> {uiText("免費註冊並取得縮網址 API key。不填也能用，只是網址較長。")}</p>
 
           <button className="backend-deploy-button" disabled={deploying || !canDeployBackend} type="button" onClick={() => void deployBackend()}>
             {deploying ? <CircleNotch className="spin" size={17} /> : <Rocket size={17} />}
-            {deploying ? '部署中...' : '開始自動部署'}
+            {deploying ? uiText("部署中...") : uiText("開始自動部署")}
           </button>
 
-          {!canDeployBackend && <p className="field-hint">自動部署只能在 LingoAct 桌面版使用。</p>}
+          {!canDeployBackend && <p className="field-hint">{uiText("自動部署只能在 LingoAct 桌面版使用。")}</p>}
 
           {steps.length > 0 && (
             <ul className="deploy-steps">
@@ -389,16 +372,15 @@ export function BackendSetup({ onCancel }: Props) {
             </ul>
           )}
           <button className="danger-ghost-button" disabled={deploying} type="button" onClick={() => void regenerateOwnerKey()}>
-            <Key size={17} />重新產生管理金鑰（切斷其他電腦）
-          </button>
+            <Key size={17} />{uiText("重新產生管理金鑰（切斷其他電腦）")}</button>
         </details>
 
         <div className="backend-setup-footer">
           {backendConfig && (
-            <button className="danger-ghost-button" type="button" onClick={reset}>清除設定</button>
+            <button className="danger-ghost-button" type="button" onClick={reset}>{uiText("清除設定")}</button>
           )}
           {onCancel && (
-            <button className="ghost-button" type="button" onClick={onCancel}>取消</button>
+            <button className="ghost-button" type="button" onClick={onCancel}>{uiText("取消")}</button>
           )}
         </div>
     </section>

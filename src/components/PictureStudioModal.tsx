@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { ArrowsClockwise, CardsThree, Crop, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
 import { TimingRow } from './TimingRow'
@@ -334,7 +335,7 @@ export function PictureStudioModal({
             </>
           )}
 
-          {error && <p className="ps-error">{error}</p>}
+          {error && <p className="ps-error">{uiText(error)}</p>}
         </div>
 
         <footer className="ps-foot">

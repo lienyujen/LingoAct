@@ -17,17 +17,17 @@ const zh = {
   responses: '查看回答', classroom: '教室',
 } as const
 const en: Record<keyof typeof zh, string> = {
-  activities: 'Start activity', current: 'Current activity', history: 'Class record',
-  choose: 'What will students practise?', listen: 'Listen', speak: 'Speak', read: 'Read', write: 'Write',
-  tools: 'Class tools', wrap: 'Wrap up',
-  orDispatch: 'or:', fromImage: 'from a picture', noBackdrop: 'no backdrop',
-  listenHint: 'Listen, practise aloud, and check it was understood',
-  speakHint: 'From reading aloud to speaking for themselves',
-  readHint: 'Words, sentences, and the order they belong in',
+  activities: 'Start an activity', current: 'Current activity', history: 'Class history',
+  choose: 'What should students practice?', listen: 'Listening', speak: 'Speaking', read: 'Reading', write: 'Writing',
+  tools: 'Classroom tools', wrap: 'Wrap up and reflect',
+  orDispatch: 'Or:', fromImage: 'Use an image', noBackdrop: 'Use a blank canvas',
+  listenHint: 'Listen, practice aloud, and check understanding',
+  speakHint: 'Build confidence, from reading aloud to speaking independently',
+  readHint: 'Understand vocabulary, sentences, and text structure',
   writeHint: 'From one sentence to a whole paragraph',
   currentEmpty: 'Choose a practice activity to get started.', historyEmpty: 'Earlier activities and student responses will appear here.',
   openControls: 'Open teaching panel', hideControls: 'Collapse teaching panel', showJoin: 'Show join QR code',
-  next: 'Start next activity', timing: 'Timing (optional)', source: 'How should students practise this material?',
+  next: 'Start next activity', timing: 'Time limits (optional)', source: 'How should students practice with this material?',
   responses: 'View responses', classroom: 'Classroom',
 }
 

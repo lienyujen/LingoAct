@@ -127,7 +127,7 @@ export async function describePictureSource(input: {
   const systemPrompt = [
     DESCRIBE_RULES,
     trackInstruction(input.trackId),
-    levelInstruction(input.framework, input.levelCode),
+    levelInstruction(input.framework, input.levelCode, input.direction),
   ].join('\n\n')
 
   const result = await callAiJson(
@@ -167,7 +167,7 @@ export async function planPictureStory(input: {
   const systemPrompt = [
     STORYBOARD_RULES,
     trackInstruction(input.trackId),
-    levelInstruction(input.framework, input.levelCode),
+    levelInstruction(input.framework, input.levelCode, input.direction),
   ].join('\n\n')
 
   const result = await callAiJson(

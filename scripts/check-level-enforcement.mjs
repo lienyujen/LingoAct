@@ -25,7 +25,6 @@ const ROOT = 'supabase/functions'
 const EXEMPT = {
   '_shared/ai.ts': 'the transport itself — it carries prompts, it does not write them',
   '_shared/listening.ts': 'text-to-speech and karaoke timings; the words are decided before it is called',
-  '_shared/custom-quiz.ts': 'takes the level from its caller as extraInstruction, and every caller is checked below',
   '_shared/file-analysis.ts': 'marks against the level its caller supplies as classInstruction; presenter-action builds it for every submission',
   '_shared/audio-analysis.ts': 'scores against the level its caller supplies as classInstruction; participant-action builds it for every recording',
   'annotate-reading/index.ts': 'decides how a character is pronounced, which is the same at every level',

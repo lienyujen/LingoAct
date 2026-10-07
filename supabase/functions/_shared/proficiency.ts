@@ -6,7 +6,9 @@
 // for listening, reading and writing, so rendering them as "A1" would silently
 // ask for material too hard for the very learners who need it easiest.
 
-export type Framework = 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
+import { HSK_GRAMMAR } from './hsk.ts'
+
+export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
 
 export type Level = {
   code: string
@@ -71,6 +73,16 @@ const SOURCE_ABOVE_LEVEL = [
 const STAY_AT_LEVEL = 'Do not aim below the level either: at the upper levels an item that merely locates a fact in the passage is too easy to be worth asking, however correct it is.'
 
 export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels: Level[]; unit: 'char' | 'word' }> = {
+  hsk: {
+    name: '汉语水平考试 HSK（2025 年新版大纲）', unit: 'char',
+    note: 'Use the official HSK syllabus published by the Center for Language Education and Cooperation in November 2025. Its vocabulary, character and grammar tables govern this class. HSK 7–9 is one combined syllabus band; do not invent separate official lists for levels 7, 8 and 9. Use simplified Chinese, Mainland vocabulary and standard Putonghua with Hanyu Pinyin. Never substitute TBCL, TOCFL or Taiwan pronunciation standards. Question length limits here are product guidance, not official HSK exam limits.',
+    levels: [300, 500, 1000, 2000, 3600, 5400, 11000].map((words, index) => ({
+      code: index === 6 ? '7-9' : String(index + 1),
+      label: `HSK ${index === 6 ? '7–9' : index + 1}`, band: Math.min(6, index + 1),
+      maxStem: [20, 26, 32, 40, 50, 60, 75][index],
+      ceiling: `The official cumulative vocabulary is ${words} entries. Use vocabulary, characters and grammar at this syllabus band or below. At elementary levels use concrete everyday contexts and short sentences; at advanced levels require inference, evaluation and discourse understanding. Do not simplify only the question while leaving its options above the class level.`,
+    })),
+  },
   // 國語文 under Taiwan's 108 curriculum — 國語 in 國小, 國文 from 國中 up.
   // These are native speakers, so the band tracks reading and writing load
   // rather than spoken command: a first-grader converses fluently and reads a
@@ -460,7 +472,32 @@ export function levelCeiling(framework: string | null, code: string | null) {
   return { unit: resolved.framework.unit, maxStem: resolved.level.maxStem, label: resolved.level.label }
 }
 
-export function levelInstruction(framework: string | null, code: string | null) {
+// Read only the teacher's direction, never an article/OCR or a student's answer.
+// A dispatch override changes this request, not the stored class default.
+export function dispatchLevelCode(framework: string | null | undefined, code: string | null | undefined, direction = ''): string | null {
+  if (!direction || !['hsk', 'tbcl', 'tocfl'].includes(framework || '')) return code || null
+  const digits: Record<string, string> = { 一: '1', 二: '2', 三: '3', 四: '4', 五: '5', 六: '6', 七: '7', 八: '8', 九: '9' }
+  const text = direction.replace(/[一二三四五六七八九]/g, (character) => digits[character])
+  const token = framework === 'tocfl' ? '(?:[ABC][12]|[1-6]|準備級[12]|准备级[12])' : '(?:7\\s*[-–—~至到]\\s*9|[1-9])'
+  const expressions = [new RegExp(`\\b${framework}\\s*(?:第\\s*)?(${token})(?![0-9]|\\.[0-9])`, 'gi'),
+    new RegExp(`(?:改(?:成|为|為|用|到)?|换(?:成|为|到)?|換(?:成|為|到)?|调(?:整)?(?:到|为|成)|調(?:整)?(?:到|為|成)|提高到|降低到|use|switch(?:\\s+to)?|change(?:\\s+to)?|set(?:\\s+to)?)\\s*(?:${framework}\\s*)?(?:第\\s*|level\\s*)?(${token})(?:\\s*[级級]|\\b)`, 'gi')]
+  const candidates: { index: number; code: string }[] = []
+  for (const expression of expressions) {
+    for (const match of text.matchAll(expression)) {
+      const clause = text.slice(0, match.index).split(/[，,。;；\n]/).pop() || ''
+      if (/(?:不要|不用|不是|别|別|不需|do\s+not|don't|not).*$/i.test(clause)) continue
+      const wanted = match[1].toUpperCase().replace(/\s/g, '')
+      const next = framework === 'hsk' ? (/^[789]$|^7[-–—~至到]9$/.test(wanted) ? '7-9' : wanted)
+        : framework === 'tbcl' ? wanted
+          : ({ A1: 'level1', A2: 'level2', B1: 'level3', B2: 'level4', C1: 'level5', C2: 'level6', '準備級1': 'novice1', '準備級2': 'novice2', '准备级1': 'novice1', '准备级2': 'novice2' } as Record<string, string>)[wanted] || `level${wanted}`
+      if (resolveLevel(framework || null, next)) candidates.push({ index: match.index || 0, code: next })
+    }
+  }
+  return candidates.sort((a, b) => b.index - a.index)[0]?.code || code || null
+}
+
+export function levelInstruction(framework: string | null, code: string | null, direction = '') {
+  code = dispatchLevelCode(framework, code, direction)
   const resolved = resolveLevel(framework, code)
   if (!resolved) {
     return 'No proficiency level was set for this class, so write for an intermediate learner and keep the wording plain.'
@@ -470,6 +507,7 @@ export function levelInstruction(framework: string | null, code: string | null) 
   return [
     `LEVEL. The class is working at ${level.label}, on the ${entry.name} scale. This is the hardest constraint on the whole task: an item above the level is worthless to this class however good a question it is, because they cannot read it.`,
     entry.note,
+    framework === 'hsk' ? `Official HSK grammar at this band: ${(HSK_GRAMMAR[code === '7-9' ? 7 : Number(code)] || []).map((point) => point.point).join('; ')}. Also allow structures already introduced in lower HSK bands. Never use TBCL grammar as the reference.` : '',
     `What a learner at ${level.label} can read: ${level.ceiling}`,
     `Keep every question stem to at most ${level.maxStem} ${unit}, and keep each option shorter than the stem.`,
     SOURCE_ABOVE_LEVEL,

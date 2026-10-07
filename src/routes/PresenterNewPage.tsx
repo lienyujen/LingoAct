@@ -1,3 +1,4 @@
+import { uiText, uiFormat } from '../lib/uiText'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowRight, ArrowsClockwise, CircleNotch, Door, ChartBar, Gear, SignIn, Sparkle, Trash, X } from '@phosphor-icons/react'
@@ -16,6 +17,10 @@ import { courseSummary, defaultCourse, readCoursePresets, saveCoursePreset } fro
 import type { CoursePreset } from '../lib/coursePresets'
 import { LessonPlan } from '../components/LessonPlan'
 import { APP_PROFILE } from '../lib/appProfiles'
+import { SystemLanguageSelector } from '../components/SystemLanguageSelector'
+import { isScProfile, useScSystemLanguage } from '../lib/scSystemLanguage'
+import { scTeachingMode } from '../lib/scTeachingMode'
+import { usePresenterText } from '../lib/presenterI18n'
 
 async function getFunctionErrorMessage(error: unknown) {
   if (!(error instanceof Error)) return '建立場次失敗'
@@ -43,6 +48,8 @@ async function getFunctionErrorMessage(error: unknown) {
 }
 
 export function PresenterNewPage() {
+  const t = usePresenterText()
+  const systemLanguage = useScSystemLanguage()
   const [courses, setCourses] = useState(readCoursePresets)
   const initialCourse = courses[0] || defaultCourse
   const [title, setTitle] = useState(initialCourse.title)
@@ -54,6 +61,17 @@ export function PresenterNewPage() {
   const [levelFramework, setLevelFramework] = useState(initialCourse.levelFramework)
   const [levelCode, setLevelCode] = useState(initialCourse.levelCode)
   const [readingAnnotation, setReadingAnnotation] = useState(initialCourse.readingAnnotation)
+  useEffect(() => {
+    if (!isScProfile) return
+    const mode = scTeachingMode(systemLanguage, levelFramework)
+    setTeachingTrack(mode.teachingTrack)
+    if (mode.framework !== levelFramework) {
+      setLevelFramework(mode.framework)
+      setLevelCode('')
+    }
+    setGuidanceLanguage(systemLanguage)
+    if (mode.simplified) setReadingAnnotation('pinyin')
+  }, [systemLanguage, levelFramework])
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(!courses.length)
   const [courseNotice, setCourseNotice] = useState('')
   const course = { title: title.trim(), teachingTrack, guidanceLanguage, levelFramework, levelCode, readingAnnotation }
@@ -70,6 +88,7 @@ export function PresenterNewPage() {
   }
 
   function rememberCourse() {
+    if (levelFramework === 'hsk' && !levelCode) { setCourseNotice(t('hskLevelRequired')); return }
     if (!course.title) { setCourseNotice('請先填寫課程名稱。'); return }
     if (saveCoursePreset(course)) {
       setCourses(readCoursePresets())
@@ -94,6 +113,11 @@ export function PresenterNewPage() {
   async function createSession(event: FormEvent) {
     event.preventDefault()
     setError('')
+    if (levelFramework === 'hsk' && !levelCode) {
+      setError(t('hskLevelRequired'))
+      setCourseSettingsOpen(true)
+      return
+    }
     if (!isSupabaseConfigured) {
       setError('請先設定 Supabase。')
       return
@@ -109,6 +133,7 @@ export function PresenterNewPage() {
           levelFramework,
           levelCode: levelCode || null,
           readingAnnotation,
+          ...(isScProfile ? { systemLanguage, appProfile: 'sc' } : {}),
         },
         headers: { 'x-lingoact-client': 'desktop-app' },
       })
@@ -193,28 +218,24 @@ export function PresenterNewPage() {
         <div className="managed-session-meta">
           <div>
             <h3>{session.title}</h3>
-            <span className={`status ${session.status}`}>{session.status === 'active' ? '進行中' : '已關閉'}</span>
+            <span className={`status ${session.status}`}>{session.status === 'active' ? uiText("進行中") : uiText("已關閉")}</span>
           </div>
-          <p>場次碼 {session.code} · {new Date(session.created_at).toLocaleString('zh-TW')}</p>
+          <p>{uiText("場次碼 ")}{session.code} · {new Date(session.created_at).toLocaleString('zh-TW')}</p>
         </div>
         <div className="managed-session-actions">
           {session.status === 'active' ? (
             <>
               <button type="button" onClick={() => rejoinSession(session)} disabled={managementBusy}>
-                <SignIn size={17} />重新加入場次
-              </button>
+                <SignIn size={17} />{uiText("重新加入場次")}</button>
               <button className="ghost-button" type="button" onClick={() => setPendingAction({ type: 'end', session })} disabled={managementBusy}>
-                <Door size={17} />關閉場次
-              </button>
+                <Door size={17} />{uiText("關閉場次")}</button>
             </>
           ) : (
             <button type="button" onClick={() => navigate(`/session-report/${session.id}`)} disabled={managementBusy}>
-              <ChartBar size={17} />檢視課堂報告
-            </button>
+              <ChartBar size={17} />{uiText("檢視課堂報告")}</button>
           )}
           <button className="danger-ghost-button" type="button" onClick={() => setPendingAction({ type: 'delete', session })} disabled={managementBusy}>
-            <Trash size={17} />移除場次
-          </button>
+            <Trash size={17} />{uiText("移除場次")}</button>
         </div>
       </article>
     )
@@ -225,25 +246,23 @@ export function PresenterNewPage() {
       <SetupNotice />
       <form className="panel form-panel" onSubmit={createSession}>
         <span className="form-heading-icon"><Sparkle size={24} /></span>
-        <h1>今天，讓學生愛上互動</h1>
-        <p className="muted">{APP_PROFILE.id === 'full' ? '華語教學的 AI 助教。' : `${APP_PROFILE.productName}・華語教學的 AI 助教。`}</p>
-        {courses.length > 0 && <label>最近的課程
-          <select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
+        <h1>{uiText(isScProfile ? "讓學生愛上中文" : "今天，讓學生愛上互動")}</h1>
+        <p className="muted">{APP_PROFILE.id === 'full' ? uiText("華語教學的 AI 助教。") : uiFormat(APP_PROFILE.id === 'english' ? "{0}・英語教學的 AI 助教。" : "{0}・華語教學的 AI 助教。", [uiText(APP_PROFILE.productName)])}</p>
+        {courses.length > 0 && <label>{uiText("最近的課程")}<select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
             const selected = courses.find((item) => item.title === event.target.value)
             if (selected) chooseCourse(selected)
             else { chooseCourse(defaultCourse); setCourseSettingsOpen(true) }
           }}>
-            <option value="">新增課程設定</option>
+            <option value="">{uiText("新增課程設定")}</option>
             {courses.map((item) => <option key={item.title} value={item.title}>{item.title}</option>)}
           </select>
         </label>}
         <label>
-          課程名稱
-          <input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：華語初級班・週二" />
+          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={uiText("例如：華語初級班・週二")} />
         </label>
-        <div className="course-summary"><strong>{courseSummary(course)}</strong><span>每個教學活動，都有全新體驗。</span></div>
+        <div className="course-summary"><strong>{courseSummary(course)}</strong><span>{uiText("每個教學活動，都有全新體驗。")}</span></div>
         <details className="teacher-disclosure" open={courseSettingsOpen} onToggle={(event) => setCourseSettingsOpen(event.currentTarget.open)}>
-        <summary>調整語言與程度</summary>
+        <summary>{uiText("調整語言與程度")}</summary>
         <LanguagePairFields
           guidanceLanguage={guidanceLanguage}
           levelCode={levelCode}
@@ -253,6 +272,11 @@ export function PresenterNewPage() {
           onAnnotationChange={setReadingAnnotation}
           onFrameworkChange={(id) => {
             setLevelFramework(id)
+            if (isScProfile) {
+              const mode = scTeachingMode(systemLanguage, id)
+              setTeachingTrack(mode.teachingTrack)
+              setReadingAnnotation(mode.annotation)
+            }
             // GEPT 中級 is not a TOEIC colour; carrying the code across would
             // store a level the new ladder has never heard of.
             setLevelCode('')
@@ -269,20 +293,19 @@ export function PresenterNewPage() {
           }}
         />
         </details>
-        <button className="ghost-button" type="button" onClick={rememberCourse}>記住這個課程設定</button>
-        {courseNotice && <p className="muted" role="status">{courseNotice}</p>}
+        <SystemLanguageSelector />
+        <button className="ghost-button" type="button" onClick={rememberCourse}>{uiText("記住這個課程設定")}</button>
+        {courseNotice && <p className="muted" role="status">{uiText(courseNotice)}</p>}
         {title.trim() && <LessonPlan key={title.trim()} courseName={title.trim()} />}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <button disabled={busy} type="submit">
-          {busy ? '準備教室中...' : '開始上課'}
+          {busy ? uiText("準備教室中...") : uiText("開始上課")}
           {!busy && <ArrowRight size={18} />}
         </button>
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={openManagement}>
-          <ArrowsClockwise size={18} />課堂紀錄與進行中的課
-        </button>
+          <ArrowsClockwise size={18} />{uiText("課堂紀錄與進行中的課")}</button>
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={() => setSystemSetupOpen(true)}>
-          <Gear size={18} />系統設定
-        </button>
+          <Gear size={18} />{uiText("系統設定")}</button>
         <p className="app-credit">
           <a href="https://github.com/lienyujen/LingoAct/blob/main/LICENSE" rel="noreferrer" target="_blank">LingoAct</a>
           {' | Designed and Developed by '}
@@ -293,7 +316,7 @@ export function PresenterNewPage() {
           without having to clear the configuration first. */}
       {systemSetupOpen && (
         <div className="modal-backdrop" role="presentation">
-          <div className="modal system-setup-modal" role="dialog" aria-modal="true" aria-label="系統設定">
+          <div className="modal system-setup-modal" role="dialog" aria-modal="true" aria-label={uiText("系統設定")}>
             <BackendSetup onCancel={() => setSystemSetupOpen(false)} />
           </div>
         </div>
@@ -304,32 +327,32 @@ export function PresenterNewPage() {
             <div className="modal-heading">
               <div>
                 <p className="eyebrow">LingoAct</p>
-                <h2 id="manage-sessions-title">管理場次</h2>
+                <h2 id="manage-sessions-title">{uiText("管理場次")}</h2>
               </div>
               <div className="session-manager-heading-actions">
-                <button aria-label="重新整理" className="icon-button ghost-button" disabled={managementBusy} title="重新整理" type="button" onClick={loadManagedSessions}>
+                <button aria-label={uiText("重新整理")} className="icon-button ghost-button" disabled={managementBusy} title={uiText("重新整理")} type="button" onClick={loadManagedSessions}>
                   <ArrowsClockwise className={managementBusy ? 'spin' : undefined} size={18} />
                 </button>
-                <button aria-label="關閉管理場次" className="icon-button ghost-button" disabled={managementBusy} type="button" onClick={() => setManagementOpen(false)}>
+                <button aria-label={uiText("關閉管理場次")} className="icon-button ghost-button" disabled={managementBusy} type="button" onClick={() => setManagementOpen(false)}>
                   <X size={18} />
                 </button>
               </div>
             </div>
-            {managementError && <p className="error">{managementError}</p>}
-            {managementNotice && <p className="success">{managementNotice}</p>}
+            {managementError && <p className="error">{uiText(managementError)}</p>}
+            {managementNotice && <p className="success">{uiText(managementNotice)}</p>}
             {managementBusy && !managedSessions.length ? (
-              <div className="session-manager-loading"><CircleNotch className="spin" size={24} />讀取場次中...</div>
+              <div className="session-manager-loading"><CircleNotch className="spin" size={24} />{uiText("讀取場次中...")}</div>
             ) : (
               <div className="session-manager-content">
                 <section>
-                  <h3>尚未結束 <span>{activeSessions.length}</span></h3>
+                  <h3>{uiText("尚未結束 ")}<span>{activeSessions.length}</span></h3>
                   <div className="managed-session-list">
-                    {activeSessions.length ? activeSessions.map(sessionRow) : <p className="muted">目前沒有進行中的場次。</p>}
+                    {activeSessions.length ? activeSessions.map(sessionRow) : <p className="muted">{uiText("目前沒有進行中的場次。")}</p>}
                   </div>
                 </section>
                 {endedSessions.length > 0 && (
                   <section>
-                    <h3>已關閉 <span>{endedSessions.length}</span></h3>
+                    <h3>{uiText("已關閉 ")}<span>{endedSessions.length}</span></h3>
                     <div className="managed-session-list">{endedSessions.map(sessionRow)}</div>
                   </section>
                 )}
@@ -340,12 +363,12 @@ export function PresenterNewPage() {
       )}
       <ConfirmDialog
         busy={managementBusy}
-        confirmLabel={pendingAction?.type === 'delete' ? '永久移除' : '關閉場次'}
+        confirmLabel={pendingAction?.type === 'delete' ? uiText("永久移除") : uiText("關閉場次")}
         description={pendingAction?.type === 'delete'
-          ? `「${pendingAction?.session.title || ''}」的學員、訊息、題目、作答、派送、分析與截圖都會永久刪除，無法復原。`
-          : `「${pendingAction?.session.title || ''}」將停止互動，學員會看到課程已結束；課堂資料與派送內容會保留，但不會產生 AI 課程總結。`}
+          ? uiFormat("「{0}」的學員、訊息、題目、作答、派送、分析與截圖都會永久刪除，無法復原。", [pendingAction?.session.title || ''])
+          : uiFormat("「{0}」將停止互動，學員會看到課程已結束；課堂資料與派送內容會保留，但不會產生 AI 課程總結。", [pendingAction?.session.title || ''])}
         open={Boolean(pendingAction)}
-        title={pendingAction?.type === 'delete' ? '確定永久移除場次？' : '確定關閉場次？'}
+        title={pendingAction?.type === 'delete' ? uiText("確定永久移除場次？") : uiText("確定關閉場次？")}
         onCancel={() => {
           if (!managementBusy) setPendingAction(null)
         }}

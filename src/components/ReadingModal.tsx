@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { BookOpen, SpeakerHigh, X } from '@phosphor-icons/react'
 import { requireSupabase } from '../lib/supabase'
@@ -21,6 +22,7 @@ type Props = {
   // 注音 or 拼音, from the class settings. Which system a class reads in is a
   // property of the class, not of one activity, so it is not asked again here.
   annotation?: AnnotationMode
+  framework?: string | null
   onClose: () => void
   onDispatched: (questionId: string) => void
 }
@@ -74,7 +76,7 @@ const FOCUS = [
   ['evaluate', 'readingEvaluate'],
 ] as const
 
-export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', onClose, onDispatched }: Props) {
+export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', framework, onClose, onDispatched }: Props) {
   const t = usePresenterText()
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
@@ -116,13 +118,13 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
     setQuizCount(saved.quizCount ?? 5)
     setFocus(saved.focus?.length ? saved.focus : FOCUS.map(([key]) => key))
     setWithAudio(saved.withAudio ?? false)
-    setAccent(saved.accent ?? 'standard_guoyu')
+    setAccent(framework === 'hsk' ? 'putonghua' : saved.accent ?? 'standard_guoyu')
     setShareShot(saved.shareShot ?? false)
     setUseImage(saved.useImage ?? true)
     setVerbatim(saved.verbatim ?? false)
     setError('')
     setPassage(null)
-  }, [open])
+  }, [open, framework])
 
   if (!open) return null
 
@@ -414,7 +416,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
               ['standard_guoyu', 'accentStandardGuoyu'],
               ['putonghua', 'accentPutonghua'],
               ['taiwanese', 'accentTaiwanese'],
-            ] as const).map(([value, label]) => (
+            ] as const).filter(([value]) => framework !== 'hsk' || value === 'putonghua').map(([value, label]) => (
               <button
                 aria-pressed={accent === value}
                 className={accent === value ? 'selected' : ''}
@@ -428,7 +430,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           </div>
         )}
 
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         {passage && <p className="muted">{t('readingSent', { n: passage.vocabulary?.length || 0, g: passage.grammar?.length || 0 })}</p>}
 
         <div className="reading-modal-actions">

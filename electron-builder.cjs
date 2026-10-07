@@ -4,6 +4,7 @@ const path = require('node:path')
 // Profile says which teaching room the build opens into; edition says which
 // paid feature set it carries. They are independent axes, not forks.
 const profiles = {
+  sc: { executable: 'LingoAct', appId: 'org.lingoact.sc.desktop' },
   full: { executable: 'LingoAct', appId: 'tw.lingoact.presenter.desktop' },
   huayu: { executable: 'LingoAct-Huayu', appId: 'tw.lingoact.huayu.desktop' },
   english: { executable: 'LingoAct-English', appId: 'tw.lingoact.english.desktop' },

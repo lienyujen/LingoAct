@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -29,7 +30,7 @@ import { SetupNotice } from '../components/SetupNotice'
 import { TextDispatchModal } from '../components/TextDispatchModal'
 import { ListeningStudioModal } from '../components/ListeningStudioModal'
 import { PictureStudioModal } from '../components/PictureStudioModal'
-import { PresenterLocaleContext, presenterLocaleFor, presenterLookup, savePresenterLocale } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLocaleFor, presenterLookup, savePresenterLocale } from '../lib/presenterI18n'
 import type { PresenterT } from '../lib/presenterI18n'
 import { PhotoTaskModal } from '../components/PhotoTaskModal'
 import { annotateCardDeck, editQuizItems } from '../lib/cardReadings'
@@ -121,7 +122,7 @@ export function PresenterPage() {
   const [session, setSession] = useState<Session | null>(null)
   // The provider below is inside this component's own tree, so the context is
   // not readable from here — the locale comes from the session row directly.
-  const locale = presenterLocaleFor(session?.teaching_language)
+  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language)
   const t = presenterLookup(locale)
   const w = workspaceText(locale)
   const [workspaceView, setWorkspaceView] = useState<'activities' | 'current' | 'history'>('activities')
@@ -749,7 +750,9 @@ export function PresenterPage() {
       // swaps mainland vocabulary for Taiwanese (視頻 for 影片, 軟件 for 軟體),
       // which is wrong when the words themselves are what the lesson is about.
       const normalizeCaptionText = await createCaptionTextNormalizer(
-        targetSession.caption_display_language !== SOURCE_CAPTION_LANGUAGE
+        targetSession.level_framework !== 'hsk'
+        && targetSession.system_language !== 'zh-CN'
+        && targetSession.caption_display_language !== SOURCE_CAPTION_LANGUAGE
         && (targetSession.caption_source_language === 'zh-tw'
           || targetSession.caption_display_language === 'zh-tw'
           || targetSession.interpretation_languages.includes('zh-tw')),
@@ -2156,7 +2159,7 @@ export function PresenterPage() {
   }
 
   return (
-    <PresenterLocaleContext.Provider value={presenterLocaleFor(session.teaching_language)}>
+    <PresenterLanguageScope value={presenterLocaleFor(session.teaching_language, session.system_language)}>
     <main className={`presenter-page${controlsOpen ? ' controls-open' : ''}${settingsOpen ? ' settings-open' : ''}${selectionMode ? ' selecting-capture' : ''}`}>
       {!selectionMode && (
         <aside className="qr-floating">
@@ -2192,7 +2195,7 @@ export function PresenterPage() {
         <PresenterControlPanel
           busy={busy}
           buzzerActive={isBuzzerPending(buzzerEvent)}
-          captionError={captionError}
+          captionError={uiText(captionError)}
           onlineCount={onlineParticipants.length}
           raisedCount={raisedCount}
           onLowerHands={() => void lowerHands()}
@@ -2266,7 +2269,7 @@ export function PresenterPage() {
           screenshotUrl={hotspotImageUrl}
           analysis={analysis}
           analysisBusy={analysisBusy}
-          analysisError={analysisError}
+          analysisError={uiText(analysisError)}
           answers={answers}
           audioResponses={audioResponses}
           busy={busy}
@@ -2346,6 +2349,7 @@ export function PresenterPage() {
         </div>
       )}
       <ReadingModal
+        framework={session.level_framework}
         annotation={classAnnotation(session)}
         capture={readingCapture}
         open={readingOpen}
@@ -2369,7 +2373,7 @@ export function PresenterPage() {
         }}
         preset={capturePreset}
         initialDraft={captureInitialDraft}
-        error={analysisError}
+        error={uiText(analysisError)}
         open={editorOpen}
         previewUrl={capturePreviewUrl}
         onCancel={cancelQuestionEditor}
@@ -2445,7 +2449,7 @@ export function PresenterPage() {
         initialPrompt={plannedPrompt}
         initialAnswerSeconds={plannedActivity?.kind === 'sentenceWall' ? plannedActivity.answerSeconds : undefined}
         busy={busy}
-        error={sentenceWallError}
+        error={uiText(sentenceWallError)}
         open={sentenceWallOpen}
         onCancel={() => setSentenceWallOpen(false)}
         onOpen={openWall}
@@ -2453,14 +2457,14 @@ export function PresenterPage() {
       <PhotoTaskModal
         initialPrompt={plannedPrompt}
         busy={busy}
-        error={photoTaskError}
+        error={uiText(photoTaskError)}
         open={photoTaskOpen}
         onCancel={() => setPhotoTaskOpen(false)}
         onOpen={openPhotoTask}
       />
       <TextDispatchModal
         busy={busy}
-        error={textDispatchError}
+        error={uiText(textDispatchError)}
         initialBody={textDispatchDraft}
         initialUrl={plannedActivity?.kind === 'textDispatch' ? plannedActivity.url : undefined}
         open={textDispatchOpen}
@@ -2469,7 +2473,7 @@ export function PresenterPage() {
       />
       <PresenterSettingsModal
         busy={settingsBusy}
-        error={settingsError}
+        error={uiText(settingsError)}
         microphones={microphones}
         open={settingsOpen}
         selectedMicrophoneId={selectedMicrophoneId}
@@ -2513,6 +2517,6 @@ export function PresenterPage() {
         />
       )}
     </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

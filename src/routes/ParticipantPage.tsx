@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { BookOpen, Coffee, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-icons/react'
@@ -40,6 +41,7 @@ import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
 import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantLocale } from '../lib/participantI18n'
+import { setUiLanguage } from '../lib/uiText'
 import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, QuestionAnalysis, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent, WritingCoachTurn } from '../types'
 
 async function participantFunctionMessage(error: unknown, fallback: string) {
@@ -108,6 +110,7 @@ export function ParticipantPage() {
   const [error, setError] = useState('')
   const [sessionChecked, setSessionChecked] = useState(false)
   const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
+  useEffect(() => { setUiLanguage(locale) }, [locale])
   const loadSequence = useRef(0)
   const loadedQuizQuestionId = useRef('')
   const navigate = useNavigate()
@@ -1092,7 +1095,7 @@ export function ParticipantPage() {
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
           <h2>{participantText(locale, 'customQuiz')}</h2>
-          <p className={quizLoadError ? 'error' : 'muted'}>{quizLoadError || participantText(locale, 'preparingQuestions')}</p>
+          <p className={quizLoadError ? 'error' : 'muted'}>{uiText(quizLoadError || participantText(locale, 'preparingQuestions'))}</p>
           {quizLoadError && <button type="button" onClick={() => void loadAll()}>{participantText(locale, 'tryAgain')}</button>}
         </section>
       )) : <ParticipantQuestionView
@@ -1158,7 +1161,7 @@ export function ParticipantPage() {
           {danmakuOpen ? participantText(locale, 'limit') : participantText(locale, 'danmakuClosed')}
           {danmakuOpen && message && ` · ${participantText(locale, 'used')} ${Math.ceil(messageUsage(message).units)}/${MESSAGE_MAX_DENSE_CHARACTERS}`}
         </p>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <button disabled={!danmakuOpen || !message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
       </form>}
       <LotteryOverlay event={lotteryEvent} participantId={participant?.id} />

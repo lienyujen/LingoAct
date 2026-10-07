@@ -28,15 +28,18 @@
   --radius-sm: 9px;
   --radius-md: 13px;
   --radius-lg: 18px;
-  /* Not Inter, and not a webfont: the CSP is font-src 'self' data:, so anything
-     from a font host would silently fall back. Segoe UI Variable ships with
-     Windows 11 and reads distinctly enough from Inter to carry the difference. */
-  font-family: "Segoe UI Variable Text", "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  /* Both variable fonts are bundled locally, including real weights 100–900.
+     Chinese and Latin UI text share one family instead of OS font fallback. */
+  font-family: "Noto Sans TC Variable", sans-serif;
   color: var(--text);
   background: transparent;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+:root:lang(zh-CN), :root:lang(zh-Hans) {
+  font-family: "Noto Sans SC Variable", sans-serif;
 }
 
 * {
@@ -5819,7 +5822,7 @@ h2 {
   box-sizing: border-box; min-height: 160px; max-height: 320px; padding: 11px; resize: vertical;
   overflow-y: scroll; scrollbar-gutter: stable;
   border: none; background: transparent; color: var(--ls-ink);
-  font-family: "Noto Sans TC", system-ui, sans-serif; font-size: 13px; line-height: 1.85;
+  font-family: inherit; font-size: 13px; line-height: 1.85;
 }
 .ls-transcript textarea:focus { outline: none; }
 

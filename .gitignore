@@ -46,3 +46,6 @@ supabase/.temp/
 # interrupted the copy is left behind, and it holds a project URL and key —
 # this repository is public, so one 'git add -A' would publish them.
 .env.bak-*
+
+# Local SC desktop folder; public releases are built separately.
+/LingoAct-SC/

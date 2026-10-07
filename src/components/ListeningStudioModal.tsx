@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useRef, useState } from 'react'
 import { TimingRow } from './TimingRow'
 import type { ClipboardEvent } from 'react'
@@ -192,11 +193,11 @@ export function ListeningStudioModal({
     if (initialTranscript) setSource('text')
     setTranscript(initialTranscript)
     setKind(initialKind)
-    setAccent(initialAccent)
+    setAccent(levelFramework === 'hsk' ? 'putonghua' : initialAccent)
     setReplayLimit(initialReplayLimit)
     setPrepareSeconds(initialPrepareSeconds)
     setAnswerSeconds(initialAnswerSeconds)
-  }, [initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open])
+  }, [levelFramework, initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open])
 
   useEffect(() => {
     if (open) return
@@ -412,7 +413,8 @@ export function ListeningStudioModal({
                   className="ls-chip is-on ls-accent-cycle"
                   type="button"
                   aria-label={`${t('accentLabel')}：${t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}`}
-                  onClick={() => { setAccent(nextAccent(accent)); setClip(null) }}
+                  disabled={levelFramework === 'hsk'}
+                  onClick={() => { setAccent(levelFramework === 'hsk' ? 'putonghua' : nextAccent(accent)); setClip(null) }}
                 >
                   {t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}
                 </button>
@@ -545,7 +547,7 @@ export function ListeningStudioModal({
             </>
           )}
 
-          {error && <p className="ls-error">{error}</p>}
+          {error && <p className="ls-error">{uiText(error)}</p>}
         </div>
 
         <footer className="ls-foot">

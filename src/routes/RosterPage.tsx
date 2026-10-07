@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { CheckCircle, ClipboardText, Hand, HandPointing, Plus, SortDescending, UserMinus, Users, X } from '@phosphor-icons/react'
@@ -23,7 +24,7 @@ import type {
   SessionEvent,
 } from '../types'
 import {
-  PresenterLocaleContext,
+  PresenterLanguageScope,
   presenterLocaleFor,
   presenterLookup,
   storedPresenterLocale,
@@ -89,7 +90,7 @@ export function RosterPage() {
   // saves the first paint from arriving in the wrong language and then
   // switching once the session row lands.
   const locale = session
-    ? presenterLocaleFor(session.teaching_language)
+    ? presenterLocaleFor(session.teaching_language, session.system_language)
     : storedPresenterLocale(sessionId)
   const t = presenterLookup(locale)
 
@@ -395,7 +396,7 @@ export function RosterPage() {
   }
 
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
     <main className="roster-window">
       <header className="roster-heading">
         <h1><Users size={17} />{t('rosterTitle')}</h1>
@@ -446,7 +447,7 @@ export function RosterPage() {
       {activeQuestion && (
         <p className="roster-hint">{t('rosterPendingHint')}</p>
       )}
-      {error && <p className="error roster-error">{error}</p>}
+      {error && <p className="error roster-error">{uiText(error)}</p>}
 
       {sortedRows.length ? (
         <ol className="roster-list">
@@ -590,6 +591,6 @@ export function RosterPage() {
         onConfirm={() => void removeParticipant()}
       />
     </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

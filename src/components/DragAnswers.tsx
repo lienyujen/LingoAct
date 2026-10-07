@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useEffect, useId, useRef, useState } from 'react'
 import Sortable from 'sortablejs'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -52,7 +53,7 @@ export function DragAnswers(props: Props) {
     </li>
   }
   return <div ref={root} className={`drag-answers is-${mode}`}>
-    <p className="muted">{locale === 'zh-TW' ? mode === 'matching' ? '把答案拖到對應格；也可以先點答案，再點配對格。' : mode === 'sentence' ? '把詞塊拖入下方句子區；也可以點選詞塊，再用箭頭調整。' : '拖曳項目，或用箭頭調整順序。' : mode === 'matching' ? 'Drag answers into matching slots, or select an answer and then a slot.' : mode === 'sentence' ? 'Drag or tap fragments into the sentence, then reorder them.' : 'Drag items or use the arrows to reorder.'}{mode !== 'ordering' && ` · ${values.filter(Boolean).length}/${options.length}`}</p>
+    <p className="muted">{locale === 'zh-TW' ? mode === 'matching' ? uiText("把答案拖到對應格；也可以先點答案，再點配對格。") : mode === 'sentence' ? uiText("把詞塊拖入下方句子區；也可以點選詞塊，再用箭頭調整。") : uiText("拖曳項目，或用箭頭調整順序。") : mode === 'matching' ? 'Drag answers into matching slots, or select an answer and then a slot.' : mode === 'sentence' ? 'Drag or tap fragments into the sentence, then reorder them.' : 'Drag items or use the arrows to reorder.'}{mode !== 'ordering' && ` · ${values.filter(Boolean).length}/${options.length}`}</p>
     {mode !== 'ordering' && <ul data-drag-zone="bank" className="interaction-bank">{bank.map((v, i) => tile(v, i, true))}</ul>}
     {mode === 'matching' ? <ol className="interaction-matches">{prompts.map((prompt, i) => <li key={`${prompt}-${i}`}>
       <strong>{prompt}</strong>

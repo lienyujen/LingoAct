@@ -1,7 +1,8 @@
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
-import { levelCeiling, stemLength, stemLengthComplaint, tbclLevelOf } from './proficiency.ts'
+import { dispatchLevelCode, levelInstruction, levelCeiling, stemLength, stemLengthComplaint, tbclLevelOf } from './proficiency.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
+import { hskLevelOf, hskOverLevelWords, hskOverLevelComplaint } from './hsk.ts'
 
 type RequestedType = 'random' | 'multiple_choice' | 'fill_blank' | 'short_answer' | 'ordering' | 'matching' | 'writing' | 'flashcard'
 type ItemType = Exclude<RequestedType, 'random' | 'writing' | 'flashcard'>
@@ -277,6 +278,8 @@ export async function generateCustomQuiz(input: {
     ? `必須產生恰好 ${input.requestedCount} 題。`
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
   const flashcard = input.requestedType === 'flashcard'
+  const defaultCode = input.levelCode
+  input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
   const level = levelCeiling(input.levelFramework ?? null, input.levelCode ?? null)
   const writing = input.requestedType === 'writing'
   // The class's language decides this, and the teacher's direction can still
@@ -338,6 +341,10 @@ ${input.sourceText}` }] : []),
   // the textbook page and read as context; the material won, and a TBCL level 1
   // class got questions pitched at the page.
   if (input.extraInstruction) requestPayload.systemInstruction.parts.push({ text: input.extraInstruction })
+  if (input.levelCode !== defaultCode || !input.extraInstruction) requestPayload.systemInstruction.parts.push({ text: [
+    input.levelCode !== defaultCode ? 'For this dispatch the teacher explicitly overrides the class default. The following level replaces any earlier default-level instruction, including its vocabulary, grammar and question-length checks. The stored class default stays unchanged.' : '',
+    levelInstruction(input.levelFramework ?? null, input.levelCode ?? null),
+  ].filter(Boolean).join('\n') })
 
   function requestBodyForModel(complaint = '') {
     // The current Generate Content API accepts JSON Schema through
@@ -411,11 +418,14 @@ ${input.sourceText}` }] : []),
 
   // 0 for a class on a ladder 國教院’s tables do not govern: an English or
   // Japanese course is not checked against a Chinese word list.
-  const tbcl = tbclLevelOf(input.levelFramework ?? null, input.levelCode ?? null)
+  const hsk = input.levelFramework === 'hsk'
+  const tbcl = hsk ? hskLevelOf(input.levelFramework, input.levelCode) : tbclLevelOf(input.levelFramework ?? null, input.levelCode ?? null)
+  const checkVocabulary = hsk ? hskOverLevelWords : overLevelWords
+  const vocabularyComplaint = hsk ? hskOverLevelComplaint : overLevelComplaint
   const vocabularyCeiling = tbcl ? ceilingFor(tbcl, input.levelStretch ?? 0) : 0
 
   const overLevel = (candidate: { items?: unknown }) => (
-    vocabularyCeiling ? overLevelWords(allText(candidate), vocabularyCeiling) : []
+    vocabularyCeiling ? checkVocabulary(allText(candidate), vocabularyCeiling) : []
   )
 
   let output = await generate()
@@ -427,7 +437,7 @@ ${input.sourceText}` }] : []),
     try {
       const complaint = [
         offenders.length ? stemLengthComplaint(input.levelFramework ?? null, input.levelCode ?? null, offenders) : '',
-        above.length ? overLevelComplaint(above, ceiling?.label || `TBCL ${vocabularyCeiling}`, vocabularyCeiling) : '',
+        above.length ? vocabularyComplaint(above, ceiling?.label || `${hsk ? 'HSK' : 'TBCL'} ${vocabularyCeiling}`, vocabularyCeiling) : '',
       ].filter(Boolean).join('\n\n')
       const retried = await generate(complaint)
       // Kept only if it is actually better on both counts together. A second
@@ -545,8 +555,11 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     // 寫作教練 hands the writing back before spending an AI call. The teacher
     // can then ask for marking or mark it themselves; submission itself stays
     // cheap and ends in `submitted` until that later review is saved.
-    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type, interaction_mode').eq('id', attempt.quiz_id).single()
+    const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type, interaction_mode, session_id, direction').eq('id', attempt.quiz_id).single()
     if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
+    const { data: classMode, error: classError } = await supabase.from('sessions').select('level_framework, level_code').eq('id', quiz.session_id).single()
+    if (classError || !classMode) throw classError || new Error('Class not found.')
+    const simplified = classMode.level_framework === 'hsk'
     if (quiz.graded === false) {
       if (quiz.interaction_mode) {
         const cleared = await supabase.from('quiz_item_answers').update({ score: null, feedback: null }).eq('attempt_id', attemptId)
@@ -558,14 +571,14 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         for (const item of items) {
           const { error } = await supabase.from('quiz_item_answers').update({
             score: item.points,
-            feedback: { zh_tw: '已完成排序寫作。', en: 'Sequence writing completed.' },
+            feedback: { zh_tw: '已完成排序寫作。', zh_cn: '已完成排序写作。', en: 'Sequence writing completed.' },
           }).eq('attempt_id', attemptId).eq('item_id', item.id)
           if (error) throw error
         }
         const totalScore = items.reduce((sum, item) => sum + Number(item.points || 0), 0)
         const { error: completeError } = await supabase.from('quiz_attempts').update({
           status: 'graded', total_score: totalScore,
-          feedback: { zh_tw: '已完成繳交。', en: 'Submission completed.' },
+          feedback: { zh_tw: '已完成繳交。', zh_cn: '已完成提交。', en: 'Submission completed.' },
           error_message: null, graded_at: new Date().toISOString(),
         }).eq('id', attemptId)
         if (completeError) throw completeError
@@ -619,10 +632,17 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       overall_feedback_en?: string
     } = { evaluations: [] }
     if (aiGradingInput.length) {
+      const feedbackInstruction = simplified
+        ? 'Feedback must use Mainland standard Simplified Chinese. The legacy feedback_zh_tw JSON fields must contain Simplified Chinese for this HSK class.'
+        : 'Feedback must use Taiwan Traditional Chinese.'
       const result = await callAiJson(
+        [
         pictureWriting
-          ? '你是 LingoAct 的形成性寫作評分助理。學生自行決定四格圖片順序，沒有標準順序，不得因順序與原圖不同扣分。依每格文字能否形成完整連貫的故事、內容發展與語言表達，按 rubric 與配分評分。每題分數不得小於 0 或超過 points。以台灣繁體中文提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。'
-          : '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。以台灣繁體中文提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
+          ? '你是 LingoAct 的形成性寫作評分助理。學生自行決定四格圖片順序，沒有標準順序，不得因順序與原圖不同扣分。依每格文字能否形成完整連貫的故事、內容發展與語言表達，按 rubric 與配分評分。每題分數不得小於 0 或超過 points。依下方回饋語言規則提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。'
+          : '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。依下方回饋語言規則提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
+        levelInstruction(classMode.level_framework, classMode.level_code, quiz.direction),
+        feedbackInstruction,
+        ].join('\n'),
         { items: aiGradingInput },
         gradingSchema,
         null,
@@ -710,6 +730,13 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
         score,
         feedback: {
           zh_tw: feedbackZhTw,
+          ...(simplified ? { zh_cn: item.type === 'matching'
+            ? (score === item.points ? '全部配对正确。' : `配对得分 ${score}/${item.points}。`)
+            : item.type === 'ordering' && !pictureWriting
+              ? (score === item.points ? '顺序正确。' : `顺序不对。${Array.isArray(item.option_images) && item.option_images.length || quiz.interaction_mode ? '等待老师公布正确答案。' : `正确顺序：${key.accepted_answers.join(' → ')}`}`)
+              : item.type === 'multiple_choice'
+                ? `${score === item.points ? '回答正确。' : '回答错误。'}正确答案：${key.accepted_answers.join('、')}`
+                : feedbackZhTw } : {}),
           en: feedbackEn,
         },
       }).eq('id', answer.id)
@@ -728,6 +755,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       total_score: totalScore,
       feedback: {
         zh_tw: overallFeedbackZhTw,
+        ...(simplified ? { zh_cn: aiGradingInput.length ? overallFeedbackZhTw : `本次自动评分 ${totalScore}/100。` } : {}),
         en: overallFeedbackEn,
       },
       error_message: null,

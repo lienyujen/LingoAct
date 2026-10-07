@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { densityBuckets } from '../lib/danmakuBursts'
 
@@ -100,14 +101,14 @@ export function DanmakuTimeline({ times, sessionStart, sessionEnd, selection, on
           onPointerDown={(event) => begin('range', event)}
         />
         <button
-          aria-label="調整起點"
+          aria-label={uiText("調整起點")}
           className="danmaku-timeline-handle"
           style={{ left: `${left}%` }}
           type="button"
           onPointerDown={(event) => begin('from', event)}
         />
         <button
-          aria-label="調整終點"
+          aria-label={uiText("調整終點")}
           className="danmaku-timeline-handle"
           style={{ left: `${right}%` }}
           type="button"

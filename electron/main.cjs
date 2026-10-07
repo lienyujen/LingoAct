@@ -6,6 +6,7 @@ const packageMetadata = require('../package.json')
 const { configDirectory, readPortableConfig, savePortableConfig } = require('./portableConfig.cjs')
 
 const APP_PROFILES = {
+  sc: { appId: 'org.lingoact.sc.desktop', displayName: 'LingoAct' },
   full: { appId: 'tw.lingoact.presenter.desktop', displayName: 'LingoAct' },
   huayu: { appId: 'tw.lingoact.huayu.desktop', displayName: 'LingoAct 華語教學版' },
   english: { appId: 'tw.lingoact.english.desktop', displayName: 'LingoAct English' },
@@ -18,6 +19,8 @@ const APP_PROFILE_ID = Object.hasOwn(APP_PROFILES, process.env.APP_PROFILE)
     ? packageMetadata.lingoactProfile
     : 'full'
 const APP_PROFILE = APP_PROFILES[APP_PROFILE_ID]
+// Keep this edition's existing preferences when its visible product name changes.
+if (APP_PROFILE_ID === 'sc') app.setPath('userData', path.join(app.getPath('appData'), 'LingoAct-SC'))
 
 function logFatalError(scope, error) {
   const message = `[${new Date().toISOString()}] [${scope}] ${error?.stack || error}\n`

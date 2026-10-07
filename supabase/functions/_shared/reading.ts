@@ -19,10 +19,11 @@ import { callAiJson } from './ai.ts'
 import { GRAMMAR_BY_LEVEL } from './tbcl-levels.generated.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
 import { wordLevel } from './tbcl-levels.generated.ts'
-import { levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
+import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
 import { resolveTrack, trackInstruction } from './teaching.ts'
 import { applyRegionalWordPinyin, regionalPronunciationInstruction } from './mandarin-pronunciation.ts'
 import type { MandarinAccent } from './mandarin-pronunciation.ts'
+import { HSK_GRAMMAR, applyHskWordPinyin, hskPinyinInstruction, hskLevelOf, hskWordLevel, hskOverLevelWords, hskOverLevelComplaint } from './hsk.ts'
 
 export type ReadingAnnotationGloss = Record<string, string>
 
@@ -118,11 +119,11 @@ export function passageLength(tbcl: number) {
 // Widened downwards when the window comes back empty: the grammar table stops
 // at level 5, so a class at 6 or 7 asked for levels 5 to 8 and would have been
 // handed nothing at all.
-function grammarLevels(ceiling: number) {
+function grammarLevels(ceiling: number, table = GRAMMAR_BY_LEVEL) {
   for (let floor = Math.max(1, ceiling - 1); floor >= 1; floor -= 1) {
     const levels: number[] = []
-    for (let level = floor; level <= Math.min(7, ceiling + 1); level += 1) {
-      if ((GRAMMAR_BY_LEVEL[level] || []).length) levels.push(level)
+    for (let level = floor; level <= Math.min(7, table === HSK_GRAMMAR ? ceiling : ceiling + 1); level += 1) {
+      if ((table[level] || []).length) levels.push(level)
     }
     if (levels.length) return levels
   }
@@ -131,18 +132,18 @@ function grammarLevels(ceiling: number) {
 
 // Names only — the examples would triple the prompt and the model does not need
 // them to recognise the pattern.
-function grammarMenu(ceiling: number) {
+function grammarMenu(ceiling: number, table = GRAMMAR_BY_LEVEL) {
   const points: string[] = []
-  for (const level of grammarLevels(ceiling)) {
-    for (const entry of GRAMMAR_BY_LEVEL[level] || []) points.push(`${entry.point}（第${level}級）`)
+  for (const level of grammarLevels(ceiling, table)) {
+    for (const entry of table[level] || []) points.push(`${entry.point}（第${level}級）`)
   }
   return points
 }
 
-function grammarIndex(ceiling: number) {
+function grammarIndex(ceiling: number, table = GRAMMAR_BY_LEVEL) {
   const index = new Map<string, { level: number; example: string }>()
-  for (const level of grammarLevels(ceiling)) {
-    for (const entry of GRAMMAR_BY_LEVEL[level] || []) {
+  for (const level of grammarLevels(ceiling, table)) {
+    for (const entry of table[level] || []) {
       if (!index.has(entry.point)) index.set(entry.point, { level, example: entry.example })
     }
   }
@@ -350,13 +351,13 @@ function overJoined(words: ReadingWord[]) {
 // loanword, a compound the benchmark never covered. 閱讀是讀詞不是讀字, so an
 // unlisted word counts as new even when every character in it is easy: 資料夾
 // is not 資料 + 夾 to someone meeting it for the first time.
-export function newWords(words: ReadingWord[], classLevel: number) {
+export function newWords(words: ReadingWord[], classLevel: number, lookup = wordLevel) {
   const seen = new Set<string>()
   const out: Array<{ word: string; level: number }> = []
   for (const { text } of words) {
     const word = (text || '').trim()
     if (!word || seen.has(word) || !HAN_WORD.test(word)) continue
-    const level = wordLevel(word)
+    const level = lookup(word)
     if (level && level < classLevel) continue
     seen.add(word)
     out.push({ word, level })
@@ -423,14 +424,19 @@ async function glossNewWords(
 }
 
 export async function generateReadingPassage(input: ReadingInput): Promise<ReadingPassage | null> {
-  const tbcl = tbclLevelOf(input.levelFramework, input.levelCode)
+  input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
+  if (input.levelFramework === 'hsk' && !hskLevelOf(input.levelFramework, input.levelCode)) throw new Error('An HSK level is required for reading.')
+  const hsk = input.levelFramework === 'hsk'
+  const tbcl = hsk ? hskLevelOf(input.levelFramework, input.levelCode) : tbclLevelOf(input.levelFramework, input.levelCode)
+  const checkWords = hsk ? hskOverLevelWords : overLevelWords
+  const complaint = hsk ? hskOverLevelComplaint : overLevelComplaint
   const ceiling = tbcl ? ceilingFor(tbcl, input.levelStretch) : 0
   const resolved = resolveLevel(input.levelFramework, input.levelCode)
   const label = resolved?.level.label || '這個班的程度'
   const length = passageLength(tbcl || 4)
-  const menu = grammarMenu(ceiling || 4)
-  const index = grammarIndex(ceiling || 4)
-  const locales = [...new Set(['zh_tw', 'en', ...input.locales])]
+  const menu = grammarMenu(ceiling || 4, hsk ? HSK_GRAMMAR : GRAMMAR_BY_LEVEL)
+  const index = grammarIndex(ceiling || 4, hsk ? HSK_GRAMMAR : GRAMMAR_BY_LEVEL)
+  const locales = [...new Set([hsk ? 'zh_cn' : 'zh_tw', 'en', ...input.locales])]
 
   const stretchNote = input.levelStretch > 0
     ? `The teacher has asked for i+${input.levelStretch}: a few words and structures up to ${input.levelStretch} level(s) above are wanted, because being stretched a little is how a reader grows. Keep them few, keep them carryable from context, and list every one of them in vocabulary.`
@@ -441,12 +447,13 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     trackInstruction(input.teachingLanguage),
     levelInstruction(input.levelFramework, input.levelCode),
     stretchNote,
-    `Length: between ${length.min} and ${length.max} characters. This is the range 華語文能力基準應用參考指引 and TOCFL use for reading at ${label}.`,
+    hsk ? `Length: between ${length.min} and ${length.max} characters, a classroom practice target rather than an official HSK exam limit.`
+      : `Length: between ${length.min} and ${length.max} characters. This is the range 華語文能力基準應用參考指引 and TOCFL use for reading at ${label}.`,
     'The passage must read as a whole piece — a notice, a message, a short account, a description — not a list of sentences that happen to use the target words.',
     input.image
       ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
       : '',
-    regionalPronunciationInstruction(`${input.source}\n${input.direction}`, input.accent),
+    hsk ? hskPinyinInstruction(`${input.source}\n${input.direction}`) : regionalPronunciationInstruction(`${input.source}\n${input.direction}`, input.accent),
     ...orthographyRules('body'),
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
@@ -472,10 +479,10 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   const TOO_MANY_ABOVE = 6
   const complaints: string[] = []
   if (ceiling) {
-    const above = overLevelWords(String(output.body || ''), ceiling)
+    const above = checkWords(String(output.body || ''), ceiling)
     if (above.length > TOO_MANY_ABOVE) {
       console.warn(`Reading passage used ${above.length} words above ${label}: ${above.slice(0, 12).map((e) => e.word).join(' ')}`)
-      complaints.push(overLevelComplaint(above, label, ceiling))
+      complaints.push(complaint(above, label, ceiling))
     }
   }
   const joined = overJoined((Array.isArray(output.words) ? output.words : []) as ReadingWord[])
@@ -495,13 +502,13 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   // sentence-ordering chunks are: joining the pieces must give the body back.
   // A list that does not reassemble would put the readings over the wrong
   // words and mark words the passage does not contain.
-  const words = applyRegionalWordPinyin(body, settleWords(output.words, body), input.accent)
+  const words = hsk ? applyHskWordPinyin(settleWords(output.words, body)) : applyRegionalWordPinyin(body, settleWords(output.words, body), input.accent)
 
   // 國教院's list decides which of them are new, and a second call says what
   // they mean. Without a usable segmentation there is nothing to judge, so the
   // passage goes out unmarked rather than marked wrongly.
   const vocabulary = await glossNewWords(
-    newWords(words, tbcl || 4),
+    newWords(words, tbcl || 4, hsk ? hskWordLevel : wordLevel),
     locales,
     resolveTrack(input.teachingLanguage).promptLanguage,
   )

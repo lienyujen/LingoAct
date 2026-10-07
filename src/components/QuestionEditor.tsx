@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { Image, NotePencil, PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
 import type { BoardPostKind, QuestionType, QuizRequestedType } from '../types'
@@ -230,7 +231,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             {t('keepScreenshot')}
           </label>
         )}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <div className="type-grid">
           {offeredTypes.map((item) => (
             <button

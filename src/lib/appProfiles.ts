@@ -2,7 +2,7 @@ import type { ActivityId, SkillTab } from './activities'
 
 // Which teaching room a build opens into. Separate from edition (the paid
 // feature set) — they are independent axes, not forks.
-export type AppProfileId = 'full' | 'huayu' | 'english' | 'guoyu' | 'ncacls'
+export type AppProfileId = 'full' | 'huayu' | 'english' | 'guoyu' | 'ncacls' | 'sc'
 
 export type AppProfile = {
   id: AppProfileId
@@ -19,6 +19,10 @@ export type AppProfile = {
 }
 
 const profiles: Record<AppProfileId, AppProfile> = {
+  sc: {
+    id: 'sc', productName: 'LingoAct', shortName: '中文教学版',
+    defaultTrack: 'putonghua', allowedTracks: ['putonghua', 'huayu'], defaultSkill: 'listen',
+  },
   full: {
     id: 'full',
     productName: 'LingoAct',

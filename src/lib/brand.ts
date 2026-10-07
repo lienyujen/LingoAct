@@ -13,18 +13,18 @@ import { APP_PROFILE } from './appProfiles'
 // JoinPage forwards the whole query string to the participant page, and this
 // reads it at runtime. The default costs nothing: no parameter means the
 // ordinary LingoAct page, so every existing link keeps working.
-export type BrandId = 'ncacls'
+export type BrandId = 'ncacls' | 'sc'
 
 export const BRAND_PARAM = 'b'
 
 // True in the NCACLS desktop build itself, which is the fallback for the
 // presenter's own preview of the student page — there is no join URL there to
 // read the parameter from.
-export const buildBrand: BrandId | null = APP_PROFILE.id === 'ncacls' ? 'ncacls' : null
+export const buildBrand: BrandId | null = APP_PROFILE.id === 'ncacls' ? 'ncacls' : APP_PROFILE.id === 'sc' ? 'sc' : null
 
 export function brandFromSearch(search: URLSearchParams): BrandId | null {
   const value = search.get(BRAND_PARAM)
-  return value === 'ncacls' ? 'ncacls' : buildBrand
+  return value === 'ncacls' || value === 'sc' ? value : buildBrand
 }
 
 // Which guidance languages an edition offers a student. NCACLS teach Chinese
@@ -38,12 +38,13 @@ export function brandFromSearch(search: URLSearchParams): BrandId | null {
 // arrives on a locale the edition does not offer is moved to its first one
 // rather than left on a language whose entry is not in the picker.
 const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
+  sc: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi'],
   ncacls: ['zh-TW', 'en', 'es'],
 }
 
 export function guidanceLocalesForBrand<T extends { code: string }>(all: readonly T[], brand: BrandId | null) {
   const allowed = brand ? BRAND_GUIDANCE_LOCALES[brand] : null
-  if (!allowed) return [...all]
+  if (!allowed) return all.filter((option) => option.code !== 'zh-CN')
   const kept = all.filter((option) => allowed.includes(option.code))
-  return kept.length ? kept : [...all]
+  return kept.length ? kept.sort((a, b) => allowed.indexOf(a.code) - allowed.indexOf(b.code)) : [...all]
 }

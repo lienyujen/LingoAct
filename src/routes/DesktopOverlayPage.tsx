@@ -11,14 +11,14 @@ import { finalizeLottery } from '../lib/lottery'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import type { Answer, BuzzerSessionEvent, CaptionSegment, LotterySessionEvent, Message, Question, Session, SessionEvent } from '../types'
-import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
 
 export function DesktopOverlayPage() {
   const { sessionId = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
   // The overlay is its own transparent window, so it resolves the class's
   // teaching language itself and provides it to the overlays it renders.
-  const locale = presenterLocaleFor(session?.teaching_language)
+  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language)
   const t = presenterLookup(locale)
   const [messages, setMessages] = useState<Message[]>([])
   const [lotteryEvent, setLotteryEvent] = useState<LotterySessionEvent | null>(null)
@@ -283,7 +283,7 @@ export function DesktopOverlayPage() {
 
   if (!session) return null
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
     <div className="desktop-overlay-root">
       <DanmakuLayer messages={messages} session={session} />
       {session.captions_enabled && (
@@ -305,6 +305,6 @@ export function DesktopOverlayPage() {
       <LotteryOverlay event={lotteryEvent} onSelect={selectLotteryCandidate} />
       <BuzzerOverlay event={buzzerEvent} onClose={cancelBuzzer} onStart={activateBuzzer} />
     </div>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

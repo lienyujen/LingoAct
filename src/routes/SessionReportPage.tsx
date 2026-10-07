@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowsClockwise, BookOpen, ChartLineUp, ChatText, CircleNotch, Clock, DownloadSimple, ListChecks, Users } from '@phosphor-icons/react'
 import { getPresenterToken } from '../lib/presenterAuth'
@@ -5,7 +6,7 @@ import { useSessionReportBack } from '../lib/sessionReportNavigation'
 import { requireSupabase } from '../lib/supabase'
 import type { AiSummary, Answer, AudioResponse, BoardPost, CaptionSegment, ExitTicket, Message, Participant, Question, Screenshot, Session, SessionAnalysis, SessionCustomQuizResults, SessionMetrics, SessionEvent, SessionReportData, SharedContent, FileResponse } from '../types'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { PresenterLocaleContext, presenterLocaleFor, presenterLookup, usePresenterText } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLocaleFor, presenterLookup, usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey, PresenterT } from '../lib/presenterI18n'
 
 const PAGE_SIZE = 1000
@@ -106,7 +107,8 @@ export function SessionReportPage() {
   // page may have to say is that there is no report — and that sentence needs
   // the language before the report it is refusing to load.
   const [teachingLanguage, setTeachingLanguage] = useState<string | null>(null)
-  const locale = presenterLocaleFor(teachingLanguage)
+  const [systemLanguage, setSystemLanguage] = useState<string | null>(null)
+  const locale = presenterLocaleFor(teachingLanguage, systemLanguage)
   const t = presenterLookup(locale)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -233,9 +235,10 @@ export function SessionReportPage() {
   // the language of the class it belongs to.
   useEffect(() => {
     let cancelled = false
-    void requireSupabase().from('sessions').select('teaching_language').eq('id', sessionId).maybeSingle()
+    void requireSupabase().from('sessions').select('teaching_language, system_language').eq('id', sessionId).maybeSingle()
       .then(({ data }) => {
         if (!cancelled) setTeachingLanguage((data?.teaching_language as string | null) ?? '')
+        if (!cancelled) setSystemLanguage((data?.system_language as string | null) ?? null)
       })
     return () => { cancelled = true }
   }, [sessionId])
@@ -310,7 +313,7 @@ export function SessionReportPage() {
     return (
       <main className="session-report-page report-loading">
         <h1>{t('reportNotMade')}</h1>
-        <p className="error">{error}</p>
+        <p className="error">{uiText(error)}</p>
         <fieldset className="report-mode-picker">
           <legend>{t('analysisMode')}</legend>
           {reportModes.map((mode) => (
@@ -349,11 +352,11 @@ export function SessionReportPage() {
   const listJoin = locale === 'zh-TW' ? '、' : ', '
 
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
     <main className="session-report-page">
       <header className="report-header">
         <div>
-          <p className="eyebrow">LingoAct Session Report</p>
+          <p className="eyebrow">LingoAct class report</p>
           <h1><BookOpen size={28} />{t('reportTitle')}</h1>
           <p className="muted">{reportData.session.title}．{new Date(reportData.session.created_at).toLocaleString(locale)}</p>
         </div>
@@ -368,7 +371,7 @@ export function SessionReportPage() {
         </div>
       </header>
 
-      {error && <p className="report-inline-error error">{error}</p>}
+      {error && <p className="report-inline-error error">{uiText(error)}</p>}
 
       <section className="report-metrics" aria-label={t('reportMetricsLabel')}>
         <article><Users size={20} /><span>{t('metricParticipants')}</span><strong>{metrics.participant_count}</strong></article>
@@ -543,6 +546,6 @@ export function SessionReportPage() {
         </section>
       </div>
     </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

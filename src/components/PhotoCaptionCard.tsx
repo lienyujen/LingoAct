@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useRef, useState } from 'react'
 import { CheckCircle, CircleNotch, Microphone, PaperPlaneTilt, PencilSimpleLine, StopCircle } from '@phosphor-icons/react'
 import { recordingToWav } from '../lib/audio'
@@ -196,7 +197,7 @@ export function PhotoCaptionCard({
           )}
         </div>
       )}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
     </article>
   )
 }

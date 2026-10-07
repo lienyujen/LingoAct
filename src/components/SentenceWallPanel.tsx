@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useState } from 'react'
 import { Eye, EyeSlash, PaperPlaneTilt, Sparkle } from '@phosphor-icons/react'
 import { usePresenterText } from '../lib/presenterI18n'
@@ -69,7 +70,7 @@ export function SentenceWallPanel({
         )}
       </div>
       {sentenceCount < 2 && <p className="muted">{t('composeNeedsTwo')}</p>}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
 
       {composition && (
         <div className="sentence-wall-composition">

@@ -3,6 +3,7 @@ import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
 import { orthographyRules, settleWords } from '../_shared/reading.ts'
+import { HSK_PRONUNCIATION, applyHskWordPinyin, hskPinyinInstruction } from '../_shared/hsk.ts'
 
 // Deciding how each character should be read, and saying so in a way the font
 // understands.
@@ -74,11 +75,11 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const presenterToken = typeof input.presenterToken === 'string' ? input.presenterToken : ''
     const text = typeof input.text === 'string' ? input.text.trim() : ''
-    const mode = input.mode === 'pinyin' ? 'pinyin' : 'zhuyin'
+    let mode = input.mode === 'pinyin' ? 'pinyin' : 'zhuyin'
     // Defaults to characters, which is what every caller wanted before 朗讀 and
     // 聽力 began spelling their readings as words.
     const granularity = input.granularity === 'words' ? 'words' : 'characters'
-    const accent: MandarinAccent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+    let accent: MandarinAccent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
       ? input.accent
       : 'standard_guoyu'
     if (!sessionId || !text) return jsonResponse({ message: '缺少標音所需資料。' }, 400)
@@ -88,6 +89,10 @@ Deno.serve(async (req) => {
     if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
       return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
     }
+    const { data: classroom, error: classError } = await supabase.from('sessions').select('level_framework').eq('id', sessionId).single()
+    if (classError) throw classError
+    const hsk = classroom.level_framework === 'hsk'
+    if (hsk) { mode = 'pinyin'; accent = 'putonghua' }
 
     const characters = [...text]
 
@@ -101,7 +106,7 @@ Deno.serve(async (req) => {
       const result = await callAiJson(
         [
           'Cut the text into words and give each word its Hanyu Pinyin reading.',
-          regionalPronunciationInstruction(text, accent),
+          hsk ? hskPinyinInstruction(text) : regionalPronunciationInstruction(text, accent),
           ...orthographyRules('text'),
         ].join('\n'),
         { text },
@@ -110,7 +115,8 @@ Deno.serve(async (req) => {
         'realtime',
       )
       if (result.status !== 'success') throw new Error('AI 標音沒有回應。')
-      const words = applyRegionalWordPinyin(text, settleWords((result.output as { words?: unknown })?.words, text), accent)
+      const segmented = settleWords((result.output as { words?: unknown })?.words, text)
+      const words = hsk ? applyHskWordPinyin(segmented) : applyRegionalWordPinyin(text, segmented, accent)
       if (!words.length) throw new Error('AI 標音的分詞對不上原文。')
       return jsonResponse({ mode, annotationText: '', words })
     }
@@ -123,7 +129,7 @@ Deno.serve(async (req) => {
         [
           'Give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
           'Use tone marks (nǐ hǎo), not tone numbers. Choose the reading the character takes in THIS context.',
-          regionalPronunciationInstruction(text, accent),
+          hsk ? HSK_PRONUNCIATION : regionalPronunciationInstruction(text, accent),
           'For anything that is not a Han character — punctuation, spaces, Latin letters, digits, newlines — return an empty string in its slot.',
           'The array must contain exactly as many entries as the character count given.',
         ].join('\n'),
@@ -138,11 +144,8 @@ Deno.serve(async (req) => {
       const list = Array.isArray(syllables) ? syllables : []
       // A misaligned array would put every reading over the wrong character, so
       // it is padded or trimmed rather than trusted.
-      const aligned = applyRegionalPinyin(
-        text,
-        characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : '')),
-        accent,
-      )
+      const readings = characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : ''))
+      const aligned = hsk ? readings : applyRegionalPinyin(text, readings, accent)
       return jsonResponse({ mode, annotationText: JSON.stringify(aligned), words: [] })
     }
 

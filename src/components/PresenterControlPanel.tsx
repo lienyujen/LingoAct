@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { Chat, ClosedCaptioning, Cloud, DiceFive, DoorOpen, Eye, EyeSlash, Gear, Hand, MonitorArrowUp, PaperPlaneTilt, BellRinging, Share, Sparkle, Users, Waveform } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { activitiesFor, SKILL_TABS } from '../lib/activities'
@@ -294,7 +295,7 @@ export function PresenterControlPanel({
             </>
           )}
         </div>
-        {isPlusEdition && captionError && <p className="error caption-control-error">{captionError}</p>}
+        {isPlusEdition && captionError && <p className="error caption-control-error">{uiText(captionError)}</p>}
       </details>
 
 

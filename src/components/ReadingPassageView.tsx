@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BookOpen, Translate, X } from '@phosphor-icons/react'
@@ -348,9 +349,9 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
           )}
           {player}
           {fontControls && (
-            <span className="reading-font-controls" aria-label="文章字級">
-              <button aria-label="縮小文章文字" disabled={fontScale <= 1} title="A−" type="button" onClick={() => setFontScale((current) => Math.max(1, current - 0.25))}>A−</button>
-              <button aria-label="放大文章文字" disabled={fontScale >= 3} title="A+" type="button" onClick={() => setFontScale((current) => Math.min(3, current + 0.25))}>A+</button>
+            <span className="reading-font-controls" aria-label={uiText("文章字級")}>
+              <button aria-label={uiText("縮小文章文字")} disabled={fontScale <= 1} title="A−" type="button" onClick={() => setFontScale((current) => Math.max(1, current - 0.25))}>A−</button>
+              <button aria-label={uiText("放大文章文字")} disabled={fontScale >= 3} title="A+" type="button" onClick={() => setFontScale((current) => Math.min(3, current + 0.25))}>A+</button>
             </span>
           )}
         </div>
@@ -430,7 +431,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
               <p className="reading-note-head">
                 <strong>{open.entry.word}</strong>
                 {open.entry.pos && <span className="reading-note-pos">{open.entry.pos}</span>}
-                {open.entry.level > 0 && <span className="reading-note-level">TBCL {open.entry.level}</span>}
+                {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
               <p><Translate size={15} />{glossFor(open.entry.gloss, locale)}</p>
             </>
@@ -438,7 +439,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
             <>
               <p className="reading-note-head">
                 <strong>{open.entry.point}</strong>
-                <span className="reading-note-level">TBCL {open.entry.level}</span>
+                <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>
               </p>
               <p><Translate size={15} />{glossFor(open.entry.note, locale)}</p>
               {open.entry.example && <p className="reading-note-example">{open.entry.example}</p>}

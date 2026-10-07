@@ -24,6 +24,7 @@ export type Session = {
   // along the class is. Independent of one another: a beginners Japanese class
   // in Taiwan teaches ja, explains in zh-TW and sits at JLPT N5.
   teaching_language: string
+  system_language?: 'zh-CN' | 'zh-TW' | 'en' | null
   guidance_language: string
   level_framework: string | null
   level_code: string | null
@@ -744,6 +745,8 @@ export type ReadingGrammar = {
 export type ReadingWord = { text: string; pinyin: string }
 
 export type ReadingPassage = {
+  level_framework?: string | null
+  level_code?: string | null
   id: string
   session_id: string
   question_id: string

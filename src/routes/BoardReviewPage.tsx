@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { Eye, EyeSlash, X } from '@phosphor-icons/react'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -50,24 +51,24 @@ export function BoardReviewPage() {
     <main className="board-review-page">
       <header className="board-review-heading">
         <div>
-          <h1>{question?.title || '討論板'}</h1>
+          <h1>{question?.title || uiText("討論板")}</h1>
           {question?.prompt_text && <p>{question.prompt_text}</p>}
         </div>
         <div className="board-review-actions">
-          <span className="muted">{live.length} 則 · {contributors} 人</span>
+          <span className="muted">{live.length} {uiText("則 · ")}{contributors} {uiText("人")}</span>
           <button
             className="ghost-button"
             disabled={busy || !question}
             type="button"
             onClick={() => void run({ action: 'set_board_visibility', questionId, shared: !revealed })}
           >
-            {revealed ? <><EyeSlash size={16} />自行作答</> : <><Eye size={16} />開放瀏覽</>}
+            {revealed ? <><EyeSlash size={16} />{uiText("自行作答")}</> : <><Eye size={16} />{uiText("開放瀏覽")}</>}
           </button>
           {/* This window draws its own frame, so it draws its own way out. */}
           <button
-            aria-label="關閉討論板視窗"
+            aria-label={uiText("關閉討論板視窗")}
             className="icon-button"
-            title="關閉"
+            title={uiText("關閉")}
             type="button"
             onClick={() => window.lingoActDesktop?.close()}
           >
@@ -75,10 +76,10 @@ export function BoardReviewPage() {
           </button>
         </div>
       </header>
-      {error && <p className="error">{error}</p>}
-      {!revealed && question && <p className="muted">學生現在只看得到自己貼的。</p>}
+      {error && <p className="error">{uiText(error)}</p>}
+      {!revealed && question && <p className="muted">{uiText("學生現在只看得到自己貼的。")}</p>}
       {question?.share_screenshot && snapshot?.imageUrl && (
-        <img alt="討論板主題" className="board-review-image" src={snapshot.imageUrl} />
+        <img alt={uiText("討論板主題")} className="board-review-image" src={snapshot.imageUrl} />
       )}
       <BoardWall
         anonymous={Boolean(snapshot?.posts.some((post) => post.anonymous_at_display))}

@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { DownloadSimple, Eye, EyeSlash, PushPin, PushPinSlash } from '@phosphor-icons/react'
 import { boardFileName, isImageCard } from '../lib/boardCards'
 import { repliesByParent, sortedBoardPosts } from '../lib/boardData'
@@ -20,7 +21,7 @@ export function BoardWall({ anonymous, busy, posts, reactions, onSetState }: Pro
   const cards = sortedBoardPosts(posts)
   const replies = repliesByParent(posts)
 
-  if (!cards.length) return <p className="muted">還沒有人貼東西。</p>
+  if (!cards.length) return <p className="muted">{uiText("還沒有人貼東西。")}</p>
 
   return (
     <div className="board-wall">
@@ -39,9 +40,9 @@ export function BoardWall({ anonymous, busy, posts, reactions, onSetState }: Pro
                   class was shown, not a fact about the card, and the person
                   giving out points has to know whose work it is. */}
               <strong>{card.participant_name}</strong>
-              {anonymous && <span className="board-wall-tag">班上匿名</span>}
-              {card.deleted_at && <span className="board-wall-tag">學生刪除</span>}
-              {card.hidden_at && <span className="board-wall-tag">已收起</span>}
+              {anonymous && <span className="board-wall-tag">{uiText("班上匿名")}</span>}
+              {card.deleted_at && <span className="board-wall-tag">{uiText("學生刪除")}</span>}
+              {card.hidden_at && <span className="board-wall-tag">{uiText("已收起")}</span>}
             </header>
 
             {card.kind === 'text' && <p className="board-wall-text">{card.body}</p>}
@@ -78,7 +79,7 @@ export function BoardWall({ anonymous, busy, posts, reactions, onSetState }: Pro
               <footer className="board-wall-actions">
                 <button
                   disabled={busy}
-                  title={card.pinned_at ? '取消置頂' : '置頂'}
+                  title={card.pinned_at ? uiText("取消置頂") : uiText("置頂")}
                   type="button"
                   onClick={() => onSetState(card.id, { pinned: !card.pinned_at })}
                 >
@@ -86,7 +87,7 @@ export function BoardWall({ anonymous, busy, posts, reactions, onSetState }: Pro
                 </button>
                 <button
                   disabled={busy}
-                  title={card.hidden_at ? '重新顯示' : '對全班收起'}
+                  title={card.hidden_at ? uiText("重新顯示") : uiText("對全班收起")}
                   type="button"
                   onClick={() => onSetState(card.id, { hidden: !card.hidden_at })}
                 >

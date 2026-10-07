@@ -6,8 +6,8 @@ import { DEFAULT_TRACK, resolveFramework, resolveTrack, teachingTrackIds } from 
 import { FRAMEWORKS } from '../_shared/proficiency.ts'
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const speakerLanguages = new Set(['zh-tw', 'en'])
-const interpretationLanguagesSupported = new Set(['zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'])
+const speakerLanguages = new Set(['zh-cn', 'zh-tw', 'en'])
+const interpretationLanguagesSupported = new Set(['zh-cn', 'zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'])
 
 function normalizedLanguage(value: unknown, supported: Set<string>, fallback = 'zh-tw') {
   return typeof value === 'string' && supported.has(value) ? value : fallback
@@ -46,7 +46,15 @@ Deno.serve(async (req) => {
     // it takes more than the publishable key every student already holds.
     if (ownerKeyConfigured() && !isOwner(input)) return jsonResponse({ message: ownerRefusalMessage(input) }, 403)
     const title = typeof input.title === 'string' ? input.title.trim().slice(0, 120) : ''
-    const sourceLanguage = normalizedLanguage(input.captionSourceLanguage, speakerLanguages)
+    const systemLanguage = input.appProfile === 'sc'
+      ? ['zh-CN', 'zh-TW', 'en'].includes(input.systemLanguage) ? input.systemLanguage : 'zh-CN'
+      : null
+    const scFramework = systemLanguage === 'zh-CN' ? 'hsk'
+      : systemLanguage === 'zh-TW' ? input.levelFramework === 'tocfl' ? 'tocfl' : 'tbcl'
+        : ['hsk', 'tocfl', 'tbcl'].includes(input.levelFramework) ? input.levelFramework : 'hsk'
+    const scTrack = scFramework === 'hsk' ? 'putonghua' : 'huayu'
+    const sourceLanguage = normalizedLanguage(input.captionSourceLanguage, speakerLanguages,
+      systemLanguage && scFramework === 'hsk' ? 'zh-cn' : 'zh-tw')
     const interpretationLanguages = Array.isArray(input.interpretationLanguages)
       ? [...new Set(input.interpretationLanguages.filter((language: unknown): language is string => (
         typeof language === 'string' && interpretationLanguagesSupported.has(language) && language !== sourceLanguage
@@ -58,22 +66,23 @@ Deno.serve(async (req) => {
     // reading annotation, the proficiency ladder and the language questions are
     // written in, and a junk value would surface much later as a clip in the
     // wrong accent or a quiz in the wrong language.
-    const teachingTrack = teachingTrackIds.has(input.teachingLanguage) ? input.teachingLanguage as string : DEFAULT_TRACK
-    const guidanceLanguage = guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : 'zh-TW'
+    const teachingTrack = systemLanguage ? scTrack : teachingTrackIds.has(input.teachingLanguage) ? input.teachingLanguage as string : DEFAULT_TRACK
+    const guidanceLanguage = systemLanguage || (guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : 'zh-TW')
 
     // A track offers only its own ladders — English has three, most languages
     // one — and a level only counts if it belongs to the ladder that was
     // chosen. Neither pairing is left to the caller: a nonsensical one produces
     // questions at the wrong difficulty instead of failing loudly.
     const track = resolveTrack(teachingTrack)
-    const levelFramework = resolveFramework(teachingTrack, input.levelFramework)
+    const levelFramework = resolveFramework(teachingTrack, systemLanguage ? scFramework : input.levelFramework)
     const levelCode = typeof input.levelCode === 'string'
       && FRAMEWORKS[levelFramework].levels.some((level) => level.code === input.levelCode)
       ? input.levelCode as string
       : null
-    const readingAnnotation = ['none', 'zhuyin', 'pinyin'].includes(input.readingAnnotation)
+    const readingAnnotation = teachingTrack === 'putonghua' ? 'pinyin' : ['none', 'zhuyin', 'pinyin'].includes(input.readingAnnotation)
       ? input.readingAnnotation as string
       : track.id === 'guoyu' ? 'zhuyin' : 'none'
+    if (levelFramework === 'hsk' && !levelCode) return jsonResponse({ message: '请选择 HSK 级别。 / Choose an HSK level.' }, 400)
     const presenterToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')
     const tokenHash = await hashPresenterToken(presenterToken)
     const supabase = getAdminClient()
@@ -98,6 +107,7 @@ Deno.serve(async (req) => {
           interpretation_audio_enabled: interpretationAudioEnabled,
           interpretation_languages: interpretationAudioEnabled ? interpretationLanguages : [],
           teaching_language: teachingTrack,
+          system_language: systemLanguage,
           guidance_language: guidanceLanguage,
           level_framework: levelFramework,
           level_code: levelCode,

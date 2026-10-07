@@ -2,6 +2,7 @@ import { APP_PROFILE, profileAllowsTrack } from './appProfiles'
 import { resolveTrack } from './teachingTracks'
 import { frameworkById } from './proficiency'
 import { GUIDANCE_LOCALES } from './participantI18n'
+import { uiText } from './uiText'
 
 export type CoursePreset = {
   title: string
@@ -23,7 +24,7 @@ const KEY = APP_PROFILE.id === 'full'
 const defaultTrack = resolveTrack(APP_PROFILE.defaultTrack)
 
 export const defaultCourse: CoursePreset = {
-  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: 'zh-TW',
+  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: APP_PROFILE.id === 'sc' ? 'zh-CN' : 'zh-TW',
   levelFramework: defaultTrack.frameworks[0], levelCode: '',
   readingAnnotation: defaultTrack.annotation,
 }
@@ -66,6 +67,6 @@ export function courseSummary(course: CoursePreset): string {
   const framework = frameworkById(course.levelFramework)
   return [resolveTrack(course.teachingTrack).label, framework?.short,
     framework?.levels.find((level) => level.code === course.levelCode)?.label,
-    GUIDANCE_LOCALES.find((locale) => locale.code === course.guidanceLanguage)?.label,
-  ].filter(Boolean).join(' · ')
+    APP_PROFILE.id === 'sc' ? null : GUIDANCE_LOCALES.find((locale) => locale.code === course.guidanceLanguage)?.label,
+  ].filter(Boolean).map((text) => uiText(text as string)).join(' · ')
 }

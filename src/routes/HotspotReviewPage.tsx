@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useState } from 'react'
 import { Cursor, X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
@@ -5,7 +6,7 @@ import { HotspotImage } from '../components/HotspotImage'
 import { getPresenterToken } from '../lib/presenterAuth'
 import { parsePins, pinColor, pinLabel } from '../lib/hotspot'
 import { requireSupabase } from '../lib/supabase'
-import { PresenterLocaleContext, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
+import { PresenterLanguageScope, presenterLocaleFor, presenterLookup } from '../lib/presenterI18n'
 
 type HotspotResult = {
   question: { id: string; title: string; prompt_text: string | null; max_pins: number | null }
@@ -37,13 +38,13 @@ export function HotspotReviewPage() {
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_hotspot_result', sessionId, presenterToken, questionId },
       }),
-      supabase.from('sessions').select('teaching_language, anonymous_enabled').eq('id', sessionId).maybeSingle(),
+      supabase.from('sessions').select('system_language, teaching_language, anonymous_enabled').eq('id', sessionId).maybeSingle(),
     ])
     if (loadError || !data?.question) {
       setError(data?.message || t('cloudUpdateFailed', { message: '' }))
       return
     }
-    setLocale(presenterLocaleFor((sessionRow as { teaching_language?: string } | null)?.teaching_language || null))
+    setLocale(presenterLocaleFor(sessionRow?.teaching_language || null, sessionRow?.system_language))
     setResult(data as HotspotResult)
     setError('')
   }, [questionId, sessionId, t])
@@ -63,7 +64,7 @@ export function HotspotReviewPage() {
   })))
 
   return (
-    <PresenterLocaleContext.Provider value={locale}>
+    <PresenterLanguageScope value={locale}>
     <main className="hotspot-review-window">
       <header>
         <div>
@@ -78,7 +79,7 @@ export function HotspotReviewPage() {
           <X size={24} />
         </button>
       </header>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{uiText(error)}</p>}
       {result && (
         <>
           <p className="muted">{t('hotspotTally', { people: answers.length, pins: pins.length })}</p>
@@ -89,6 +90,6 @@ export function HotspotReviewPage() {
       )}
       {!result && !error && <p className="muted">{t('loadingSession')}</p>}
     </main>
-    </PresenterLocaleContext.Provider>
+    </PresenterLanguageScope>
   )
 }

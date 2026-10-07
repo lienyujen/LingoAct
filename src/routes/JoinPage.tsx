@@ -10,6 +10,7 @@ import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import type { Participant, Session } from '../types'
+import { setUiLanguage, uiText } from '../lib/uiText'
 
 export function JoinPage() {
   const { sessionId: sessionReference = '' } = useParams()
@@ -21,6 +22,7 @@ export function JoinPage() {
   const [sessionLookupError, setSessionLookupError] = useState('')
   const [returning, setReturning] = useState(false)
   const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
+  useEffect(() => { setUiLanguage(locale) }, [locale])
   // The teacher's 導引語 is the starting point and it wins on a change; a
   // student's own pick stands until then. Same rule as the class page, so
   // arriving through either door lands on the same language.
@@ -200,7 +202,7 @@ export function JoinPage() {
             placeholder={participantText(locale, 'namePlaceholder')}
           />
         </label>
-        {(error || sessionLookupError) && <p className="error">{error || sessionLookupError}</p>}
+        {(error || sessionLookupError) && <p className="error">{uiText(error || sessionLookupError)}</p>}
         <button disabled={busy || !session || Boolean(sessionLookupError)} type="submit">
           {participantText(locale, busy ? 'joining' : session?.status === 'ended' ? 'viewClass' : 'joinAction')}
           {!busy && <ArrowRight size={18} />}

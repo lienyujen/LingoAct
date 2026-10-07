@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { ArrowCounterClockwise, Check, Cursor, Eraser, Pen, TextT, Trash, X } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { participantText } from '../lib/participantI18n'
@@ -563,8 +564,8 @@ export function BoardDrawing({ busy, locale, backgroundUrl, onSubmit }: Props) {
                 if (event.key === 'Escape') setTyping(null)
               }}
             />
-            <button aria-label="確定" type="button" onClick={commitText}><Check size={16} /></button>
-            <button aria-label="取消" className="ghost-button" type="button" onClick={() => setTyping(null)}><X size={16} /></button>
+            <button aria-label={uiText("確定")} type="button" onClick={commitText}><Check size={16} /></button>
+            <button aria-label={uiText("取消")} className="ghost-button" type="button" onClick={() => setTyping(null)}><X size={16} /></button>
           </div>
         )}
       </div>

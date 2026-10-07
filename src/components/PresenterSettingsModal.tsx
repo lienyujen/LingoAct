@@ -1,3 +1,4 @@
+import { uiText } from '../lib/uiText'
 import { ArrowsClockwise, Gear, Microphone, Translate, X } from '@phosphor-icons/react'
 import { LanguagePairFields } from './LanguagePairFields'
 import { resolveFramework, resolveTrack } from '../lib/teachingTracks'
@@ -6,6 +7,7 @@ import type { FormEvent } from 'react'
 import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES, defaultInterpretationLanguages } from '../lib/captionLanguages'
 import type { Session } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
+import { scTeachingMode } from '../lib/scTeachingMode'
 
 export type PresenterCaptionSettings = {
   sourceLanguage: string
@@ -145,6 +147,7 @@ export function PresenterSettingsModal({
 
   function submit(event: FormEvent) {
     event.preventDefault()
+    if (levelFramework === 'hsk' && !levelCode) return
     onSave(
       { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages },
       microphoneId,
@@ -168,6 +171,7 @@ export function PresenterSettingsModal({
         <section className="presenter-settings-section">
           <div className="presenter-settings-section-heading"><span><Translate size={17} />{t('courseLanguages')}</span></div>
           <LanguagePairFields
+            systemLanguage={session.system_language}
             guidanceLanguage={guidanceLanguage}
             levelCode={levelCode}
             levelFramework={levelFramework}
@@ -177,6 +181,11 @@ export function PresenterSettingsModal({
             onFrameworkChange={(id) => {
               setLevelFramework(id)
               setLevelCode('')
+              if (session.system_language) {
+                const mode = scTeachingMode(session.system_language, id)
+                setTeachingTrack(mode.teachingTrack)
+                setReadingAnnotation(mode.annotation)
+              }
             }}
             onGuidanceChange={setGuidanceLanguage}
             onLevelChange={setLevelCode}
@@ -298,10 +307,10 @@ export function PresenterSettingsModal({
           <p className="muted caption-cost-note">{t('captionCostNote')}</p>
         </section>
 
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{uiText(error)}</p>}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onClose}>{t('cancel')}</button>
-          <button disabled={busy || (interpretationAudioEnabled && !interpretationLanguages.length)} type="submit">
+          <button disabled={busy || (levelFramework === 'hsk' && !levelCode) || (interpretationAudioEnabled && !interpretationLanguages.length)} type="submit">
             <Gear size={17} />{busy ? t('saving') : t('saveSettings')}
           </button>
         </div>

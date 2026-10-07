@@ -1,6 +1,22 @@
 import { callAiJson, errorDetail } from './ai.ts'
 import { levelInstruction } from './proficiency.ts'
 import { trackInstruction } from './teaching.ts'
+import { usesMainlandFeedback } from './feedback-language.ts'
+import type { FeedbackSettings } from './feedback-language.ts'
+
+type PictureLanguage = { trackId: string | null; framework: string | null; settings?: FeedbackSettings }
+function mainlandPicture(input: PictureLanguage) {
+  return usesMainlandFeedback({ ...input.settings, teaching_language: input.trackId, level_framework: input.framework })
+}
+export function pictureLanguageRules(rules: string, input: PictureLanguage) {
+  if (!mainlandPicture(input)) return rules
+  return [
+    rules.replaceAll('Traditional Chinese', 'Mainland standard Simplified Chinese')
+      .replace("For a class in Taiwan that means 便利商店, 夜市, 捷運, 騎樓, 早餐店, 學校走廊", 'For this Mainland Chinese class that means 便利店、超市、地铁、公交站、早餐店、学校走廊')
+      .replace('who is teaching in Taiwan', 'who is teaching Mainland standard Chinese'),
+    'SCRIPT AND STANDARD: Write all Chinese output directly in natural Mainland standard Simplified Chinese, including title, cast, panels, target_words, pattern, spoken_prompt, written_prompt, order_prompt and caution. Use standard Putonghua and HSK vocabulary and grammar at the selected class level. Do not use Traditional characters, Taiwan regional vocabulary or Bopomofo. Keep the task instructions short and understandable at that level; do not reveal the answer.',
+  ].join('\n\n')
+}
 
 // 看圖說寫: a four-panel picture the class describes or narrates.
 //
@@ -123,9 +139,10 @@ export async function describePictureSource(input: {
   framework: string | null
   levelCode: string | null
   direction: string
+  settings?: FeedbackSettings
 }): Promise<PictureStoryboard & { caution: string }> {
   const systemPrompt = [
-    DESCRIBE_RULES,
+    pictureLanguageRules(DESCRIBE_RULES, input),
     trackInstruction(input.trackId),
     levelInstruction(input.framework, input.levelCode, input.direction),
   ].join('\n\n')
@@ -144,7 +161,7 @@ export async function describePictureSource(input: {
     ? output.target_words.map((word) => cleanLine(word, 40)).filter(Boolean).slice(0, 8)
     : []
   return {
-    title: cleanLine(output.title, 80) || '看圖說寫',
+    title: cleanLine(output.title, 80) || (mainlandPicture(input) ? '看图说写' : '看圖說寫'),
     // A captured picture has no cast to keep consistent and no panels: nothing
     // is being drawn, so both stay empty and 排順序 is not offered for it.
     cast: '',
@@ -163,9 +180,10 @@ export async function planPictureStory(input: {
   framework: string | null
   levelCode: string | null
   direction: string
+  settings?: FeedbackSettings
 }): Promise<PictureStoryboard> {
   const systemPrompt = [
-    STORYBOARD_RULES,
+    pictureLanguageRules(STORYBOARD_RULES, input),
     trackInstruction(input.trackId),
     levelInstruction(input.framework, input.levelCode, input.direction),
   ].join('\n\n')
@@ -197,7 +215,7 @@ export async function planPictureStory(input: {
     : []
 
   return {
-    title: cleanLine(output.title, 60) || '看圖說寫',
+    title: cleanLine(output.title, 60) || (mainlandPicture(input) ? '看图说写' : '看圖說寫'),
     cast: cleanLine(output.cast, 400),
     panels,
     targetWords,

@@ -827,12 +827,12 @@ Deno.serve(async (req) => {
     // type, no student view and no results view of its own.
     if (action === 'generate_picture') {
       const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 500) : ''
-      const { data: classRow } = await supabase.from('sessions')
-        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+      const classRow = await classFeedbackSettings(supabase, sessionId)
 
       let storyboard
       try {
         storyboard = await planPictureStory({
+          settings: classRow,
           trackId: classRow?.teaching_language ?? null,
           framework: classRow?.level_framework ?? null,
           levelCode: classRow?.level_code ?? null,
@@ -866,11 +866,11 @@ Deno.serve(async (req) => {
       // screen and well inside what the model accepts.
       if (base64.length > 11_000_000) return jsonResponse({ message: '圖片太大，請框選小一點的範圍。' }, 413)
 
-      const { data: classRow } = await supabase.from('sessions')
-        .select('teaching_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+      const classRow = await classFeedbackSettings(supabase, sessionId)
 
       try {
         const storyboard = await describePictureSource({
+          settings: classRow,
           image: { mimeType, base64 },
           trackId: classRow?.teaching_language ?? null,
           framework: classRow?.level_framework ?? null,

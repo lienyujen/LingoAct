@@ -36,7 +36,7 @@
     "test:sc": "node --test scripts/test-sc-teaching.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --force",
-    "test:feedback": "node --test scripts/test-feedback-language.mjs"
+    "test:feedback": "node --test scripts/test-feedback-language.mjs scripts/test-learning-translation.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "5.3.0",

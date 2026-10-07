@@ -18,12 +18,15 @@ export const GUIDANCE_LOCALES = [
   { code: 'fr', label: 'Français', short: 'FR' },
   { code: 'de', label: 'Deutsch', short: 'DE' },
   { code: 'vi', label: 'Tiếng Việt', short: 'VI' },
+  { code: 'th', label: 'ภาษาไทย', short: 'TH' },
+  { code: 'id', label: 'Bahasa Indonesia', short: 'ID' },
 ] as const
 
 export type ParticipantLocale = (typeof GUIDANCE_LOCALES)[number]['code']
 
 const messages = {
   'zh-TW': {
+    translating: '翻譯中…', translationUnavailable: '暫時無法翻譯，先顯示英文說明。',
     language: '語言', chinese: '繁體中文', english: 'English', courseEnded: '課程已結束', classDismissed: '下課啦！',
     thankYou: '謝謝你的參與。', aiSummary: 'AI 課程總結', todayHighlights: '今天的課程重點', lessonKeyPoints: '課堂重點整理',
     learningReview: '學習整理', strengths: '本次掌握的重點', reviewMore: '可以再複習', sharedResources: '課堂文字與連結',
@@ -163,6 +166,7 @@ const messages = {
     recordAgain: '重錄一次',
   },
   en: {
+    translating: 'Translating…', translationUnavailable: 'Translation is temporarily unavailable. Showing the English explanation.',
     language: 'Language', chinese: "Traditional Chinese", english: 'English', courseEnded: 'Class ended', classDismissed: "Class dismissed!",
     thankYou: 'Thank you for participating.', aiSummary: 'AI class summary', todayHighlights: 'Today’s class highlights', lessonKeyPoints: 'Key takeaways',
     learningReview: 'Learning review', strengths: "What you learned", reviewMore: "What to review", sharedResources: 'Class text and links',

@@ -853,6 +853,8 @@ export const scPresenterMessages: Record<string, string> = {
   "sendNow": "立即发送"
 }
 export const scParticipantMessages: Record<string, string> = {
+  "translating": "翻译中…",
+  "translationUnavailable": "暂时无法翻译，先显示英文说明。",
   "language": "语言",
   "chinese": "繁体中文",
   "english": "English",

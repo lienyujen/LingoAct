@@ -110,6 +110,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
           </div>
           {(graded || marked) && <strong className="quiz-total-score">{data.attempt.total_score}/{data.attempt.max_score}</strong>}
         </div>
+        {data.translation_status && <p className="muted">{participantText(locale, data.translation_status === 'pending' ? 'translating' : 'translationUnavailable')}</p>}
         {data.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(data.attempt.feedback, locale)}</p>}
         {pictureWriting && pictureSegments.length > 0 && (
           <div className="participant-picture-writing-review">

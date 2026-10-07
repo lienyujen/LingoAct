@@ -1,3 +1,4 @@
+import { useClassChineseFont } from '../lib/classChineseFont'
 import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -63,6 +64,7 @@ export function ParticipantPage() {
   const participantToken = localStorage.getItem(`lingoact_participant_token_${sessionId}`)
   const [participant, setParticipant] = useState<Participant | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  useClassChineseFont(session)
   const [question, setQuestion] = useState<Question | null>(null)
   const [answer, setAnswer] = useState<Answer | null>(null)
   const [audioResponse, setAudioResponse] = useState<AudioResponse | null>(null)
@@ -113,6 +115,7 @@ export function ParticipantPage() {
   useEffect(() => { setUiLanguage(locale) }, [locale])
   const loadSequence = useRef(0)
   const loadedQuizQuestionId = useRef('')
+  const historyDetailLocales = useRef<Record<string, string>>({})
   const navigate = useNavigate()
   const location = useLocation()
   // Also tells the class whether anyone is at the front of the room.
@@ -303,6 +306,7 @@ export function ParticipantPage() {
             participantId,
             participantToken,
             questionId: nextQuestion.id,
+            locale,
           },
         })
         if (requestId !== loadSequence.current) return
@@ -421,7 +425,7 @@ export function ParticipantPage() {
 
   const loadHistoryDetails = useCallback(async (historyQuestion: Question) => {
     if (!participantId || !participantToken || !['custom_quiz', 'pronunciation', 'oral_response'].includes(historyQuestion.type)) return
-    if (historyQuizData[historyQuestion.id] || historyAudioResponses[historyQuestion.id]) return
+    if ((historyQuizData[historyQuestion.id] || historyAudioResponses[historyQuestion.id]) && historyDetailLocales.current[historyQuestion.id] === locale) return
     setHistoryLoadingQuestionIds((current) => new Set(current).add(historyQuestion.id))
     try {
       const action = historyQuestion.type === 'custom_quiz' ? 'get_custom_quiz' : 'get_recording_result'
@@ -429,6 +433,8 @@ export function ParticipantPage() {
         body: { action, sessionId, participantId, participantToken, questionId: historyQuestion.id, locale },
       })
       if (detailError) throw detailError
+      if (localeRef.current !== locale) return
+      if (!data?.translation_status && !data?.response?.translation_status) historyDetailLocales.current[historyQuestion.id] = locale
       if (historyQuestion.type === 'custom_quiz') {
         setHistoryQuizData((current) => ({ ...current, [historyQuestion.id]: participantQuizPayload(data, historyQuestion.id) }))
       } else {
@@ -1027,6 +1033,7 @@ export function ParticipantPage() {
           to find the text is being asked to answer from memory. */}
       {passage && (
         <ReadingPassageView
+          learningCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined}
           activeCue={readingCue}
           cues={question?.karaoke_cues}
           imageUrl={passageImageUrl}

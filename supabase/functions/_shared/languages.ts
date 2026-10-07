@@ -4,7 +4,7 @@
 // Mirrors GUIDANCE_LOCALES in src/lib/participantI18n.ts — Edge Functions and
 // the browser bundle share no module graph. The teaching side of the pair lives
 // in _shared/teaching.ts, which carries more than a list of codes.
-export const guidanceLanguages = new Set(['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi'])
+export const guidanceLanguages = new Set(['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'])
 
 // Named for a model rather than for a locale switch: 寫作教練 explains a draft
 // to the learner, and explaining happens in the language they understand best.
@@ -18,6 +18,8 @@ const guidanceNames: Record<string, string> = {
   fr: 'French (français)',
   de: 'German (Deutsch)',
   vi: 'Vietnamese (Tiếng Việt)',
+  th: 'Thai (ภาษาไทย)',
+  id: 'Indonesian (Bahasa Indonesia)',
 }
 
 export function guidanceLanguageName(code: string | null | undefined) {

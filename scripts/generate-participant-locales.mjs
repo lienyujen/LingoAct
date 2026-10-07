@@ -22,6 +22,8 @@ const targets = [
   { code: 'fr', name: 'French' },
   { code: 'de', name: 'German' },
   { code: 'vi', name: 'Vietnamese' },
+  { code: 'th', name: 'Thai' },
+  { code: 'id', name: 'Indonesian' },
 ]
 
 function geminiKey() {

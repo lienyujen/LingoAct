@@ -853,6 +853,8 @@
     "sendNow": "Send now"
   },
   "src/lib/participantI18n.ts": {
+    "translating": "Translating…",
+    "translationUnavailable": "Translation is temporarily unavailable. Showing the English explanation.",
     "language": "Language",
     "chinese": "Traditional Chinese",
     "english": "English",

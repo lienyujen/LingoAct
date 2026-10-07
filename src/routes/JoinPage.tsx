@@ -1,3 +1,4 @@
+import { useClassChineseFont } from '../lib/classChineseFont'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowRight, User, Waves } from '@phosphor-icons/react'
@@ -15,6 +16,7 @@ import { setUiLanguage, uiText } from '../lib/uiText'
 export function JoinPage() {
   const { sessionId: sessionReference = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
+  useClassChineseFont(session)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

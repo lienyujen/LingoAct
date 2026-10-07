@@ -136,6 +136,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
     const analysis = localizedFields(originalAnalysis?.translations, locale) || originalAnalysis
     return (
       <div className="audio-response-card" aria-live="polite">
+        {response.translation_status && <p className="muted">{participantText(locale, response.translation_status === 'pending' ? 'translating' : 'translationUnavailable')}</p>}
         {question.status === 'active' ? (
           <div className="audio-sent-row">
             <p className="success">{participantText(locale, 'recordingSent')}</p>

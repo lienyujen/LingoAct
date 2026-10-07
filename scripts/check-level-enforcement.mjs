@@ -23,6 +23,7 @@ const ROOT = 'supabase/functions'
 // Exempt, and why. "It does not generate anything a student reads" is the only
 // argument that works here; "it seemed fine" is not one.
 const EXEMPT = {
+  '_shared/learning-translation.ts': 'translates existing explanations faithfully; preserves their meaning, difficulty and Chinese teaching references without generating or grading new content',
   '_shared/ai.ts': 'the transport itself — it carries prompts, it does not write them',
   '_shared/listening.ts': 'text-to-speech and karaoke timings; the words are decided before it is called',
   '_shared/file-analysis.ts': 'marks against the level its caller supplies as classInstruction; presenter-action builds it for every submission',

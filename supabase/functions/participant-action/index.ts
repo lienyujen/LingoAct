@@ -5,6 +5,7 @@ import { gradeCustomQuizAttempt, translateFlashcardItems } from '../_shared/cust
 import { getAdminClient, hashParticipantToken } from '../_shared/supabase.ts'
 import { askWritingCoach } from '../_shared/writing-coach.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
+import { cachedLearningTranslation, demandTranslationLocales, explanationSource, translateQuizFeedback, translateFileFeedback, translateAudioFeedback, type TranslationSource } from '../_shared/learning-translation.ts'
 import { classFeedbackSettings } from '../_shared/feedback-language.ts'
 import { classLevelInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
@@ -117,6 +118,37 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const participantId = typeof input.participantId === 'string' ? input.participantId : ''
     const participantToken = typeof input.participantToken === 'string' ? input.participantToken : ''
+    if (action === 'get_reading_translation') {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: 'Participant authorization failed.' }, 403)
+      const locale = typeof input.locale === 'string' ? input.locale : ''
+      if (!demandTranslationLocales.has(locale)) return jsonResponse({ values: {} })
+      if (!validUuid(input.questionId)) return jsonResponse({ message: 'Invalid question.' }, 400)
+      const { data: readingQuestion, error: readingQuestionError } = await supabase.from('questions')
+        .select('type, status').eq('id', input.questionId).eq('session_id', sessionId).maybeSingle()
+      if (readingQuestionError) throw readingQuestionError
+      if (!readingQuestion || readingQuestion.status === 'draft') return jsonResponse({ values: {} })
+      if (readingQuestion.type === 'custom_quiz' && readingQuestion.status === 'active') {
+        const { data: readingAttempt, error: readingAttemptError } = await supabase.from('quiz_attempts')
+          .select('status').eq('question_id', input.questionId).eq('participant_id', participantId).maybeSingle()
+        if (readingAttemptError) throw readingAttemptError
+        if (!['graded', 'submitted', 'failed'].includes(readingAttempt?.status || '')) return jsonResponse({ values: {} })
+      }
+      const { data: passage, error } = await supabase.from('reading_passages')
+        .select('vocabulary, grammar').eq('question_id', input.questionId).eq('session_id', sessionId).maybeSingle()
+      if (error) throw error
+      if (!passage) return jsonResponse({ values: {} })
+      const sources: Record<string, TranslationSource> = {}
+      for (const [index, entry] of (passage.vocabulary || []).entries()) {
+        const source = explanationSource(entry.gloss)
+        if (source && !entry.gloss?.[locale]) sources[`word:${index}`] = source
+      }
+      for (const [index, entry] of (passage.grammar || []).entries()) {
+        const source = explanationSource(entry.note)
+        if (source && !entry.note?.[locale]) sources[`grammar:${index}`] = source
+      }
+      return jsonResponse(await cachedLearningTranslation(supabase, sessionId, locale, sources))
+    }
     if (['teaching_context', 'teaching_pair_submit'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限驗證失敗。' }, 403)
@@ -251,7 +283,8 @@ Deno.serve(async (req) => {
           if (error) throw error
           coachTurns = data || []
         }
-        return jsonResponse({ quiz, items: items || [], attempt: attempt || null, answers, coachTurns, reviewAnswers })
+        const translated = await translateQuizFeedback(supabase, sessionId, requestedLocale, attempt, answers)
+        return jsonResponse({ quiz, items: items || [], ...translated, coachTurns, reviewAnswers })
       }
 
       if (!quiz) return jsonResponse({ message: '自訂測驗仍在出題中，請稍候。' }, 409)
@@ -904,7 +937,7 @@ Deno.serve(async (req) => {
       // says nothing about which photograph it was. The URL is built on the
       // page, against the backend that page actually joined — see fileLinks.ts
       // — and the bucket is public, so there is no token to go stale.
-      return jsonResponse({ responses: rows || [] })
+      return jsonResponse(await translateFileFeedback(supabase, sessionId, typeof input.locale === 'string' ? input.locale : '', rows || []))
     }
     if (['prepare_recording_upload', 'submit_recording', 'get_recording_result', 'discard_recording'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
@@ -956,7 +989,7 @@ Deno.serve(async (req) => {
           .createSignedUrl(response.storage_path, 3600)
         if (signedError) throw signedError
         const { storage_path: _storagePath, ...safeResponse } = response
-        return jsonResponse({ response: { ...safeResponse, signed_url: signed.signedUrl } })
+        return jsonResponse({ response: await translateAudioFeedback(supabase, sessionId, typeof input.locale === 'string' ? input.locale : '', { ...safeResponse, signed_url: signed.signedUrl }) })
       }
 
       // What the teacher's AI made of this student's own upload.

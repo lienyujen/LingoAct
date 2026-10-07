@@ -139,6 +139,8 @@ const verdictKeys = {
 // The marking is written in both languages; which one a student reads follows
 // the language they are on, the same as every other AI text on this page.
 function inLocale(analysis: FileAnalysis, locale: ParticipantLocale) {
+  const translated = analysis.translations?.[locale]
+  if (translated) return translated
   const chinese = locale === 'zh-TW' || locale === 'zh-CN'
   return {
     summary: (chinese ? analysis.summary_zh_tw : analysis.summary_en) || analysis.summary_zh_tw || '',
@@ -169,23 +171,26 @@ export function MyUploadMarking({ sessionId, questionId, participantId, particip
   poll?: boolean
 }) {
   const [responses, setResponses] = useState<MyResponse[]>([])
+  const [translationStatus, setTranslationStatus] = useState<'pending' | 'failed' | undefined>()
 
   useEffect(() => {
     if (!sessionId || !questionId || !participantId || !participantToken) return
     let active = true
+    let retryTimer: number | undefined
     async function load() {
       const { data } = await requireSupabase().functions.invoke('participant-action', {
-        body: { action: 'get_my_file_responses', sessionId, questionId, participantId, participantToken },
+        body: { action: 'get_my_file_responses', sessionId, questionId, participantId, participantToken, locale },
       })
-      if (active) setResponses((data?.responses || []) as MyResponse[])
+      if (active) { setResponses((data?.responses || []) as MyResponse[]); setTranslationStatus(data?.translation_status) }
+      if (active && !poll && data?.translation_status === 'pending') retryTimer = window.setTimeout(() => void load(), 1800)
     }
     void load()
-    if (!poll) return () => { active = false }
+    if (!poll) return () => { active = false; window.clearTimeout(retryTimer) }
     const timer = window.setInterval(() => void load(), 8000)
     return () => { active = false; window.clearInterval(timer) }
-  }, [sessionId, questionId, participantId, participantToken, poll])
+  }, [sessionId, questionId, participantId, participantToken, poll, locale])
 
-  return <MyUploadList locale={locale} responses={responses} />
+  return <>{translationStatus && <p className="muted">{participantText(locale, translationStatus === 'pending' ? 'translating' : 'translationUnavailable')}</p>}<MyUploadList locale={locale} responses={responses} /></>
 }
 
 // Just the drawing of it, so what a student sees can be looked at without a

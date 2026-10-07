@@ -1,3 +1,4 @@
+import { useReadingTranslation, type LearningCredentials } from '../lib/useReadingTranslation'
 import { uiText } from '../lib/uiText'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -9,6 +10,7 @@ import type { KaraokeCue, ReadingPassage, ReadingGrammar, ReadingVocabulary } fr
 
 type Props = {
   passage: ReadingPassage
+  learningCredentials?: LearningCredentials
   locale: ParticipantLocale
   // The capture the passage was written from, when the teacher chose to show
   // it. A photograph belongs with the text; a page of source material does not,
@@ -202,16 +204,21 @@ function glossFor(gloss: Record<string, string> | undefined, locale: Participant
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
 }
 
-export function ReadingPassageView({ passage, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false }: Props) {
+export function ReadingPassageView({ passage: originalPassage, learningCredentials, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false }: Props) {
   // The student's own switches, separate from the teacher's. A teacher who
   // turned the grammar on wants it available; a reader who finds it busy can
   // put it away without losing the vocabulary colouring, and the other way
   // round. They start on for a passage sent to be read — and off under a quiz,
   // where they would be the answer key.
+  const translation = useReadingTranslation(originalPassage, locale, learningCredentials, locked)
+  const passage = translation.passage
   const [showGrammar, setShowGrammar] = useState(!locked)
   const [showWords, setShowWords] = useState(!locked)
   const [showRuby, setShowRuby] = useState(false)
-  const [open, setOpen] = useState<Mark | null>(null)
+  const [selection, setOpen] = useState<Mark | null>(null)
+  const open: Mark | null = selection?.kind === 'word'
+    ? { kind: 'word', entry: passage.vocabulary.find(entry => entry.word === selection.entry.word) || selection.entry }
+    : selection?.kind === 'grammar' ? { kind: 'grammar', entry: passage.grammar.find(entry => entry.point === selection.entry.point && entry.span === selection.entry.span) || selection.entry } : null
   const [fontScale, setFontScale] = useState(() => fontControls ? 2 : 1)
   const hasGrammar = (passage.grammar || []).length > 0
   const hasWords = (passage.vocabulary || []).length > 0
@@ -418,6 +425,7 @@ export function ReadingPassageView({ passage, locale, imageUrl, player, locked =
 
       {open && (
         <aside className="reading-note" role="status">
+          {translation.status && <p className="muted">{participantText(locale, translation.status === 'pending' ? 'translating' : 'translationUnavailable')}</p>}
           <button
             aria-label={participantText(locale, 'close')}
             className="reading-note-close"

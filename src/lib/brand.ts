@@ -38,7 +38,7 @@ export function brandFromSearch(search: URLSearchParams): BrandId | null {
 // arrives on a locale the edition does not offer is moved to its first one
 // rather than left on a language whose entry is not in the picker.
 const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
-  sc: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi'],
+  sc: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
   ncacls: ['zh-TW', 'en', 'es'],
 }
 

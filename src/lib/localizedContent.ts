@@ -11,7 +11,7 @@ export function localizedFields<T>(translations: Record<string, T> | null | unde
 
 export function localizedFeedback(feedback: Record<string, string> | null | undefined, locale: ParticipantLocale) {
   if (!feedback) return ''
-  return feedback[contentLocaleKey(locale)] || feedback.zh_tw || feedback.en || ''
+  return feedback[contentLocaleKey(locale)] || ((locale === 'zh-TW' || locale === 'zh-CN') ? feedback.zh_tw || feedback.en : feedback.en || feedback.zh_tw) || ''
 }
 
 // Typography rather than translation: Chinese and Japanese separate list items

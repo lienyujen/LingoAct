@@ -82,8 +82,23 @@ export function ParticipantQuestionHistory({ analyses,
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const requestedDetails = useRef(new Set<string>())
   const previousQuizData = useRef(quizData)
+  const previousLocale = useRef(locale)
+  useEffect(() => {
+    if (previousLocale.current === locale) return
+    previousLocale.current = locale
+    requestedDetails.current.clear()
+    for (const question of history) if (openIds.has(question.id)) void onLoadDetails(question)
+  }, [locale, history, openIds, onLoadDetails])
   const newestId = history[0]?.id || ''
   const loadDetailsRef = useRef(onLoadDetails)
+
+  useEffect(() => {
+    const pending = history.filter(question => openIds.has(question.id)
+      && (quizData[question.id]?.translation_status === 'pending' || audioResponses[question.id]?.translation_status === 'pending'))
+    if (!pending.length) return
+    const timer = window.setTimeout(() => { for (const question of pending) void loadDetailsRef.current(question) }, 1800)
+    return () => window.clearTimeout(timer)
+  }, [history, openIds, quizData, audioResponses])
 
   useEffect(() => {
     loadDetailsRef.current = onLoadDetails
@@ -185,6 +200,7 @@ export function ParticipantQuestionHistory({ analyses,
                     )}
                     {passage && (
                       <ReadingPassageView
+                        learningCredentials={teachingCredentials}
                         imageUrl={screenshot?.public_url || null}
                         locale={locale}
                         passage={passage}

@@ -42,6 +42,15 @@
   font-family: "Noto Sans SC Variable", sans-serif;
 }
 
+/* Student translations change the UI language, never the class's Chinese face. */
+:root[data-chinese-font="tc"] {
+  font-family: "Noto Sans TC Variable", sans-serif;
+}
+
+:root[data-chinese-font="sc"] {
+  font-family: "Noto Sans SC Variable", sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }

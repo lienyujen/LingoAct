@@ -344,6 +344,7 @@ export type AudioAnalysis = {
 }
 
 export type AudioResponse = {
+  translation_status?: 'pending' | 'failed'
   id: string
   session_id: string
   question_id: string
@@ -575,6 +576,7 @@ export type WritingCoachTurn = {
 }
 
 export type ParticipantQuizData = {
+  translation_status?: 'pending' | 'failed'
   quiz: Quiz
   items: QuizItem[]
   attempt: QuizAttempt | null
@@ -687,6 +689,7 @@ export type FileAnalysisStatus = 'pending' | 'analyzing' | 'success' | 'failed' 
 export type FileVerdict = 'correct' | 'partial' | 'incorrect' | 'unscored'
 
 export interface FileAnalysis {
+  translations?: Record<string, { summary: string; strengths: string[]; improvements: string[] }>
   // Absent on anything marked before grading existed, so both stay optional.
   verdict?: FileVerdict
   score?: number | null

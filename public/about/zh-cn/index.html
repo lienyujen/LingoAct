@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN" id="top"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LingoAct｜使用指南与授权</title><meta name="description" content="了解 LingoAct 的语言教学活动、课堂操作、自行部署及使用授权。">
+<link rel="canonical" href="https://lingoact.ehuayu.org/about/zh-cn">
+<link rel="alternate" hreflang="zh-Hant" href="https://lingoact.ehuayu.org/about"><link rel="alternate" hreflang="zh-Hans" href="https://lingoact.ehuayu.org/about/zh-cn"><link rel="alternate" hreflang="en" href="https://lingoact.ehuayu.org/about/en">
+<meta name="theme-color" content="#7d2c61"><meta property="og:title" content="LingoAct｜使用指南与授权"><meta property="og:description" content="了解 LingoAct 的语言教学活动、课堂操作、自行部署及使用授权。"><meta property="og:type" content="website">
+<link rel="stylesheet" href="../about.css"><link rel="icon" href="../mark.svg" type="image/svg+xml">
+</head><body>
+<header class="header"><a class="brand" href="#top"><img src="../mark.svg" alt="" width="36" height="36">LingoAct</a><nav aria-label="LingoAct｜使用指南与授权"><a href="#features">教学功能</a>
+<a href="#start">开始使用</a>
+<a href="#editions">版本选择</a>
+<a href="#license">使用授权</a></nav><div class="languages" aria-label="Language">
+<a href="../" lang="zh-TW" >繁體</a>
+<a href="../zh-cn/" lang="zh-CN" aria-current="page">简体</a>
+<a href="../en/" lang="en" >English</a></div></header>
+<main><section class="hero"><div><p class="eyebrow">语言教师的 AI 助教</p><h1>让学生爱上中文</h1><p class="lead">让每个学生都参与听、说、读、写。教师通过电脑发布活动，学生用手机或电脑浏览器加入，无需安装 App。</p><div class="actions"><a class="button primary" href="#start">阅读使用指南 <span aria-hidden="true">↗</span></a><a class="button" href="#license">查看授权</a></div><p class="small">教师桌面程序 × 学生浏览器</p></div>
+<div class="workflow" aria-label="课堂流程示意"><div class="workflow-head"><span class="status-dot"></span>LingoAct <small>课堂流程示意</small></div><div class="flow-row"><span class="flow-number">01</span><div><strong>教师</strong><p>选择语言和级别<br>发布教学活动</p></div><span class="flow-icon" aria-hidden="true">↗</span></div><div class="flow-row"><span class="flow-number">02</span><div><strong>学生</strong><p>扫码加入<br>作答与练习</p></div><span class="flow-icon" aria-hidden="true">✓</span></div><div class="flow-row"><span class="flow-number">03</span><div><strong>回到课堂</strong><p>查看回答与反馈</p></div><span class="flow-icon" aria-hidden="true">↻</span></div></div></section>
+<section id="features"><p class="section-kicker">01 / CLASSROOM</p><h2>一堂课，四种语言练习</h2><p class="section-lead">根据课程语言与级别安排活动，让题目、标音和评估服务于你的教学目标。</p><div class="feature-grid"><article class="feature"><span class="skill" aria-hidden="true">听</span><h3>听说播音室</h3><p>将文字或截图转成语音，发布听力理解或朗读练习，并采用与教学设置对应的语音和标音方式。</p></article>
+<article class="feature"><span class="skill" aria-hidden="true">说</span><h3>看图说写</h3><p>用现有图片或 AI 生成的图片练习描述与叙事。题目会连同建议词语、句型一起发送给学生，并保留教学原文。</p></article>
+<article class="feature"><span class="skill" aria-hidden="true">读</span><h3>阅读与测验</h3><p>根据级别生成或处理文章，搭配生词、语法说明与理解题。阅读任务可设置 i+1 或 i+2 的难度。</p></article>
+<article class="feature"><span class="skill" aria-hidden="true">写</span><h3>手写与写作</h3><p>学生可以在画布上书写，也可以拍照、上传或粘贴手写图片。写作活动支持教师查看和 AI 反馈。</p></article></div><p class="note">还支持词语卡、投票、问答、词云、讨论板、随机点名、抢答，以及课后反馈与报表导出。</p></section>
+<section id="start"><p class="section-kicker">02 / GET STARTED</p><h2>从首次打开，到上完一堂课</h2><p class="section-lead">先设置自己的后端，再开始教学。课堂数据会存入你设置的 Supabase 项目。</p><ol class="steps"><li><span class="step-number">01</span><div><h3>获取合适的教师版本</h3><p>向作者获取对应的 Windows 或 macOS 版本。Windows 解压后运行文件夹内的程序；macOS 打开 DMG，将 App 移入“应用程序”。</p></div></li>
+<li><span class="step-number">02</span><div><h3>连接自己的 Supabase</h3><p>在设置页面填写 Supabase 项目网址或项目标识符及 publishable key。如果尚未建立后端，可使用程序中的部署向导建立数据表和 AI 功能，并按页面提示提供访问令牌及所需的 AI 密钥。</p></div></li>
+<li><span class="step-number">03</span><div><h3>选择语言、标准与级别</h3><p>创建课程时先选择教学语言与级别。华语版默认繁体，可切换简体。简体采用 HSK 与普通话，繁体沿用 TBCL／TOCFL 及原有的华语教学设置；也可以调整单个任务的级别。</p></div></li>
+<li><span class="step-number">04</span><div><h3>邀请学生扫码加入</h3><p>打开“加入课堂”二维码。学生通过浏览器加入并填写姓名，无需安装程序。需要外语界面时，使用学生页右下角的语言菜单。</p></div></li>
+<li><span class="step-number">05</span><div><h3>发布活动，查看学生回答</h3><p>选择听、说、读或写活动，准备材料后发布，学生页面会自动更新。看图说写的词语和句型会随题目一起发送；切换界面语言不会翻译这些练习材料。</p></div></li>
+<li><span class="step-number">06</span><div><h3>查看反馈，保存课堂成果</h3><p>在教师端查看作答，并根据需要启用分析或批改。下课时收集 Exit Ticket，查看报告并导出。AI 反馈应由教师审核后用于教学。</p></div></li></ol>
+<aside class="portable"><div><h3>让设置跟着文件夹走</h3><p>Windows 将 .env 放在 EXE 所在的文件夹；macOS 放在 App 外部的同一个文件夹。复制整个文件夹即可带走这些公开设置。更新程序时，请保留自己的 .env。</p><p class="small">只填写 Supabase 网址、公开密钥和学生端网址。Gemini、OpenAI 等私密密钥保留在后端，教师管理密钥需另外设置。请将示例中的占位内容换成你自己的公开设置。</p></div><pre><code>VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_KEY
+VITE_PUBLIC_APP_URL=https://lingo.ehuayu.org</code></pre></aside><p class="note">软件授权与云服务费用是两回事。Supabase 和 AI 服务的额度、费用取决于你自己的账号和用量。 <a href="https://supabase.com/pricing" target="_blank" rel="noopener noreferrer">Supabase</a> · <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">Gemini</a> · <a href="https://openai.com/api/pricing/" target="_blank" rel="noopener noreferrer">OpenAI</a></p></section>
+<section id="editions"><p class="section-kicker">03 / EDITIONS</p><h2>选择适合你的教学版本</h2><p class="section-lead">各版本共用学生页面和活动数据格式，区别在于教师端的语言、标准与活动配置。</p><div class="editions"><article><h3>华语教学版</h3><p>默认繁体，可选简体或 English。简体采用 HSK，繁体采用 TBCL／TOCFL；English 可选择三种标准。</p></article>
+<article><h3>简体中文／HSK 版</h3><p>固定简体中文、HSK 和中国大陆标准普通话。学生仍可选择外语界面。</p></article>
+<article><h3>NCACLS 版</h3><p>面向中文学校的繁体华语教学版本，沿用华语文级别与注音设置。</p></article>
+<article><h3>英语教学版</h3><p>以英语教学为主，提供对应的级别及听说读写活动。</p></article>
+<article><h3>台湾语文教学版</h3><p>以台湾地区的母语语文教学为主，使用当地课程纲要阶段与注音符号。</p></article>
+<article><h3>完整教学版</h3><p>保留多种教学语言与活动，适合需要切换不同语言课程的教师。</p></article></div></section>
+<section id="license" class="license"><p class="section-kicker">04 / LICENSE</p><h2>使用授权</h2><p class="section-lead">以下为作者目前的授权说明。完整英文条款与作者补充说明均可在本页公开阅读，无需 GitHub 账号。</p><div class="license-grid"><article><span class="label">PERSONAL & EDUCATIONAL</span><h3>可以免费使用</h3><p>个人用途、学校与教育机构、公立研究机构、政府部门及非营利组织，可以依授权使用，无论其资金来源。</p></article><article><span class="label">COMMERCIAL</span><h3>商业用途须取得授权</h3><p>补习班、培训班等营利教育机构、企业内部培训（含受企业委托授课的外部讲师）、收费线上课程、付费工作坊和付费研修活动，须取得商业授权。</p></article></div><p>作者接受自愿捐款，不设固定价格。请根据使用规模自行决定金额，并保留 PayPal 付款收据。该收据即为本软件的商业使用授权证明。其他使用情况请联系作者。</p><div class="actions"><a class="button primary" href="https://www.paypal.com/paypalme/lienyujen" target="_blank" rel="noopener noreferrer">获取商业授权 · PayPal ↗</a><a class="button" href="https://www.facebook.com/lienyujen/" target="_blank" rel="noopener noreferrer">联系作者</a></div><p class="small">中文说明用于帮助理解。完整授权以附载的 PolyForm Noncommercial License 1.0.0 及作者补充说明为准。转发软件时，请一并提供授权条款与必要的版权声明。</p><details class="legal"><summary>阅读完整授权原文 <span>PolyForm Noncommercial 1.0.0</span></summary><a href="../LICENSE.txt" download>下载完整授权文本 ↓</a><pre>Required Notice: Copyright 2026 Yujen Lien (https://github.com/lienyujen/LingoAct)
+
+---
+
+Note from the licensor (not part of the PolyForm text below)
+
+Free for personal use, schools and educational institutions, public research
+organizations, government bodies, and nonprofits — regardless of how they are
+funded.
+
+The following are commercial purposes and require a commercial licence:
+
+  - Cram schools, tutoring centres, and other for-profit teaching businesses
+  - Corporate training, including external trainers engaged by a company
+  - Paid online courses, paid workshops, and paid seminars
+
+HOW TO OBTAIN A COMMERCIAL LICENCE
+
+Donate an amount of your own choosing, scaled to your use, at:
+
+  https://www.paypal.com/paypalme/lienyujen
+
+Keep the payment receipt. That receipt is your commercial licence for this
+software. There is no fixed price. For anything else, contact the author.
+
+補習班、才藝班等營利教育機構、企業內訓講師（含受企業委託授課的外部講師）、
+收費線上課程、付費工作坊與付費研習，均屬商業用途，需取得商業授權。
+
+商業授權取得方式：請至上方 PayPal 連結依使用規模自由樂捐，並留存付款收據，
+該收據即為你的商業使用授權證明。金額由你自行斟酌，沒有固定價目。
+
+---
+
+# PolyForm Noncommercial License 1.0.0
+
+&lt;https://polyformproject.org/licenses/noncommercial/1.0.0&gt;
+
+## Acceptance
+
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
+
+## Copyright License
+
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose.  However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
+
+## Distribution License
+
+The licensor grants you an additional copyright license to distribute copies of the software.  Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software.  For example:
+
+&gt; Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+
+## Changes and New Works License
+
+The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
+
+## Patent License
+
+The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
+
+## Noncommercial Purposes
+
+Any noncommercial purpose is a permitted purpose.
+
+## Personal Uses
+
+Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
+
+## Noncommercial Organizations
+
+Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
+
+## Fair Use
+
+You may have &quot;fair use&quot; rights for the software under the law. These terms do not limit them.
+
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
+
+**You** refers to the individual or entity agreeing to these terms.
+
+**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
+
+**Your licenses** are all the licenses granted to you for the software under these terms.
+
+**Use** means anything you do with the software requiring one of your licenses.
+</pre></details></section>
+<section id="faq"><h2>课堂常见问题</h2><div class="faq"><details><summary>学生需要安装程序吗？</summary><p>不需要。教师使用桌面程序，学生通过手机、平板或电脑浏览器加入。</p></details>
+<details><summary>切换学生界面语言，会把中文练习也翻译掉吗？</summary><p>看图说写的题目、词语和句型保留教学原文。部分阅读词义、语法说明及评估说明会在学生实际选择外语时按需翻译，其中的中文教学引用仍会保留。</p></details>
+<details><summary>题目没有出现时怎么办？</summary><p>先确认教师已完成发布，学生页面连接正常且使用新版。可刷新一次以加载最新版；如果问题持续，请向教师说明活动类型并提供画面，不要重复提交作答。</p></details>
+<details><summary>可以使用自己的后端吗？</summary><p>可以。设置自己的 Supabase 项目即可，加入链接会带上对应的公开连接信息。私密 AI 密钥不应出现在学生页面或 .env 中。</p></details></div></section>
+</main><footer><div class="brand">LingoAct</div><p>Designed and Developed by <a href="https://www.facebook.com/lienyujen/" target="_blank" rel="noopener noreferrer">Yujen Lien</a></p><p class="small">内容更新：2026 年 10 月 7 日 · <a href="#top">返回顶部 ↑</a></p></footer>
+</body></html>

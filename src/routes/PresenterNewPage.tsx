@@ -312,7 +312,7 @@ export function PresenterNewPage() {
         <button className="ghost-button manage-sessions-button" disabled={busy} type="button" onClick={() => setSystemSetupOpen(true)}>
           <Gear size={18} />{uiText("系統設定")}</button>
         <p className="app-credit">
-          <a href="https://github.com/lienyujen/LingoAct/blob/main/LICENSE" rel="noreferrer" target="_blank">LingoAct</a>
+          <a href="https://lingoact.ehuayu.org/about" rel="noreferrer" target="_blank">LingoAct</a>
           {' | Designed and Developed by '}
           <a href="https://www.facebook.com/lienyujen/" rel="noreferrer" target="_blank">Yujen Lien</a>
         </p>

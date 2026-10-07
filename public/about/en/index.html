@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" id="top"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LingoAct | Getting started and licensing</title><meta name="description" content="Explore LingoAct classroom activities, setup, teaching editions, and licensing.">
+<link rel="canonical" href="https://lingoact.ehuayu.org/about/en">
+<link rel="alternate" hreflang="zh-Hant" href="https://lingoact.ehuayu.org/about"><link rel="alternate" hreflang="zh-Hans" href="https://lingoact.ehuayu.org/about/zh-cn"><link rel="alternate" hreflang="en" href="https://lingoact.ehuayu.org/about/en">
+<meta name="theme-color" content="#7d2c61"><meta property="og:title" content="LingoAct | Getting started and licensing"><meta property="og:description" content="Explore LingoAct classroom activities, setup, teaching editions, and licensing."><meta property="og:type" content="website">
+<link rel="stylesheet" href="../about.css"><link rel="icon" href="../mark.svg" type="image/svg+xml">
+</head><body>
+<header class="header"><a class="brand" href="#top"><img src="../mark.svg" alt="" width="36" height="36">LingoAct</a><nav aria-label="LingoAct | Getting started and licensing"><a href="#features">Teaching tools</a>
+<a href="#start">Get started</a>
+<a href="#editions">Editions</a>
+<a href="#license">Licensing</a></nav><div class="languages" aria-label="Language">
+<a href="../" lang="zh-TW" >繁體</a>
+<a href="../zh-cn/" lang="zh-CN" >简体</a>
+<a href="../en/" lang="en" aria-current="page">English</a></div></header>
+<main><section class="hero"><div><p class="eyebrow">An AI teaching assistant for language teachers</p><h1>Inspire a love of Chinese</h1><p class="lead">Bring every student into listening, speaking, reading, and writing. Teachers send activities from a desktop app; students join in a phone or computer browser. No student app required.</p><div class="actions"><a class="button primary" href="#start">Read the getting-started guide <span aria-hidden="true">↗</span></a><a class="button" href="#license">View licensing</a></div><p class="small">Teacher desktop app × Student browser</p></div>
+<div class="workflow" aria-label="Classroom workflow illustration"><div class="workflow-head"><span class="status-dot"></span>LingoAct <small>Classroom workflow illustration</small></div><div class="flow-row"><span class="flow-number">01</span><div><strong>Teacher</strong><p>Choose a language and level<br>Send a learning activity</p></div><span class="flow-icon" aria-hidden="true">↗</span></div><div class="flow-row"><span class="flow-number">02</span><div><strong>Students</strong><p>Scan to join<br>Respond and practice</p></div><span class="flow-icon" aria-hidden="true">✓</span></div><div class="flow-row"><span class="flow-number">03</span><div><strong>Back in class</strong><p>Review responses and feedback</p></div><span class="flow-icon" aria-hidden="true">↻</span></div></div></section>
+<section id="features"><p class="section-kicker">01 / CLASSROOM</p><h2>Four skills. One connected classroom.</h2><p class="section-lead">Start with your course language and level, then choose activities, pronunciation support, and assessment that fit your goals.</p><div class="feature-grid"><article class="feature"><span class="skill" aria-hidden="true">L</span><h3>Listening studio</h3><p>Turn text or a screen capture into speech, then send a listening task or read-aloud practice with the pronunciation and annotation settings for your class.</p></article>
+<article class="feature"><span class="skill" aria-hidden="true">S</span><h3>Picture speaking and writing</h3><p>Use an existing image or generate one with AI. Students receive the prompt, suggested vocabulary, and sentence patterns in the language they are learning.</p></article>
+<article class="feature"><span class="skill" aria-hidden="true">R</span><h3>Reading and quizzes</h3><p>Create or adapt a passage at the selected level, with vocabulary, grammar notes, and comprehension questions. Reading tasks can stretch to i+1 or i+2.</p></article>
+<article class="feature"><span class="skill" aria-hidden="true">W</span><h3>Handwriting and composition</h3><p>Students can write on the canvas, take a photo, upload an image, or paste their handwritten work. Teachers can review submissions and use AI feedback.</p></article></div><p class="note">Other activities include vocabulary cards, polls, short answers, word clouds, discussion boards, random selection, buzz-in activities, exit tickets, and report exports.</p></section>
+<section id="start"><p class="section-kicker">02 / GET STARTED</p><h2>From first launch to a complete lesson</h2><p class="section-lead">Set up your own backend before you teach. Classroom data is stored in the Supabase project you configure.</p><ol class="steps"><li><span class="step-number">01</span><div><h3>Get the right teacher edition</h3><p>Contact the author for the appropriate Windows or macOS edition. On Windows, extract the download and run the executable inside the folder. On macOS, open the DMG and move the app to Applications.</p></div></li>
+<li><span class="step-number">02</span><div><h3>Connect your Supabase project</h3><p>Enter your Supabase project URL or project reference and publishable key in Settings. If you have not set up the backend, use the in-app deployment wizard to create the tables and AI functions. Follow its prompts to supply an access token and the required AI keys.</p></div></li>
+<li><span class="step-number">03</span><div><h3>Choose a language, standard, and level</h3><p>Set the teaching language and proficiency level before opening the class. The Huayu edition defaults to Traditional Chinese and also supports Simplified Chinese. Simplified uses HSK and Putonghua; Traditional retains TBCL/TOCFL and the existing Taiwanese Mandarin settings. Individual tasks can use a different level.</p></div></li>
+<li><span class="step-number">04</span><div><h3>Invite students to scan and join</h3><p>Open the classroom QR code. Students join in a browser and enter their name. They can choose their interface language from the menu at the bottom right of the student page.</p></div></li>
+<li><span class="step-number">05</span><div><h3>Send an activity and watch responses</h3><p>Choose a listening, speaking, reading, or writing activity, prepare the material, and send it. Student pages update automatically. Picture prompts include vocabulary and sentence patterns; changing the interface language does not translate this practice material.</p></div></li>
+<li><span class="step-number">06</span><div><h3>Review feedback and save the results</h3><p>Review responses on the teacher dashboard and request analysis or grading when useful. Collect exit tickets, review the class report, and export results. Teachers should review AI feedback before using it for instruction.</p></div></li></ol>
+<aside class="portable"><div><h3>Take your settings with you</h3><p>On Windows, put .env beside the executable. On macOS, put it beside the app, outside the app bundle. Copy the folder to carry these public settings to another computer. Keep your .env when updating.</p><p class="small">Include only the Supabase URL, public key, and student-page URL. Private Gemini and OpenAI keys stay in the backend. Configure the teacher management key separately. Replace the placeholders below with your own public settings.</p></div><pre><code>VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_KEY
+VITE_PUBLIC_APP_URL=https://lingo.ehuayu.org</code></pre></aside><p class="note">Software licensing and cloud-service charges are separate. Supabase and AI allowances and costs depend on your own accounts and usage. <a href="https://supabase.com/pricing" target="_blank" rel="noopener noreferrer">Supabase</a> · <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">Gemini</a> · <a href="https://openai.com/api/pricing/" target="_blank" rel="noopener noreferrer">OpenAI</a></p></section>
+<section id="editions"><p class="section-kicker">03 / EDITIONS</p><h2>Choose your teaching edition</h2><p class="section-lead">All editions share the student page and activity data format. Their teacher interfaces, language standards, and activity configurations differ.</p><div class="editions"><article><h3>Huayu edition</h3><p>Defaults to Traditional Chinese; also offers Simplified Chinese and English. Simplified uses HSK, Traditional uses TBCL/TOCFL, and English offers all three standards.</p></article>
+<article><h3>Simplified Chinese / HSK edition</h3><p>Uses Simplified Chinese, HSK, and standard Mainland Putonghua. Students can still choose a translated interface.</p></article>
+<article><h3>NCACLS edition</h3><p>A Traditional Chinese edition for Chinese schools, using the Huayu proficiency and pronunciation-annotation settings.</p></article>
+<article><h3>English teaching edition</h3><p>Focuses on English teaching with appropriate proficiency settings and listening, speaking, reading, and writing activities.</p></article>
+<article><h3>Taiwanese language arts edition</h3><p>For Chinese language arts as a first language in Taiwan, with curriculum stages and Bopomofo settings.</p></article>
+<article><h3>Full edition</h3><p>Retains multiple teaching languages and activities for teachers who work across language courses.</p></article></div></section>
+<section id="license" class="license"><p class="section-kicker">04 / LICENSE</p><h2>Licensing</h2><p class="section-lead">The author’s current licensing terms are summarized below. The full English license and the author’s additional notice are publicly available here, without a GitHub account.</p><div class="license-grid"><article><span class="label">PERSONAL & EDUCATIONAL</span><h3>Permitted free use</h3><p>Personal use, schools and educational institutions, public research organizations, government bodies, and nonprofits may use the software under the license, regardless of how they are funded.</p></article><article><span class="label">COMMERCIAL</span><h3>Commercial use requires a license</h3><p>Cram schools, tutoring centers, and other for-profit teaching businesses; corporate training, including external trainers engaged by a company; and paid online courses, workshops, and seminars require a commercial license.</p></article></div><p>There is no fixed price. Donate an amount of your choosing through PayPal, scaled to your use, and keep the payment receipt. That receipt is your commercial license for this software. Contact the author for other arrangements.</p><div class="actions"><a class="button primary" href="https://www.paypal.com/paypalme/lienyujen" target="_blank" rel="noopener noreferrer">Commercial license · PayPal ↗</a><a class="button" href="https://www.facebook.com/lienyujen/" target="_blank" rel="noopener noreferrer">Contact the author</a></div><p class="small">The complete terms are the included PolyForm Noncommercial License 1.0.0 and the author’s additional notice. When distributing the software, include the license terms and required copyright notices.</p><details class="legal"><summary>Read the complete license <span>PolyForm Noncommercial 1.0.0</span></summary><a href="../LICENSE.txt" download>Download the full license text ↓</a><pre>Required Notice: Copyright 2026 Yujen Lien (https://github.com/lienyujen/LingoAct)
+
+---
+
+Note from the licensor (not part of the PolyForm text below)
+
+Free for personal use, schools and educational institutions, public research
+organizations, government bodies, and nonprofits — regardless of how they are
+funded.
+
+The following are commercial purposes and require a commercial licence:
+
+  - Cram schools, tutoring centres, and other for-profit teaching businesses
+  - Corporate training, including external trainers engaged by a company
+  - Paid online courses, paid workshops, and paid seminars
+
+HOW TO OBTAIN A COMMERCIAL LICENCE
+
+Donate an amount of your own choosing, scaled to your use, at:
+
+  https://www.paypal.com/paypalme/lienyujen
+
+Keep the payment receipt. That receipt is your commercial licence for this
+software. There is no fixed price. For anything else, contact the author.
+
+補習班、才藝班等營利教育機構、企業內訓講師（含受企業委託授課的外部講師）、
+收費線上課程、付費工作坊與付費研習，均屬商業用途，需取得商業授權。
+
+商業授權取得方式：請至上方 PayPal 連結依使用規模自由樂捐，並留存付款收據，
+該收據即為你的商業使用授權證明。金額由你自行斟酌，沒有固定價目。
+
+---
+
+# PolyForm Noncommercial License 1.0.0
+
+&lt;https://polyformproject.org/licenses/noncommercial/1.0.0&gt;
+
+## Acceptance
+
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
+
+## Copyright License
+
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose.  However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
+
+## Distribution License
+
+The licensor grants you an additional copyright license to distribute copies of the software.  Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software.  For example:
+
+&gt; Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+
+## Changes and New Works License
+
+The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
+
+## Patent License
+
+The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
+
+## Noncommercial Purposes
+
+Any noncommercial purpose is a permitted purpose.
+
+## Personal Uses
+
+Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
+
+## Noncommercial Organizations
+
+Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
+
+## Fair Use
+
+You may have &quot;fair use&quot; rights for the software under the law. These terms do not limit them.
+
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
+
+**You** refers to the individual or entity agreeing to these terms.
+
+**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
+
+**Your licenses** are all the licenses granted to you for the software under these terms.
+
+**Use** means anything you do with the software requiring one of your licenses.
+</pre></details></section>
+<section id="faq"><h2>Common classroom questions</h2><div class="faq"><details><summary>Do students need to install an app?</summary><p>No. Teachers use a desktop app; students join in a browser on a phone, tablet, or computer.</p></details>
+<details><summary>Does changing the interface language translate the Chinese practice?</summary><p>Picture prompts, vocabulary, and sentence patterns stay in the teaching language. Some reading definitions, grammar notes, and assessment explanations are translated on demand when a student chooses a supported language. Chinese teaching references remain unchanged.</p></details>
+<details><summary>What if an activity does not appear?</summary><p>Check that the teacher has finished sending it and that the student page is connected and up to date. Refresh once to load the latest page. If the problem continues, tell the teacher which activity it is and share the screen; avoid repeatedly submitting answers.</p></details>
+<details><summary>Can I use my own backend?</summary><p>Yes. Configure your Supabase project. Join links carry the corresponding public connection information. Private AI keys should never appear on the student page or in .env.</p></details></div></section>
+</main><footer><div class="brand">LingoAct</div><p>Designed and Developed by <a href="https://www.facebook.com/lienyujen/" target="_blank" rel="noopener noreferrer">Yujen Lien</a></p><p class="small">Updated October 7, 2026 · <a href="#top">Back to top ↑</a></p></footer>
+</body></html>

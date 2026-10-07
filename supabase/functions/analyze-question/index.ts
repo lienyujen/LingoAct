@@ -1,4 +1,5 @@
 import { corsHeaders, geminiModels, jsonResponse, errorDetail } from '../_shared/ai.ts'
+import { classFeedbackSettings, feedbackSystemPrompt } from '../_shared/feedback-language.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 
 const analysisSchema = {
@@ -236,7 +237,7 @@ Deno.serve(async (req) => {
       : '你是 LingoAct 的課堂形成性評量分析助理。請以繁體中文分析截圖中的題目與匿名化群體作答。若 presenter_question 有內容，detected_question 應優先忠實使用該題目；若為空，截圖有明確題幹時忠實轉寫或精簡，沒有明顯題幹時依畫面脈絡與選項產生中立、不誘導且不暗示正解的題目。無論是否有 presenter_question，都必須繼續根據截圖、選項及實際作答行為分析理解、證據、常見誤解與教學行動，不可只依題目文字推測。選擇題與是非題只能提出建議答案，最後決定權屬於講者。投票題不判定對錯。'
 
     const requestPayload = {
-        systemInstruction: { parts: [{ text: instruction }] },
+        systemInstruction: { parts: [{ text: feedbackSystemPrompt(instruction, await classFeedbackSettings(supabase, sessionId)) }] },
         contents: [{ role: 'user', parts }],
       }
 

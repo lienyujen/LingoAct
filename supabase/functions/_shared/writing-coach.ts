@@ -1,4 +1,5 @@
 import { callAiJson, errorDetail } from './ai.ts'
+import { feedbackSystemPrompt, type FeedbackSettings } from './feedback-language.ts'
 import { guidanceLanguageName } from './languages.ts'
 import { levelInstruction } from './proficiency.ts'
 import { resolveTrack, trackInstruction } from './teaching.ts'
@@ -56,10 +57,11 @@ export async function askWritingCoach(input: {
   trackId: string | null
   framework: string | null
   levelCode: string | null
+  feedbackSettings?: FeedbackSettings
   guidanceLanguage: string
 }): Promise<CoachReply> {
   const track = resolveTrack(input.trackId)
-  const systemPrompt = [
+  const systemPrompt = feedbackSystemPrompt([
     RULES,
     trackInstruction(input.trackId),
     levelInstruction(input.framework, input.levelCode, input.direction),
@@ -67,7 +69,7 @@ export async function askWritingCoach(input: {
     input.previous.length
       ? 'You have spoken to this learner before about this same piece. Their earlier drafts and what you asked are below. Do not ask again for something they have now put in — notice it instead — and do not repeat a question they have already answered.'
       : '',
-  ].filter(Boolean).join('\n\n')
+  ].filter(Boolean).join('\n\n'), input.feedbackSettings)
 
   const result = await callAiJson(
     systemPrompt,

@@ -1,3 +1,4 @@
+import { mainlandFeedbackInstruction } from './feedback-language.ts'
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 import { dispatchLevelCode, levelInstruction, levelCeiling, stemLength, stemLengthComplaint, tbclLevelOf } from './proficiency.ts'
@@ -557,7 +558,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     // cheap and ends in `submitted` until that later review is saved.
     const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type, interaction_mode, session_id, direction').eq('id', attempt.quiz_id).single()
     if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
-    const { data: classMode, error: classError } = await supabase.from('sessions').select('level_framework, level_code').eq('id', quiz.session_id).single()
+    const { data: classMode, error: classError } = await supabase.from('sessions').select('system_language, teaching_language, level_framework, level_code').eq('id', quiz.session_id).single()
     if (classError || !classMode) throw classError || new Error('Class not found.')
     const simplified = classMode.level_framework === 'hsk'
     if (quiz.graded === false) {
@@ -642,6 +643,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
           : '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。依下方回饋語言規則提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
         levelInstruction(classMode.level_framework, classMode.level_code, quiz.direction),
         feedbackInstruction,
+        ...[mainlandFeedbackInstruction(classMode)].filter(Boolean),
         ].join('\n'),
         { items: aiGradingInput },
         gradingSchema,

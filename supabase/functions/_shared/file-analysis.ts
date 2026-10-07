@@ -1,4 +1,5 @@
 import { geminiThinkingConfig, requestGemini } from './ai.ts'
+import { feedbackSystemPrompt, type FeedbackSettings } from './feedback-language.ts'
 
 // Gemini reads these directly. Office formats (docx/pptx/xlsx) are deliberately
 // absent: they would need conversion, and a confident-sounding analysis of bytes
@@ -73,6 +74,7 @@ export async function analyzeFileResponse(input: {
   // a poor answer, and marking it without knowing the level is marking it
   // against whatever standard the model happens to reach for.
   classInstruction?: string
+  feedbackSettings?: FeedbackSettings
 }) {
   const describing = Boolean(input.caption?.text || input.caption?.audio)
   const marking = Boolean(input.questionImage) || Boolean(input.promptText)
@@ -120,7 +122,7 @@ export async function analyzeFileResponse(input: {
   const response = await requestGemini(JSON.stringify({
     systemInstruction: {
       parts: [{
-        text: describing ? describingInstruction + '\n請以繁體中文給出具體、尊重且可行的個別回饋，再提供結構相同且忠實的英文版本；英文版是翻譯，不可另行推論。所有結論都要根據看得到、聽得到的內容，不可臆測。'
+        text: feedbackSystemPrompt(describing ? describingInstruction + '\n請以繁體中文給出具體、尊重且可行的個別回饋，再提供結構相同且忠實的英文版本；英文版是翻譯，不可另行推論。所有結論都要根據看得到、聽得到的內容，不可臆測。'
           : '你是 LingoAct 的作業批改助理。學員上傳了檔案回應教師的題目；若有多個檔案，那是同一份作答的不同頁或不同部分，請合併判讀後只給一份整體批改，不要逐頁分別評分。'
           + '若有題目畫面，請先讀懂題目再批改學生的作答；沒有題目畫面時，依 presenter_question 與檔案內容判斷。'
           + 'verdict 為整體判定：correct 完全正確、partial 部分正確或方向對但有錯、incorrect 明顯錯誤、'
@@ -128,7 +130,7 @@ export async function analyzeFileResponse(input: {
           + 'score 為 0 到 100 的整數；開放式題目仍可依完成度與品質評分，真的無法評分時填 null。'
           + '請以繁體中文給出具體、尊重且可行的個別回饋，再提供結構相同且忠實的英文版本；英文版是翻譯，不可另行推論。'
           + 'summary 說明學生答了什麼、對在哪裡或錯在哪一步；strengths 指出做得好的地方；improvements 提出可改進之處。'
-          + '所有結論都要根據看得到的內容，不可臆測看不到的部分；字跡不清或檔案不完整時，請在 summary 誠實說明並以 unscored 處理，不可捏造。',
+          + '所有結論都要根據看得到的內容，不可臆測看不到的部分；字跡不清或檔案不完整時，請在 summary 誠實說明並以 unscored 處理，不可捏造。', input.feedbackSettings),
       }],
     },
     contents: [{ role: 'user', parts }],

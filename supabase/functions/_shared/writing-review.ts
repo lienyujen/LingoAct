@@ -1,4 +1,5 @@
 import { callAiJson, errorDetail } from './ai.ts'
+import { feedbackSystemPrompt, type FeedbackSettings } from './feedback-language.ts'
 import { levelInstruction } from './proficiency.ts'
 import { trackInstruction } from './teaching.ts'
 
@@ -109,12 +110,13 @@ export async function reviewWriting(input: {
   trackId: string | null
   framework: string | null
   levelCode: string | null
+  feedbackSettings?: FeedbackSettings
 }): Promise<WritingReview> {
-  const systemPrompt = [
+  const systemPrompt = feedbackSystemPrompt([
     RULES,
     trackInstruction(input.trackId),
     levelInstruction(input.framework, input.levelCode, input.direction),
-  ].join('\n\n')
+  ].join('\n\n'), input.feedbackSettings)
 
   const result = await callAiJson(
     systemPrompt,

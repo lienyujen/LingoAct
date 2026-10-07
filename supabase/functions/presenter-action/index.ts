@@ -5,6 +5,7 @@ import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
 import { dispatchLevelCode, levelInstruction } from '../_shared/proficiency.ts'
 import { describePictureSource, drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
 import { composeSentenceWall } from '../_shared/sentence-wall.ts'
+import { classFeedbackSettings } from '../_shared/feedback-language.ts'
 import { reviewWriting } from '../_shared/writing-review.ts'
 import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.ts'
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
@@ -750,6 +751,7 @@ Deno.serve(async (req) => {
           questionImage: await questionScreenshot(supabase, question?.screenshot_id || null),
           caption,
           classInstruction,
+          feedbackSettings: await classFeedbackSettings(supabase, sessionId),
         })
         const { data: updatedRows, error: updateError } = await supabase.from('file_responses').update({
           analysis_status: 'success',
@@ -1410,6 +1412,7 @@ Deno.serve(async (req) => {
             prompt: promptById.get(answer.item_id as string) || '',
             text: (answer.answer_text || '').slice(0, 4000),
           })),
+          feedbackSettings: await classFeedbackSettings(supabase, sessionId),
           composition: (attempt.composition || '').slice(0, 12000),
           trackId: classRow?.teaching_language ?? null,
           framework: classRow?.level_framework ?? null,

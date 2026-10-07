@@ -5,6 +5,7 @@ import { gradeCustomQuizAttempt, translateFlashcardItems } from '../_shared/cust
 import { getAdminClient, hashParticipantToken } from '../_shared/supabase.ts'
 import { askWritingCoach } from '../_shared/writing-coach.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
+import { classFeedbackSettings } from '../_shared/feedback-language.ts'
 import { classLevelInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { participantTeachingCycle } from '../_shared/teaching-cycle.ts'
@@ -300,6 +301,7 @@ Deno.serve(async (req) => {
             trackId: liveSession.teaching_language ?? null,
             framework: liveSession.level_framework ?? null,
             levelCode: liveSession.level_code ?? null,
+            feedbackSettings: await classFeedbackSettings(supabase, sessionId),
             guidanceLanguage: liveSession.guidance_language ?? 'zh-TW',
           })
         } catch (error) {
@@ -1090,11 +1092,12 @@ Deno.serve(async (req) => {
           audioMimeType: 'audio/wav',
         }
         const classInstruction = await classLevelInstruction(supabase, sessionId)
+        const feedbackSettings = await classFeedbackSettings(supabase, sessionId)
         let analysis = null
         let lastError: unknown = null
         for (let attempt = 0; attempt < 2 && !analysis; attempt += 1) {
           try {
-            analysis = await analyzeAudioResponse({ ...request, classInstruction })
+            analysis = await analyzeAudioResponse({ ...request, classInstruction, feedbackSettings })
           } catch (error) {
             lastError = error
           }

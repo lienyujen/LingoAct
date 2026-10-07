@@ -276,6 +276,7 @@ jobs:
           - 修正看圖說寫 AI 的簡體設定，以及慢速載入導致題目一直停在「出題中」的問題。
           - 中文字型跟隨教師的簡繁設定，補上按需多語說明翻譯及瀏覽器整頁翻譯防護。
           - 支援同資料夾 `.env` 隨身設定；更新時請保留自己的 `.env`。下載包只附 `.env.example`。
+          - 首頁授權連結改為公開的教學與授權頁：https://lingoact.ehuayu.org/about。
 
           `SHA256SUMS.txt` 提供下載檔案的 SHA-256 校驗值。
 
@@ -295,7 +296,7 @@ jobs:
           部分公司電腦的資安政策可能直接封鎖。
 
           個人與教育用途免費；補習班、企業內訓與收費課程屬商業用途，
-          授權說明請見公開下載頁。
+          使用教學與完整授權：https://lingoact.ehuayu.org/about。
           MD
           )
           if gh release view "$TAG" >/dev/null 2>&1; then

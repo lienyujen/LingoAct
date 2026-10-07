@@ -21,7 +21,7 @@ export type AppProfile = {
 const profiles: Record<AppProfileId, AppProfile> = {
   sc: {
     id: 'sc', productName: 'LingoAct', shortName: '中文教学版',
-    defaultTrack: 'putonghua', allowedTracks: ['putonghua', 'huayu'], defaultSkill: 'listen',
+    defaultTrack: 'putonghua', allowedTracks: ['putonghua'], defaultSkill: 'listen',
   },
   full: {
     id: 'full',

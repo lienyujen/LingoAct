@@ -31,10 +31,18 @@ test('Huayu gains SC capabilities with an independent Traditional default and fu
     assert.equal(brand.buildBrand,'huayu');assert.equal(brand.brandFromSearch(new URLSearchParams('b=huayu')),'huayu')
     const locales=['zh-TW','zh-CN','en','vi','th','ja','ko','id'].map(code=>({code}))
     assert.deepEqual(brand.guidanceLocalesForBrand(locales,'huayu').map(item=>item.code),['zh-TW','zh-CN','en','ja','ko','vi','th','id'])
+   }else if(profile==='sc'){
+    assert.equal(config.profileAllowsTrack('huayu'),false)
+    for(const saved of ['zh-TW','en']){
+     values.set('lingoact:sc:system-language',saved)
+     assert.equal(language.scSystemLanguage(),'zh-CN')
+     language.setScSystemLanguage(saved)
+     assert.equal(values.get('lingoact:sc:system-language'),'zh-CN')
+    }
    }else if(profile==='ncacls')assert.equal(config.profileAllowsTrack('putonghua'),false)
   }
   // Choosing SC in Huayu did not change the SC edition's saved/default language.
-  assert.equal(values.get('lingoact:sc:system-language'),undefined)
+  assert.equal(values.get('lingoact:huayu:system-language'),'en')
  }finally{globalThis.localStorage=previousStorage;globalThis.window=previousWindow}
 })
 
@@ -55,6 +63,7 @@ test('real create-session handler persists Huayu script, standard, level, captio
    {appProfile:'huayu',systemLanguage:'zh-TW',levelFramework:'tocfl',levelCode:'level2',readingAnnotation:'pinyin',expect:['zh-TW','huayu','tocfl','pinyin','zh-tw']},
    ...['hsk','tocfl','tbcl'].map(framework=>({appProfile:'huayu',systemLanguage:'en',levelFramework:framework,levelCode:framework==='tocfl'?'level2':'2',expect:['en',framework==='hsk'?'putonghua':'huayu',framework,framework==='hsk'?'pinyin':'none',framework==='hsk'?'zh-cn':'zh-tw']})),
    {appProfile:'sc',levelFramework:'hsk',levelCode:'2',expect:['zh-CN','putonghua','hsk','pinyin','zh-cn']},
+   ...['zh-TW','en'].map(language=>({appProfile:'sc',systemLanguage:language,levelFramework:'tbcl',levelCode:'2',readingAnnotation:'zhuyin',expect:['zh-CN','putonghua','hsk','pinyin','zh-cn']})),
    {teachingLanguage:'huayu',guidanceLanguage:'vi',levelFramework:'tocfl',levelCode:'level2',readingAnnotation:'zhuyin',expect:[null,'huayu','tocfl','zhuyin','zh-tw']},
   ]
   for(const {expect,...input} of cases){

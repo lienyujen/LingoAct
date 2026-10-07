@@ -1,9 +1,10 @@
 import { uiText } from '../lib/uiText'
+import { APP_PROFILE } from '../lib/appProfiles'
 import { supportsChineseSystemLanguage, setScSystemLanguage, useScSystemLanguage } from '../lib/scSystemLanguage'
 
 export function SystemLanguageSelector() {
   const language = useScSystemLanguage()
-  if (!supportsChineseSystemLanguage) return null
+  if (!supportsChineseSystemLanguage || APP_PROFILE.id === 'sc') return null
   return <div className="language-pair-field">
     <span className="language-pair-label">{language === 'zh-TW' || language === 'en' ? uiText("系統語言") : uiText("系统语言")}</span>
     <div className="language-pair-options">

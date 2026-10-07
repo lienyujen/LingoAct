@@ -5,6 +5,7 @@ import { resolveTrack } from './teachingTracks'
 import { scPresenterMessages } from './scLocales.generated'
 import { supportsChineseSystemLanguage, scSystemLanguage } from './scSystemLanguage'
 import { setUiLanguage } from './uiText'
+import { APP_PROFILE } from './appProfiles'
 
 // The teacher's own interface, in the language of the class they are teaching.
 //
@@ -1083,6 +1084,7 @@ const presenterLocales: readonly string[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko',
 // spelling; the locale tables key on BCP-47. Converting here rather than
 // renaming either side keeps rows already written valid.
 export function presenterLocaleFor(teachingLanguage: string | null | undefined, systemLanguage?: string | null): PresenterLocale {
+  if (APP_PROFILE.id === 'sc') return 'zh-CN'
   if (systemLanguage && presenterLocales.includes(systemLanguage)) return systemLanguage as PresenterLocale
   if (supportsChineseSystemLanguage && !teachingLanguage) return scSystemLanguage()
   const language = resolveTrack(teachingLanguage).language

@@ -77,6 +77,10 @@ export function PresenterNewPage() {
   const course = { title: title.trim(), teachingTrack, guidanceLanguage, levelFramework, levelCode, readingAnnotation }
 
   function chooseCourse(value: CoursePreset) {
+    if (APP_PROFILE.id === 'sc') {
+      value = { ...value, teachingTrack: 'putonghua', guidanceLanguage: 'zh-CN', levelFramework: 'hsk',
+        levelCode: value.levelFramework === 'hsk' ? value.levelCode : '', readingAnnotation: 'pinyin' }
+    }
     if (supportsChineseSystemLanguage) setScSystemLanguage(value.guidanceLanguage === 'en' ? 'en' : value.teachingTrack === 'putonghua' ? 'zh-CN' : 'zh-TW')
     setTitle(value.title)
     setTeachingTrack(value.teachingTrack)

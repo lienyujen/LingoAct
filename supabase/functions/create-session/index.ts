@@ -46,9 +46,10 @@ Deno.serve(async (req) => {
     // it takes more than the publishable key every student already holds.
     if (ownerKeyConfigured() && !isOwner(input)) return jsonResponse({ message: ownerRefusalMessage(input) }, 403)
     const title = typeof input.title === 'string' ? input.title.trim().slice(0, 120) : ''
-    const systemLanguage = ['sc', 'huayu'].includes(input.appProfile)
-      ? ['zh-CN', 'zh-TW', 'en'].includes(input.systemLanguage) ? input.systemLanguage : input.appProfile === 'sc' ? 'zh-CN' : 'zh-TW'
-      : null
+    const systemLanguage = input.appProfile === 'sc' ? 'zh-CN'
+      : input.appProfile === 'huayu'
+        ? ['zh-CN', 'zh-TW', 'en'].includes(input.systemLanguage) ? input.systemLanguage : 'zh-TW'
+        : null
     const scFramework = systemLanguage === 'zh-CN' ? 'hsk'
       : systemLanguage === 'zh-TW' ? input.levelFramework === 'tocfl' ? 'tocfl' : 'tbcl'
         : ['hsk', 'tocfl', 'tbcl'].includes(input.levelFramework) ? input.levelFramework : 'hsk'

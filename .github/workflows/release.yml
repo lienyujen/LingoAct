@@ -52,6 +52,24 @@ jobs:
             product: LingoAct-Huayu
             target: --win zip --x64
             artifact: LingoAct-Huayu.zip
+          - label: Windows Full
+            os: windows-latest
+            profile: full
+            product: LingoAct
+            target: --win zip --x64
+            artifact: LingoAct-Full.zip
+          - label: Windows English
+            os: windows-latest
+            profile: english
+            product: LingoAct-English
+            target: --win zip --x64
+            artifact: LingoAct-English.zip
+          - label: Windows Guoyu
+            os: windows-latest
+            profile: guoyu
+            product: LingoAct-Guoyu
+            target: --win zip --x64
+            artifact: LingoAct-Guoyu.zip
           - label: Windows NCACLS
             os: windows-latest
             profile: ncacls
@@ -150,6 +168,25 @@ jobs:
           pnpm build
           pnpm exec electron-builder $TARGET --publish never
 
+      - name: Distinguish the full edition download
+        if: matrix.profile == 'full' && (github.event_name == 'push' || inputs.platform == 'all')
+        shell: bash
+        run: mv release/LingoAct.zip release/LingoAct-Full.zip
+
+      - name: Verify the Windows app starts
+        if: matrix.os == 'windows-latest' && (github.event_name == 'push' || inputs.platform == 'all')
+        env:
+          PRODUCT: ${{ matrix.product }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process'
+          import assert from 'node:assert/strict'
+          const output = execFileSync(`release/win-unpacked/${process.env.PRODUCT}.exe`, ['--smoke-test'], { encoding: 'utf8', timeout: 30000, windowsHide: true })
+          assert.match(output, /LINGOACT_SMOKE_TEST_OK/)
+          console.log(output)
+          JS
+
       # Check the exact app and image this job uploads. Besides the signature,
       # invoking --version makes macOS load the universal executable; lipo by
       # itself only proves both slices exist, not that the kernel accepts them.
@@ -215,17 +252,32 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
+          (cd builds && shopt -s nullglob && sha256sum -- *.zip *.dmg > SHA256SUMS.txt)
           notes=$(cat <<'MD'
           ## 下載
 
           | 版本 | Windows | macOS |
           |---|---|---|
-          | LingoAct（HSK／TOCFL／TBCL，多语言界面） | `LingoAct.zip` | `LingoAct.dmg` |
-          | 華語教學版（TBCL／TOCFL、注音／拼音） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
+          | LingoAct 簡體中文／HSK 版 | `LingoAct.zip` | `LingoAct.dmg` |
+          | 華語教學版（預設繁體，可選簡體或 English） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
+          | 完整教學版 | `LingoAct-Full.zip` | — |
+          | 英語教學版 | `LingoAct-English.zip` | — |
+          | 國語教學版 | `LingoAct-Guoyu.zip` | — |
           | 全美中文學校聯合總會版 | `LingoAct-NCACLS.zip` | `LingoAct-NCACLS.dmg` |
 
           **Windows：** 解壓縮後執行裡面的 exe。
           **macOS：** 開啟 dmg，把 App 拖進「應用程式」。同一個檔案支援 Apple Silicon 與 Intel。
+
+          ## 本次更新
+
+          - 華語教學版加入簡體／HSK 模式，預設仍是繁體；English 可選 HSK、TOCFL 或 TBCL。
+          - 簡體版固定使用簡體中文、HSK 與普通話。
+          - 看圖說寫同步派送建議詞彙與句型；學生切換外語介面時，題目和建議保留教學原文。
+          - 修正看圖說寫 AI 的簡體設定，以及慢速載入導致題目一直停在「出題中」的問題。
+          - 中文字型跟隨教師的簡繁設定，補上按需多語說明翻譯及瀏覽器整頁翻譯防護。
+          - 支援同資料夾 `.env` 隨身設定；更新時請保留自己的 `.env`。下載包只附 `.env.example`。
+
+          `SHA256SUMS.txt` 提供下載檔案的 SHA-256 校驗值。
 
           ## 首次使用
 

@@ -5,6 +5,7 @@ import './index.css'
 import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/noto-sans-tc'
 import App from './App.tsx'
+import { guardTranslationDom } from './lib/translationDomGuard'
 
 window.addEventListener('error', (event) => {
   console.error('[global-error]', event.message, event.error?.stack || '')
@@ -17,7 +18,9 @@ window.addEventListener('unhandledrejection', (event) => {
 // Phosphor defaults to its 'regular' weight, which is thinner than the icon
 // language this interface is built around. Setting it once here beats repeating
 // weight="bold" on every one of the several hundred call sites.
-createRoot(document.getElementById('root')!).render(
+const appRoot = document.getElementById('root')!
+guardTranslationDom(appRoot)
+createRoot(appRoot).render(
   <StrictMode>
     <IconContext.Provider value={{ weight: 'bold' }}>
       <App />

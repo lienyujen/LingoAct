@@ -7,7 +7,7 @@ import { parsePins, serialisePins } from '../lib/hotspot'
 import { RubyText } from './RubyText'
 import { participantText } from '../lib/participantI18n'
 import type { ParticipantLocale, ParticipantMessageKey } from '../lib/participantI18n'
-import { listSeparator, localizedFields } from '../lib/localizedContent'
+import { listSeparator } from '../lib/localizedContent'
 import { useReadingFont } from '../lib/readingFont'
 import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
 import type { Answer, AudioResponse, Question } from '../types'
@@ -54,7 +54,6 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
   // the question: both close answering, and the student is told which happened.
   const timeUp = secondsLeft === 0
   const acceptingAnswers = question.status === 'active' && !timeUp
-  const translation = localizedFields(question.translations, locale)
   // A question with no title of its own is described by its kind, and that
   // description belongs to whoever is reading rather than to English.
   const typeTitles: Partial<Record<Question['type'], ParticipantMessageKey>> = {
@@ -67,10 +66,10 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
   }
   const typeKey = typeTitles[question.type]
   const fallbackTitle = question.title || (typeKey ? participantText(locale, typeKey) : '')
-  const prompt = translation?.prompt_text || translation?.title || question.prompt_text || fallbackTitle || participantText(locale, 'interactiveQuestion')
+  const prompt = question.prompt_text || fallbackTitle || participantText(locale, 'interactiveQuestion')
   // Something to put away: 注音 set into the font, or 拼音 above the line.
   const hasReading = Boolean(readingFamily || question.reading_words?.length || question.reading_ruby?.length)
-  const translatedOptions = translation?.options?.length === question.options.length ? translation.options : question.options
+  const translatedOptions = question.options
   const displayAnswer = (value: string) => {
     const index = question.options.indexOf(value)
     return index >= 0 ? translatedOptions[index] : value

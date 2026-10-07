@@ -41,7 +41,6 @@ import { usePageVisibility } from '../lib/usePageVisibility'
 import { contentLocaleKey, localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
 import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
-import { localizedFields } from '../lib/localizedContent'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { setUiLanguage } from '../lib/uiText'
 import type { AiSummary, Answer, AudioResponse, BuzzerSessionEvent, ExitTicket, ListeningClip, LotterySessionEvent, Participant, ParticipantQuizData, Question, QuestionAnalysis, Screenshot, Session, SessionAnalysis, SessionEvent, SharedContent, WritingCoachTurn } from '../types'
@@ -1085,7 +1084,7 @@ export function ParticipantPage() {
           variant={question.type === 'pronunciation' ? 'model' : 'listening'}
           prompt={question.type === 'custom_quiz'
             ? null
-            : localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
+            : question.prompt_text}
           readingFontUrl={question.reading_font_url}
           readingRuby={question.reading_ruby}
           readingWords={question.reading_words}

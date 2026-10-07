@@ -211,11 +211,10 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
   }
 
   if (!current) return null
-  const translation = localizedFields(current.translations, locale)
   const promptIsWord = current.prompt_is_word === true
   const promptReading = current.prompt_reading || ''
-  const promptText = promptIsWord ? current.prompt_text : (translation?.prompt_text || current.prompt_text)
-  const options = promptIsWord && translation?.options?.length === current.options.length ? translation.options : current.options
+  const promptText = current.prompt_text
+  const options = current.options
 
   return (
     <section className="panel participant-question participant-flashcards">

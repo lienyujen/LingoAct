@@ -39,10 +39,7 @@ type Props = {
 }
 
 function answerText(question: Question, answer: Answer, locale: ParticipantLocale) {
-  const translation = localizedFields(question.translations, locale)
-  const translatedOptions = translation?.options?.length === question.options.length
-    ? translation.options
-    : question.options
+  const translatedOptions = question.options
   const display = (value: string) => {
     const index = question.options.indexOf(value)
     return index >= 0 ? translatedOptions[index] : value
@@ -57,8 +54,7 @@ function questionTitle(question: Question, locale: ParticipantLocale) {
   // view. Putting that paragraph in the collapsed history row would turn the
   // navigation label into a wall of text.
   if (question.type === 'listening') return participantText(locale, 'listening')
-  const translation = localizedFields(question.translations, locale)
-  return translation?.prompt_text || translation?.title || question.prompt_text || translation?.title || question.title
+  return question.prompt_text || question.title
 }
 
 export function ParticipantQuestionHistory({ analyses,
@@ -234,7 +230,7 @@ export function ParticipantQuestionHistory({ analyses,
                         variant={question.type === 'pronunciation' ? 'model' : 'listening'}
                         prompt={question.type === 'custom_quiz'
                           ? null
-                          : localizedFields(question.translations, locale)?.prompt_text || question.prompt_text}
+                          : question.prompt_text}
                         readingFontUrl={question.reading_font_url}
                         readingRuby={question.reading_ruby}
                         readingWords={question.reading_words}
@@ -274,7 +270,7 @@ export function ParticipantQuestionHistory({ analyses,
                         )}
                         {quiz.items.map((item, itemIndex) => {
                           const response = quiz.answers.find((entry) => entry.item_id === item.id)
-                          const prompt = localizedFields(item.translations, locale)?.prompt_text || item.prompt_text
+                          const prompt = item.prompt_text
                           const submitted = response?.answer_values?.join(', ') || response?.answer_text || '-'
                           const feedback = localizedFeedback(response?.feedback, locale)
                           // 圖片排序: the values are panel ids, so the order the

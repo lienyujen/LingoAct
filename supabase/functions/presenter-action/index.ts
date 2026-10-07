@@ -39,99 +39,6 @@ const speakerLanguages = new Set(['zh-cn', 'zh-tw', 'en'])
 // 'source' is the presenter asking for the transcript unaltered.
 const captionDisplayLanguages = new Set(['zh-cn', 'zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr', 'source'])
 const interpretationLanguagesSupported = new Set(['zh-cn', 'zh-tw', 'en', 'es', 'ja', 'ko', 'vi', 'de', 'id', 'th', 'fr'])
-const questionTranslationSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    translations: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          locale: { type: 'string' },
-          title: { type: 'string' },
-          prompt_text: { type: 'string' },
-          options: { type: 'array', items: { type: 'string' } },
-        },
-        required: ['locale', 'title', 'prompt_text', 'options'],
-      },
-    },
-  },
-  required: ['translations'],
-}
-
-export type QuestionTranslation = { title: string; prompt_text: string; options: string[] }
-
-// Every language asked for, in one call.
-//
-// It used to produce English and nothing else, so a class reading in Spanish
-// got the teacher's original Chinese. Asking for several at once rather than
-// once per language is the cheap part; deciding WHICH languages to ask for is
-// where the money is, and that is the caller's job — nobody should pay to
-// translate a question into a language no one in the room reads.
-async function translateQuestion(title: string, promptText: string, options: string[], locales: string[] = ['en']) {
-  const wanted = [...new Set(locales)].filter(Boolean)
-  if ((!promptText && !options.length) || !wanted.length) return {}
-  const result = await callAiJson(
-    [
-      'Translate this instructor-authored classroom question into each language listed in "into", writing each one concisely and naturally.',
-      'Preserve names, numbers, formulas, meaning, option order, and the number of options exactly.',
-      'Do not answer, explain, summarize, or add content.',
-      'Return one entry per requested language, echoing its code in "locale".',
-    ].join(' '),
-    { title, prompt_text: promptText, options, into: wanted.map((code) => ({ locale: code, language: guidanceLanguageName(code) })) },
-    questionTranslationSchema,
-    null,
-    'realtime',
-  )
-  if (result.status !== 'success') return {}
-  const rows = (result.output as { translations?: unknown })?.translations
-  if (!Array.isArray(rows)) return {}
-
-  const out: Record<string, QuestionTranslation> = {}
-  for (const row of rows as Array<Record<string, unknown>>) {
-    const code = typeof row.locale === 'string' ? row.locale : ''
-    if (!wanted.includes(code)) continue
-    // A list of the wrong length would put an answer under the wrong option,
-    // so a language that came back malformed is dropped rather than stored.
-    if (!Array.isArray(row.options) || row.options.length !== options.length) continue
-    out[contentLocaleKey(code)] = {
-      title: String(row.title || ''),
-      prompt_text: String(row.prompt_text || ''),
-      options: row.options.map((option) => String(option)),
-    }
-  }
-  return out
-}
-
-// The student page stores zh-TW under zh_tw, because a hyphen is not a
-// comfortable JSON key to write by hand and the column has always looked
-// like that.
-function contentLocaleKey(code: string) {
-  return code === 'zh-TW' ? 'zh_tw' : code
-}
-
-// Which languages are actually being read in this room right now.
-//
-// Reported by each student's own heartbeat, so this is who is present rather
-// than who might turn up. zh-TW is left out because the question is already in
-// it — the teacher wrote it — and a language nobody has chosen is never asked
-// for at all.
-async function roomLocales(supabase: ReturnType<typeof getAdminClient>, sessionId: string) {
-  const { data } = await supabase.from('participants')
-    .select('locale')
-    .eq('session_id', sessionId)
-    .is('removed_at', null)
-    .gte('last_seen_at', new Date(Date.now() - 30 * 60_000).toISOString())
-  const codes = new Set<string>()
-  for (const row of (data || []) as Array<{ locale?: string | null }>) {
-    const code = row.locale || ''
-    if (code && code !== 'zh-TW') codes.add(code)
-  }
-  return [...codes]
-}
-
 function randomIndex(length: number) {
   if (length <= 1) return 0
   const ceiling = Math.floor(0x100000000 / length) * length
@@ -889,12 +796,8 @@ Deno.serve(async (req) => {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
       if (!promptText) return jsonResponse({ message: '請先寫出要學生拍什麼、說明什麼。' }, 400)
 
-      let translations = {}
-      try {
-        translations = await translateQuestion('拍照描述', promptText, [], ['en', ...await roomLocales(supabase, sessionId)])
-      } catch (translationError) {
-        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
-      }
+      // Classroom materials stay in the language the teacher dispatched.
+      const translations = {}
 
       const stoppedAt = new Date().toISOString()
       const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
@@ -929,12 +832,8 @@ Deno.serve(async (req) => {
       const answerSeconds = timingSeconds(input.answerSeconds, 600)
       if (answerSeconds === undefined) return jsonResponse({ message: '時間設定不正確。' }, 400)
 
-      let translations = {}
-      try {
-        translations = await translateQuestion('造句', promptText, [], ['en', ...await roomLocales(supabase, sessionId)])
-      } catch (translationError) {
-        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
-      }
+      // Classroom materials stay in the language the teacher dispatched.
+      const translations = {}
 
       const stoppedAt = new Date().toISOString()
       const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
@@ -2072,17 +1971,7 @@ Deno.serve(async (req) => {
         : []
 
       const title = readAloud ? '朗讀發音' : '聽力'
-      let translations = {}
-      // The audio-only prompt is the exact script being spoken, not guidance
-      // text. Translating it would make the highlighted words disagree with the
-      // recording for every student using another interface language.
-      if (!audioOnly) {
-        try {
-          translations = await translateQuestion(title, promptText, [], ['en', ...await roomLocales(supabase, sessionId)])
-        } catch (translationError) {
-          console.error('listening question translation failed', translationError instanceof Error ? translationError.message : translationError)
-        }
-      }
+      const translations = {}
 
       const { error: stopError } = await stopActiveQuestions(supabase, sessionId, new Date().toISOString())
       if (stopError) throw stopError
@@ -2479,14 +2368,8 @@ Deno.serve(async (req) => {
         hotspot: '圖上點選',
         board: '討論板',
       }
-      let translations = {}
-      try {
-        if (input.preservePromptLanguage !== true) {
-          translations = await translateQuestion(titles[type], promptText, options, ['en', ...await roomLocales(supabase, sessionId)])
-        }
-      } catch (translationError) {
-        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
-      }
+      // Classroom materials stay in the language the teacher dispatched.
+      const translations = {}
       if (hasBackdrop) {
         const stored = await storedObject(supabase, 'lingoact-screenshots', storagePath)
         if (!stored.ok) {

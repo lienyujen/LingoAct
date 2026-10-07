@@ -9,7 +9,7 @@ import { DragAnswers } from './DragAnswers'
 import { InteractionReadout } from './InteractionReadout'
 import { WritingCoachPanel } from './WritingCoachPanel'
 import { RevisedWriting } from './RevisedWriting'
-import { localizedFeedback, localizedFields } from '../lib/localizedContent'
+import { localizedFeedback } from '../lib/localizedContent'
 import type { ParticipantQuizData } from '../types'
 
 export type QuizSubmission = Array<{ itemId: string; answerText?: string; answerValues?: string[] }>
@@ -151,10 +151,9 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
         )}
         {submitted && data.items.map((item, index) => {
           const response = data.answers.find((answer) => answer.item_id === item.id)
-          const translation = localizedFields(item.translations, locale)
           return (
             <article className="quiz-graded-item" key={item.id}>
-              <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong></div>
+              <div><strong>{index + 1}. {item.prompt_text}</strong></div>
               <p className="quiz-written-back">{response?.answer_text}</p>
               {data.quiz.interaction_mode && <InteractionReadout item={item} values={response?.answer_values || []} />}
               {/* Written back to them, not only to the teacher's panel: notes
@@ -167,10 +166,9 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
         })}
         {graded && !pictureWriting && data.items.map((item, index) => {
           const response = data.answers.find((answer) => answer.item_id === item.id)
-          const translation = localizedFields(item.translations, locale)
           return (
             <article className="quiz-graded-item" key={item.id}>
-              <div><strong>{index + 1}. {translation?.prompt_text || item.prompt_text}</strong><span>{response?.score ?? 0}/{item.points}</span></div>
+              <div><strong>{index + 1}. {item.prompt_text}</strong><span>{response?.score ?? 0}/{item.points}</span></div>
               <p>{localizedFeedback(response?.feedback, locale)}</p>
               {data.quiz.interaction_mode && <InteractionReadout item={item} values={response?.answer_values || []} />}
             </article>
@@ -191,11 +189,10 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
           : participantText(locale, 'quizHintKey')}</p>}
       <form className="custom-quiz-form" onSubmit={submit}>
         {data.items.map((item, index) => {
-          const translation = localizedFields(item.translations, locale)
-          const options = translation?.options?.length === item.options.length ? translation.options : item.options
+          const options = item.options
           return (
             <fieldset className="custom-quiz-item" key={item.id}>
-              <legend><span>{index + 1}</span>{translation?.prompt_text || item.prompt_text}{!writing && data.quiz.graded && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
+              <legend><span>{index + 1}</span>{item.prompt_text}{!writing && data.quiz.graded && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
               {item.type === 'multiple_choice' ? (
                 <div className="quiz-choice-list">
                   {item.options.map((option, optionIndex) => (
@@ -227,9 +224,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
                   optionLabels={options}
                   options={item.options}
                   pairPrompts={item.pair_prompts}
-                  promptLabels={translation?.pair_prompts?.length === item.pair_prompts.length
-                    ? translation.pair_prompts
-                    : item.pair_prompts}
+                  promptLabels={item.pair_prompts}
                   values={matchAnswers[item.id] || []}
                   onChange={(next) => setMatchAnswers((current) => ({ ...current, [item.id]: next }))}
                 />

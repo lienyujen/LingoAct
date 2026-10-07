@@ -18,8 +18,8 @@ test('picture scaffolds reach stored question unchanged, without translation AI 
  }
  try{
   await import('../supabase/functions/presenter-action/index.ts')
-  for(const questionType of ['oral_response','short_answer']){
-   const response=await handler(new Request('https://example.supabase.co/functions/v1/presenter-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create_question',sessionId,presenterToken:'test-presenter',questionType,promptText:prompt,preservePromptLanguage:true,options:[]})}))
+  for(const questionType of ['oral_response','short_answer','multiple_choice','true_false','poll','board']){
+   const response=await handler(new Request('https://example.supabase.co/functions/v1/presenter-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create_question',sessionId,presenterToken:'test-presenter',questionType,promptText:prompt,options:['甲','乙'],boardFormats:['text']})}))
    assert.equal(response.status,200,await response.clone().text())
    assert.equal(stored.prompt_text,prompt);assert.deepEqual(stored.translations,{})
    for(const locale of ['en','vi','th','ja','ko','id','zh-TW','zh-CN'])assert.equal(stored.translations[locale]?.prompt_text||stored.prompt_text,prompt)

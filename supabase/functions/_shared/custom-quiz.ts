@@ -85,7 +85,7 @@ const translatedFieldsSchema = {
   required: ['prompt_text', 'options', 'pair_prompts'],
 }
 
-function quizGenerationSchema(_flashcard: boolean) {
+function quizGenerationSchema(flashcard: boolean) {
   return {
   type: 'object',
   additionalProperties: false,
@@ -114,10 +114,10 @@ function quizGenerationSchema(_flashcard: boolean) {
           // is worked out by matching rather than declared — see below.
           target_word: { type: 'string' },
           rubric: { type: 'string' },
-          translation_en: translatedFieldsSchema,
+          ...(flashcard ? { translation_en: translatedFieldsSchema } : {}),
         },
         required: [
-          'type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'target_word', 'rubric', 'translation_en',
+          'type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'target_word', 'rubric', ...(flashcard ? ['translation_en'] : []),
         ],
       },
     },
@@ -324,7 +324,7 @@ export async function generateCustomQuiz(input: {
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} translation_en 一律提供忠實自然的英文版本；若主文已是英文則保持相同意思。${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard ? 'translation_en 僅翻譯字卡的解釋面，詞語面保留原文。' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{
@@ -484,7 +484,7 @@ ${input.sourceText}` }] : []),
       if (options.length !== pairPrompts.length) throw new Error(`Item ${index + 1} has mismatched columns.`)
     }
     if (type === 'fill_blank' && !acceptedAnswers.length) throw new Error(`Item ${index + 1} needs an accepted answer.`)
-    const rawTranslations = { en: item.translation_en }
+    const rawTranslations = flashcard ? { en: item.translation_en } : {}
     // Every type with options gets them in a different order from the one the
     // model produced; what differs is why.
     //

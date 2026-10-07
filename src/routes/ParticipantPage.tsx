@@ -1,4 +1,5 @@
 import { useClassChineseFont } from '../lib/classChineseFont'
+import { createSerializedReload } from '../lib/serializedReload'
 import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -160,7 +161,8 @@ export function ParticipantPage() {
     setLocale(nextLocale)
   }
 
-  const loadAll = useCallback(async () => {
+  const [serializedReload] = useState(createSerializedReload)
+  const loadSnapshot = useCallback(async () => {
     if (!isSupabaseConfigured || !sessionId || !participantId) return
     const requestId = ++loadSequence.current
     const supabase = requireSupabase()
@@ -422,6 +424,7 @@ export function ParticipantPage() {
       setPassageImageUrl(null)
     }
   }, [locale, participantId, participantToken, sessionId])
+  const loadAll = useCallback(() => serializedReload(loadSnapshot), [loadSnapshot, serializedReload])
 
   const loadHistoryDetails = useCallback(async (historyQuestion: Question) => {
     if (!participantId || !participantToken || !['custom_quiz', 'pronunciation', 'oral_response'].includes(historyQuestion.type)) return

@@ -430,5 +430,13 @@
   "關閉程式": "Close app",
   "讓學生愛上中文": "Bring Chinese to life",
   "中文教学版": "Chinese Teaching",
-  "{0}・英語教學的 AI 助教。": "{0} · Your AI assistant for teaching English."
+  "{0}・英語教學的 AI 助教。": "{0} · Your AI assistant for teaching English.",
+  "播放中": "Playing",
+  "作答中": "Accepting responses",
+  "已停止作答": "Responses closed",
+  "已結束": "Ended",
+  "草稿": "Draft",
+  "電寫題": "Handwritten response",
+  "电写题": "Handwritten response",
+  "手写题": "Handwritten response"
 }

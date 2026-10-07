@@ -139,7 +139,7 @@ const verdictKeys = {
 // The marking is written in both languages; which one a student reads follows
 // the language they are on, the same as every other AI text on this page.
 function inLocale(analysis: FileAnalysis, locale: ParticipantLocale) {
-  const chinese = locale === 'zh-TW'
+  const chinese = locale === 'zh-TW' || locale === 'zh-CN'
   return {
     summary: (chinese ? analysis.summary_zh_tw : analysis.summary_en) || analysis.summary_zh_tw || '',
     strengths: (chinese ? analysis.strengths_zh_tw : analysis.strengths_en)?.length

@@ -21,6 +21,7 @@ import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 import type { Answer, AudioResponse, FileResponse, Question, QuestionAnalysis } from '../types'
 import { QuestionActivityStatus } from './QuestionActivityStatus'
+const drawingDefaultTitles = new Set(['電寫題', '电写题', '手写题', 'Handwritten response'])
 
 type Props = {
   anonymousEnabled: boolean
@@ -836,7 +837,7 @@ export function QuestionResult(props: Props) {
       <>
         <section className="panel result-panel upload-results-panel">
           <div className="panel-heading">
-            <h2><FileArrowUp size={20} />{question.title}</h2>
+            <h2><FileArrowUp size={20} />{question.type === 'drawing' && (!question.title || drawingDefaultTitles.has(question.title)) ? t('typeDrawing') : question.title}</h2>
             <QuestionStatusActions {...props} question={question} />
           </div>
           {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}

@@ -9,7 +9,7 @@ import { DragAnswers } from './DragAnswers'
 import { InteractionReadout } from './InteractionReadout'
 
 export function InteractionResults({ results, anonymousEnabled }: { results: PresenterQuizResults; anonymousEnabled: boolean }) {
-  const zh = usePresenterLocale() === 'zh-TW', item = results.items[0]
+  const zh = ['zh-TW', 'zh-CN'].includes(usePresenterLocale()), item = results.items[0]
   const incomingKey = results.keys.find(k => k.item_id === item?.id)?.accepted_answers || []
   const signature = JSON.stringify(incomingKey)
   const [key, setKey] = useState(incomingKey), [editing, setEditing] = useState(false), [draft, setDraft] = useState<string[]>([])

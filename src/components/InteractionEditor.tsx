@@ -9,7 +9,7 @@ export function InteractionEditor({ value, direction, previewUrl, onChange, onDi
   onChange: (value: InteractionDraft) => void; onDirectionChange: (value: string) => void
   onGenerate: (request: Record<string, unknown>) => Promise<InteractionGenerated>; onBusy: (busy: boolean) => void
 }) {
-  const zh = usePresenterLocale() === 'zh-TW'
+  const zh = ['zh-TW', 'zh-CN'].includes(usePresenterLocale())
   const [slicing, setSlicing] = useState(value.tiles.length > 0), [count, setCount] = useState(value.tiles.length || 4), [busy, setBusy] = useState(false), [error, setError] = useState('')
   const change = (fields: Partial<InteractionDraft>) => onChange({ ...value, ...fields })
   async function generate() {

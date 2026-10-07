@@ -30,10 +30,20 @@ const en: Record<keyof typeof zh, string> = {
   next: 'Start next activity', timing: 'Time limits (optional)', source: 'How should students practice with this material?',
   responses: 'View responses', classroom: 'Classroom',
 }
+const cn: Record<keyof typeof zh, string> = {
+  activities: '开始活动', current: '当前活动', history: '课堂记录',
+  choose: '想让学生练习什么？', listen: '听', speak: '说', read: '读', write: '写',
+  tools: '课堂工具', wrap: '总结与回顾', orDispatch: '或者：', fromImage: '使用图片', noBackdrop: '使用空白画布',
+  listenHint: '听音频、跟读，再检查是否听懂', speakHint: '从跟读到独立表达',
+  readHint: '理解词汇、句子和文章结构', writeHint: '从写一句话到写一段话',
+  currentEmpty: '还没有活动。请选择一项练习，让学生开始。', historyEmpty: '已完成的活动保存在这里，方便回顾学生的回答。',
+  openControls: '打开教学面板', hideControls: '收起教学面板', showJoin: '显示加入课堂的二维码',
+  next: '开始下一个活动', timing: '时间设置（选填）', source: '想用这份材料练习什么？', responses: '查看回答', classroom: '教室',
+}
 
 export function useWorkspaceText() {
   const locale = usePresenterLocale()
   return workspaceText(locale)
 }
 
-export function workspaceText(locale: string) { return locale === 'zh-TW' ? zh : en }
+export function workspaceText(locale: string) { return locale === 'zh-CN' ? cn : locale === 'zh-TW' ? zh : en }

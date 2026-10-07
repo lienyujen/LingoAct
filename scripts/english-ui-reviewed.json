@@ -933,8 +933,12 @@
     "drawEraser": "Eraser",
     "drawText": "Text",
     "drawUndo": "Undo",
-    "drawClear": "Clear",
+    "drawClear": "Clear canvas",
     "drawDeleteSelected": "Delete selected",
+    "drawImport": "Take photo / upload image",
+    "drawImportHint": "You can also paste an image. Use Select to move, resize, or rotate it, then continue writing.",
+    "drawImportFailed": "This image could not be opened. Choose a JPG, PNG, or WebP image.",
+    "drawImportTooLarge": "This image exceeds 20 MB. Resize it before uploading.",
     "drawBlank": "Use a blank canvas",
     "drawSelectHint": "Tap to select and drag to move. Use two fingers to resize or rotate, or drag the corner handles with a mouse.",
     "drawTextPlaceholder": "Type, then press Enter or ✓",
@@ -1226,6 +1230,7 @@
     "任務說明": "Task instructions",
     "但是": "but",
     "作品": "Student work",
+    "作答中": "Accepting responses",
     "作答失敗，可能已經提交過。": "Submission failed; it may have already been submitted.",
     "作答方式": "Response format",
     "你": "you",
@@ -1330,9 +1335,11 @@
     "尚未連接 Supabase。": "Not connected to Supabase.",
     "就是": "That is / Exactly",
     "已作答 {0} 人": "{0} responded",
+    "已停止作答": "Responses closed",
     "已儲存在這台電腦，下次可直接選用。": "Saved on this computer for use in future classes.",
     "已換發新金鑰。其他電腦上的舊金鑰立刻失效，需要重新貼上這一組。": "A new key has been generated. Old keys on other computers are now invalid. Update those computers with this key.",
     "已收起": "Hidden",
+    "已結束": "Ended",
     "已複製。": "Copied.",
     "已關閉": "Closed",
     "已關閉 ": "Closed ",
@@ -1352,6 +1359,7 @@
     "我們": "We / Us",
     "我的": "My / Mine",
     "所以": "So / Therefore",
+    "手写题": "Handwritten response",
     "找不到作答權限。": "Your access to submit responses was not found.",
     "找不到足夠且不同的排序項目，請補充出題方向。": "There are not enough distinct items for a sequencing activity. Add more detail to your instructions.",
     "找不到足夠的區塊，請換截圖或補充出題方向。": "There are not enough identifiable sections in this image. Use another screenshot or add more detail to your instructions.",
@@ -1364,6 +1372,7 @@
     "授課錦囊": "Teaching toolkit",
     "搶答失敗。": "Buzz-in failed.",
     "搶答失敗，請稍後再試。": "Buzz-in failed. Please try again later.",
+    "播放中": "Playing",
     "操作失敗。": "Operation failed.",
     "改為有標準答案": "Use an answer key",
     "改為無標準答案": "Make this open-ended",
@@ -1431,6 +1440,7 @@
     "產生管理金鑰": "Generate admin key",
     "用截圖分割出題": "Split Screenshot into Questions",
     "用這個重點再練": "Practice Again with This Focus",
+    "电写题": "Handwritten response",
     "留空即可 —— QR Code 會指向共用學員端，並自動帶上你的專案，學生資料仍然只進你的 Supabase。 商業使用者請自行託管並填入自己的網址。": "Leave blank to use the shared student site. QR codes automatically connect students to your Supabase project, where their data is stored. Commercial users should host their own student site and enter its URL.",
     "畫面發生錯誤：": "Screen error:",
     "發生在：": "Occurred at:",
@@ -1479,6 +1489,7 @@
     "臺灣華語文能力基準 TBCL": "Taiwan Benchmarks for the Chinese Language TBCL",
     "與": "and",
     "英語": "English",
+    "草稿": "Draft",
     "華語教學版": "Chinese as a Second Language Edition",
     "華語教學的 AI 助教。": "Your AI assistant for teaching Chinese.",
     "華語文": "Mandarin Chinese",
@@ -1577,6 +1588,7 @@
     "關閉管理場次": "Close class management",
     "關閉討論板視窗": "Close discussion board window",
     "隨身設定已啟用：公開連線設定會儲存在程式同資料夾的 .env，搬移整個資料夾即可沿用。": "Portable settings are enabled. Public connection settings are saved in .env alongside the app. Move the entire folder to keep using them.",
+    "電寫題": "Handwritten response",
     "韓國語文能力測驗 TOPIK": "Test of Proficiency in Korean TOPIK",
     "韓語": "Korean",
     "韓語能力測驗 TOPIK": "Korean Language Proficiency Test TOPIK",
@@ -1594,6 +1606,10 @@
     "，每種口譯語言各建立一條連線，需付費帳號且用量等級要足夠。": ". Each translation language uses a separate live connection and requires a paid account with sufficient API capacity."
   },
   "inline": [
+    {
+      "filename": "src\\components\\BoardDrawing.tsx",
+      "text": "No image canvas"
+    },
     {
       "filename": "src\\components\\DragAnswers.tsx",
       "text": "Drag answers into matching slots, or select an answer and then a slot."
@@ -1865,6 +1881,10 @@
     {
       "filename": "src\\components\\ParticipantTeachingContext.tsx",
       "text": "Submit shared response"
+    },
+    {
+      "filename": "src\\components\\QuestionResult.tsx",
+      "text": "Handwritten response"
     },
     {
       "filename": "src\\components\\TeachingCyclePanel.tsx",

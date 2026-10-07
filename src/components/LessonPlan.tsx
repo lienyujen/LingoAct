@@ -142,7 +142,7 @@ export function LessonPlan({ courseName, busy = false, onStart }: {
   const [notice, setNotice] = useState('')
   const t = usePresenterText()
   const w = useWorkspaceText()
-  const chinese = usePresenterLocale() === 'zh-TW'
+  const chinese = ['zh-TW', 'zh-CN'].includes(usePresenterLocale())
 
   // The same table the activity menu is built from, so the plan can never offer
   // something the app does not have — or miss something it does.
@@ -260,7 +260,7 @@ export function LessonPlan({ courseName, busy = false, onStart }: {
       {has('pictureMode') && <select aria-label={chinese ? uiText("作答方式") : 'Answer mode'} value={draft.pictureMode} onChange={(e) => setDraft({ ...draft, pictureMode: e.target.value as 'spoken' | 'written' })}><option value="spoken">{t('modeSpoken')}</option><option value="written">{t('modeWritten')}</option></select>}
     </div>}
     {has('aiGrading') && <label className="lesson-plan-check"><input checked={draft.aiGrading} type="checkbox" onChange={(e) => setDraft({ ...draft, aiGrading: e.target.checked })} />{t('pictureAiGrading')}</label>}
-    <label>{promptMeta[0]}<textarea aria-label={promptMeta[0]} rows={3} maxLength={draft.kind === 'textDispatch' ? 5000 : 2000} value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={promptMeta[1]} /></label>
+    <label>{uiText(promptMeta[0])}<textarea aria-label={uiText(promptMeta[0])} rows={3} maxLength={draft.kind === 'textDispatch' ? 5000 : 2000} value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={uiText(promptMeta[1])} /></label>
     {has('link') && <label>{chinese ? uiText("連結（選填）") : 'Link (optional)'}<input value={draft.url || ''} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://" /></label>}
     <button className="ghost-button" type="button" disabled={busy || (promptRequired && !draft.prompt.trim()) || plan.activities.length >= 20} onClick={() => {
       save({ ...plan, activities: [...plan.activities, { ...draft, id: crypto.randomUUID(), prompt: draft.prompt.trim(), url: draft.url?.trim() }] }); setDraft(initialActivity(draft.kind))

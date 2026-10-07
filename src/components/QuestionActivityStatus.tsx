@@ -1,4 +1,5 @@
 import type { Question } from '../types'
+import { uiText } from '../lib/uiText'
 
 function isAudioActivity(question: Question) {
   return question.type === 'listening'
@@ -13,7 +14,7 @@ export function QuestionActivityStatus({ question, audioOnly = false }: { questi
   return (
     <span className={`status ${onAir ? 'on-air' : question.status}`}>
       {onAir && <span className="status-live-dot" />}
-      {audioActivity ? (onAir ? 'ON AIR' : question.status.toUpperCase()) : question.status}
+      {onAir ? uiText('播放中') : uiText({ active: '作答中', stopped: '已停止作答', closed: '已結束', draft: '草稿' }[question.status])}
     </span>
   )
 }

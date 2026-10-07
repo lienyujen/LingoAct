@@ -760,6 +760,38 @@ export const uiLocales: Record<string, { "zh-CN": string; en: string }> = {
     "zh-CN": "提交共同结果",
     "en": "Submit shared response"
   },
+  "播放中": {
+    "zh-CN": "播放中",
+    "en": "Playing"
+  },
+  "作答中": {
+    "zh-CN": "作答中",
+    "en": "Accepting responses"
+  },
+  "已停止作答": {
+    "zh-CN": "已停止作答",
+    "en": "Responses closed"
+  },
+  "已結束": {
+    "zh-CN": "已结束",
+    "en": "Ended"
+  },
+  "草稿": {
+    "zh-CN": "草稿",
+    "en": "Draft"
+  },
+  "電寫題": {
+    "zh-CN": "手写题",
+    "en": "Handwritten response"
+  },
+  "电写题": {
+    "zh-CN": "手写题",
+    "en": "Handwritten response"
+  },
+  "手写题": {
+    "zh-CN": "手写题",
+    "en": "Handwritten response"
+  },
   "文章字級": {
     "zh-CN": "文章字号",
     "en": "Text size"

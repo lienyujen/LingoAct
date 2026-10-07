@@ -28,6 +28,7 @@ export type QuestionDraft = {
   options: string[]
   allowMultiple: boolean
   promptText: string
+  preservePromptLanguage?: boolean
   quizSettings?: CustomQuizSettings
   // Null on both means untimed, which stays the default.
   prepareSeconds: number | null

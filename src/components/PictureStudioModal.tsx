@@ -1,4 +1,5 @@
 import { uiText } from '../lib/uiText'
+import { pictureStudentPrompt } from '../lib/pictureStudentPrompt'
 import { useEffect, useState } from 'react'
 import { ArrowsClockwise, CardsThree, Crop, Image as ImageIcon, Microphone, PaperPlaneTilt, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
 import { TimingRow } from './TimingRow'
@@ -164,12 +165,13 @@ export function PictureStudioModal({
     setError('')
     setBusy(mode === 'ordering' ? t('cuttingPanels') : t('sending'))
     try {
+      const studentPrompt = pictureStudentPrompt(promptText, picture.storyboard, { words: t('pictureVocabulary'), pattern: t('picturePattern') })
       if (mode === 'ordering') {
         await dispatchPictureWriting({
           sessionId,
           presenterToken,
           file: picture.file,
-          promptText: promptText.trim(),
+          promptText: studentPrompt,
           title: picture.storyboard.title,
           aiGrading,
         }, t)
@@ -180,7 +182,8 @@ export function PictureStudioModal({
         type: mode === 'spoken' ? 'oral_response' : 'short_answer',
         options: [],
         allowMultiple: false,
-        promptText: promptText.trim(),
+        promptText: studentPrompt,
+        preservePromptLanguage: true,
         prepareSeconds: mode === 'spoken' ? prepareSeconds : null,
         answerSeconds,
       })

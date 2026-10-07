@@ -87,7 +87,8 @@ const messages = {
     modeSpoken: '口說', modeWritten: '打字', modeOrdering: '排序寫作題',
     pictureOrderingHint: '四格會被切開並打亂。學生自行排序，並在每張圖下寫一段；這題沒有標準順序。',
     pictureAiGrading: '使用 AI 評分', pictureAiGradingOn: '依故事完整性與寫作內容評分。', pictureAiGradingOff: '不評分；完成繳交即得滿分。',
-    questionLabel: '題目', planPrivate: '以上只有你看得到，學生端只會收到圖和題目。',
+    pictureVocabulary: '建議詞彙', picturePattern: '建議句型',
+    questionLabel: '題目', planPrivate: '學生會收到圖片、題目、建議詞彙與句型；分鏡規劃僅教師可見。',
     cuttingPanels: '正在切開四格並派送…', generateFailed: '生成失敗，請再試一次。',
 
     // 即時造句牆
@@ -616,7 +617,8 @@ const messages = {
     modeSpoken: "Speaking", modeWritten: "Writing", modeOrdering: "Story sequencing",
     pictureOrderingHint: "The four panels are separated and shuffled. Students choose their own order and write part of the story under each panel. There is no single correct order.",
     pictureAiGrading: 'Use AI grading', pictureAiGradingOn: "Assess story coherence, development, and language use.", pictureAiGradingOff: 'No grading; a completed submission earns full credit.',
-    questionLabel: "Prompt", planPrivate: "Only you can see these settings. Students receive the image and prompt.",
+    pictureVocabulary: 'Suggested vocabulary', picturePattern: 'Suggested sentence patterns',
+    questionLabel: "Prompt", planPrivate: "Students receive the image, prompt, suggested vocabulary, and sentence patterns. The storyboard plan is only visible to you.",
     cuttingPanels: "Separating and sending panels…", generateFailed: "Generation failed. Please try again.",
 
     sentenceWallSub: "Each student writes a sentence. Their sentences appear together on the class display.",

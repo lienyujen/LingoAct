@@ -1080,12 +1080,9 @@ Deno.serve(async (req) => {
       })))
       if (panelError) throw panelError
 
-      let translations = {}
-      try {
-        translations = await translateQuestion(title, promptText, [], ['en', ...await roomLocales(supabase, sessionId)])
-      } catch (translationError) {
-        console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
-      }
+      // Picture instructions and language scaffolds are learning material.
+      // Keep them in the teaching language, including when reviewing history.
+      const translations = {}
 
       // The question carries no screenshot: the intact picture is the answer,
       // and it never enters the class.
@@ -2484,7 +2481,9 @@ Deno.serve(async (req) => {
       }
       let translations = {}
       try {
-        translations = await translateQuestion(titles[type], promptText, options, ['en', ...await roomLocales(supabase, sessionId)])
+        if (input.preservePromptLanguage !== true) {
+          translations = await translateQuestion(titles[type], promptText, options, ['en', ...await roomLocales(supabase, sessionId)])
+        }
       } catch (translationError) {
         console.error('question translation failed', translationError instanceof Error ? translationError.message : translationError)
       }

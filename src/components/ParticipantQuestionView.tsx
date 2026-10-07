@@ -90,7 +90,7 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
         ? <h2 className="reading-text" style={{ fontFamily: readingFamily }}>{prompt}</h2>
         : (question.reading_words?.length || question.reading_ruby?.length) && showReading
           ? <h2 className="reading-text reading-ruby"><RubyText ruby={question.reading_ruby || []} text={prompt} words={question.reading_words} /></h2>
-          : <h2>{prompt}</h2>}
+          : <h2 style={{ whiteSpace: 'pre-line' }}>{prompt}</h2>}
       {hasReading && (
         <label className="listening-transcript-toggle">
           <input checked={!showReading} type="checkbox" onChange={(event) => setShowReading(!event.target.checked)} />

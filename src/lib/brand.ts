@@ -13,34 +13,28 @@ import { APP_PROFILE } from './appProfiles'
 // JoinPage forwards the whole query string to the participant page, and this
 // reads it at runtime. The default costs nothing: no parameter means the
 // ordinary LingoAct page, so every existing link keeps working.
-export type BrandId = 'ncacls' | 'sc' | 'huayu'
+export type BrandId = 'ncacls' | 'sc' | 'huayu' | 'english'
 
 export const BRAND_PARAM = 'b'
 
 // True in the NCACLS desktop build itself, which is the fallback for the
 // presenter's own preview of the student page — there is no join URL there to
 // read the parameter from.
-export const buildBrand: BrandId | null = ['ncacls', 'sc', 'huayu'].includes(APP_PROFILE.id) ? APP_PROFILE.id as BrandId : null
+export const buildBrand: BrandId | null = ['ncacls', 'sc', 'huayu', 'english'].includes(APP_PROFILE.id) ? APP_PROFILE.id as BrandId : null
 
 export function brandFromSearch(search: URLSearchParams): BrandId | null {
   const value = search.get(BRAND_PARAM)
-  return value === 'ncacls' || value === 'sc' || value === 'huayu' ? value : buildBrand
+  return value === 'ncacls' || value === 'sc' || value === 'huayu' || value === 'english' ? value : buildBrand
 }
 
-// Which guidance languages an edition offers a student. NCACLS teach Chinese
-// in the United States, so their classes need English and Spanish — and
-// 繁體中文 itself, which is the language being taught and the one the teacher
-// demonstrates in. Cutting the other five is the point; cutting Chinese from a
-// Chinese course is not.
-//
-// Filtered rather than replaced, so the codes stay the ones the rest of the
-// app already knows and the menu keeps the app-wide order. A student who
-// arrives on a locale the edition does not offer is moved to its first one
-// rather than left on a language whose entry is not in the picker.
+// Editions keep their teaching script while learners choose a guidance language.
+// NCACLS defaults to Traditional Chinese and includes its requested languages.
+// Ordering the allowed list makes the default deterministic for old join links.
 const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
+  english: ['en', 'zh-TW'],
   huayu: ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
   sc: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
-  ncacls: ['zh-TW', 'en', 'es'],
+  ncacls: ['zh-TW', 'en', 'es', 'vi', 'th', 'id', 'ja', 'ko', 'my'],
 }
 
 export function guidanceLocalesForBrand<T extends { code: string }>(all: readonly T[], brand: BrandId | null) {

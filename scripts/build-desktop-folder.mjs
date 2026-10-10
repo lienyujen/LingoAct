@@ -20,7 +20,7 @@ const profiles = {
   huayu: 'LingoAct-Huayu',
   english: 'LingoAct-English',
   guoyu: 'LingoAct-Guoyu',
-  ncacls: 'LingoAct-NCACLS',
+  ncacls: 'LingoAct-TC',
 }
 const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
 const productName = profiles[profileId]
@@ -72,7 +72,8 @@ const relativeFiles = (dir, prefix = '') => fs.readdirSync(dir, { withFileTypes:
 
 if (fs.existsSync(target)) {
   const built = new Set(relativeFiles(unpacked))
-  const stale = relativeFiles(target).filter((file) => file !== '.env' && !built.has(file))
+  const stale = relativeFiles(target).filter((file) => !built.has(file)
+    && (file.startsWith('resources/') || file.startsWith('locales/') || /^LingoAct(?:-[\w]+)?\.exe$/i.test(file)))
   for (const file of stale) fs.rmSync(path.join(target, file), { force: true })
   if (stale.length) console.log(`removed ${stale.length} stale file(s) from the previous build`)
 } else {

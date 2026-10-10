@@ -19,7 +19,7 @@ export type ListeningAnalysis = {
   transcript: string
 }
 
-export type ListeningAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
+export type ListeningAccent = import('./speechAccent').SpeechAccent
 // The request field keeps its original speakerGenders name for compatibility
 // with deployed functions, but it now carries the teacher's voice choice too.
 export type SpeakerGender = 'male' | 'female' | 'boy' | 'girl' | 'unknown'

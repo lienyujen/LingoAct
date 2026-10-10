@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-10-08",
+  "counts": {
+    "sources": 13,
+    "frameworks": 4,
+    "levels": 21,
+    "descriptors": 44,
+    "vocabulary": 8020,
+    "grammar": 93,
+    "score_thresholds": 20,
+    "exam_parts": 15,
+    "source_pages": 237,
+    "competencies": 513,
+    "official_tables": 36
+  },
+  "vocabulary_by_list": {
+    "basic1200": 1214,
+    "additional800": 794,
+    "ceec-1": 1002,
+    "ceec-2": 1002,
+    "ceec-3": 1002,
+    "ceec-4": 1002,
+    "ceec-5": 1002,
+    "ceec-6": 1002
+  },
+  "competencies_by_source": {
+    "naer-general-2018": 393,
+    "naer-vocational": 120
+  },
+  "ceec_crosscheck": "level-sorted and alphabetically-sorted tables match entry, POS and level",
+  "database": "data/english/english-standards.sqlite",
+  "deployment_status": "local_research_only",
+  "limitations": [
+    "CEFR PDF CLI download blocked: official web PDF reviewed; original corpus absent; summaries and citations present.",
+    "CEEC full vocabulary requires written permission for commercial use; DB is excluded from source control and release assets.",
+    "No fixed official GEPT/TOEIC/CEFR vocabulary or grammar lists invented.",
+    "GEPT exam specifications/rubrics are retained as official HTML table rows with source links; spans are not yet normalized into runtime exam entities."
+  ]
+}

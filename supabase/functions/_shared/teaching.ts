@@ -1,5 +1,6 @@
 import type { Framework } from './proficiency.ts'
 import { levelInstruction } from './proficiency.ts'
+import { englishVocabularyInstruction } from './english.ts'
 
 // The class's track and its level, as one instruction, read from the session.
 //
@@ -16,6 +17,8 @@ export async function classLevelInstruction(
   return [
     trackInstruction(data?.teaching_language),
     levelInstruction(data?.level_framework ?? null, data?.level_code ?? null),
+    data?.teaching_language === 'en' && data?.level_framework === 'cefr'
+      ? englishVocabularyInstruction('cefr', data.level_code) : '',
   ].join('\n')
 }
 
@@ -67,7 +70,7 @@ export const TEACHING_TRACKS: Record<string, TeachingTrack> = {
     promptLanguage: 'Traditional Chinese as written in Taiwan (臺灣繁體中文)',
     audience: 'The learners are native Mandarin-speaking schoolchildren in Taiwan following the 108 國語文 curriculum — 國語 in primary school, 國文 from junior high. Do not write as though for a foreign learner: never gloss ordinary words, and pitch the difficulty at what they can READ and WRITE at this stage rather than at what they can say.',
   },
-  en: { id: 'en', frameworks: ['en108', 'gept', 'toeic'], language: 'en', promptLanguage: 'English', audience: 'The learners are studying English as a foreign language in Taiwan and share Mandarin as a first language.' },
+  en: { id: 'en', frameworks: ['en108', 'cefr', 'gept', 'toeic'], language: 'en', promptLanguage: 'English', audience: 'The learners are studying English as an additional language. Follow their selected school curriculum, CEFR ability level, GEPT level or TOEIC target. Do not assume every learner has Mandarin as a first language. English passages, prompts, options, reference answers, target words and sentence patterns stay in English. Guidance and explanatory feedback follow the selected guidance language. Pronunciation focuses on intelligibility, word stress, sentence stress and connected speech; intelligible accepted American and British variants are not errors.' },
   ja: { id: 'ja', frameworks: ['jlpt'], language: 'ja', promptLanguage: 'Japanese (日本語)', audience: 'The learners are studying Japanese as a foreign language in Taiwan.' },
   ko: { id: 'ko', frameworks: ['topik'], language: 'ko', promptLanguage: 'Korean (한국어)', audience: 'The learners are studying Korean as a foreign language in Taiwan.' },
   fr: { id: 'fr', frameworks: ['cefr'], language: 'fr', promptLanguage: 'French (français)', audience: 'The learners are studying French as a foreign language in Taiwan.' },
@@ -104,7 +107,9 @@ export const teachingTrackIds = new Set(Object.keys(TEACHING_TRACKS))
 export function trackInstruction(trackId: string | null | undefined) {
   const track = resolveTrack(trackId)
   return [
-    `This class is a ${track.promptLanguage} class. Every question, option, instruction and reference answer must be written in ${track.promptLanguage} unless the teacher's direction explicitly asks for another language.`,
+    track.id === 'en'
+      ? 'This is an English class. Every teaching passage, question, option, task instruction and reference answer must remain in English, even when the teacher gives directions in another language. Only separate explanatory notes may use the selected guidance language.'
+      : `This class is a ${track.promptLanguage} class. Every question, option, instruction and reference answer must be written in ${track.promptLanguage} unless the teacher's direction explicitly asks for another language.`,
     track.audience,
   ].join('\n')
 }

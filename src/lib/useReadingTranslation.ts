@@ -4,7 +4,7 @@ import type { ParticipantLocale } from './participantI18n'
 import type { ReadingPassage } from '../types'
 
 export type LearningCredentials = { sessionId: string; participantId: string; participantToken: string }
-const targetLocales = new Set(['vi', 'th', 'ja', 'ko', 'id', 'es', 'fr', 'de'])
+const targetLocales = new Set(['vi', 'th', 'ja', 'ko', 'id', 'es', 'fr', 'de', 'my'])
 
 export function useReadingTranslation(passage: ReadingPassage, locale: ParticipantLocale, credentials?: LearningCredentials, locked = false) {
   const [result, setResult] = useState<{ key: string; values: Record<string, string>; status?: 'pending' | 'failed' } | null>(null)

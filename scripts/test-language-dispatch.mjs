@@ -1,3 +1,4 @@
+import { englishTextRuns } from '../src/lib/englishText.ts'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -71,6 +72,7 @@ test('pinyin control remains available when the passage has no new vocabulary', 
   }).outputText
   const exports = {}
   new Function('require', 'exports', compiled)((name) => {
+    if (name === '../lib/englishText') return { englishTextRuns }
     if (name === '../lib/uiText') return { uiText: (text) => text }
     if (name === '@phosphor-icons/react') return { BookOpen: () => null, Translate: () => null, X: () => null }
     if (name === '../lib/readingFont') return { useReadingFont: () => null }
@@ -95,7 +97,8 @@ test('zhuyin passages use IVS readings for new words and never fall back to piny
     const exports = {}
     let state = 0
     new Function('require', 'exports', compiled)((name) => {
-      if (name === '../lib/uiText') return { uiText: (text) => text }
+      if (name === '../lib/englishText') return { englishTextRuns }
+    if (name === '../lib/uiText') return { uiText: (text) => text }
       if (name === 'react') return { ...require(name), useState: (initial) => [state++ === 2 ? all : typeof initial === 'function' ? initial() : initial, () => {}] }
       if (name === '@phosphor-icons/react') return { BookOpen: () => null, Translate: () => null, X: () => null }
       if (name === '../lib/readingFont') return { useReadingFont: () => 'CorrectSubset' }

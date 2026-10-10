@@ -1,0 +1,18 @@
+{
+  "reviewed_on": "2026-10-08",
+  "coverage_policy": "Public materials inform LingoAct's own teaching organisation. No claim of complete publisher textbook alignment, frequency ranking or publisher endorsement.",
+  "sources": [
+    {"id":"longteng-vocabulary-design","publisher":"龍騰文化","title":"學測字彙王／Power單字素養力","url":"https://www.ltedu.com.tw/Web/Upload/SHM_IMG/3/detail.aspx?SUBJECT_ID=10","coverage":"public product description; design reference only","observations":["CEEC bands 3–4 in the advertised GSAT book","recycling previously learned words","related words and confusable forms","life-context organisation"],"word_list_imported":false},
+    {"id":"hanlin-vocabulary-design","publisher":"翰林出版","title":"大考必勝單字（進階）","url":"https://books.hanlin.com.tw/product/772200","coverage":"public product description; design reference only","observations":["CEEC bands 5–6 in the advertised advanced book","collocations and phrases","spiral review"],"word_list_imported":false},
+    {"id":"nani-vocabulary-design","publisher":"南一書局","title":"我愛單字酷：高中系列","url":"https://english.nani.com.tw/client/product/category/2","coverage":"public product catalogue; design reference only","observations":["publisher ranges 1–2500, 2501–4500, 4501–7000; not CEEC or CEFR levels"],"word_list_imported":false},
+    {"id":"nani-thematic-design","publisher":"南一書局","title":"我愛單字酷中級：產品介紹","url":"https://shop.nani1953.com.tw/products/我愛單字酷-中級-2501-20240617123802","coverage":"official indexed product description; full page timed out","observations":["thematic organisation and lexical networks"],"word_list_imported":false},
+    {"id":"hanlin-news-2023-01","publisher":"翰林出版","title":"高中英文時事通：2023年1月號","url":"https://material.hle.com.tw/wp-content/uploads/2022/01/高中英文時事通2023年1月號.pdf","coverage":"page 2 Vocabulary & Phrases; written forms only, no copied definitions, examples, audio or article","page":2,"terms":["league","debut","leopard","delight","champion","championship","autograph-hunting","pick up","athletic","dominant","center","stint","anticipation","suspend","cap","presence","all around","attendance","assess","impact","in particular"],"word_list_imported":true}
+  ],
+  "lingoact_design": {
+    "level_authority":"CEEC original six bands; never infer grade, CEFR, Lexile or GEPT from CEEC band",
+    "organisation":"LingoAct editorial topics, teacher-selected units, explicit word-family links and contextual collocations",
+    "review":"Select previously practised words using actual classroom history, not a fabricated publisher frequency score",
+    "missing_metadata":"null or empty means unreviewed, not absent from the language",
+    "textbook_alignment":"Teacher-provided edition, book and lesson can be added later; publisher labels alone are not alignment evidence"
+  }
+}

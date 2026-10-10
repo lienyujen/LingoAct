@@ -1,4 +1,6 @@
 import { regionalPronunciationInstruction, regionalSpeechText } from './mandarin-pronunciation.ts'
+import { speechAccent, englishPronunciationInstruction } from './speech-accent.ts'
+import type { SpeechAccent } from './speech-accent.ts'
 
 // Turning a passage into something a class can listen to.
 //
@@ -52,7 +54,8 @@ const accentByLanguage: Record<string, string> = {
   vi: 'natural northern Vietnamese',
 }
 
-function accentFor(language: string, accent: ChineseAccent | null) {
+function accentFor(language: string, accent: SpeechAccent | null) {
+  if (language === 'en' || language.startsWith('en-')) return accent === 'british' ? 'standard British English' : 'General American English'
   if (language === 'zh-tw' || language === 'zh-cn') {
     if (accent === 'putonghua') {
       return 'standard Putonghua (普通話) as defined and taught in Mainland China, with neutral standard pronunciation, accurate retroflex initials and erhua only where standard Putonghua calls for it; do not use Taiwanese Mandarin pronunciation or vocabulary'
@@ -79,16 +82,18 @@ function voiceDescription(voice: Exclude<SpeakerGender, 'unknown'>) {
 export function buildVoicePlan(
   kind: ClipKind,
   language: string,
-  accentChoice: ChineseAccent | null,
+  accentChoice: SpeechAccent | null,
   speakers: string[],
   speakerGenders: SpeakerGender[] = [],
   text = '',
 ): VoicePlan {
-  if (language === 'zh-cn') accentChoice = 'putonghua'
+  accentChoice = speechAccent(language, accentChoice)
+  const mandarinAccent = speechAccent(language.startsWith('zh') ? language : 'zh-tw', accentChoice) as ChineseAccent
   const accent = accentFor(language, accentChoice)
   const pronunciation = language === 'zh-cn' ? 'Use standard Mainland Putonghua. Do not use Taiwan pronunciation or cross-strait vocabulary substitutions.'
-    : language.startsWith('zh') ? regionalPronunciationInstruction(text, accentChoice) : ''
-  let speechText = language.startsWith('zh') && language !== 'zh-cn' ? regionalSpeechText(text, accentChoice) : text
+    : language.startsWith('zh') ? regionalPronunciationInstruction(text, mandarinAccent)
+      : language.startsWith('en') ? englishPronunciationInstruction(accentChoice === 'british' ? 'british' : 'american') : ''
+  let speechText = language.startsWith('zh') && language !== 'zh-cn' ? regionalSpeechText(text, mandarinAccent) : text
   if (kind === 'dialogue' && speakers.length >= 2) {
     if (language.startsWith('zh') && language !== 'zh-cn') {
       const labels = new Set(speakers.slice(0, 2).map((speaker) => speaker.trim()))
@@ -97,8 +102,8 @@ export function buildVoicePlan(
       speechText = text.replace(/[^\r\n]+/gu, (line) => {
         const match = line.match(/^(\s*([^：:]{1,30})[：:]\s*)(.*)$/u)
         return match && labels.has(match[2].trim())
-          ? match[1] + regionalSpeechText(match[3], accentChoice)
-          : regionalSpeechText(line, accentChoice)
+          ? match[1] + regionalSpeechText(match[3], mandarinAccent)
+          : regionalSpeechText(line, mandarinAccent)
       })
     }
     const used = { female: 0, male: 0, boy: 0, girl: 0 }
@@ -559,7 +564,7 @@ function completeCues(input: KaraokeCue[], transcript: string, totalMs: number, 
 export async function contentHash(
   text: string,
   language: string,
-  accent: ChineseAccent | null,
+  accent: SpeechAccent | null,
   kind: ClipKind,
   speakers: string[] = [],
   speakerGenders: SpeakerGender[] = [],

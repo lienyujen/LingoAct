@@ -1,3 +1,4 @@
+import { createRevisionGuard } from '../lib/realtimeSnapshot'
 import { useClassChineseFont } from '../lib/classChineseFont'
 import { createSerializedReload } from '../lib/serializedReload'
 import { uiText } from '../lib/uiText'
@@ -63,7 +64,14 @@ export function ParticipantPage() {
   const participantId = localStorage.getItem(`lingoact_participant_${sessionId}`)
   const participantToken = localStorage.getItem(`lingoact_participant_token_${sessionId}`)
   const [participant, setParticipant] = useState<Participant | null>(null)
+  const participantRevision = useRef(createRevisionGuard())
+  const participantRef = useRef(participant)
+  participantRef.current = participant
+  const ownRowLoader = useRef(createSerializedReload())
+  const handSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => { participantRevision.current.changed() }, [participantId, sessionId])
   const [session, setSession] = useState<Session | null>(null)
+  const teachingLanguage = session?.teaching_language
   useClassChineseFont(session)
   const [question, setQuestion] = useState<Question | null>(null)
   const [answer, setAnswer] = useState<Answer | null>(null)
@@ -100,7 +108,25 @@ export function ParticipantPage() {
   // the note in lib/standings.
   const pageVisible = usePageVisibility()
   const liveSessionId = pageVisible && session?.status === 'active' ? sessionId : ''
-  const standing = useMyStanding(liveSessionId, participant?.id || null)
+  const refreshParticipantRow = useCallback(() => ownRowLoader.current(async () => {
+    if (!isSupabaseConfigured || !participantId || !sessionId || navigator.onLine === false || document.visibilityState === 'hidden') return
+    const revision = participantRevision.current.current()
+    const { data, error } = await requireSupabase().from('participants').select('*').eq('id', participantId).eq('session_id', sessionId).maybeSingle()
+    if (error || !data || !participantRevision.current.accepts(revision)) return
+    participantRevision.current.changed()
+    setParticipant(data as Participant)
+  }), [participantId, sessionId])
+  const syncLoweredHand = useCallback(() => {
+    if (!participantRef.current?.hand_raised_at || handSyncTimer.current !== null) return
+    // Invalidation only: an unauthenticated broadcast cannot lower a hand.
+    handSyncTimer.current = setTimeout(() => {
+      handSyncTimer.current = null
+      void refreshParticipantRow()
+    }, 100 + Math.random() * 300)
+  }, [refreshParticipantRow])
+  const standing = useMyStanding(liveSessionId, participant?.id || null, syncLoweredHand)
+  useEffect(() => () => { if (handSyncTimer.current !== null) clearTimeout(handSyncTimer.current) }, [])
+
   const [handBusy, setHandBusy] = useState(false)
   // Keyed by question id, so it survives every reload and every new question.
   const [questionAnalyses, setQuestionAnalyses] = useState<Record<string, QuestionAnalysis>>({})
@@ -162,7 +188,8 @@ export function ParticipantPage() {
 
   const [serializedReload] = useState(createSerializedReload)
   const loadSnapshot = useCallback(async () => {
-    if (!isSupabaseConfigured || !sessionId || !participantId) return
+    if (!isSupabaseConfigured || !sessionId || !participantId || navigator.onLine === false) return
+    const participantReadRevision = participantRevision.current.current()
     const requestId = ++loadSequence.current
     const supabase = requireSupabase()
     const [{ data: sessionData }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }, { data: sessionQuizzes }] = await Promise.all([
@@ -203,7 +230,7 @@ export function ParticipantPage() {
         .map((row) => [row.question_id as string, row.output_json as QuestionAnalysis]),
     ))
     setSessionChecked(true)
-    setParticipant(participantData as Participant | null)
+    if (participantRevision.current.accepts(participantReadRevision)) setParticipant(participantData as Participant | null)
     setExitTicket((exitTicketData as ExitTicket | null) || null)
     setSharedContents((sharedContentData || []) as SharedContent[])
     setBuzzerEvent((buzzerData as BuzzerSessionEvent | null) || null)
@@ -488,9 +515,17 @@ export function ParticipantPage() {
     if (reloadTimer.current !== null) return
     reloadTimer.current = window.setTimeout(() => {
       reloadTimer.current = null
-      void loadAll()
+      if (document.visibilityState !== 'hidden') void loadAll()
     }, 150 + Math.random() * 600)
   }, [loadAll])
+
+  useEffect(() => {
+    if (!liveSessionId) return
+    const reconnect = () => { scheduleLoad(); void refreshParticipantRow() }
+    const timer = window.setInterval(() => void refreshParticipantRow(), 30_000 + Math.random() * 5000)
+    window.addEventListener('online', reconnect)
+    return () => { window.clearInterval(timer); window.removeEventListener('online', reconnect) }
+  }, [liveSessionId, refreshParticipantRow, scheduleLoad])
 
   useEffect(() => () => {
     if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current)
@@ -527,6 +562,12 @@ export function ParticipantPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'participants', filter: `id=eq.${participantId}` }, payload => {
+        const row = payload.new as Participant
+        if (row.id !== participantId || row.session_id !== sessionId) return
+        participantRevision.current.changed()
+        setParticipant(current => current ? { ...current, ...row } : current)
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` }, (payload) => {
         const event = payload.new as SessionEvent
         if (event.event_type === 'buzzer') {
@@ -543,7 +584,7 @@ export function ParticipantPage() {
           }
         }
       })
-      .subscribe()
+      .subscribe(status => { if (status === 'SUBSCRIBED') { void refreshParticipantRow(); scheduleLoad() } })
 
     return () => {
       supabase.removeChannel(channel)
@@ -561,21 +602,27 @@ export function ParticipantPage() {
   async function toggleHand() {
     if (!participant || !participantToken || handBusy) return
     const raised = !participant.hand_raised_at
+    const previousHand = participant.hand_raised_at
+    participantRevision.current.changed()
+    const mutationRevision = participantRevision.current.current()
     setHandBusy(true)
-    // Moved before the round trip: putting a hand up is the one thing in this
-    // page that has to feel instant, and the presenter's list is what actually
-    // decides it anyway.
     setParticipant((current) => (
       current ? { ...current, hand_raised_at: raised ? new Date().toISOString() : null } : current
     ))
     try {
-      await requireSupabase().functions.invoke('participant-action', {
+      const { data, error: handError } = await requireSupabase().functions.invoke('participant-action', {
         body: { action: 'set_hand', sessionId, participantId: participant.id, participantToken, raised },
       })
+      if (handError) throw handError
+      if (data?.participantState?.id === participantId && participantRevision.current.accepts(mutationRevision)) {
+        participantRevision.current.changed()
+        setParticipant(current => current ? { ...current, ...data.participantState } : current)
+      }
     } catch {
-      setParticipant((current) => (
-        current ? { ...current, hand_raised_at: raised ? null : new Date().toISOString() } : current
-      ))
+      if (participantRevision.current.accepts(mutationRevision)) {
+        participantRevision.current.changed()
+        setParticipant(current => current ? { ...current, hand_raised_at: previousHand } : current)
+      }
     } finally {
       setHandBusy(false)
     }
@@ -831,7 +878,7 @@ export function ParticipantPage() {
   if (session?.status === 'ended') {
     return (
       <main className="participant-page participant-ended-page">
-        <ParticipantLanguageSwitcher locale={locale} onChange={changeLocale} />
+        <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
         <SetupNotice />
         <StudentSocialLinks />
         <section className="participant-ended-hero">
@@ -917,7 +964,7 @@ export function ParticipantPage() {
   if (sessionChecked && !session) {
     return (
       <main className="participant-page participant-ended-page">
-        <ParticipantLanguageSwitcher locale={locale} onChange={changeLocale} />
+        <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
         <SetupNotice />
         <section className="participant-ended-hero">
           <span className="participant-ended-icon"><Waves size={34} /></span>
@@ -930,7 +977,7 @@ export function ParticipantPage() {
 
   return (
     <main className="participant-page">
-      <ParticipantLanguageSwitcher locale={locale} onChange={changeLocale} />
+      <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
       <SetupNotice />
       <StudentSocialLinks />
       <header className="participant-header">
@@ -1012,6 +1059,7 @@ export function ParticipantPage() {
           <ExitTicketForm
             busy={exitTicketBusy}
             category={session.exit_ticket_category}
+            teachingLanguage={session.teaching_language}
             prompt={exitTicketPrompt(session, locale) || ''}
             ticket={exitTicket}
             locale={locale}

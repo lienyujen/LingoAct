@@ -1,0 +1,32 @@
+{
+  "unique_written_forms": 6264,
+  "official_original_rows": {
+    "basic1200": 1214,
+    "additional800": 794,
+    "ceec-1": 1002,
+    "ceec-2": 1002,
+    "ceec-3": 1002,
+    "ceec-4": 1002,
+    "ceec-5": 1002,
+    "ceec-6": 1002
+  },
+  "ceec_written_forms": 6088,
+  "topic_tagged_forms": 232,
+  "collocation_enriched_forms": 41,
+  "family_enriched_forms": 43,
+  "publisher_sample_terms": 21,
+  "unlevelled_sample_terms": [
+    "all around",
+    "assess",
+    "autograph-hunting",
+    "in particular",
+    "pick up",
+    "stint"
+  ],
+  "runtime_status": "bounded lexical anchors in English generation; school reading lookup; no official CEFR/GEPT vocabulary conversion",
+  "limitations": [
+    "Publisher materials are public design references and one attributed sample, not full textbook word lists.",
+    "Editorial metadata covers a reviewed starter subset; remaining entries have empty fields.",
+    "No publisher frequency ranking, CEFR mapping, Lexile measure or unverified pronunciation is assigned."
+  ]
+}

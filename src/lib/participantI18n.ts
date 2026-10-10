@@ -20,6 +20,7 @@ export const GUIDANCE_LOCALES = [
   { code: 'vi', label: 'Tiếng Việt', short: 'VI' },
   { code: 'th', label: 'ภาษาไทย', short: 'TH' },
   { code: 'id', label: 'Bahasa Indonesia', short: 'ID' },
+  { code: 'my', label: 'မြန်မာဘာသာ', short: 'MY' },
 ] as const
 
 export type ParticipantLocale = (typeof GUIDANCE_LOCALES)[number]['code']
@@ -361,7 +362,7 @@ export function participantLocaleFromStorage(sessionDefault?: string | null): Pa
   if (isParticipantLocale(stored)) return stored
   if (isParticipantLocale(sessionDefault)) return sessionDefault
   const brand = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search).get('b')
-  return brand === 'sc' || import.meta.env.VITE_APP_PROFILE === 'sc' ? 'zh-CN' : import.meta.env.VITE_APP_PROFILE === 'english' ? 'en' : 'zh-TW'
+  return brand === 'sc' || import.meta.env.VITE_APP_PROFILE === 'sc' ? 'zh-CN' : (brand === 'english' || import.meta.env.VITE_APP_PROFILE === 'english') ? 'en' : 'zh-TW'
 }
 
 // The 導引語 the teacher set, applied so that it actually wins.

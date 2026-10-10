@@ -6,16 +6,17 @@ import { GUIDANCE_LOCALES, guidanceLocaleShort, participantText } from '../lib/p
 import type { ParticipantLocale } from '../lib/participantI18n'
 
 type Props = {
+  teachingLanguage?: string
   locale: ParticipantLocale
   onChange: (locale: ParticipantLocale) => void
 }
 
-export function ParticipantLanguageSwitcher({ locale, onChange }: Props) {
+export function ParticipantLanguageSwitcher({ locale, onChange, teachingLanguage }: Props) {
   const [open, setOpen] = useState(false)
   // Read from the link, not from the build: this page is one deployment shared
   // by every edition. See lib/brand.ts.
   const [searchParams] = useSearchParams()
-  const options = guidanceLocalesForBrand(GUIDANCE_LOCALES, brandFromSearch(searchParams))
+  const options = guidanceLocalesForBrand(GUIDANCE_LOCALES, teachingLanguage === 'en' ? 'english' : brandFromSearch(searchParams))
 
   // A device that has been in a Chinese class before arrives holding zh-TW,
   // and the class default can be a language this edition does not offer

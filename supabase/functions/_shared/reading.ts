@@ -15,6 +15,8 @@
 // sentence that has no 把 in it. It is given the points TBCL actually lists for
 // this level and the ones just above, and anything it returns that is not on
 // that list is dropped.
+import { ENGLISH_GRAMMAR } from './english-grammar.generated.ts'
+import { englishMaterialIssue, requireEnglishMaterial } from './english-material.ts'
 import { callAiJson } from './ai.ts'
 import { GRAMMAR_BY_LEVEL } from './tbcl-levels.generated.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
@@ -23,6 +25,8 @@ import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from '
 import { resolveTrack, trackInstruction } from './teaching.ts'
 import { applyRegionalWordPinyin, regionalPronunciationInstruction } from './mandarin-pronunciation.ts'
 import type { MandarinAccent } from './mandarin-pronunciation.ts'
+import type { SpeechAccent } from './speech-accent.ts'
+import { englishWords, englishNewWords, englishReadingTargets, englishVocabularyInstruction } from './english.ts'
 import { HSK_GRAMMAR, applyHskWordPinyin, hskPinyinInstruction, hskLevelOf, hskWordLevel, hskOverLevelWords, hskOverLevelComplaint } from './hsk.ts'
 
 export type ReadingAnnotationGloss = Record<string, string>
@@ -212,7 +216,7 @@ export type ReadingInput = {
   // The same selection drives the visible readings and any recording made
   // from the passage. Standard Guoyu and Taiwanese share MOE lexical readings;
   // their spoken cadence remains different in the TTS prompt.
-  accent: MandarinAccent
+  accent: SpeechAccent
   // Which languages the annotations are written in. zh-TW and en always, plus
   // whatever this class's students can choose.
   locales: string[]
@@ -376,16 +380,17 @@ async function glossNewWords(
   entries: Array<{ word: string; level: number }>,
   locales: string[],
   languageName: string,
+  passage = '',
 ): Promise<ReadingVocabulary[]> {
   if (!entries.length) return []
   const result = await callAiJson(
     [
       `這些是一篇${languageName}短文裡學生還沒學過的詞。請只做兩件事：給詞類，並翻譯。`,
-      '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
+      languageName === 'English' ? 'Use English part-of-speech labels. Explain only the sense used in the supplied passage; keep English words and patterns unchanged inside explanations.' : '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
       '翻譯要短，說出這個詞在這篇文章裡的意思，不要只換一個同義詞。',
       '不要增加或刪除任何詞，回傳的順序與輸入相同。',
     ].join('\n'),
-    { words: entries.map((entry) => entry.word), languages: locales },
+    { words: entries.map((entry) => entry.word), languages: locales, passage },
     {
       type: 'object',
       additionalProperties: false,
@@ -425,6 +430,7 @@ async function glossNewWords(
 
 export async function generateReadingPassage(input: ReadingInput): Promise<ReadingPassage | null> {
   input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
+  if (resolveTrack(input.teachingLanguage).language === 'en') return generateEnglishReading(input)
   if (input.levelFramework === 'hsk' && !hskLevelOf(input.levelFramework, input.levelCode)) throw new Error('An HSK level is required for reading.')
   const hsk = input.levelFramework === 'hsk'
   const tbcl = hsk ? hskLevelOf(input.levelFramework, input.levelCode) : tbclLevelOf(input.levelFramework, input.levelCode)
@@ -453,7 +459,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     input.image
       ? '附上的圖片就是教師提供的素材。如果圖片上是文字（課本頁面、投影片、公告），請把它當作要改寫的原文；如果圖片是照片或插圖，請把它當作這篇文章要描述或討論的對象。不要描述圖片的排版或畫質，只用它的內容。'
       : '',
-    hsk ? hskPinyinInstruction(`${input.source}\n${input.direction}`) : regionalPronunciationInstruction(`${input.source}\n${input.direction}`, input.accent),
+    hsk ? hskPinyinInstruction(`${input.source}\n${input.direction}`) : regionalPronunciationInstruction(`${input.source}\n${input.direction}`, input.accent as MandarinAccent),
     ...orthographyRules('body'),
     `grammar: the structures worth pointing out, each named EXACTLY as it appears in this list and not otherwise: ${menu.join('、')}.`,
     'For each grammar point give span: the exact stretch of the passage, copied character for character, where the pattern appears. If you cannot copy it exactly, leave the point out.',
@@ -502,7 +508,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   // sentence-ordering chunks are: joining the pieces must give the body back.
   // A list that does not reassemble would put the readings over the wrong
   // words and mark words the passage does not contain.
-  const words = hsk ? applyHskWordPinyin(settleWords(output.words, body)) : applyRegionalWordPinyin(body, settleWords(output.words, body), input.accent)
+  const words = hsk ? applyHskWordPinyin(settleWords(output.words, body)) : applyRegionalWordPinyin(body, settleWords(output.words, body), input.accent as MandarinAccent)
 
   // 國教院's list decides which of them are new, and a second call says what
   // they mean. Without a usable segmentation there is nothing to judge, so the
@@ -533,6 +539,53 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
       })
       .filter((entry): entry is ReadingGrammar => entry !== null),
   }
+}
+
+async function generateEnglishReading(input: ReadingInput): Promise<ReadingPassage | null> {
+  const target = englishReadingTargets(input.levelFramework, input.levelCode, input.levelStretch)
+  const menu = [...ENGLISH_GRAMMAR.map(entry => entry.point.toLowerCase()), 'present simple', 'present continuous', 'past simple', 'future forms', 'modal verbs', 'comparatives', 'relative clauses', 'passive voice', 'perfect aspect', 'conditionals', 'cause and result', 'contrast and concession', 'reference and cohesion']
+  // Appendix 6 supplies grammar references; these extra broad labels are editorial, not official CEFR bands.
+  const instruction = [
+    'You write English reading materials for LingoAct. Write title, body and target grammar spans in English. Never output Chinese pinyin, Bopomofo or Chinese grammar points.',
+    trackInstruction('en'), levelInstruction(input.levelFramework,input.levelCode,input.direction),
+    englishVocabularyInstruction(input.levelFramework,input.levelCode,`${input.source}\n${input.direction}`),
+    `Length: ${target.min}–${target.max} English words, a classroom practice target, not an official examination limit.`,
+    input.levelStretch ? `i+${input.levelStretch}: keep the course level unchanged. Add a small, context-supported amount of unfamiliar vocabulary, more complex syntax or inference. Do not advance an entire CEFR band.` : 'Keep lexical and syntactic load within the selected course level.',
+    'Use teacher material as the basis of one coherent text. If the image contains text, use its content; if it is a photograph, describe or discuss what is pictured. Avoid describing layout.',
+    `The system tokenises the passage exactly. In words, nominate at most 12 useful vocabulary aids appropriate to this class level and stretch: copy each selected word exactly from body into text, and leave pinyin empty. Omit familiar basic words and personal names. Do not claim an official CEFR or GEPT word-list level. Identify up to four useful grammar points from: ${menu.join(', ')}. Copy each span exactly from body; omit a point if you cannot show it in the passage.`,
+  ].join('\n')
+  const payload = {source:input.source,direction:input.direction}
+  let result = await callAiJson(instruction,payload,passageSchema(),input.image || null,'deep')
+  if (result.status !== 'success') return null
+  let output = result.output as Record<string,unknown>
+  const issue = englishMaterialIssue(output.title, output.body)
+  if (issue) {
+    result = await callAiJson(`${instruction}\nCorrection required: ${issue}`,payload,passageSchema(),input.image || null,'deep')
+    if (result.status !== 'success') throw new Error(issue)
+    output = result.output as Record<string,unknown>
+  }
+  requireEnglishMaterial(output.title, output.body)
+  const body = String(output.body || '').trim()
+  if (!body) return null
+  const words = englishWords(body)
+  // School references are checked against the source list. Other frameworks
+  // use the generator's level-aware choices, never an invented CEEC mapping.
+  const eligible = englishNewWords(body,input.levelFramework,input.levelCode)
+  const nominated = new Set((Array.isArray(output.words) ? output.words : []).map(raw =>
+    String((raw as Record<string,unknown>).text || '').toLowerCase()))
+  const candidates = (input.levelFramework === 'en108' ? eligible : eligible.filter(entry => nominated.has(entry.word.toLowerCase()))).slice(0,12)
+  const locales = [...new Set(['zh_tw','en',...input.locales])]
+  const vocabulary = await glossNewWords(candidates,locales,'English',body)
+  const seen = new Set<string>()
+  const grammar = (Array.isArray(output.grammar) ? output.grammar : []).flatMap((raw) => {
+    const entry = raw as Record<string,unknown>
+    const point = String(entry.point || '').toLowerCase().replace(/^english:\s*/,'').trim()
+    const span = String(entry.span || '').trim()
+    if (!menu.includes(point) || !span || !body.includes(span) || seen.has(point)) return []
+    seen.add(point)
+    return [{point:`English: ${point}`,level:0,example:span,span,note:{}}]
+  })
+  return {title:String(output.title || '').trim(),body,words,vocabulary,grammar:grammar.slice(0,4)}
 }
 
 // Notes for points this deployment has not explained yet. One call for all of
@@ -570,7 +623,7 @@ export async function writeMissingGrammarNotes(
 
   const result = await callAiJson(
     [
-      '你是華語文法說明助理。下面是臺灣華語文能力基準的語法點，每一個附了官方例句。',
+      points.every((entry) => entry.point.startsWith('English: ')) ? 'You explain English grammar to language learners. These are LingoAct teaching categories with examples from the passage, not official HSK or TBCL grammar. Explain in each requested guidance language, retaining English words and patterns as English.' : '你是華語文法說明助理。下面是臺灣華語文能力基準的語法點，每一個附了官方例句。',
       '請為每一個語法點寫一到兩句說明：這個句型在做什麼、什麼時候用。寫給學語言的人看，不是寫給語言學家看。',
       '用每一個要求的語言各寫一份，意思相同。不要重述例句，不要加上級別或術語。',
     ].join('\n'),

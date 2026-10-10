@@ -17,9 +17,9 @@ const zh = {
   responses: '查看回答', classroom: '教室',
 } as const
 const en: Record<keyof typeof zh, string> = {
-  activities: 'Start an activity', current: 'Current activity', history: 'Class history',
-  choose: 'What should students practice?', listen: 'Listening', speak: 'Speaking', read: 'Reading', write: 'Writing',
-  tools: 'Classroom tools', wrap: 'Wrap up and reflect',
+  activities: 'Activities', current: 'Current', history: 'History',
+  choose: 'Practice skills', listen: 'Listening', speak: 'Speaking', read: 'Reading', write: 'Writing',
+  tools: 'Class tools', wrap: 'Wrap-up',
   orDispatch: 'Or:', fromImage: 'Use an image', noBackdrop: 'Use a blank canvas',
   listenHint: 'Listen, practice aloud, and check understanding',
   speakHint: 'Build confidence, from reading aloud to speaking independently',
@@ -27,7 +27,7 @@ const en: Record<keyof typeof zh, string> = {
   writeHint: 'From one sentence to a whole paragraph',
   currentEmpty: 'Choose a practice activity to get started.', historyEmpty: 'Earlier activities and student responses will appear here.',
   openControls: 'Open teaching panel', hideControls: 'Collapse teaching panel', showJoin: 'Show join QR code',
-  next: 'Start next activity', timing: 'Time limits (optional)', source: 'How should students practice with this material?',
+  next: 'Next activity', timing: 'Time limits (optional)', source: 'Choose an activity',
   responses: 'View responses', classroom: 'Classroom',
 }
 const cn: Record<keyof typeof zh, string> = {

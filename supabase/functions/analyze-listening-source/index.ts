@@ -1,3 +1,4 @@
+import { requireEnglishMaterial } from '../_shared/english-material.ts'
 import { corsHeaders, errorDetail, geminiThinkingConfig, jsonResponse, requestGemini } from '../_shared/ai.ts'
 import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from '../_shared/proficiency.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from '../_shared/tbcl-check.ts'
@@ -119,6 +120,7 @@ Deno.serve(async (req) => {
     }
 
     let transcript = (result.transcript || '').trim()
+    if (track.language === 'en') requireEnglishMaterial(transcript, ...(result.speakers || []))
     if (!transcript) return jsonResponse({ message: '這張截圖沒有可以朗讀的內容。' }, 422)
 
     // Checked against 國教院's published lists, not merely asked for — the same

@@ -1,3 +1,4 @@
+import { accentChoices, speechAccent } from '../lib/speechAccent'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { BookOpen, SpeakerHigh, X } from '@phosphor-icons/react'
@@ -22,12 +23,13 @@ type Props = {
   // 注音 or 拼音, from the class settings. Which system a class reads in is a
   // property of the class, not of one activity, so it is not asked again here.
   annotation?: AnnotationMode
+  teachingLanguage?: string
   framework?: string | null
   onClose: () => void
   onDispatched: (questionId: string) => void
 }
 
-type Accent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
+type Accent = import('../lib/speechAccent').SpeechAccent
 
 // What the teacher chose last time. A reading dispatch has seven switches on it
 // and a teacher uses the same six of them every lesson; making them tick the
@@ -76,7 +78,7 @@ const FOCUS = [
   ['evaluate', 'readingEvaluate'],
 ] as const
 
-export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', framework, onClose, onDispatched }: Props) {
+export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', framework, teachingLanguage = 'zh-tw', onClose, onDispatched }: Props) {
   const t = usePresenterText()
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
@@ -118,13 +120,13 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
     setQuizCount(saved.quizCount ?? 5)
     setFocus(saved.focus?.length ? saved.focus : FOCUS.map(([key]) => key))
     setWithAudio(saved.withAudio ?? false)
-    setAccent(framework === 'hsk' ? 'putonghua' : saved.accent ?? 'standard_guoyu')
+    setAccent(speechAccent(framework === 'hsk' ? 'zh-cn' : teachingLanguage, saved.accent))
     setShareShot(saved.shareShot ?? false)
     setUseImage(saved.useImage ?? true)
     setVerbatim(saved.verbatim ?? false)
     setError('')
     setPassage(null)
-  }, [open, framework])
+  }, [open, framework, teachingLanguage])
 
   if (!open) return null
 
@@ -226,6 +228,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
               presenterToken,
               transcript: written.body,
               kind: 'passage',
+              language: teachingLanguage,
               accent,
             },
           })
@@ -412,11 +415,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
         {withAudio && (
           <div className="segmented-control reading-accents">
-            {([
-              ['standard_guoyu', 'accentStandardGuoyu'],
-              ['putonghua', 'accentPutonghua'],
-              ['taiwanese', 'accentTaiwanese'],
-            ] as const).filter(([value]) => framework !== 'hsk' || value === 'putonghua').map(([value, label]) => (
+            {accentChoices(framework === 'hsk' ? 'zh-cn' : teachingLanguage).map(({value, label}) => (
               <button
                 aria-pressed={accent === value}
                 className={accent === value ? 'selected' : ''}

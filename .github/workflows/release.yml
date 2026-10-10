@@ -64,30 +64,24 @@ jobs:
             product: LingoAct-English
             target: --win zip --x64
             artifact: LingoAct-English.zip
-          - label: Windows Guoyu
-            os: windows-latest
-            profile: guoyu
-            product: LingoAct-Guoyu
-            target: --win zip --x64
-            artifact: LingoAct-Guoyu.zip
-          - label: Windows NCACLS
+          - label: Windows TC
             os: windows-latest
             profile: ncacls
-            product: LingoAct-NCACLS
+            product: LingoAct-TC
             target: --win zip --x64
-            artifact: LingoAct-NCACLS.zip
+            artifact: LingoAct-TC.zip
           - label: macOS Huayu
             os: macos-latest
             profile: huayu
             product: LingoAct-Huayu
             target: --mac dmg --universal
             artifact: LingoAct-Huayu.dmg
-          - label: macOS NCACLS
+          - label: macOS TC
             os: macos-latest
             profile: ncacls
-            product: LingoAct-NCACLS
+            product: LingoAct-TC
             target: --mac dmg --universal
-            artifact: LingoAct-NCACLS.dmg
+            artifact: LingoAct-TC.dmg
     steps:
       - name: Checkout
         if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
@@ -136,6 +130,10 @@ jobs:
       - name: Build
         if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
         run: pnpm build
+
+      - name: Check classroom synchronization and teaching regressions
+        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
+        run: pnpm test:offline
 
       # The build above is only credential-free because no .env reaches the runner.
       # Check the bundle rather than trust that, so a committed .env fails the
@@ -262,14 +260,17 @@ jobs:
           | 華語教學版（預設繁體，可選簡體或 English） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
           | 完整教學版 | `LingoAct-Full.zip` | — |
           | 英語教學版 | `LingoAct-English.zip` | — |
-          | 國語教學版 | `LingoAct-Guoyu.zip` | — |
-          | 全美中文學校聯合總會版 | `LingoAct-NCACLS.zip` | `LingoAct-NCACLS.dmg` |
+          | 繁體中文版（TC） | `LingoAct-TC.zip` | `LingoAct-TC.dmg` |
 
           **Windows：** 解壓縮後執行裡面的 exe。
           **macOS：** 開啟 dmg，把 App 拖進「應用程式」。同一個檔案支援 Apple Silicon 與 Intel。
 
           ## 本次更新
 
+          - 英語教學版提供 CEFR、GEPT、TOEIC 與各級學校模式；國中七至九年級、高中 Grade 10–12 可分別選擇難度，教學內容、語音及閱讀標註使用英語。
+          - 重新整理 TOEIC 中英文分級排版，修正英語版中文介面的學員名單。
+          - 分數改為事件更新與短時間事件合併，降低重複全班查詢；舉手與教師放下手立即同步，防止舊資料覆蓋，保留重連補同步與定期校正。
+          - 原 NCACLS 版改名為 LingoAct-TC，預設繁體中文並恢復原品牌；學生端增加越南文、泰文、印尼文、日文、韓文與緬甸文說明。
           - 華語教學版加入簡體／HSK 模式，預設仍是繁體；English 可選 HSK、TOCFL 或 TBCL。
           - 簡體版固定使用簡體中文、HSK 與普通話。
           - 看圖說寫同步派送建議詞彙與句型；學生切換外語介面時，題目和建議保留教學原文。

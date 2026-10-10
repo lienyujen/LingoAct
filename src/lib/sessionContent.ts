@@ -11,9 +11,10 @@ import type { Session } from '../types'
 // seventh language arrives. Until then an unknown language sees the original
 // prompt rather than one it did not ask for.
 export function exitTicketPrompt(
-  session: Pick<Session, 'exit_ticket_prompt' | 'exit_ticket_prompt_en' | 'exit_ticket_prompt_translations'>,
+  session: Pick<Session, 'exit_ticket_prompt' | 'exit_ticket_prompt_en' | 'exit_ticket_prompt_translations'> & Partial<Pick<Session, 'teaching_language'>>,
   locale: ParticipantLocale,
 ) {
+  if (session.teaching_language === 'en') return session.exit_ticket_prompt
   const translated = session.exit_ticket_prompt_translations?.[contentLocaleKey(locale)]
   if (translated) return translated
   if (locale === 'en' && session.exit_ticket_prompt_en) return session.exit_ticket_prompt_en

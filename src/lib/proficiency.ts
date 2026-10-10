@@ -68,13 +68,14 @@ export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: {
   {
     // 英語文 under the 108 curriculum, which begins in 國小三年級.
     id: 'en108',
-    name: '十二年國教・英語文',
-    short: '108課綱',
+    name: '各級學校',
+    short: '各級學校',
     levels: [
       { code: 'p34', label: '國小三、四年級' },
       { code: 'p56', label: '國小五、六年級' },
       { code: 'j', label: '國中' },
-      { code: 'h', label: '高中' },
+      { code: 'h', label: '普通高中' },
+      { code: 'v', label: '技術型高中' },
     ],
   },
   {
@@ -100,6 +101,11 @@ export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: {
       { code: 'green', label: '綠色 470–725' },
       { code: 'blue', label: '藍色 730–855' },
       { code: 'gold', label: '金色 860–990' },
+      { code: 'sw-a1', label: '口說 50／寫作 30' },
+      { code: 'sw-a2', label: '口說 90／寫作 70' },
+      { code: 'sw-b1', label: '口說 120／寫作 120' },
+      { code: 'sw-b2', label: '口說 160／寫作 150' },
+      { code: 'sw-c1', label: '口說 180／寫作 180' },
     ],
   },
   {
@@ -132,6 +138,7 @@ export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: {
     name: 'CEFR',
     short: 'CEFR',
     levels: [
+      { code: 'Pre-A1', label: 'Pre-A1' },
       { code: 'A1', label: 'A1' },
       { code: 'A2', label: 'A2' },
       { code: 'B1', label: 'B1' },
@@ -154,6 +161,16 @@ export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: {
     ],
   },
 ]
+
+const school = FRAMEWORKS.find((framework) => framework.id === 'en108')!
+school.levels.push(
+  {code:'j7',label:'國中七年級'}, {code:'j8',label:'國中八年級'}, {code:'j9',label:'國中九年級'},
+  {code:'h1',label:'普通高中一年級'}, {code:'h2',label:'普通高中二年級'}, {code:'h3',label:'普通高中三年級'},
+)
+for (const level of [...school.levels]) {
+  school.levels.push({code:`${level.code}-foundation`,label:`${level.label}・基礎`},
+    {code:`${level.code}-advanced`,label:`${level.label}・進階`})
+}
 
 export function frameworkById(id: string) {
   return FRAMEWORKS.find((framework) => framework.id === id)

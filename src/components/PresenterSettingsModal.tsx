@@ -147,7 +147,7 @@ export function PresenterSettingsModal({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (levelFramework === 'hsk' && !levelCode) return
+    if ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) return
     onSave(
       { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages },
       microphoneId,
@@ -310,7 +310,7 @@ export function PresenterSettingsModal({
         {error && <p className="error">{uiText(error)}</p>}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onClose}>{t('cancel')}</button>
-          <button disabled={busy || (levelFramework === 'hsk' && !levelCode) || (interpretationAudioEnabled && !interpretationLanguages.length)} type="submit">
+          <button disabled={busy || ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) || (interpretationAudioEnabled && !interpretationLanguages.length)} type="submit">
             <Gear size={17} />{busy ? t('saving') : t('saveSettings')}
           </button>
         </div>

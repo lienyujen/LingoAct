@@ -1,8 +1,5 @@
 import { uiText, uiFormat } from '../lib/uiText'
 import type { ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import ncaclsMark from '../assets/ncacls-mark.png'
-import { brandFromSearch } from '../lib/brand'
 
 type SocialLink = {
   href: string
@@ -38,28 +35,8 @@ const socialLinks: SocialLink[] = [
   },
 ]
 
-// 全美中文學校聯合總會. The same two places, pointing at the organisation the
-// students actually belong to: their Facebook page, and their own site in
-// place of the YouTube channel — marked with the edition's own app icon, so
-// the link looks like the app the class is already using.
-const ncaclsLinks: SocialLink[] = [
-  {
-    href: 'https://www.facebook.com/NCACLS/',
-    label: 'Facebook',
-    title: '全美中文學校聯合總會 Facebook',
-    icon: facebookIcon,
-  },
-  {
-    href: 'https://sites.google.com/ncacls.net/ncacls2021',
-    label: 'NCACLS',
-    title: '全美中文學校聯合總會',
-    icon: <img alt="" src={ncaclsMark} />,
-  },
-]
-
 export function StudentSocialLinks() {
-  const [searchParams] = useSearchParams()
-  const links = brandFromSearch(searchParams) === 'ncacls' ? ncaclsLinks : socialLinks
+  const links = socialLinks
 
   return (
     <nav aria-label={uiText("社群連結")} className="student-social-links">

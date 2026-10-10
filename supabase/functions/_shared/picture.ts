@@ -1,3 +1,4 @@
+import { requireEnglishMaterial } from './english-material.ts'
 import { callAiJson, errorDetail } from './ai.ts'
 import { levelInstruction } from './proficiency.ts'
 import { trackInstruction } from './teaching.ts'
@@ -9,6 +10,9 @@ function mainlandPicture(input: PictureLanguage) {
   return usesMainlandFeedback({ ...input.settings, teaching_language: input.trackId, level_framework: input.framework })
 }
 export function pictureLanguageRules(rules: string, input: PictureLanguage) {
+  if (input.trackId === 'en') return [rules.replaceAll('Traditional Chinese', 'English'),
+    'ENGLISH CLASS: All titles, target words, sentence patterns and learner-facing task instructions must be in natural English at the selected class level. Cast and panels are also in English. Do not introduce Chinese Pinyin, Bopomofo or Mandarin vocabulary rules. Preserve teacher-specified learning targets.',
+  ].join('\n\n')
   if (!mainlandPicture(input)) return rules
   return [
     rules.replaceAll('Traditional Chinese', 'Mainland standard Simplified Chinese')
@@ -157,11 +161,12 @@ export async function describePictureSource(input: {
     throw new Error(errorDetail((result.output as { message?: string })?.message, '無法讀取這張圖片。'))
   }
   const output = result.output as Record<string, unknown>
+  if (input.trackId === 'en') requireEnglishMaterial(output.title, output.cast, output.pattern, output.spoken_prompt, output.written_prompt, output.order_prompt, ...(Array.isArray(output.target_words) ? output.target_words : []), ...(Array.isArray(output.panels) ? output.panels : []))
   const words = Array.isArray(output.target_words)
     ? output.target_words.map((word) => cleanLine(word, 40)).filter(Boolean).slice(0, 8)
     : []
   return {
-    title: cleanLine(output.title, 80) || (mainlandPicture(input) ? '看图说写' : '看圖說寫'),
+    title: cleanLine(output.title, 80) || (input.trackId === 'en' ? 'Picture prompts' : mainlandPicture(input) ? '看图说写' : '看圖說寫'),
     // A captured picture has no cast to keep consistent and no panels: nothing
     // is being drawn, so both stay empty and 排順序 is not offered for it.
     cast: '',
@@ -203,6 +208,7 @@ export async function planPictureStory(input: {
   }
 
   const output = result.output as Record<string, unknown>
+  if (input.trackId === 'en') requireEnglishMaterial(output.title, output.cast, output.pattern, output.spoken_prompt, output.written_prompt, output.order_prompt, ...(Array.isArray(output.target_words) ? output.target_words : []), ...(Array.isArray(output.panels) ? output.panels : []))
   // The model sometimes numbers its own panels — 「右下（圖四）：」 — which would be
   // printed twice, once by it and once by the list the teacher reads.
   const panels = Array.isArray(output.panels)
@@ -215,7 +221,7 @@ export async function planPictureStory(input: {
     : []
 
   return {
-    title: cleanLine(output.title, 60) || (mainlandPicture(input) ? '看图说写' : '看圖說寫'),
+    title: cleanLine(output.title, 60) || (input.trackId === 'en' ? 'Picture prompts' : mainlandPicture(input) ? '看图说写' : '看圖說寫'),
     cast: cleanLine(output.cast, 400),
     panels,
     targetWords,

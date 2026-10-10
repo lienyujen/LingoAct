@@ -7,6 +7,7 @@
 // ask for material too hard for the very learners who need it easiest.
 
 import { HSK_GRAMMAR } from './hsk.ts'
+import { englishVocabularyInstruction } from './english.ts'
 
 export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
 
@@ -149,11 +150,11 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
     ],
   },
   // 英語文 under the same curriculum, which starts in 國小三年級. The stage
-  // targets are the curriculum's own CEFR references, not a guess.
+  // School stages retain their own curriculum targets, without a fixed CEFR conversion.
   en108: {
     name: '十二年國民基本教育課程綱要・語文領域－英語文',
     note: [
-      'Taiwan\'s 108 curriculum for English as a foreign language, beginning in the third year of primary school. Write for a Taiwanese classroom: the learners share Mandarin as a first language, and the curriculum expects roughly CEFR A2 by the end of junior high and B1 by the end of senior high.',
+      'Taiwan\'s 108 curriculum for English as a foreign language, beginning in the third year of primary school. Write for the selected Taiwanese school stage independently of CEFR. Reference the separate vocational curriculum for vocational high school; do not assign a fixed CEFR equivalence to a school stage or assume every learner has the same first language.',
       COMPETENCY_ORIENTED,
     ].join('\n'),
     unit: 'word',
@@ -164,44 +165,44 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
       },
       {
         code: 'p56', label: '國小五、六年級（第三學習階段）', band: 1, maxStem: 14,
-        ceiling: 'Ten to twelve years old, still primary. Around a thousand words on everyday topics: daily routine, weather, hobbies, places in town, simple feelings. Present simple and present continuous, can/can\'t, there is/are, and the past of common verbs. Up to about fourteen words per sentence, at most one clause.',
+        ceiling: 'Ten to twelve years old, still primary. Primary graduation targets are oral use of at least 300 words and writing at least 180; use short familiar everyday topics: daily routine, weather, hobbies, places in town, simple feelings. Present simple and present continuous, can/can\'t, there is/are, and the past of common verbs. Up to about fourteen words per sentence, at most one clause.',
       },
       {
-        code: 'j', label: '國中（第四學習階段，約 CEFR A2）', band: 2, maxStem: 20,
-        ceiling: 'Junior high, working towards roughly CEFR A2 by 九年級. Familiar topics and short texts: a message, a notice, a short article about school or family life. Past, future, comparatives and common phrasal verbs are fair. Up to about twenty words. Idiom and abstract argument are not yet.',
+        code: 'j', label: '國中（第四學習階段）', band: 2, maxStem: 20,
+        ceiling: 'Junior high: at least 1200 words by graduation, with the 2000-word reference list for extension; not a fixed CEFR equivalence. Familiar topics and short texts: a message, a notice, a short article about school or family life. Past, future, comparatives and common phrasal verbs are fair. Up to about twenty words. Idiom and abstract argument are not yet.',
       },
       {
-        code: 'h', label: '高中（第五學習階段，約 CEFR B1）', band: 3, maxStem: 28,
-        ceiling: 'Senior high, working towards roughly CEFR B1. Articles of general interest, an opinion with a reason, a straightforward narrative. Relative clauses, passives and the perfect aspect are fair. Up to about twenty-eight words. Academic or specialised vocabulary still is not.',
+        code: 'h', label: '普通高中（第五學習階段）', band: 3, maxStem: 28,
+        ceiling: 'Senior high: prioritise the curriculum common 4500-word target and the CEEC six-band reference, not a fixed CEFR equivalence. Articles of general interest, an opinion with a reason, a straightforward narrative. Relative clauses, passives and the perfect aspect are fair. Up to about twenty-eight words. Academic or specialised vocabulary still is not.',
       },
     ],
   },
   // 多益, named by certificate colour because that is how a Taiwanese class
   // talks about a TOEIC target.
   toeic: {
-    name: '多益普及測驗 TOEIC',
-    note: 'The English test most often sat in Taiwan, scored 10-990 and reported as a certificate colour. It is workplace English: favour offices, travel, correspondence and everyday transactions over academic prose.',
+    name: '多益 TOEIC',
+    note: 'The English test most often sat in Taiwan, scored 10-990 and reported as a certificate colour. It is workplace English: favour offices, travel, correspondence and everyday transactions over academic prose. Certificate colours are Listening and Reading total-score goals, not CEFR equivalents and not evidence of Speaking or Writing proficiency. S/W codes name independent per-skill minimum targets; neither skill compensates for the other. AI classroom marks are not official TOEIC scores.',
     unit: 'word',
     levels: [
       {
         code: 'orange', label: 'TOEIC 橘色證書（10-215）', band: 1, maxStem: 14,
-        ceiling: 'Roughly CEFR A1. Can handle a name badge, a price, a time, a simple form. Present simple, sentences of about eight to fourteen words, high-frequency workplace nouns only (office, meeting, phone, email, order). No conditionals, no passives, no idiom.',
+        ceiling: 'Can handle a name badge, a price, a time, a simple form. Present simple, sentences of about eight to fourteen words, high-frequency workplace nouns only (office, meeting, phone, email, order). No conditionals, no passives, no idiom.',
       },
       {
         code: 'brown', label: 'TOEIC 棕色證書（220-465）', band: 2, maxStem: 20,
-        ceiling: 'Roughly CEFR A2. Short notices, schedules, simple correspondence. Past and future, modals of request. Up to about twenty words. Business idiom and complex clauses are above this level.',
+        ceiling: 'Short notices, schedules, simple correspondence. Past and future, modals of request. Up to about twenty words. Business idiom and complex clauses are above this level.',
       },
       {
         code: 'green', label: 'TOEIC 綠色證書（470-725）', band: 3, maxStem: 26,
-        ceiling: 'Roughly CEFR B1. Routine correspondence, meeting arrangements, travel and everyday transactions handled independently. Relative clauses and passives are fair. Up to about twenty-six words.',
+        ceiling: 'Routine correspondence, meeting arrangements, travel and everyday transactions handled independently. Relative clauses and passives are fair. Up to about twenty-six words.',
       },
       {
         code: 'blue', label: 'TOEIC 藍色證書（730-855）', band: 4, maxStem: 34,
-        ceiling: 'Roughly CEFR B2. Reports, negotiation, comparing proposals, inferring intent from tone. Common business idiom is fair. Ask for inference rather than retrieval.',
+        ceiling: 'Reports, negotiation, comparing proposals, inferring intent from tone. Common business idiom is fair. Ask for inference rather than retrieval.',
       },
       {
         code: 'gold', label: 'TOEIC 金色證書（860-990）', band: 5, maxStem: 45,
-        ceiling: 'Roughly CEFR C1. Nuance, register and implication in professional English; contracts, analyses, indirect refusals. An item answerable by matching a phrase is below this level.',
+        ceiling: 'Nuance, register and implication in professional English; contracts, analyses, indirect refusals. An item answerable by matching a phrase is below this level.',
       },
     ],
   },
@@ -281,7 +282,7 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
   },
   cefr: {
     name: 'CEFR',
-    note: 'The Common European Framework, used in Taiwan for French, German and Spanish, and as the spine the other frameworks map onto.',
+    note: 'The Common European Framework of Reference: ability descriptors for reception, production, interaction and mediation. Do not convert school stages or certificate colours into it; it does not supply an official universal English word list.',
     unit: 'word',
     levels: [
       {
@@ -325,7 +326,7 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
       },
       {
         code: 'high-intermediate', label: 'GEPT 中高級', band: 4, maxStem: 36,
-        ceiling: 'Roughly CEFR B2. Argument and commentary in a range of fields, inference from tone, weighing a position. Common idiom is fair. Retrieval items are too easy here.',
+        ceiling: 'Argument and commentary in a range of fields, inference from tone, weighing a position. Common idiom is fair. Retrieval items are too easy here.',
       },
       {
         code: 'advanced', label: 'GEPT 高級', band: 5, maxStem: 48,
@@ -424,6 +425,35 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
   },
 }
 
+FRAMEWORKS.en108.levels.push({ code:'v', label:'技術型高中（英語文）', band:3, maxStem:28,
+  ceiling:'Follow the independent vocational English curriculum: daily and workplace communication, practical instructions, correspondence and vocational contexts chosen by the teacher. Do not infer proficiency from a school year or force an ordinary high-school course on vocational learners.' })
+FRAMEWORKS.cefr.levels.unshift({code:'Pre-A1',label:'CEFR Pre-A1',band:0,maxStem:8,
+  ceiling:'Recognise familiar words and labels with support, use isolated words and memorised expressions, and provide basic personal information. Very short supported utterances; no extended abstract text.'})
+for (const [code, speaking, writing, band] of [['sw-a1',50,30,1],['sw-a2',90,70,2],['sw-b1',120,120,3],['sw-b2',160,150,4],['sw-c1',180,180,5]] as const) {
+  FRAMEWORKS.toeic.levels.push({code,label:`TOEIC Speaking ${speaking} / Writing ${writing}`,band,maxStem:14+band*5,
+    ceiling:`Independent targets: speaking at least ${speaking}/200; writing at least ${writing}/200. Practise describing photographs, responding to questions and requests, expressing an opinion, composing replies and organised opinion writing at this target. Do not require reading or listening certificate scores. These are preparation targets, not an AI-to-TOEIC scoring conversion.`})
+}
+
+// Year-specific pacing is editorial teaching guidance inside the official
+// school stage, not an official year-by-year word list or CEFR conversion.
+for (const [code,label,stage,maxStem,pacing] of [
+  ['j7','國中七年級','j',16,'Grade 7: consolidate primary-school English. Use familiar school, family and daily-life contexts; basic present forms, simple questions and short descriptions. Introduce new vocabulary and past-time expressions with support rather than assuming junior-high graduation knowledge.'],
+  ['j8','國中八年級','j',18,'Grade 8: build on familiar daily-life English with short narratives, past and future reference, comparisons and practical exchanges. Support new grammar in context and ask for simple reasons or sequencing.'],
+  ['j9','國中九年級','j',20,'Grade 9: integrate junior-high learning in short messages and passages, identifying main ideas and details, drawing simple inferences and giving reasons. Review tense contrasts and common connectors in context.'],
+  ['h1','普通高中一年級','h',24,'Grade 10 (first year of Taiwan senior high): bridge from junior high through accessible narratives and everyday informational texts. Develop paragraph organisation, supported relative clauses, passive and perfect forms; do not presume senior-high graduation vocabulary.'],
+  ['h2','普通高中二年級','h',26,'Grade 11 (second year of Taiwan senior high): develop connected reading and writing on general-interest topics, comparison, cause and effect and opinions with evidence. Use richer collocations and clause relationships with context.'],
+  ['h3','普通高中三年級','h',28,'Grade 12 (third year of Taiwan senior high): integrate senior-high reading, inference, summarising, discourse connections and organised evidence-based writing. Prioritise common academic and general-interest language over specialised jargon.'],
+] as const) {
+  const base = FRAMEWORKS.en108.levels.find(level => level.code === stage)!
+  FRAMEWORKS.en108.levels.push({...base,code,label,maxStem,ceiling:`${base.ceiling} ${pacing} These are LingoAct editorial pacing suggestions within the official school-stage curriculum, not a compulsory textbook sequence or an official grade-specific vocabulary/grammar list. Teacher-specified taught material takes priority.`})
+}
+for (const level of [...FRAMEWORKS.en108.levels]) {
+  FRAMEWORKS.en108.levels.push(
+    {...level,code:`${level.code}-foundation`,label:`${level.label}・基礎`,maxStem:Math.max(8,level.maxStem-4),ceiling:`${level.ceiling} Teacher-selected foundation support within this school stage: shorten text, use familiar concrete words, provide context and simple prompts. This is a product adjustment, not an official grade or CEFR level.`},
+    {...level,code:`${level.code}-advanced`,label:`${level.label}・進階`,ceiling:`${level.ceiling} Teacher-selected extension within this school stage: more inference, connected sentences and slightly richer vocabulary with context. Do not automatically promote the class to another school stage or CEFR band.`},
+  )
+}
+
 export function resolveLevel(framework: string | null, code: string | null) {
   const entry = FRAMEWORKS[framework as Framework]
   if (!entry) return null
@@ -475,7 +505,32 @@ export function levelCeiling(framework: string | null, code: string | null) {
 // Read only the teacher's direction, never an article/OCR or a student's answer.
 // A dispatch override changes this request, not the stored class default.
 export function dispatchLevelCode(framework: string | null | undefined, code: string | null | undefined, direction = ''): string | null {
-  if (!direction || !['hsk', 'tbcl', 'tocfl'].includes(framework || '')) return code || null
+  if (!direction) return code || null
+  if (['en108','cefr','gept','toeic'].includes(framework || '')) {
+    const entry = FRAMEWORKS[framework as Framework]
+    const aliases: Record<string,string> = {國小三四年級:'p34',國小五六年級:'p56',七年級:'j7',八年級:'j8',九年級:'j9',國一:'j7',國二:'j8',國三:'j9',高一:'h1',高二:'h2',高三:'h3',高中一年級:'h1',高中二年級:'h2',高中三年級:'h3',grade7:'j7',grade8:'j8',grade9:'j9',grade10:'h1',grade11:'h2',grade12:'h3',seniorhighyear1:'h1',seniorhighyear2:'h2',seniorhighyear3:'h3',國中:'j',普通高中:'h',高中:'h',技術型高中:'v',技高:'v',初級:'elementary',中級:'intermediate',中高級:'high-intermediate',高級:'advanced',橘色:'orange',棕色:'brown',綠色:'green',藍色:'blue',金色:'gold'}
+    const clauses = direction.split(/[，,。;；\n]/)
+    let chosen = code || null
+    for (const clause of clauses) {
+      if (/(?:不要|不用|不是|別|别|do\s+not|don't|not\s+)/i.test(clause)) continue
+      if (!/(?:改|換|换|調|调|提高|降低|use|switch|change|set|CEFR|GEPT|TOEIC)/i.test(clause)) continue
+      for (const level of entry.levels) {
+        const escaped = level.code.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
+        if (new RegExp(`(^|[^a-z0-9-])${escaped}(?![a-z0-9-])`,'i').test(clause)) chosen=level.code
+      }
+      for (const [label,target] of Object.entries(aliases).sort((a,b)=>b[0].length-a[0].length)) {
+        if (clause.replace(/[、，\s]/g,'').toLowerCase().includes(label) && entry.levels.some(level=>level.code===target)) { chosen=target; break }
+      }
+      if (framework === 'en108' && chosen) {
+        const base = chosen.split('-')[0]
+        if (/(?:foundation|基礎|基础)/i.test(clause)) chosen = `${base}-foundation`
+        else if (/(?:advanced|進階|进阶)/i.test(clause)) chosen = `${base}-advanced`
+        else if (/(?:standard|一般|標準|标准)/i.test(clause)) chosen = base
+      }
+    }
+    return chosen
+  }
+  if (!['hsk', 'tbcl', 'tocfl'].includes(framework || '')) return code || null
   const digits: Record<string, string> = { 一: '1', 二: '2', 三: '3', 四: '4', 五: '5', 六: '6', 七: '7', 八: '8', 九: '9' }
   const text = direction.replace(/[一二三四五六七八九]/g, (character) => digits[character])
   const token = framework === 'tocfl' ? '(?:[ABC][12]|[1-6]|準備級[12]|准备级[12])' : '(?:7\\s*[-–—~至到]\\s*9|[1-9])'
@@ -507,6 +562,7 @@ export function levelInstruction(framework: string | null, code: string | null, 
   return [
     `LEVEL. The class is working at ${level.label}, on the ${entry.name} scale. This is the hardest constraint on the whole task: an item above the level is worthless to this class however good a question it is, because they cannot read it.`,
     entry.note,
+    ['en108','gept','toeic'].includes(framework || '') ? englishVocabularyInstruction(framework,code,direction) : '',
     framework === 'hsk' ? `Official HSK grammar at this band: ${(HSK_GRAMMAR[code === '7-9' ? 7 : Number(code)] || []).map((point) => point.point).join('; ')}. Also allow structures already introduced in lower HSK bands. Never use TBCL grammar as the reference.` : '',
     `What a learner at ${level.label} can read: ${level.ceiling}`,
     `Keep every question stem to at most ${level.maxStem} ${unit}, and keep each option shorter than the stem.`,

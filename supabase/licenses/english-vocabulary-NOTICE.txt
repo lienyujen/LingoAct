@@ -1,0 +1,22 @@
+LingoAct English Teaching Vocabulary — 2026-10-08
+
+CEEC vocabulary source: 大學入學考試中心「高中英文參考詞彙表（111學年度起適用）」
+https://www.ceec.edu.tw/files/file_pool/1/0N118345621497981164/高中英文參考詞彙表(111學年度起適用).pdf
+Noncommercial use with attribution. Commercial use requires prior written
+permission from CEEC. This vocabulary component is not covered by any broader
+permission to commercialise the LingoAct application.
+
+School vocabulary source: 國家教育研究院／教育部「十二年國民基本教育課程綱要
+語文領域—英語文」，附錄五國民中小學常用2000字參考詞彙表。
+Original entries, source pages and levels are retained in the dataset.
+
+Publisher design references: 龍騰文化「學測字彙王／Power單字素養力」；
+翰林出版「大考必勝單字（進階）」；南一書局「我愛單字酷高中系列」。
+One public vocabulary occurrence sample: 翰林出版「高中英文時事通2023年1月號」，
+page 2. Publisher URLs and coverage are in publisher-references.json.
+No publisher textbook passages, definitions, examples, audio or complete
+proprietary book lists are redistributed. No publisher endorsement is claimed.
+
+LingoAct authored the editorial topic labels, word-family relationships,
+collocations, sense cautions and dataset organisation. These are teaching
+metadata, not official frequency scores, CEFR bands or Lexile measures.

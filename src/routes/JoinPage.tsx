@@ -16,6 +16,7 @@ import { setUiLanguage, uiText } from '../lib/uiText'
 export function JoinPage() {
   const { sessionId: sessionReference = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
+  const teachingLanguage = session?.teaching_language
   useClassChineseFont(session)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
@@ -155,7 +156,7 @@ export function JoinPage() {
   if (sessionChecked && !session && !sessionLookupError) {
     return (
       <main className="participant-page participant-ended-page">
-        <ParticipantLanguageSwitcher locale={locale} onChange={changeLocale} />
+        <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
         <SetupNotice />
         <StudentSocialLinks />
         <section className="participant-ended-hero">
@@ -185,7 +186,7 @@ export function JoinPage() {
 
   return (
     <main className="center-page">
-      <ParticipantLanguageSwitcher locale={locale} onChange={changeLocale} />
+      <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
       <SetupNotice />
       <StudentSocialLinks />
       <form autoComplete="off" className="panel form-panel" onSubmit={join}>

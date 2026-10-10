@@ -1,7 +1,10 @@
+import { requireEnglishMaterial } from '../_shared/english-material.ts'
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { buildVoicePlan, contentHash, durationMs, karaokeCues, synthesize, wavFromPcm } from '../_shared/listening.ts'
-import type { ChineseAccent, ChineseScript, ClipKind, SpeakerGender } from '../_shared/listening.ts'
+import { speechAccent } from '../_shared/speech-accent.ts'
+import type { SpeechAccent } from '../_shared/speech-accent.ts'
+import type { ChineseScript, ClipKind, SpeakerGender } from '../_shared/listening.ts'
 
 const KINDS: ClipKind[] = ['passage', 'dialogue', 'scene']
 
@@ -20,8 +23,8 @@ Deno.serve(async (req) => {
     const transcript = typeof input.transcript === 'string' ? input.transcript.trim() : ''
     const kind = KINDS.includes(input.kind) ? input.kind as ClipKind : 'passage'
     let language = (typeof input.language === 'string' ? input.language : 'zh-tw').toLowerCase()
-    let accent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
-      ? input.accent as ChineseAccent
+    let accent: SpeechAccent | null = ['american', 'british', 'standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+      ? input.accent as SpeechAccent
       : input.script === 'simplified' ? 'putonghua'
         : input.script === 'traditional' ? 'taiwanese' : null
     // Kept in the legacy script column so existing deployments need no schema
@@ -45,9 +48,11 @@ Deno.serve(async (req) => {
     if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
       return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
     }
-    const { data: classroom, error: classError } = await supabase.from('sessions').select('level_framework').eq('id', sessionId).single()
+    const { data: classroom, error: classError } = await supabase.from('sessions').select('level_framework, teaching_language').eq('id', sessionId).single()
     if (classError) throw classError
     if (classroom.level_framework === 'hsk') { language = 'zh-cn'; accent = 'putonghua'; script = 'simplified' }
+
+    if (classroom.teaching_language === 'en') { requireEnglishMaterial(transcript, ...speakers); language = 'en'; accent = speechAccent('en', accent); script = null }
 
     // Asking for the same words twice is the common case: a teacher tweaks a
     // question, not the passage. Returning the clip already paid for keeps the
@@ -113,7 +118,7 @@ Deno.serve(async (req) => {
         public_url: publicUrl.publicUrl,
         duration_ms: clipDurationMs,
         karaoke_cues: cues,
-        voices: { instruction: plan.instruction, speakers: plan.speakers, voiceNames: plan.voiceNames, speakerGenders },
+        voices: { accent, instruction: plan.instruction, speakers: plan.speakers, voiceNames: plan.voiceNames, speakerGenders },
         content_hash: hash,
       })
       .select('*')

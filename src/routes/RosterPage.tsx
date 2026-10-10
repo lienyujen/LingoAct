@@ -1,3 +1,5 @@
+import { createBatchedRefresh, createRealtimeSnapshot } from '../lib/realtimeSnapshot'
+import { createSerializedReload } from '../lib/serializedReload'
 import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -90,7 +92,7 @@ export function RosterPage() {
   // saves the first paint from arriving in the wrong language and then
   // switching once the session row lands.
   const locale = session
-    ? presenterLocaleFor(session.teaching_language, session.system_language)
+    ? presenterLocaleFor(session.teaching_language, session.system_language, session.guidance_language)
     : storedPresenterLocale(sessionId)
   const t = presenterLookup(locale)
 
@@ -102,9 +104,12 @@ export function RosterPage() {
 
   useEffect(() => { readRoster() }, [readRoster])
 
-  const load = useCallback(async () => {
+  const participantSnapshot = useRef(createRealtimeSnapshot())
+  const [serializedRosterLoad] = useState(createSerializedReload)
+  const load = useCallback(() => serializedRosterLoad(async () => {
     if (!isSupabaseConfigured || !sessionId) return
     const supabase = requireSupabase()
+    participantSnapshot.current.begin()
     const [p, q, a, m, e, pt, s] = await Promise.all([
       supabase.from('participants').select('*').eq('session_id', sessionId).order('joined_at').limit(5000),
       supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at').limit(500),
@@ -116,7 +121,9 @@ export function RosterPage() {
     ])
     // Someone the presenter removed keeps their row, because everything they
     // answered hangs off it, but they are no longer in the class.
-    setParticipants(((p.data || []) as Participant[]).filter((entry) => !entry.removed_at))
+    if (p.error) participantSnapshot.current.abort()
+    else participantSnapshot.current.replace({ participants: p.data || [] })
+    setParticipants(participantSnapshot.current.rows<Participant>('participants').filter(entry => !entry.removed_at))
     setQuestions((q.data || []) as Question[])
     setAnswers((a.data || []) as Answer[])
     setMessages((m.data || []) as Message[])
@@ -128,7 +135,7 @@ export function RosterPage() {
     // while every tap was in fact being recorded — the failure looked like a
     // broken button instead of a database that had not been brought up to date.
     if (pt.error) {
-      setError(presenterLookup(presenterLocaleFor((s.data as Session | null)?.teaching_language))('pointsUnavailable'))
+      setError(presenterLookup(presenterLocaleFor((s.data as Session | null)?.teaching_language, (s.data as Session | null)?.system_language, (s.data as Session | null)?.guidance_language))('pointsUnavailable'))
       return
     }
 
@@ -151,7 +158,7 @@ export function RosterPage() {
     if (quizResult.data) setQuiz(quizResult.data as SessionCustomQuizResults)
     setUploadMarks((uploadResult.data?.responses || []) as FileResponse[])
     setBoardPosts((boardResult.data?.posts || []) as BoardPost[])
-  }, [sessionId])
+  }), [sessionId, serializedRosterLoad])
 
   // A class of 145 writes last_seen_at 4.8 times a second between them, and
   // every one of those used to pull the whole session back — participants,
@@ -163,6 +170,7 @@ export function RosterPage() {
     new: Record<string, unknown>
     old: Record<string, unknown>
   }) => {
+    participantSnapshot.current.update('participants', payload)
     setParticipants((current) => {
       if (payload.eventType === 'DELETE') {
         const goneId = payload.old?.id as string | undefined
@@ -187,18 +195,13 @@ export function RosterPage() {
 
   // Answers, points and board cards arrive in bursts — a whole class at once —
   // and they all want the same reload.
-  const reloadTimer = useRef<number | null>(null)
-  const scheduleLoad = useCallback(() => {
-    if (reloadTimer.current !== null) return
-    reloadTimer.current = window.setTimeout(() => {
-      reloadTimer.current = null
-      void load()
-    }, 400)
+  const rosterBatch = useRef<ReturnType<typeof createBatchedRefresh> | null>(null)
+  const scheduleLoad = useCallback(() => rosterBatch.current?.request(), [])
+  useEffect(() => {
+    const batch = createBatchedRefresh(async () => { try { await load() } catch { /* Reconnect/correction retries a failed snapshot. */ } })
+    rosterBatch.current = batch
+    return () => { batch.stop(); rosterBatch.current = null }
   }, [load])
-
-  useEffect(() => () => {
-    if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current)
-  }, [])
 
   useEffect(() => {
     void load()
@@ -206,15 +209,17 @@ export function RosterPage() {
     const supabase = requireSupabase()
     const channel = supabase.channel(`roster:${sessionId}`)
     channel.on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `session_id=eq.${sessionId}` }, applyParticipant)
-    for (const table of ['answers', 'messages', 'questions', 'session_events', 'participant_points', 'board_posts']) {
-      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+    for (const table of ['answers', 'messages', 'questions', 'session_events', 'participant_points', 'board_posts', 'sessions']) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: table === 'sessions' ? `id=eq.${sessionId}` : `session_id=eq.${sessionId}` }, scheduleLoad)
     }
-    channel.subscribe()
+    channel.subscribe(status => { if (status === 'SUBSCRIBED') scheduleLoad() })
+    window.addEventListener('online', scheduleLoad)
     // Attention is reported on a heartbeat rather than as a row change, so the
     // figures need a nudge to stay current.
-    const timer = window.setInterval(() => void load(), 20_000)
+    const timer = window.setInterval(scheduleLoad, 30_000)
     return () => {
       window.clearInterval(timer)
+      window.removeEventListener('online', scheduleLoad)
       void supabase.removeChannel(channel)
     }
   }, [applyParticipant, load, scheduleLoad, sessionId])
@@ -353,7 +358,13 @@ export function RosterPage() {
   async function lowerHands(participantId?: string) {
     setBusyId(participantId || 'all')
     if (await callPresenter({ action: 'lower_hands', participantId }, t('lowerHandsFailed'))) {
-      await load()
+      setParticipants(current => current.map(row => {
+        if (participantId && row.id !== participantId) return row
+        const next = { ...row, hand_raised_at: null }
+        participantSnapshot.current.update('participants', { eventType: 'UPDATE', new: next, old: {} })
+        return next
+      }))
+      scheduleLoad()
     }
     setBusyId('')
   }

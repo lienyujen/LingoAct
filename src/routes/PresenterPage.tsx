@@ -122,7 +122,7 @@ export function PresenterPage() {
   const [session, setSession] = useState<Session | null>(null)
   // The provider below is inside this component's own tree, so the context is
   // not readable from here — the locale comes from the session row directly.
-  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language)
+  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language, session?.guidance_language)
   const t = presenterLookup(locale)
   const w = workspaceText(locale)
   const [workspaceView, setWorkspaceView] = useState<'activities' | 'current' | 'history'>('activities')
@@ -2161,7 +2161,7 @@ export function PresenterPage() {
   }
 
   return (
-    <PresenterLanguageScope value={presenterLocaleFor(session.teaching_language, session.system_language)}>
+    <PresenterLanguageScope value={presenterLocaleFor(session.teaching_language, session.system_language, session.guidance_language)}>
     <main className={`presenter-page${controlsOpen ? ' controls-open' : ''}${settingsOpen ? ' settings-open' : ''}${selectionMode ? ' selecting-capture' : ''}`}>
       {!selectionMode && (
         <aside className="qr-floating">
@@ -2351,6 +2351,7 @@ export function PresenterPage() {
         </div>
       )}
       <ReadingModal
+        teachingLanguage={resolveTrack(session.teaching_language).language}
         framework={session.level_framework}
         annotation={classAnnotation(session)}
         capture={readingCapture}

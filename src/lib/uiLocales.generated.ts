@@ -1490,15 +1490,15 @@ export const uiLocales: Record<string, { "zh-CN": string; en: string }> = {
   },
   "高中一年級": {
     "zh-CN": "高中一年级",
-    "en": "Senior high school · Year 1"
+    "en": "Grade 10"
   },
   "高中二年級": {
     "zh-CN": "高中二年级",
-    "en": "Senior high school · Year 2"
+    "en": "Grade 11"
   },
   "高中三年級": {
     "zh-CN": "高中三年级",
-    "en": "Senior high school · Year 3"
+    "en": "Grade 12"
   },
   "臺灣華語文能力基準 TBCL": {
     "zh-CN": "台湾华语文能力基准 TBCL",

@@ -27,6 +27,7 @@ function AppRoutes() {
   const systemLanguage = useScSystemLanguage()
   const location = useLocation()
   useEffect(() => {
+    if (APP_PROFILE.id === 'ncacls' && !location.pathname.startsWith('/participant/')) setUiLanguage('zh-TW')
     if (supportsChineseSystemLanguage && (location.pathname === '/' || location.pathname === '/presenter/new' || !isSupabaseConfigured)) setUiLanguage(systemLanguage)
   }, [systemLanguage, location.pathname])
   const returnFromSessionReport = useSessionReportBack()
@@ -89,7 +90,7 @@ export function App() {
   }, [uiLanguage])
   return (
     <HashRouter>
-      <PresenterLocaleContext.Provider value={supportsChineseSystemLanguage ? systemLanguage : presenterLocaleFor(APP_PROFILE.defaultTrack)}>
+      <PresenterLocaleContext.Provider value={supportsChineseSystemLanguage ? systemLanguage : APP_PROFILE.defaultTrack === 'en' ? (uiLanguage === 'zh-TW' ? 'zh-TW' : 'en') : presenterLocaleFor(APP_PROFILE.defaultTrack)}>
       <ErrorBoundary>
         <AppRoutes />
       </ErrorBoundary>

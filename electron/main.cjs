@@ -11,7 +11,7 @@ const APP_PROFILES = {
   huayu: { appId: 'tw.lingoact.huayu.desktop', displayName: 'LingoAct 華語教學版' },
   english: { appId: 'tw.lingoact.english.desktop', displayName: 'LingoAct English' },
   guoyu: { appId: 'tw.lingoact.guoyu.desktop', displayName: 'LingoAct 國語文教學版' },
-  ncacls: { appId: 'org.ncacls.lingoact.desktop', displayName: 'LingoAct NCACLS' },
+  ncacls: { appId: 'org.ncacls.lingoact.desktop', displayName: 'LingoAct TC' },
 }
 const APP_PROFILE_ID = Object.hasOwn(APP_PROFILES, process.env.APP_PROFILE)
   ? process.env.APP_PROFILE
@@ -21,6 +21,7 @@ const APP_PROFILE_ID = Object.hasOwn(APP_PROFILES, process.env.APP_PROFILE)
 const APP_PROFILE = APP_PROFILES[APP_PROFILE_ID]
 // Keep this edition's existing preferences when its visible product name changes.
 if (APP_PROFILE_ID === 'sc') app.setPath('userData', path.join(app.getPath('appData'), 'LingoAct-SC'))
+if (APP_PROFILE_ID === 'ncacls') app.setPath('userData', path.join(app.getPath('appData'), 'LingoAct-NCACLS'))
 
 function logFatalError(scope, error) {
   const message = `[${new Date().toISOString()}] [${scope}] ${error?.stack || error}\n`

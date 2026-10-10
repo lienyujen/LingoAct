@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-10-08",
+  "decisions": {
+    "target_language": "en",
+    "default_mode": "school",
+    "school_label": "各級學校",
+    "guidance_languages": ["zh-TW", "en"],
+    "difficulty_adjustments": ["foundation", "standard", "advanced"],
+    "reading_challenge": ["current", "i+1", "i+2"],
+    "challenge_policy": "i+1/i+2 adjust lexical support, syntactic load and task complexity within the selected course; never automatically advance a whole CEFR level.",
+    "override_policy": "An explicit teacher level in an activity prompt overrides the course default for that activity only.",
+    "translation_policy": "Teacher materials, posts, prompts, options, vocabulary and sentence-pattern scaffolds remain in the target language. Translate only interface labels and non-assessment explanatory support on student request.",
+    "phonology_policy": "Use intelligibility, word stress, sentence stress and connected speech as teaching targets. Accent choice is independent of proficiency; do not penalise an intelligible accepted variety.",
+    "annotation_policy": "Phonics and IPA are optional English teaching support, not Chinese pinyin/zhuyin. IPA dialect/transcription must match the selected model voice."
+  },
+  "frameworks": [
+    {"id":"school","legacy_framework":"en108","label":"各級學校","type":"curriculum","sources":["naer-general-2018","naer-vocational","ceec-vocabulary-111"],"official_fixed_vocabulary":true,"notes":"學段與 CEFR 不作固定換算。國小一、二年級及大學沒有本課綱的統一年級能力表，不虛構官方標準；教師可用 CEFR 自訂。技高採獨立課綱。"},
+    {"id":"cefr","legacy_framework":"cefr","label":"一般英語能力 CEFR","type":"proficiency","sources":["cefr-2020"],"official_fixed_vocabulary":false,"notes":"能力描述涵蓋接收、產出、互動與中介；不是英語專屬詞彙或文法清單。"},
+    {"id":"gept","legacy_framework":"gept","label":"全民英檢 GEPT","type":"exam","sources":["gept-elementary","gept-intermediate","gept-high-intermediate","gept-advanced","gept-cefr"],"official_fixed_vocabulary":true,"vocabulary_reference_url":"https://www.lttc.ntu.edu.tw/tw/vocabulary","vocabulary_imported":false,"notes":"採目前官方列出的四級；聽讀與說寫分項對照。已找到2024年修訂的初、中、中高級官方參考字表；尚未匯入或確認重散布條件，高級不補造詞表。"},
+    {"id":"toeic","legacy_framework":"toeic","label":"多益 TOEIC","type":"exam","sources":["toeic-lr","toeic-sw","toeic-cefr","toeic-certificate"],"official_fixed_vocabulary":false,"notes":"Listening and Reading 及 Speaking and Writing 各自選目標；證書顏色不是 CEFR 等級。不得將 LingoAct AI 分數標示為官方 TOEIC 分數。"}
+  ],
+  "school_stages": [
+    {"code":"p34","label":"國小三、四年級","official_stage":"II","source":"naer-general-2018","source_pages":[5,10,18],"focus":"字母、字音連結、簡易生活用語及口語互動","cefr":null},
+    {"code":"p56","label":"國小五、六年級","official_stage":"III","source":"naer-general-2018","source_pages":[5,10,18,29],"focus":"簡易聽說讀寫；畢業口語應用至少300字詞，書寫至少180字詞","oral_word_target":300,"spelling_word_target":180,"cefr":null},
+    {"code":"j","label":"國中","official_stage":"IV","source":"naer-general-2018","source_pages":[5,29,56,57,58,59,60,61,70,71,72,73],"focus":"日常溝通、基本句構、閱讀理解；畢業至少1200字詞，2000字參考表供延伸","minimum_vocabulary_target":1200,"reference_vocabulary_target":2000,"cefr":null},
+    {"code":"h","label":"普通高中","official_stage":"V","source":"naer-general-2018","source_pages":[5,29],"focus":"較長文本、觀點表達、篇章組織及跨文化理解；課綱優先常用4500字，另參考大考中心六級詞彙表","preferred_vocabulary_target":4500,"cefr":null},
+    {"code":"v","label":"技術型高中","official_stage":"V-vocational","source":"naer-vocational","source_pages":[1,8,14],"focus":"日常生活與職場溝通，依群科與職業情境選材","cefr":null}
+  ],
+  "cefr_levels": [
+    {"code":"Pre-A1","skills":{"listening":"Recognise familiar words with support.","reading":"Recognise familiar labels and symbols.","speaking":"Use isolated words and memorised expressions.","writing":"Provide basic personal details."}},
+    {"code":"A1","skills":{"listening":"Follow slow, familiar basic speech.","reading":"Understand very short familiar texts.","speaking":"Exchange basic personal information with help.","writing":"Write simple phrases and messages."}},
+    {"code":"A2","skills":{"listening":"Understand short routine everyday messages.","reading":"Find information in simple everyday texts.","speaking":"Handle predictable everyday exchanges.","writing":"Write short linked everyday messages."}},
+    {"code":"B1","skills":{"listening":"Follow main points on familiar topics.","reading":"Understand straightforward factual texts.","speaking":"Narrate experiences and explain reasons.","writing":"Write connected texts on familiar topics."}},
+    {"code":"B2","skills":{"listening":"Follow extended speech and argument.","reading":"Understand viewpoints in complex texts.","speaking":"Discuss viewpoints with sustained interaction.","writing":"Develop clear arguments with supporting detail."}},
+    {"code":"C1","skills":{"listening":"Understand implicit meaning in extended speech.","reading":"Interpret complex texts and register.","speaking":"Communicate flexibly on complex matters.","writing":"Organise complex ideas clearly and precisely."}},
+    {"code":"C2","skills":{"listening":"Understand demanding speech with ease.","reading":"Interpret subtle distinctions across texts.","speaking":"Express fine distinctions fluently.","writing":"Produce precise, nuanced, well-structured texts."}}
+  ],
+  "cefr_reference": {"source":"cefr-2020","source_pages_by_skill":{"listening":[48],"reading":[54],"speaking":[62,72],"writing":[66],"phonology":[133,134,135],"grammar":[132],"vocabulary":[131,132]},"status":"editorial_summary_of_official_descriptors","verbatim_republication":false},
+  "gept_levels": [
+    {"code":"elementary","label":"初級","source":"gept-elementary","receptive_cefr":"A2","productive_cefr":"A2+","skills":{"listening":"理解簡短日常對話及訊息","reading":"閱讀簡短告示、書信和故事","speaking":"簡短介紹自己及日常生活","writing":"寫出簡單句子和短段落"}},
+    {"code":"intermediate","label":"中級","source":"gept-intermediate","receptive_cefr":"B1","productive_cefr":"B1+","skills":{"listening":"理解日常與工作場合的主要訊息","reading":"閱讀一般生活及工作文本","speaking":"描述經驗並簡述意見和理由","writing":"撰寫簡短連貫的敘述及說明"}},
+    {"code":"high-intermediate","label":"中高級","source":"gept-high-intermediate","receptive_cefr":"B2","productive_cefr":"B2+","skills":{"listening":"理解一般報導、簡報及討論","reading":"理解較長生活及工作文本","speaking":"流暢討論並說明觀點","writing":"組織文章、書信及工作報告"}},
+    {"code":"advanced","label":"高級","source":"gept-advanced","receptive_cefr":"C1","productive_cefr":"C1+","skills":{"listening":"掌握複雜談話與專業論述","reading":"理解複雜篇章及隱含意義","speaking":"靈活處理抽象及專業議題","writing":"精確組織複雜論述與正式文本"}}
+  ],
+  "toeic_certificate_bands": [
+    {"code":"orange","label":"橘色","min":10,"max":215},
+    {"code":"brown","label":"棕色","min":220,"max":465},
+    {"code":"green","label":"綠色","min":470,"max":725},
+    {"code":"blue","label":"藍色","min":730,"max":855},
+    {"code":"gold","label":"金色","min":860,"max":990}
+  ],
+  "toeic_cefr_thresholds": {
+    "source":"toeic-cefr",
+    "levels":["A1","A2","B1","B2","C1"],
+    "listening":[60,110,275,400,490],
+    "reading":[60,115,275,385,455],
+    "speaking":[50,90,120,160,180],
+    "writing":[30,70,120,150,180],
+    "rules":["Keep each skill threshold independent. Adding L/R minima is a teaching reference, not proof that either skill meets its threshold.","Reading C1=455 is published as a reference with limited expert agreement (45%). Preserve this caveat.","No C2 TOEIC threshold is published in this table; do not infer one.","A certificate colour or L/R total does not establish speaking or writing proficiency."]
+  },
+  "toeic_exams": [
+    {"id":"toeic-lr","label":"TOEIC 聽力與閱讀","source":"toeic-lr","skills":["listening","reading"],"scale":{"listening":[5,495],"reading":[5,495],"total":[10,990]},"duration_minutes":{"listening":45,"reading":75},"parts":[
+      {"part":1,"skill":"listening","task":"照片描述","items":6},
+      {"part":2,"skill":"listening","task":"應答問題","items":25},
+      {"part":3,"skill":"listening","task":"簡短對話","items":39},
+      {"part":4,"skill":"listening","task":"簡短獨白","items":30},
+      {"part":5,"skill":"reading","task":"句子填空","items":30},
+      {"part":6,"skill":"reading","task":"段落填空","items":16},
+      {"part":7,"skill":"reading","task":"單篇及多篇閱讀","items":54}
+    ]},
+    {"id":"toeic-sw","label":"TOEIC 口說與寫作","source":"toeic-sw","skills":["speaking","writing"],"scale":{"speaking":[0,200],"writing":[0,200]},"duration_minutes":{"speaking":20,"writing":60},"parts":[
+      {"part":"s1","skill":"speaking","task":"朗讀","items":2,"prepare_seconds":45,"answer_seconds":45,"rubric_scale":[0,3]},
+      {"part":"s2","skill":"speaking","task":"描述照片","items":2,"prepare_seconds":45,"answer_seconds":30,"rubric_scale":[0,3]},
+      {"part":"s3","skill":"speaking","task":"回答問題","items":3,"answer_seconds_sequence":[15,15,30],"rubric_scale":[0,3]},
+      {"part":"s4","skill":"speaking","task":"依據題目資料應答","items":3,"prepare_seconds":45,"answer_seconds_sequence":[15,15,30],"rubric_scale":[0,3]},
+      {"part":"s5","skill":"speaking","task":"陳述意見","items":1,"prepare_seconds":45,"answer_seconds":60,"rubric_scale":[0,5]},
+      {"part":"w1","skill":"writing","task":"依照片及指定詞造句","items":5,"group_minutes":8,"rubric_scale":[0,3]},
+      {"part":"w2","skill":"writing","task":"回覆書面要求","items":2,"group_minutes":20,"rubric_scale":[0,4]},
+      {"part":"w3","skill":"writing","task":"意見論述","items":1,"group_minutes":30,"rubric_scale":[0,5]}
+    ]}
+  ],
+  "source_usage": {
+    "ceec-vocabulary-111":{"redistribution":"noncommercial_with_attribution","commercial":"requires_written_permission","bundle_by_default":true,"approved_use":"user_confirmed_noncommercial_2026-10-08","scope":"selected vocabulary export only; raw research corpus excluded"},
+    "cefr-2020":{"redistribution":"links_and_editorial_summaries_only","bundle_verbatim":false},
+    "gept":{"redistribution":"facts_and_editorial_summaries_only","official_exam_items_included":false},
+    "toeic":{"redistribution":"facts_and_editorial_summaries_only","official_exam_items_included":false}
+  }
+}

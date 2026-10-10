@@ -55,16 +55,12 @@ const profiles: Record<AppProfileId, AppProfile> = {
     allowedTracks: ['guoyu'],
     defaultSkill: 'read',
   },
-  // 全美中文學校聯合總會. Its classes are 華語文 taught in traditional script to
-  // learners in the United States, so it is the 華語 room with the council's
-  // own name and icon. 注音 and 漢語拼音 need nothing here: the 華語文 track
-  // already carries annotationChoice, which is what lets a teacher pick
-  // between them per class — a beginner reading traditional wants 注音, one
-  // arriving from pinyin wants 拼音, and an American Chinese school has both.
+  // The Traditional-only edition retains its legacy profile id for old join links
+  // and saved courses, while its visible name and branding are now LingoAct TC.
   ncacls: {
     id: 'ncacls',
-    productName: 'LingoAct NCACLS',
-    shortName: 'NCACLS',
+    productName: 'LingoAct TC',
+    shortName: '繁體中文版',
     defaultTrack: 'huayu',
     allowedTracks: ['huayu'],
     defaultSkill: 'listen',

@@ -53,11 +53,11 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   }
   const canRepeat = ['short_answer', 'pronunciation', 'oral_response', 'custom_quiz'].includes(question.type) && question.teaching_mode !== 'pair'
   return <details className="panel teaching-cycle-panel">
-    <summary>{zh ? uiText("下一步教學") : 'Next teaching step'}</summary>
+    <summary>{zh ? uiText("下一步教學") : 'Follow-up'}</summary>
     <div className="teaching-cycle-actions">
       {canRepeat && <button disabled={busy || !active} type="button" onClick={() => { setMode('repeat'); setFocus('') }}>{zh ? uiText("再練一次") : "Practice again"}</button>}
-      <button disabled={busy} type="button" onClick={() => { setMode('discuss'); void run(loadSamples) }}>{zh ? uiText("挑作品討論") : 'Discuss student work'}</button>
-      <button disabled={busy} type="button" onClick={() => { setMode('diagnose'); void run(loadSamples) }}>{zh ? uiText("看看全班卡在哪") : 'Review learning needs'}</button>
+      <button disabled={busy} type="button" onClick={() => { setMode('discuss'); void run(loadSamples) }}>{zh ? uiText("挑作品討論") : 'Discuss work'}</button>
+      <button disabled={busy} type="button" onClick={() => { setMode('diagnose'); void run(loadSamples) }}>{zh ? uiText("看看全班卡在哪") : 'Learning needs'}</button>
       <button disabled={busy || !active || participants.length < 2} type="button" onClick={openPair}>{zh ? uiText("兩人共同任務") : 'Pair task'}</button>
       {question.teaching_mode === 'pair' && <button disabled={busy} type="button" onClick={() => void run(loadSamples)}>{zh ? uiText("更新各組結果") : 'Refresh pair results'}</button>}
     </div>

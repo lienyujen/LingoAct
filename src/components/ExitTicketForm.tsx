@@ -12,9 +12,10 @@ type Props = {
   busy: boolean
   onSubmit: (value: { responseText: string; rating: number }) => void
   locale?: ParticipantLocale
+  teachingLanguage?: string | null
 }
 
-export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, locale = 'zh-TW' }: Props) {
+export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, locale = 'zh-TW', teachingLanguage }: Props) {
   const [responseText, setResponseText] = useState('')
   const [rating, setRating] = useState(0)
 
@@ -44,7 +45,7 @@ export function ExitTicketForm({ prompt, category, ticket, busy, onSubmit, local
       ) : (
         <form className="exit-ticket-form" onSubmit={submit}>
           <fieldset className="exit-ticket-question">
-            <legend><span>{participantText(locale, 'required')}</span>{participantText(locale, 'ratingPrompt')}</legend>
+            <legend><span>{participantText(locale, 'required')}</span>{participantText(teachingLanguage === 'en' ? 'en' : locale, 'ratingPrompt')}</legend>
             <div className="star-rating" role="radiogroup" aria-label={participantText(locale, 'ratingLabel')}>
               {[1, 2, 3, 4, 5].map((value) => (
               <button

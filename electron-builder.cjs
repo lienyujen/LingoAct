@@ -9,7 +9,7 @@ const profiles = {
   huayu: { executable: 'LingoAct-Huayu', appId: 'tw.lingoact.huayu.desktop' },
   english: { executable: 'LingoAct-English', appId: 'tw.lingoact.english.desktop' },
   guoyu: { executable: 'LingoAct-Guoyu', appId: 'tw.lingoact.guoyu.desktop' },
-  ncacls: { executable: 'LingoAct-NCACLS', appId: 'org.ncacls.lingoact.desktop', icon: 'build/icon-ncacls.ico', macIcon: 'build/ncacls-source.png' },
+  ncacls: { executable: 'LingoAct-TC', appId: 'org.ncacls.lingoact.desktop' },
 }
 const profileId = Object.hasOwn(profiles, process.env.APP_PROFILE) ? process.env.APP_PROFILE : 'full'
 const profile = profiles[profileId]
@@ -44,6 +44,13 @@ module.exports = {
     'dist/**/*',
     'electron/**/*',
     'supabase/licenses/**/*',
+    // The approved noncommercial vocabulary travels with English-capable
+    // editions; the larger private research corpus never enters releases.
+    ...(['english', 'full'].includes(profileId) ? [
+      'data/english/lingoact-vocabulary.json',
+      'data/english/publisher-references.json',
+      'data/english/grammar-reference.json',
+    ] : []),
     'package.json',
     // package.json's dependencies are renderer-only libraries already
     // bundled into dist/**/*.js by Vite, so none of them needs shipping.

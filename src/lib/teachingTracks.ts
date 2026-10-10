@@ -69,9 +69,9 @@ export const TEACHING_TRACKS: TeachingTrack[] = [
   {
     id: 'en',
     label: '英語',
-    note: '108課綱・全民英檢・多益',
+    note: '各級學校・CEFR・全民英檢・多益',
     language: 'en',
-    frameworks: ['en108', 'gept', 'toeic'],
+    frameworks: ['en108', 'cefr', 'gept', 'toeic'],
     annotation: 'none',
     annotationChoice: false,
   },

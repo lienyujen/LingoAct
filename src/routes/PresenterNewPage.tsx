@@ -1,4 +1,4 @@
-import { uiText, uiFormat } from '../lib/uiText'
+import { uiText, uiFormat, setUiLanguage } from '../lib/uiText'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowRight, ArrowsClockwise, CircleNotch, Door, ChartBar, Gear, SignIn, Sparkle, Trash, X } from '@phosphor-icons/react'
@@ -57,7 +57,10 @@ export function PresenterNewPage() {
   // All of it travels with the session, so the class is set up before anyone
   // joins and no activity has to ask again.
   const [teachingTrack, setTeachingTrack] = useState(initialCourse.teachingTrack)
-  const [guidanceLanguage, setGuidanceLanguage] = useState(initialCourse.guidanceLanguage)
+  const [guidanceLanguage, setGuidanceLanguage] = useState(APP_PROFILE.id === 'ncacls' ? 'zh-TW' : initialCourse.guidanceLanguage)
+  useEffect(() => {
+    if (APP_PROFILE.defaultTrack === 'en') setUiLanguage(guidanceLanguage === 'zh-TW' ? 'zh-TW' : 'en')
+  }, [guidanceLanguage])
   const [levelFramework, setLevelFramework] = useState(initialCourse.levelFramework)
   const [levelCode, setLevelCode] = useState(initialCourse.levelCode)
   const [readingAnnotation, setReadingAnnotation] = useState(initialCourse.readingAnnotation)
@@ -84,7 +87,7 @@ export function PresenterNewPage() {
     if (supportsChineseSystemLanguage) setScSystemLanguage(value.guidanceLanguage === 'en' ? 'en' : value.teachingTrack === 'putonghua' ? 'zh-CN' : 'zh-TW')
     setTitle(value.title)
     setTeachingTrack(value.teachingTrack)
-    setGuidanceLanguage(value.guidanceLanguage)
+    setGuidanceLanguage(APP_PROFILE.id === 'ncacls' ? 'zh-TW' : value.guidanceLanguage)
     setLevelFramework(value.levelFramework)
     setLevelCode(value.levelCode)
     setReadingAnnotation(value.readingAnnotation)
@@ -93,7 +96,7 @@ export function PresenterNewPage() {
   }
 
   function rememberCourse() {
-    if (levelFramework === 'hsk' && !levelCode) { setCourseNotice(t('hskLevelRequired')); return }
+    if ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) { setCourseNotice(t(teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired')); return }
     if (!course.title) { setCourseNotice('請先填寫課程名稱。'); return }
     if (saveCoursePreset(course)) {
       setCourses(readCoursePresets())
@@ -118,8 +121,8 @@ export function PresenterNewPage() {
   async function createSession(event: FormEvent) {
     event.preventDefault()
     setError('')
-    if (levelFramework === 'hsk' && !levelCode) {
-      setError(t('hskLevelRequired'))
+    if ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) {
+      setError(t(teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired'))
       setCourseSettingsOpen(true)
       return
     }
@@ -138,7 +141,7 @@ export function PresenterNewPage() {
           levelFramework,
           levelCode: levelCode || null,
           readingAnnotation,
-          ...(supportsChineseSystemLanguage ? { systemLanguage, appProfile: APP_PROFILE.id } : {}),
+          ...(APP_PROFILE.id === 'ncacls' ? { systemLanguage: 'zh-TW', appProfile: APP_PROFILE.id } : supportsChineseSystemLanguage ? { systemLanguage, appProfile: APP_PROFILE.id } : {}),
         },
         headers: { 'x-lingoact-client': 'desktop-app' },
       })
@@ -264,7 +267,7 @@ export function PresenterNewPage() {
           </select>
         </label>}
         <label>
-          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={uiText("例如：華語初級班・週二")} />
+          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={teachingTrack === 'en' ? 'e.g. Beginner English · Tuesday' : uiText("例如：華語初級班・週二")} />
         </label>
         <div className="course-summary"><strong>{courseSummary(course)}</strong><span>{uiText("每個教學活動，都有全新體驗。")}</span></div>
         <details className="teacher-disclosure" open={courseSettingsOpen} onToggle={(event) => setCourseSettingsOpen(event.currentTarget.open)}>

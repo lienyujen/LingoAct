@@ -9,6 +9,7 @@ import { cachedLearningTranslation, demandTranslationLocales, explanationSource,
 import { classFeedbackSettings } from '../_shared/feedback-language.ts'
 import { classLevelInstruction } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
+import { quizGenerationFailed } from '../_shared/quiz-state.ts'
 import { participantTeachingCycle } from '../_shared/teaching-cycle.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -139,12 +140,17 @@ Deno.serve(async (req) => {
       if (error) throw error
       if (!passage) return jsonResponse({ values: {} })
       const sources: Record<string, TranslationSource> = {}
+      const englishReferences: string[] = (passage.grammar || []).some((entry: { point: string }) => entry.point.startsWith('English: '))
+        ? [...(passage.vocabulary || []).map((entry: { word: string }) => entry.word),
+          ...(passage.grammar || []).map((entry: { span: string }) => entry.span)] : []
       for (const [index, entry] of (passage.vocabulary || []).entries()) {
         const source = explanationSource(entry.gloss)
+        if (source && /^[A-Za-z]/.test(entry.word)) source.references = [...englishReferences, entry.word]
         if (source && !entry.gloss?.[locale]) sources[`word:${index}`] = source
       }
       for (const [index, entry] of (passage.grammar || []).entries()) {
         const source = explanationSource(entry.note)
+        if (source && entry.point.startsWith('English: ')) source.references = englishReferences
         if (source && !entry.note?.[locale]) sources[`grammar:${index}`] = source
       }
       return jsonResponse(await cachedLearningTranslation(supabase, sessionId, locale, sources))
@@ -199,7 +205,7 @@ Deno.serve(async (req) => {
       if (quizError) throw quizError
 
       if (action === 'get_custom_quiz') {
-        if (!quiz && question.title === '出題失敗，請重新派送') {
+        if (!quiz && quizGenerationFailed(question.title)) {
           return jsonResponse({ message: 'AI 出題暫時失敗，請等待教師重新派送。' }, 503)
         }
         if (!quiz) return jsonResponse({ generating: true })
@@ -679,12 +685,13 @@ Deno.serve(async (req) => {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限失效。' }, 403)
       const raised = input.raised !== false
-      const { error } = await supabase.from('participants')
+      const { data: participantState, error } = await supabase.from('participants')
         .update({ hand_raised_at: raised ? new Date().toISOString() : null })
         .eq('id', participantId)
         .eq('session_id', sessionId)
+        .select('id, session_id, hand_raised_at').single()
       if (error) throw error
-      return jsonResponse({ ok: true })
+      return jsonResponse({ ok: true, participantState })
     }
     if (['prepare_board_upload', 'get_my_board_posts', 'withdraw_board_post', 'edit_board_post', 'toggle_board_reaction'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
@@ -947,7 +954,7 @@ Deno.serve(async (req) => {
 
       const { data: question, error: questionError } = await supabase
         .from('questions')
-        .select('id, session_id, screenshot_id, type, status, prompt_text, learning_focus')
+        .select('id, session_id, screenshot_id, listening_clip_id, type, status, prompt_text, learning_focus')
         .eq('id', questionId)
         .eq('session_id', sessionId)
         .maybeSingle()
@@ -1124,7 +1131,15 @@ Deno.serve(async (req) => {
           audioBytes: new Uint8Array(await audioBlob.arrayBuffer()),
           audioMimeType: 'audio/wav',
         }
-        const classInstruction = await classLevelInstruction(supabase, sessionId)
+        let classInstruction = await classLevelInstruction(supabase, sessionId)
+        if (question.listening_clip_id) {
+          const { data: modelClip } = await supabase.from('listening_clips')
+            .select('language, voices').eq('id', question.listening_clip_id).eq('session_id', sessionId).maybeSingle()
+          if (modelClip?.language === 'en') {
+            const accent = modelClip.voices?.accent === 'british' ? 'British English' : 'American English'
+            classInstruction += `\nThe supplied model recording uses ${accent}. Discuss word stress, connected speech and intelligibility against that model. An intelligible accepted American or British variant is not a pronunciation error; describe a difference constructively rather than deducting marks for accent identity.`
+          }
+        }
         const feedbackSettings = await classFeedbackSettings(supabase, sessionId)
         let analysis = null
         let lastError: unknown = null

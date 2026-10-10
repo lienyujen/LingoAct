@@ -8,6 +8,7 @@ import { supportsChineseSystemLanguage, useScSystemLanguage } from '../lib/scSys
 import { scFrameworkChoices } from '../lib/scTeachingMode'
 import type { ScSystemLanguage } from '../lib/scTeachingMode'
 import { uiText } from '../lib/uiText'
+import { SCHOOL_STAGES, SCHOOL_GRADES, schoolStage as stageOf, schoolDifficulty as difficultyOf, schoolLevelCode } from '../lib/schoolLevels'
 
 type Props = {
   systemLanguage?: ScSystemLanguage | null
@@ -53,6 +54,26 @@ export function LanguagePairFields({
   const framework = frameworkById(activeId)
   const choices = (supportsChineseSystemLanguage ? scFrameworkChoices(systemLanguage) : track.frameworks).map((id) => frameworkById(id)).filter(Boolean)
   const availableTracks = TEACHING_TRACKS.filter((option) => APP_PROFILE.allowedTracks.includes(option.id))
+  const schoolStage = activeId === 'en108' ? stageOf(levelCode) : levelCode
+  const schoolDifficulty = difficultyOf(levelCode)
+  const schoolGrade = levelCode.split('-')[0]
+  const levels = activeId === 'en108' ? SCHOOL_STAGES : framework?.levels || []
+
+  const levelButtons = (values: readonly { code: string; label: string }[]) => (
+    values.map((level) => (
+              <span key={level.code}>
+              <button
+                aria-pressed={schoolStage === level.code}
+                className={schoolStage === level.code ? 'language-chip selected' : 'language-chip'}
+                key={level.code}
+                type="button"
+                onClick={() => onLevelChange(activeId === 'en108' ? schoolStage === level.code ? levelCode : SCHOOL_GRADES[level.code]?.[0].code || level.code : level.code)}
+              >
+                <strong>{activeId === 'toeic' ? uiText(level.label).split(/\s*[／/]\s*/).map((line, index) => <span key={index}>{line}</span>) : uiText(level.label)}</strong>
+              </button>
+              </span>
+            ))
+  )
 
   return (
     <div className="language-pair">
@@ -87,7 +108,7 @@ export function LanguagePairFields({
                 type="button"
                 onClick={() => onFrameworkChange(option!.id)}
               >
-                <strong>{option!.short}</strong>
+                <strong>{uiText(option!.short)}</strong>
                 <small>{uiText(option!.name)}</small>
               </button>
             ))}
@@ -101,8 +122,8 @@ export function LanguagePairFields({
             {t('levelLabel')}
             {choices.length > 1 ? <em>{uiText(framework.name)}</em> : <em>{t('levelFromTrack', { name: uiText(framework.name) })}</em>}
           </span>
-          <div className="language-pair-options">
-            {activeId !== 'hsk' && <button
+          <div className={activeId === 'toeic' ? 'toeic-level-groups' : 'language-pair-options'}>
+            {activeId !== 'hsk' && track.id !== 'en' && <button
               aria-pressed={!levelCode}
               className={!levelCode ? 'language-chip selected' : 'language-chip'}
               type="button"
@@ -110,18 +131,33 @@ export function LanguagePairFields({
             >
               <strong>{t('levelUnset')}</strong>
             </button>}
-            {framework.levels.map((level) => (
-              <button
-                aria-pressed={levelCode === level.code}
-                className={levelCode === level.code ? 'language-chip selected' : 'language-chip'}
-                key={level.code}
-                type="button"
-                onClick={() => onLevelChange(level.code)}
-              >
-                <strong>{uiText(level.label)}</strong>
-              </button>
-            ))}
+            {activeId === 'toeic' ? ['lr', 'sw'].map((section) => (
+              <section className="toeic-level-group" key={section}>
+                <h4>{t(section === 'sw' ? 'toeicSpeakingWriting' : 'toeicListeningReading')}</h4>
+                <div className="toeic-level-grid">{levelButtons(levels.filter(level => level.code.startsWith('sw-') === (section === 'sw')))}</div>
+              </section>
+            )) : levelButtons(levels)}
           </div>
+          {activeId === 'en108' && SCHOOL_GRADES[schoolStage] && <div className="school-grade-field">
+            <span className="language-pair-label">{uiText('年級')}</span>
+            <div className="language-pair-options">
+              {SCHOOL_GRADES[schoolStage].map(grade => <button type="button" key={grade.code}
+                aria-pressed={schoolGrade === grade.code} className={schoolGrade === grade.code ? 'language-chip selected' : 'language-chip'}
+                onClick={() => onLevelChange(schoolLevelCode(grade.code, schoolDifficulty))}>
+                <strong>{uiText(grade.label)}</strong>
+              </button>)}
+            </div>
+          </div>}
+          {activeId === 'en108' && schoolStage && <div className="school-grade-field">
+            <span className="language-pair-label">{uiText('難度')}</span>
+            <div className="language-pair-options">
+            {(['foundation','standard','advanced'] as const).map((difficulty) => <button type="button" key={difficulty}
+              aria-pressed={schoolDifficulty === difficulty} className={schoolDifficulty === difficulty ? 'language-chip selected' : 'language-chip'}
+              onClick={() => onLevelChange(schoolLevelCode(schoolGrade, difficulty))}>
+              {uiText({foundation:'基礎',standard:'一般',advanced:'進階'}[difficulty])}
+            </button>)}
+            </div>
+          </div>}
         </div>
       )}
 
@@ -151,11 +187,11 @@ export function LanguagePairFields({
         </div>
       )}
 
-      {!supportsChineseSystemLanguage && <div className="language-pair-field">
+      {!supportsChineseSystemLanguage && APP_PROFILE.id !== 'ncacls' && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainGuidanceLanguage')}</span>
         <p className="language-pair-hint">{t('mainGuidanceHint')}</p>
         <div className="language-pair-options">
-          {guidanceLocalesForBrand(GUIDANCE_LOCALES, buildBrand).map((locale) => (
+          {guidanceLocalesForBrand(GUIDANCE_LOCALES, buildBrand).filter((locale) => track.id !== 'en' || ['zh-TW','en'].includes(locale.code)).map((locale) => (
             <button
               aria-pressed={guidanceLanguage === locale.code}
               className={guidanceLanguage === locale.code ? 'language-chip selected' : 'language-chip'}

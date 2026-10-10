@@ -22,6 +22,9 @@ importers:
       '@fontsource-variable/noto-sans-tc':
         specifier: 5.3.0
         version: 5.3.0
+      '@fontsource/noto-sans-myanmar':
+        specifier: 5.3.0
+        version: 5.3.0
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -171,6 +174,9 @@ packages:
 
   '@fontsource-variable/noto-sans-tc@5.3.0':
     resolution: {integrity: sha512-sniyvTx+yRXlce9bjBV0i3kBG3/YFJiz6SZA9plNJLCR4TbY8il+G759gAXWHZu01eAclbJEN2YR+qbQjZTjkg==}
+
+  '@fontsource/noto-sans-myanmar@5.3.0':
+    resolution: {integrity: sha512-/ja/Fbmtv4TRpd8LgnVFvDRFIzR0bvYaVCwGNK6Hnn5uBGccCfGFnZ7wRPG1/IyMnScVIjrnOmN+2jOL0b8tRQ==}
 
   '@hapi/address@5.1.1':
     resolution: {integrity: sha512-A+po2d/dVoY7cYajycYI43ZbYMXukuopIsqCjh5QzsBCipDtdofHntljDlpccMjIfTy6UOkg+5KPriwYch2bXA==}
@@ -2135,6 +2141,8 @@ snapshots:
   '@fontsource-variable/noto-sans-sc@5.3.0': {}
 
   '@fontsource-variable/noto-sans-tc@5.3.0': {}
+
+  '@fontsource/noto-sans-myanmar@5.3.0': {}
 
   '@hapi/address@5.1.1':
     dependencies:

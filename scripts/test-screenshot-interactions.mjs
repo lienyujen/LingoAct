@@ -1,17 +1,14 @@
+import { fixtureSql } from './live-test-db.mjs'
 // Isolated fixture: no real class rows are edited and no AI calls are made.
 import assert from 'node:assert/strict'
 import { randomUUID, createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-const project = process.env.LINGOACT_TEST_PROJECT, token = process.env.SUPABASE_ACCESS_TOKEN
-if (!project || !token) throw new Error('Set LINGOACT_TEST_PROJECT and SUPABASE_ACCESS_TOKEN.')
+const project = process.env.LINGOACT_TEST_PROJECT
+if (!project) throw new Error('Set LINGOACT_TEST_PROJECT; sign in to the Supabase CLI or set SUPABASE_ACCESS_TOKEN.')
 const session = randomUUID(), teacher = randomUUID() + randomUUID()
 const students = Array.from({ length: 2 }, () => ({ id: randomUUID(), token: randomUUID() + randomUUID() }))
 const hash = v => createHash('sha256').update(v).digest('hex')
-async function sql(query) {
-  const r = await fetch(`https://api.supabase.com/v1/projects/${project}/database/query`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
-  if (!r.ok) throw new Error(await r.text())
-  return r.json()
-}
+const sql = query => fixtureSql(project, query)
 async function call(endpoint, body, expected = 200) {
   const r = await fetch(`https://${project}.supabase.co/functions/v1/${endpoint}-action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: session, ...body }) })
   const data = await r.json(); assert.equal(r.status, expected, JSON.stringify(data)); return data

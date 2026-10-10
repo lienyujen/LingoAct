@@ -1,3 +1,4 @@
+import { accentChoices, speechAccent } from '../lib/speechAccent'
 import { uiText } from '../lib/uiText'
 import { useEffect, useRef, useState } from 'react'
 import { TimingRow } from './TimingRow'
@@ -56,17 +57,6 @@ const KIND_LABELS: Record<StudioKind, PresenterMessageKey> = {
 // Two voices is the synthesis API's ceiling, so the assignment UI never offers
 // more than the audio can actually distinguish.
 const VOICE_LIMIT = 2
-
-const ACCENTS: Array<{ value: ListeningAccent; label: PresenterMessageKey }> = [
-  { value: 'standard_guoyu', label: 'accentStandardGuoyu' },
-  { value: 'putonghua', label: 'accentPutonghua' },
-  { value: 'taiwanese', label: 'accentTaiwanese' },
-]
-
-function nextAccent(current: ListeningAccent) {
-  const at = ACCENTS.findIndex((choice) => choice.value === current)
-  return ACCENTS[(at + 1) % ACCENTS.length].value
-}
 
 const VOICE_CHOICES: Array<{ value: Exclude<SpeakerGender, 'unknown'>; label: PresenterMessageKey }> = [
   { value: 'male', label: 'voiceMale' },
@@ -169,6 +159,8 @@ export function ListeningStudioModal({
   onDispatched,
 }: Props) {
   const t = usePresenterText()
+  const ACCENTS = accentChoices(levelFramework === 'hsk' ? 'zh-cn' : teachingLanguage)
+  const nextAccent = (current: ListeningAccent) => ACCENTS[(ACCENTS.findIndex(choice => choice.value === current) + 1) % ACCENTS.length].value
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
   const [kind, setKind] = useState<StudioKind>('passage')
@@ -193,11 +185,11 @@ export function ListeningStudioModal({
     if (initialTranscript) setSource('text')
     setTranscript(initialTranscript)
     setKind(initialKind)
-    setAccent(levelFramework === 'hsk' ? 'putonghua' : initialAccent)
+    setAccent(speechAccent(levelFramework === 'hsk' ? 'zh-cn' : teachingLanguage, initialAccent))
     setReplayLimit(initialReplayLimit)
     setPrepareSeconds(initialPrepareSeconds)
     setAnswerSeconds(initialAnswerSeconds)
-  }, [levelFramework, initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open])
+  }, [teachingLanguage, levelFramework, initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open])
 
   useEffect(() => {
     if (open) return
@@ -295,7 +287,7 @@ export function ListeningStudioModal({
         transcript: transcript.trim(),
         kind,
         language: teachingLanguage,
-        accent: teachingLanguage.startsWith('zh') ? accent : null,
+        accent: teachingLanguage.startsWith('zh') || teachingLanguage.startsWith('en') ? accent : null,
         speakers: kind === 'dialogue' ? speakers : [],
         speakerGenders: kind === 'dialogue' ? speakerGenders : [],
         screenshotId,
@@ -407,12 +399,12 @@ export function ListeningStudioModal({
                 {t(KIND_LABELS[value])}
               </button>
             ))}
-            {teachingLanguage.startsWith('zh') && (
-              <div className="ls-accent-set" aria-label={t('accentLabel')}>
+            {(teachingLanguage.startsWith('zh') || teachingLanguage.startsWith('en')) && (
+              <div className="ls-accent-set" aria-label={t(teachingLanguage.startsWith('en') ? 'accentEnglishLabel' : 'accentLabel')}>
                 <button
                   className="ls-chip is-on ls-accent-cycle"
                   type="button"
-                  aria-label={`${t('accentLabel')}：${t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}`}
+                  aria-label={`${t(teachingLanguage.startsWith('en') ? 'accentEnglishLabel' : 'accentLabel')}：${t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}`}
                   disabled={levelFramework === 'hsk'}
                   onClick={() => { setAccent(levelFramework === 'hsk' ? 'putonghua' : nextAccent(accent)); setClip(null) }}
                 >

@@ -1600,9 +1600,9 @@
     "顯示正確答案": "Show correct answer",
     "驗證中…": "Verifying…",
     "高中": "Senior High School",
-    "高中一年級": "Senior high school · Year 1",
-    "高中三年級": "Senior high school · Year 3",
-    "高中二年級": "Senior high school · Year 2",
+    "高中一年級": "Grade 10",
+    "高中三年級": "Grade 12",
+    "高中二年級": "Grade 11",
     "高級": "Advanced",
     "高階級・B2": "Upper-intermediate · B2",
     "，每種口譯語言各建立一條連線，需付費帳號且用量等級要足夠。": ". Each translation language uses a separate live connection and requires a paid account with sufficient API capacity."

@@ -1,8 +1,12 @@
-import { callAiJson, corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
+import { notifyHandsLowered } from '../_shared/classroom-sync.ts'
+import { activityTitle } from '../_shared/activity-language.ts'
+import { quizGenerationFailed } from '../_shared/quiz-state.ts'
+import { englishMaterialIssue, requireEnglishMaterial } from '../_shared/english-material.ts'
+import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { attachBoardUrls, BOARD_KINDS } from '../_shared/board.ts'
 const boardKinds = new Set<string>(BOARD_KINDS)
 import { generateCustomQuiz } from '../_shared/custom-quiz.ts'
-import { dispatchLevelCode, levelInstruction } from '../_shared/proficiency.ts'
+import { dispatchLevelCode, levelInstruction, resolveLevel } from '../_shared/proficiency.ts'
 import { describePictureSource, drawPicture, drawingPrompt, planPictureStory } from '../_shared/picture.ts'
 import { composeSentenceWall } from '../_shared/sentence-wall.ts'
 import { classFeedbackSettings } from '../_shared/feedback-language.ts'
@@ -338,6 +342,17 @@ Deno.serve(async (req) => {
       : null
     if (!keyRecord && !owner) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
 
+    let dispatchTrack: string | null | undefined
+    async function sessionTrack() {
+      if (dispatchTrack === undefined) {
+        const { data, error } = await supabase.from('sessions').select('teaching_language').eq('id', sessionId).single()
+        if (error) throw error
+        dispatchTrack = data?.teaching_language || null
+      }
+      return dispatchTrack
+    }
+    async function isEnglishSession() { return await sessionTrack() === 'en' }
+
     if (['teaching_samples', 'teaching_repeat', 'teaching_discuss', 'teaching_diagnose', 'teaching_pair'].includes(action)) {
       return await presenterTeachingCycle(supabase, sessionId, input)
     }
@@ -348,7 +363,7 @@ Deno.serve(async (req) => {
       const { data: sessionMode, error: modeError } = await supabase.from('sessions')
         .select('system_language, teaching_language, level_framework, level_code').eq('id', sessionId).single()
       if (modeError) throw modeError
-      if (sessionMode.system_language) {
+      if (sessionMode.system_language && sessionMode.teaching_language !== 'en') {
         const allowed = sessionMode.system_language === 'zh-CN' ? ['hsk']
           : sessionMode.system_language === 'zh-TW' ? ['tbcl', 'tocfl'] : ['hsk', 'tocfl', 'tbcl']
         const framework = allowed.includes(input.levelFramework) ? input.levelFramework : sessionMode.level_framework
@@ -392,6 +407,12 @@ Deno.serve(async (req) => {
         if (typeof code !== 'string' || !/^(?:[1-6]|7-9)$/.test(code)) {
           return jsonResponse({ message: '请选择 HSK 级别。 / Choose an HSK level.' }, 400)
         }
+      }
+      if ((values.teaching_language || sessionMode.teaching_language) === 'en') {
+        const framework = String(values.level_framework || sessionMode.level_framework || 'en108')
+        const code = 'level_code' in values ? values.level_code : sessionMode.level_code
+        if (!resolveLevel(framework, typeof code === 'string' ? code : null)) return jsonResponse({ message: 'Choose a valid level for your English class.' }, 400)
+        values.reading_annotation = 'none'
       }
       if (typeof input.sentenceWallEnabled === 'boolean') values.sentence_wall_enabled = input.sentenceWallEnabled
       if (typeof input.danmakuEnabled === 'boolean') values.danmaku_enabled = input.danmakuEnabled
@@ -548,11 +569,12 @@ Deno.serve(async (req) => {
 
     if (action === 'create_file_request') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       const { data: question, error } = await supabase.from('questions').insert({
         session_id: sessionId,
         type: 'file_upload',
         status: 'active',
-        title: '檔案上傳',
+        title: activityTitle(await sessionTrack(), 'file_upload', '檔案上傳'),
         prompt_text: promptText || null,
       }).select('*').single()
       if (error) throw error
@@ -794,6 +816,7 @@ Deno.serve(async (req) => {
     // whatever the student walks up to, which is the point of the activity.
     if (action === 'open_photo_task') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       if (!promptText) return jsonResponse({ message: '請先寫出要學生拍什麼、說明什麼。' }, 400)
 
       // Classroom materials stay in the language the teacher dispatched.
@@ -808,7 +831,7 @@ Deno.serve(async (req) => {
         screenshot_id: null,
         type: 'file_upload',
         status: 'active',
-        title: '拍照描述',
+        title: activityTitle(await sessionTrack(), 'photo', '拍照描述'),
         prompt_text: promptText,
         options: [],
         translations,
@@ -828,6 +851,7 @@ Deno.serve(async (req) => {
     // and put the sentences on the projector.
     if (action === 'open_sentence_wall') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       if (!promptText) return jsonResponse({ message: '請先寫出要學生造句的題目。' }, 400)
       const answerSeconds = timingSeconds(input.answerSeconds, 600)
       if (answerSeconds === undefined) return jsonResponse({ message: '時間設定不正確。' }, 400)
@@ -846,7 +870,7 @@ Deno.serve(async (req) => {
         screenshot_id: null,
         type: 'short_answer',
         status: 'active',
-        title: '造句',
+        title: activityTitle(await sessionTrack(), 'sentence', '造句'),
         prompt_text: promptText,
         options: [],
         translations,
@@ -956,10 +980,11 @@ Deno.serve(async (req) => {
 
       const promptText = typeof input.promptText === 'string' && input.promptText.trim()
         ? input.promptText.trim().slice(0, 1000)
-        : '請自行安排四張圖的順序，並在每張圖下寫出故事。'
+        : await isEnglishSession() ? 'Arrange the four pictures, then write the story below each picture.' : await sessionTrack() === 'putonghua' ? '请先排列四张图片，再根据每张图片写出故事。' : '請自行安排四張圖的順序，並在每張圖下寫出故事。'
       const title = typeof input.title === 'string' && input.title.trim()
         ? input.title.trim().slice(0, 200)
-        : '排序寫作題'
+        : activityTitle(await sessionTrack(), 'picture_story', '排序寫作題')
+      if (await isEnglishSession()) requireEnglishMaterial(title, promptText)
       const aiGrading = input.aiGrading === true
 
       const stoppedAt = new Date().toISOString()
@@ -1159,10 +1184,10 @@ Deno.serve(async (req) => {
         replay_limit: replayLimit,
         type: 'custom_quiz',
         status: 'active',
-        title: '出題中，請稍候',
-        prompt_text: direction,
+        title: classRow?.teaching_language === 'en' ? 'Preparing questions…' : '出題中，請稍候',
+        prompt_text: classRow?.teaching_language === 'en' ? null : direction,
         options: [],
-        translations: { en: { title: 'Preparing questions, please wait', prompt_text: direction, options: [] } },
+        translations: { en: { title: 'Preparing questions, please wait', prompt_text: classRow?.teaching_language === 'en' ? null : direction, options: [] } },
         allow_multiple: false,
       }).select('*').single()
       if (questionError) throw questionError
@@ -1241,7 +1266,7 @@ Deno.serve(async (req) => {
 
           const { error: questionUpdateError } = await supabase.from('questions').update({
             title: generated.title,
-            translations: { en: { title: 'AI custom quiz', prompt_text: direction, options: [] } },
+            translations: { en: { title: 'AI custom quiz', prompt_text: classRow?.teaching_language === 'en' ? null : direction, options: [] } },
           }).eq('id', questionId)
           if (questionUpdateError) throw questionUpdateError
         } catch (error) {
@@ -1253,8 +1278,8 @@ Deno.serve(async (req) => {
               screen_summary: { error: detail.slice(0, 500) },
             }).eq('id', screenshotId),
             supabase.from('questions').update({
-              title: '出題失敗，請重新派送',
-              translations: { en: { title: 'Question generation failed. Please send it again.', prompt_text: direction, options: [] } },
+              title: classRow?.teaching_language === 'en' ? 'Question generation failed. Please try again.' : '出題失敗，請重新派送',
+              translations: { en: { title: 'Question generation failed. Please send it again.', prompt_text: classRow?.teaching_language === 'en' ? null : direction, options: [] } },
             }).eq('id', questionId),
           ])
         }
@@ -1658,7 +1683,7 @@ Deno.serve(async (req) => {
         const { data: pendingQuestion, error: pendingError } = await supabase.from('questions').select('title')
           .eq('id', questionId).eq('session_id', sessionId).maybeSingle()
         if (pendingError) throw pendingError
-        if (pendingQuestion?.title === '出題失敗，請重新派送') {
+        if (quizGenerationFailed(pendingQuestion?.title)) {
           return jsonResponse({ message: 'AI 出題暫時失敗，請重新派送。', generating: false }, 503)
         }
         if (pendingQuestion) {
@@ -1946,6 +1971,7 @@ Deno.serve(async (req) => {
       const zhuyin = clip.annotation === 'zhuyin'
       const readingText = zhuyin ? (clip.annotation_text || clip.transcript) : clip.transcript
       const promptText = audioOnly ? readingText.slice(0, 4000) : readAloud ? readingText.slice(0, 1000) : teacherPrompt
+      if (await isEnglishSession()) requireEnglishMaterial(clip.transcript, teacherPrompt)
       let readingRuby: string[] | null = null
       if ((readAloud || audioOnly) && clip.annotation === 'pinyin' && clip.annotation_text) {
         try {
@@ -1970,7 +1996,7 @@ Deno.serve(async (req) => {
         ? settleWords(clip.annotation_words, promptText)
         : []
 
-      const title = readAloud ? '朗讀發音' : '聽力'
+      const title = activityTitle(await sessionTrack(), readAloud ? 'pronunciation' : 'listening', readAloud ? '朗讀發音' : '聽力')
       const translations = {}
 
       const { error: stopError } = await stopActiveQuestions(supabase, sessionId, new Date().toISOString())
@@ -2034,6 +2060,7 @@ Deno.serve(async (req) => {
       }
       const { error } = await query
       if (error) throw error
+      notifyHandsLowered(supabase, sessionId, participantId)
       return jsonResponse({ ok: true })
     }
 
@@ -2288,6 +2315,8 @@ Deno.serve(async (req) => {
       const screenshotId = input.screenshotId
       const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
       const type = typeof input.questionType === 'string' ? input.questionType : ''
+      const english = await isEnglishSession()
+      if (english) requireEnglishMaterial(input.promptText, ...(Array.isArray(input.options) ? input.options : []))
       // A backdrop is optional. Asking the class 「你今天學到什麼？」 used to mean
       // screenshotting some irrelevant corner of the screen first, because this
       // was the only way to create a question at all — 拍照描述 already inserts
@@ -2355,6 +2384,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '時間設定不正確。' }, 400)
       }
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       const titles: Record<string, string> = {
         send_screen: '派送畫面',
         poll: '投票題',
@@ -2402,7 +2432,7 @@ Deno.serve(async (req) => {
           screenshot_id: hasBackdrop ? screenshotId : null,
           type,
           status: 'active',
-          title: titles[type],
+          title: activityTitle(await sessionTrack(), type, titles[type]),
           prompt_text: promptText || null,
           options,
           translations,
@@ -2727,6 +2757,7 @@ Deno.serve(async (req) => {
     if (action === 'share_content') {
       const body = typeof input.body === 'string' ? input.body.trim().slice(0, 5000) : ''
       const url = normalizedUrl(input.url)
+      if (await isEnglishSession()) requireEnglishMaterial(body)
       if (!body && !url) return jsonResponse({ message: '請輸入文字或網址。' }, 400)
 
       const { data, error } = await supabase
@@ -2947,8 +2978,8 @@ Deno.serve(async (req) => {
       // Already at the right level: store it as written and make no rewrite
       // call at all.
       const verbatim = input.verbatim === true
-      const accent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
-        ? input.accent as 'standard_guoyu' | 'putonghua' | 'taiwanese'
+      const accent = ['american', 'british', 'standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
+        ? input.accent as import('../_shared/speech-accent.ts').SpeechAccent
         : 'standard_guoyu'
 
       // A capture is material on its own, so it satisfies this the way pasted
@@ -3011,6 +3042,7 @@ Deno.serve(async (req) => {
 
       // The languages the annotations have to exist in: the two that are always
       // hand-written in the app, plus whatever this class's students can pick.
+      if (classRow?.teaching_language === 'en' && verbatim) requireEnglishMaterial(sourceText)
       const locales = [...new Set(['zh_tw', 'en', String(classRow?.guidance_language || 'en').toLowerCase().replace('-', '_')])]
 
       if (verbatim && !sourceText) {
@@ -3020,7 +3052,7 @@ Deno.serve(async (req) => {
       // Written by the teacher, kept as written. No annotations, because
       // working out which words are new is the rewrite call they just declined.
       const passage = verbatim
-        ? { title: direction || '閱讀', body: sourceText, vocabulary: [], grammar: [] }
+        ? { title: classRow?.teaching_language === 'en' && englishMaterialIssue(direction) ? 'Reading' : direction || (classRow?.teaching_language === 'en' ? 'Reading' : '閱讀'), body: sourceText, vocabulary: [], grammar: [] }
         : await generateReadingPassage({
         source: sourceText,
         image,
@@ -3092,8 +3124,8 @@ Deno.serve(async (req) => {
         // because the passage is the readable version of it.
         share_screenshot: shareScreenshot,
         status: 'active',
-        title: passage.title || (classRow?.level_framework === 'hsk' ? '阅读' : '閱讀'),
-        prompt_text: withQuiz ? (classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : '',
+        title: passage.title || (classRow?.teaching_language === 'en' ? 'Reading' : classRow?.level_framework === 'hsk' ? '阅读' : '閱讀'),
+        prompt_text: withQuiz ? (classRow?.teaching_language === 'en' ? 'Read the passage, then answer the questions below.' : classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : '',
         options: [],
         allow_multiple: false,
       }).select('*').single()
@@ -3145,7 +3177,7 @@ Deno.serve(async (req) => {
               levelFramework: classRow?.level_framework ?? null,
               levelCode: classRow?.level_code ?? null,
               levelStretch,
-              direction: direction || '閱讀理解',
+              direction: direction || (classRow?.teaching_language === 'en' ? 'Reading comprehension' : '閱讀理解'),
               requestedCount: quizCount,
               requestedType: 'random',
             })
@@ -3191,7 +3223,7 @@ Deno.serve(async (req) => {
             // coming, with the vocabulary locked behind finishing it.
             await supabase.from('questions').update({
               type: 'reading',
-              prompt_text: '這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。',
+              prompt_text: classRow?.teaching_language === 'en' ? 'The questions could not be generated. Read the passage, or ask your teacher to send the activity again.' : '這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。',
             }).eq('id', questionId)
           }
         }

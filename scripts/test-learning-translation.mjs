@@ -79,7 +79,7 @@ test('on-demand batch translation caches, serializes concurrent claims and inval
     assert.equal(calls,1)
     await cachedLearningTranslation(db,'class','vi',{grammar:{...sources.grammar,text:'Use 因为……所以 to explain your answer.'}})
     assert.equal(calls,2); assert.equal(db.rows.size,2)
-    for (const [locale,name] of [['th','Thai'],['ja','Japanese'],['ko','Korean'],['id','Indonesian']]) {
+    for (const [locale,name] of [['th','Thai'],['ja','Japanese'],['ko','Korean'],['id','Indonesian'],['my','Burmese']]) {
       const translated = await translateLearningTexts(sources,locale)
       assert.match(translated.grammar,/因为……所以/)
       assert.match(prompts.at(-1),new RegExp(name))
@@ -90,13 +90,34 @@ test('on-demand batch translation caches, serializes concurrent claims and inval
     assert.equal(quiz.attempt.total_score,100); assert.equal(quiz.answers[0].score,20)
     assert.equal(quiz.answers[0].answer_text,'星期三'); assert.match(quiz.answers[0].feedback.vi,/星期三/)
     assert.equal(attempt.feedback.vi,undefined)
+    const englishAttempt = { id: 'english', total_score: 100, feedback: { en: 'Your answer is clear.', zh_tw: 'Your answer is clear.' } }
+    const englishAnswer = { id: 'english-answer', answer_text: 'on Tuesday', answer_values: [], score: 20, feedback: { en: 'You used on Tuesday correctly.', zh_tw: 'You used on Tuesday correctly.' } }
+    const beforeChinese = calls
+    const chineseFeedback = await translateQuizFeedback(db, 'english-class', 'zh-TW', englishAttempt, [englishAnswer])
+    assert.equal(calls, beforeChinese + 1)
+    assert.match(prompts.at(-1), /Traditional Chinese as written in Taiwan/)
+    assert.match(chineseFeedback.answers[0].feedback.zh_tw, /on Tuesday/)
+    assert.equal(chineseFeedback.answers[0].answer_text, 'on Tuesday')
+    assert.equal(chineseFeedback.attempt.feedback.en, englishAttempt.feedback.en)
+    await translateQuizFeedback(db, 'english-class', 'zh-TW', englishAttempt, [englishAnswer])
+    assert.equal(calls, beforeChinese + 1, 'Repeated guidance requests reuse the translation cache')
+    await translateQuizFeedback(db, 'traditional-class', 'zh-TW', { id: 'traditional', feedback: { zh_tw: '回答正確。', en: 'Correct.' } }, [])
+    assert.equal(calls, beforeChinese + 1, 'Traditional Chinese feedback needs no translation call')
     const file = {id:'f',analysis_status:'success',analysis_json:{score:80,summary_zh_tw:'写得很好。',summary_en:'You used 因为……所以 correctly.',strengths_zh_tw:['句型正确。'],strengths_en:['Correct sentence pattern.'],improvements_zh_tw:[],improvements_en:[]}}
     const files = await translateFileFeedback(db,'class','vi',[file])
     assert.equal(files.responses[0].analysis_json.score,80)
     assert.match(files.responses[0].analysis_json.translations.vi.summary,/因为……所以/)
+    const englishFile = { id: 'english-file', analysis_status: 'success', analysis_json: { score: 80, summary_zh_tw: 'Your writing is clear.', summary_en: 'Your writing is clear.', strengths_zh_tw: ['Clear ideas.'], strengths_en: ['Clear ideas.'], improvements_zh_tw: [], improvements_en: [] } }
+    const chineseFile = await translateFileFeedback(db, 'english-class', 'zh-TW', [englishFile])
+    assert.ok(chineseFile.responses[0].analysis_json.translations.zh_tw.summary)
+    assert.equal(chineseFile.responses[0].analysis_json.summary_en, 'Your writing is clear.')
     const audio = await translateAudioFeedback(db,'class','vi',{id:'oral',analysis_json:{score:90,transcript:'我喜欢中文。',summary:'表达清楚。',strengths:[],improvements:[],limitations:[],translations:{en:{summary:'Your sentence 我喜欢中文 is clear.'}}}})
     assert.equal(audio.analysis_json.transcript,'我喜欢中文。'); assert.equal(audio.analysis_json.score,90)
     assert.match(audio.analysis_json.translations.vi.summary,/我喜欢中文/)
+    const englishAudio = { id: 'english-audio', analysis_json: { score: 90, transcript: 'I like English.', summary: 'Your speech is clear.', strengths: [], improvements: [], limitations: [], translations: { en: { summary: 'Your speech is clear.' } } } }
+    const chineseAudio = await translateAudioFeedback(db, 'english-class', 'zh-TW', englishAudio)
+    assert.ok(chineseAudio.analysis_json.translations.zh_tw.summary)
+    assert.equal(chineseAudio.analysis_json.transcript, 'I like English.')
     // A failed request enters a short cooldown instead of spending on every poll.
     globalThis.fetch = async()=>{calls++;return new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"g":"lost the token"}'}]}}]}),{status:200})}
     const failureSource={g:{text:'Use 因為……所以.',english:true}}, before=calls

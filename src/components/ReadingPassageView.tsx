@@ -1,5 +1,6 @@
 import { useReadingTranslation, type LearningCredentials } from '../lib/useReadingTranslation'
 import { uiText } from '../lib/uiText'
+import { englishTextRuns } from '../lib/englishText'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BookOpen, Translate, X } from '@phosphor-icons/react'
@@ -48,7 +49,7 @@ const VS_LAST = 0xE01EF
 
 function wordReadings(passage: ReadingPassage) {
   const words = passage.words || []
-  if (!words.length) return null
+  if (!words.length || !words.some(word => word.pinyin?.trim())) return null
   const map = new Map<number, { text: string; pinyin: string }>()
   let offset = 0
   for (const word of words) {
@@ -130,7 +131,12 @@ function occurrences(body: string, needle: string) {
   if (!needle) return found
   let at = body.indexOf(needle)
   while (at !== -1) {
-    found.push([at, at + needle.length])
+    // English words must not match fragments such as "he" inside "the".
+    const wordCharacter = /[A-Za-z'’-]/
+    const validStart = !/^[A-Za-z]/.test(needle) || at === 0 || !wordCharacter.test(body[at - 1])
+    const end = at + needle.length
+    const validEnd = !/[A-Za-z]$/.test(needle) || end === body.length || !wordCharacter.test(body[end])
+    if (validStart && validEnd) found.push([at, end])
     at = body.indexOf(needle, at + needle.length)
   }
   return found
@@ -219,7 +225,8 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   const open: Mark | null = selection?.kind === 'word'
     ? { kind: 'word', entry: passage.vocabulary.find(entry => entry.word === selection.entry.word) || selection.entry }
     : selection?.kind === 'grammar' ? { kind: 'grammar', entry: passage.grammar.find(entry => entry.point === selection.entry.point && entry.span === selection.entry.span) || selection.entry } : null
-  const [fontScale, setFontScale] = useState(() => fontControls ? 2 : 1)
+  const isEnglish = ['en108', 'cefr', 'gept', 'toeic'].includes(passage.level_framework || '') && !/\p{Script=Han}/u.test(passage.body)
+  const [fontScale, setFontScale] = useState(() => fontControls && !isEnglish ? 2 : 1)
   const hasGrammar = (passage.grammar || []).length > 0
   const hasWords = (passage.vocabulary || []).length > 0
 
@@ -256,6 +263,11 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   // One character at a time, so a reading sits over the character it belongs to
   // and not over the word it happens to start.
   function annotated(text: string, at: number, isNewWord = false) {
+    if (isEnglish) return englishTextRuns(text).map(run => {
+      const start = charAt.get(at + run.offset) ?? -1
+      const lit = spoken && start < spoken.end_index && start + run.end - run.start > spoken.start_index
+      return run.word ? <span key={run.offset} className={lit ? 'karaoke-word active' : 'karaoke-word'}>{run.text}</span> : run.text
+    })
     // A word the class has not met carries its reading from the very start,
     // quiz or no quiz. Nobody is being tested on whether they can guess how
     // 小明 or 資料夾 is pronounced, and a learner who cannot say the word
@@ -308,7 +320,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   }
 
   return (
-    <section className="reading-passage">
+    <section className={isEnglish ? 'reading-passage english-reading' : 'reading-passage'}>
       {/* The picture comes before the title, because it is what the passage is
           about and a reader looks at it before reading anything. */}
       {imageUrl && <img alt="" className="reading-image" src={imageUrl} />}
@@ -342,7 +354,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
               {participantText(locale, 'readingGrammar')}
             </button>
           )}
-          {(hasReadings || Boolean(byWord)) && (
+          {!isEnglish && (hasReadings || Boolean(byWord)) && (
             <button
               aria-pressed={rubyOn}
               className={`reading-toggle${rubyOn ? ' is-on' : ''}`}
@@ -439,15 +451,15 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
               <p className="reading-note-head">
                 <strong>{open.entry.word}</strong>
                 {open.entry.pos && <span className="reading-note-pos">{open.entry.pos}</span>}
-                {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
+                {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : ['en108','cefr','gept','toeic'].includes(passage.level_framework || '') ? 'CEEC' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
               <p><Translate size={15} />{glossFor(open.entry.gloss, locale)}</p>
             </>
           ) : (
             <>
               <p className="reading-note-head">
-                <strong>{open.entry.point}</strong>
-                <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>
+                <strong>{open.entry.point.replace(/^English: /, '')}</strong>
+                {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
               <p><Translate size={15} />{glossFor(open.entry.note, locale)}</p>
               {open.entry.example && <p className="reading-note-example">{open.entry.example}</p>}

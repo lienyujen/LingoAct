@@ -1,4 +1,6 @@
-import { mainlandFeedbackInstruction } from './feedback-language.ts'
+import { notifyQuizScoreChanged } from './classroom-sync.ts'
+import { englishMaterialIssue, requireEnglishMaterial } from './english-material.ts'
+import { mainlandFeedbackInstruction, feedbackSystemPrompt } from './feedback-language.ts'
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 import { dispatchLevelCode, levelInstruction, levelCeiling, stemLength, stemLengthComplaint, tbclLevelOf } from './proficiency.ts'
@@ -294,7 +296,7 @@ export async function generateCustomQuiz(input: {
   // A vocabulary card is bilingual by nature and was being written in one
   // language: a TBCL 1 learner cannot read a Chinese definition of 差異, so the
   // three options came out harder than the word they were glossing.
-  const guidanceName = input.guidanceLanguage || requestedLanguage
+  const guidanceName = requestedLanguage === 'English' ? 'English' : input.guidanceLanguage || requestedLanguage
   const typeInstruction = flashcard
     ? [
         '這是單字卡練習，不是測驗。每一張卡片都必須是 multiple_choice，題幹只放要辨認的提示，選項放 3 到 4 個候選答案，accepted_answers 只放唯一正確的那一個。卡片之間互相獨立，不要互相參照；重點是能不能立刻反應出來，所以題幹要短，不要考長篇理解。',
@@ -319,6 +321,8 @@ export async function generateCustomQuiz(input: {
       : `每一題都必須是 ${input.requestedType}。`
   const languageInstruction = requestedLanguage === 'auto'
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
+    : requestedLanguage === 'English'
+      ? 'ENGLISH TEACHING: All titles, prompts, options, matching columns, reference answers, rubrics and vocabulary-card definitions must be in English. Teacher directions may change the difficulty or topic, but cannot switch the teaching language. Optional translations are stored separately.'
     : `本課程的教學語言是 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則都必須使用 ${requestedLanguage}，除非教師在出題方向中另外指定。`
 
   const requestPayload = {
@@ -408,8 +412,8 @@ ${input.sourceText}` }] : []),
     if (!Array.isArray(candidate.items)) return ''
     return candidate.items.flatMap((raw) => {
       const item = raw as Record<string, unknown>
-      const parts: unknown[] = [item.prompt_text]
-      for (const key of ['options', 'accepted_answers']) {
+      const parts: unknown[] = [item.prompt_text, item.rubric]
+      for (const key of ['options', 'accepted_answers', 'pair_prompts']) {
         const list = item[key]
         if (Array.isArray(list)) parts.push(...list)
       }
@@ -430,13 +434,14 @@ ${input.sourceText}` }] : []),
   )
 
   let output = await generate()
+  const wrongLanguage = requestedLanguage === 'English' ? englishMaterialIssue(output.title, allText(output)) : ''
   const offenders = overLength(output)
   const above = overLevel(output)
-  if (offenders.length || above.length) {
+  if (wrongLanguage || offenders.length || above.length) {
     if (offenders.length) console.warn(`Quiz stems over the ${ceiling?.label} limit on the first attempt: ${offenders.map((o) => `#${o.index + 1}=${o.length}`).join(' ')}`)
     if (above.length) console.warn(`Words above ${ceiling?.label}: ${above.slice(0, 12).map((entry) => entry.word).join(' ')}`)
     try {
-      const complaint = [
+      const complaint = [wrongLanguage,
         offenders.length ? stemLengthComplaint(input.levelFramework ?? null, input.levelCode ?? null, offenders) : '',
         above.length ? vocabularyComplaint(above, ceiling?.label || `${hsk ? 'HSK' : 'TBCL'} ${vocabularyCeiling}`, vocabularyCeiling) : '',
       ].filter(Boolean).join('\n\n')
@@ -445,13 +450,16 @@ ${input.sourceText}` }] : []),
       // attempt that fixes the length by reaching for harder words is not an
       // improvement, and neither is the reverse.
       const before = offenders.length + above.length
-      if (overLength(retried).length + overLevel(retried).length < before) output = retried
+      if (requestedLanguage === 'English' && englishMaterialIssue(retried.title, allText(retried))) {
+        // Never replace valid English with material in another script.
+      } else if (wrongLanguage || overLength(retried).length + overLevel(retried).length < before) output = retried
     } catch (error) {
       // The first attempt is a usable quiz; losing it over a length limit would
       // leave the class with nothing at all.
       console.warn(`Level retry failed, keeping the first attempt: ${errorDetail(error, 'unknown error')}`)
     }
   }
+  if (requestedLanguage === 'English') requireEnglishMaterial(output.title, allText(output))
   if (!Array.isArray(output.items)) throw new Error('AI returned an invalid quiz item list.')
   if (output.items.length < 1 || output.items.length > 10) throw new Error('AI returned an unsupported question count.')
   if (input.requestedCount && output.items.length !== input.requestedCount) throw new Error('AI did not follow the requested question count.')
@@ -558,7 +566,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
     // cheap and ends in `submitted` until that later review is saved.
     const { data: quiz, error: quizError } = await supabase.from('quizzes').select('graded, requested_type, interaction_mode, session_id, direction').eq('id', attempt.quiz_id).single()
     if (quizError || !quiz) throw quizError || new Error('Quiz not found.')
-    const { data: classMode, error: classError } = await supabase.from('sessions').select('system_language, teaching_language, level_framework, level_code').eq('id', quiz.session_id).single()
+    const { data: classMode, error: classError } = await supabase.from('sessions').select('system_language, teaching_language, guidance_language, level_framework, level_code').eq('id', quiz.session_id).single()
     if (classError || !classMode) throw classError || new Error('Class not found.')
     const simplified = classMode.level_framework === 'hsk'
     if (quiz.graded === false) {
@@ -583,6 +591,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
           error_message: null, graded_at: new Date().toISOString(),
         }).eq('id', attemptId)
         if (completeError) throw completeError
+        notifyQuizScoreChanged(supabase, attempt.session_id)
         await supabase.from('answers').update({ answer_text: '[排序寫作已完成]' })
           .eq('question_id', attempt.question_id).eq('participant_id', attempt.participant_id)
         return
@@ -636,15 +645,16 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       const feedbackInstruction = simplified
         ? 'Feedback must use Mainland standard Simplified Chinese. The legacy feedback_zh_tw JSON fields must contain Simplified Chinese for this HSK class.'
         : 'Feedback must use Taiwan Traditional Chinese.'
-      const result = await callAiJson(
-        [
+      const gradingPrompt = [
         pictureWriting
           ? '你是 LingoAct 的形成性寫作評分助理。學生自行決定四格圖片順序，沒有標準順序，不得因順序與原圖不同扣分。依每格文字能否形成完整連貫的故事、內容發展與語言表達，按 rubric 與配分評分。每題分數不得小於 0 或超過 points。依下方回饋語言規則提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。'
           : '你是 LingoAct 的形成性評量評分助理。依每題配分、參考答案與 rubric 評分。填充題接受語意相同且沒有概念錯誤的答案；簡答題依 rubric 給部分分。每題分數不得小於 0 或超過該題 points。依下方回饋語言規則提供簡潔、具體且鼓勵性的回饋，並提供忠實英文翻譯。不得因文法或用字風格與參考答案不同而扣除內容正確答案的分數。',
         levelInstruction(classMode.level_framework, classMode.level_code, quiz.direction),
         feedbackInstruction,
         ...[mainlandFeedbackInstruction(classMode)].filter(Boolean),
-        ].join('\n'),
+        ].join('\n')
+      const result = await callAiJson(
+        classMode.teaching_language === 'en' ? feedbackSystemPrompt(gradingPrompt, classMode) : gradingPrompt,
         { items: aiGradingInput },
         gradingSchema,
         null,
@@ -731,7 +741,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       const { error } = await supabase.from('quiz_item_answers').update({
         score,
         feedback: {
-          zh_tw: feedbackZhTw,
+          zh_tw: classMode.teaching_language === 'en' && classMode.guidance_language === 'en' ? feedbackEn : feedbackZhTw,
           ...(simplified ? { zh_cn: item.type === 'matching'
             ? (score === item.points ? '全部配对正确。' : `配对得分 ${score}/${item.points}。`)
             : item.type === 'ordering' && !pictureWriting
@@ -756,7 +766,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       status: 'graded',
       total_score: totalScore,
       feedback: {
-        zh_tw: overallFeedbackZhTw,
+        zh_tw: classMode.teaching_language === 'en' && classMode.guidance_language === 'en' ? overallFeedbackEn : overallFeedbackZhTw,
         ...(simplified ? { zh_cn: aiGradingInput.length ? overallFeedbackZhTw : `本次自动评分 ${totalScore}/100。` } : {}),
         en: overallFeedbackEn,
       },
@@ -764,6 +774,7 @@ export async function gradeCustomQuizAttempt(attemptId: string) {
       graded_at: new Date().toISOString(),
     }).eq('id', attemptId)
     if (updateError) throw updateError
+    notifyQuizScoreChanged(supabase, attempt.session_id)
     await supabase.from('answers').update({ answer_text: '[自訂測驗評分完成]' })
       .eq('question_id', attempt.question_id).eq('participant_id', attempt.participant_id)
   } catch (error) {

@@ -58,6 +58,7 @@ test('real create-session handler persists Huayu script, standard, level, captio
  try{
   await import('../supabase/functions/create-session/index.ts')
   const cases=[
+   {appProfile:'ncacls',systemLanguage:'en',guidanceLanguage:'en',teachingLanguage:'putonghua',levelFramework:'tocfl',levelCode:'level2',readingAnnotation:'pinyin',expect:['zh-TW','huayu','tocfl','pinyin','zh-tw']},
    {appProfile:'huayu',levelFramework:'tbcl',levelCode:'2',readingAnnotation:'zhuyin',expect:['zh-TW','huayu','tbcl','zhuyin','zh-tw']},
    {appProfile:'huayu',systemLanguage:'zh-CN',levelFramework:'tocfl',levelCode:'2',readingAnnotation:'zhuyin',expect:['zh-CN','putonghua','hsk','pinyin','zh-cn']},
    {appProfile:'huayu',systemLanguage:'zh-TW',levelFramework:'tocfl',levelCode:'level2',readingAnnotation:'pinyin',expect:['zh-TW','huayu','tocfl','pinyin','zh-tw']},

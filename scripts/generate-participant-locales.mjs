@@ -24,6 +24,7 @@ const targets = [
   { code: 'vi', name: 'Vietnamese' },
   { code: 'th', name: 'Thai' },
   { code: 'id', name: 'Indonesian' },
+  { code: 'my', name: 'Burmese (Myanmar language)' },
 ]
 
 function geminiKey() {
@@ -83,6 +84,10 @@ async function translate(key, strings, target) {
   const translated = JSON.parse(text)
 
   const missing = Object.keys(strings).filter((k) => typeof translated[k] !== 'string')
+  for (const [name, source] of Object.entries(strings)) {
+    const placeholders = (value) => [...value.matchAll(/\{\w+\}/g)].map((match) => match[0]).sort().join('|')
+    if (typeof translated[name] === 'string' && placeholders(source) !== placeholders(translated[name])) throw new Error(`${target.code}: changed placeholders for ${name}`)
+  }
   if (missing.length) throw new Error(`${target.code}: ${missing.length} keys missing, first is "${missing[0]}"`)
   return translated
 }
@@ -91,8 +96,9 @@ const key = geminiKey()
 const strings = englishStrings()
 console.log(`English catalogue: ${Object.keys(strings).length} keys`)
 
-const generated = {}
-for (const target of targets) {
+const requested = process.argv.slice(2)
+const generated = requested.length ? JSON.parse(fs.readFileSync(outputPath, 'utf8').split(' = ')[1]) : {}
+for (const target of targets.filter((target) => !requested.length || requested.includes(target.code))) {
   process.stdout.write(`  ${target.code} (${target.name})... `)
   generated[target.code] = await translate(key, strings, target)
   console.log(`${Object.keys(generated[target.code]).length} keys`)

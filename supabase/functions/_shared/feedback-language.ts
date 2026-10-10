@@ -3,6 +3,7 @@ import { resolveLevel } from './proficiency.ts'
 export type FeedbackSettings = {
   system_language?: string | null
   teaching_language?: string | null
+  guidance_language?: string | null
   level_framework?: string | null
   level_code?: string | null
 }
@@ -12,7 +13,7 @@ export async function classFeedbackSettings(
   sessionId: string,
 ): Promise<FeedbackSettings> {
   const { data, error } = await db.from('sessions')
-    .select('system_language, teaching_language, level_framework, level_code')
+    .select('system_language, teaching_language, guidance_language, level_framework, level_code')
     .eq('id', sessionId).maybeSingle()
   if (error) throw error
   if (!data) throw new Error('Class not found.')
@@ -47,6 +48,15 @@ export function mainlandFeedbackInstruction(settings?: FeedbackSettings) {
 }
 
 export function feedbackSystemPrompt(original: string, settings?: FeedbackSettings) {
+  if (settings?.teaching_language === 'en') {
+    const englishGuidance = settings.guidance_language === 'en'
+    const prompt = englishGuidance ? original.replaceAll('繁體中文', 'English').replaceAll('Traditional Chinese', 'English') : original
+    return [prompt,
+      'This is an English language class. Assess English against the selected class level and the actual task. Keep quoted learner answers, corrections, target vocabulary, sentence patterns and transcripts in their original English. Do not apply Mandarin pronunciation, Pinyin, Bopomofo, TBCL or HSK rules. Accept intelligible American and British English and other established English varieties; do not invent an error merely because a spelling or accent differs from the model.',
+      englishGuidance ? 'Write explanatory feedback in plain English, including legacy base fields named zh_tw: these are compatibility keys. Keep translations.en faithful to the same evidence and judgment.' : 'Write the surrounding explanation in Traditional Chinese, with its faithful English counterpart where requested.',
+      'Keep explanations accessible at the teacher-selected class level; a little stretch is acceptable. Give concrete evidence and one or two achievable next steps. Classroom AI marks are not official exam scores.',
+    ].join('\n\n')
+  }
   if (!usesMainlandFeedback(settings)) return original
   // Remove the old explicit script demand before adding the class policy, so
   // the model is never asked to obey two contradictory output languages.

@@ -288,7 +288,7 @@ const messages = {
     captureFromScreen: '直接框選畫面',
     listeningDropOrHint: '或把截圖貼上（Ctrl+V）、選擇檔案',
     scriptTraditional: '台灣腔', scriptSimplified: '普通話',
-    accentLabel: '中文口音', accentStandardGuoyu: '標準國語', accentPutonghua: '普通話', accentTaiwanese: '台灣腔',
+    accentAmerican: '美式發音', accentBritish: '英式發音', accentEnglishLabel: '英語發音', englishLevelRequired: '請選擇英語課程的級別。', toeicListeningReading: 'TOEIC 聽力與閱讀', toeicSpeakingWriting: 'TOEIC 口說與寫作', accentLabel: '中文口音', accentStandardGuoyu: '標準國語', accentPutonghua: '普通話', accentTaiwanese: '台灣腔',
     voiceMale: '男聲', voiceFemale: '女聲', voiceBoy: '男孩', voiceGirl: '女孩',
     speakerName: '角色名稱', speakerVoice: '角色聲音', speakerVoiceCycle: '點一下循環切換男聲、女聲、男孩、女孩',
     generateListeningText: '依班級程度產生聽力文字',
@@ -561,9 +561,9 @@ const messages = {
     drawLots: "Pick a student", drawFromOnline: "Randomly pick an online student",
     teacherSettings: 'Teacher settings', teacherSettingsHint: "Set up recording, captions, live audio translation, and your microphone",
     classActivities: 'Class activities',
-    captureQuestion: "Screenshot activities", listeningStudio: "Listening and speaking studio", pictureTalk: "Picture-based speaking and writing",
+    captureQuestion: "Screenshot", listeningStudio: "Audio studio", pictureTalk: "Picture prompts",
     sentenceWall: 'Sentence wall', photoTask: "Photo descriptions", textDispatch: 'Send text',
-    wordCloud: 'Word cloud', fileTransfer: "Share and collect files", readingActivity: "Reading and quizzes",
+    wordCloud: 'Word cloud', fileTransfer: "Files", readingActivity: "Reading & quizzes",
     readingSource: "Source text",
     readingSourcePlaceholder: "Paste a passage, article, or other material. AI will adapt it to your students’ proficiency level.",
     readingDirection: "Topic or learning goal (optional)",
@@ -598,7 +598,7 @@ const messages = {
     cloudTermsSave: 'Save and apply',
     flashcards: "Flashcards", writingCoach: 'Writing coach',
     classWrapUp: "Wrap up", generateExitTicket: 'Generate an exit ticket', exitTicketSent: 'Exit ticket sent',
-    endClass: "End class and create report",
+    endClass: "End class",
     classSettings: 'Class settings',
     danmaku: 'Live comments', anonymous: 'Anonymous', recording: 'Recording', captions: 'Captions',
     on: 'On', off: 'Off', connecting: 'Connecting',
@@ -638,7 +638,7 @@ const messages = {
 
     captureTitle: "Screenshot activities", capturePreviewAlt: "Screenshot preview",
     typeSendScreen: "Share screenshot", typeCustomQuiz: "Custom quiz", typePoll: 'Poll',
-    typeMultipleChoice: 'Multiple choice', typeFileUpload: "File submission", typeShortAnswer: "Short answer", typeDrawing: "Handwritten response",
+    typeMultipleChoice: 'Multiple choice', typeFileUpload: "Upload", typeShortAnswer: "Short answer", typeDrawing: "Handwriting",
     typeHotspot: "Image hotspots",
     typeBoard: 'Discussion board',
     boardFormatsLegend: "Allowed response formats (leave all unchecked to share content only)",
@@ -675,7 +675,7 @@ const messages = {
     drawingTypeHint: "Students write directly on the screenshot or use a blank canvas. Each student submits an image. View responses individually or use AI to grade them together.",
     drawingPromptLabel: "Prompt (optional; helps AI grade responses)",
     drawingPromptPlaceholder: "For example: Show your work.",
-    typeOralResponse: "Spoken response", typePronunciation: "Read-aloud practice",
+    typeOralResponse: "Speaking", typePronunciation: "Read aloud",
     allowMultiple: "Allow multiple selections", options: "Options", optionN: "Option {n}",
     uploadTypeHint: "Students receive the screenshot and an upload button. They can photograph their work on a phone or tablet. Close submissions to review and grade their responses.",
     readAloudLabel: 'What to read aloud (optional)', uploadPromptLabel: 'Instructions (optional)', promptLabel: 'Question (optional)',
@@ -770,7 +770,7 @@ const messages = {
     referenceAnswerLabel: "Reference answers (one accepted answer per line)", saveReferenceAnswer: "Save reference answers",
     deckEditFailed: 'The deck could not be changed.', markFailed: "Grading failed.", answerUpdateFailed: 'The answer could not be updated.',
     writingCoachShort: 'Writing coach', storyOrdering: "Story sequencing",
-    answeredOf: '{n} of {online} answered', expandQuiz: "Expand quiz",
+    answeredOf: '{n}/{online} answered', expandQuiz: "Expand quiz",
     practising: "practicing", collected: "submitted", averageScore: "Average score", grading: "grading",
     showAnswersToggle: "Show correct answers (you can correct AI-generated answers)",
     deckHasN: '{n} cards in this deck', addNCards: '{n} more', activateDeck: 'Use as current activity',
@@ -811,18 +811,18 @@ const messages = {
     captureFromScreen: "Capture screen area",
     listeningDropOrHint: 'Or paste a screenshot (Ctrl+V), or choose a file',
     scriptTraditional: "Taiwanese Mandarin", scriptSimplified: "Standard Mandarin (Mainland China)",
-    accentLabel: 'Mandarin accent', accentStandardGuoyu: "Standard Mandarin (Taiwan)", accentPutonghua: "Standard Mandarin (Mainland China)", accentTaiwanese: "Taiwanese Mandarin",
+    accentAmerican: 'American English', accentBritish: 'British English', accentEnglishLabel: 'English pronunciation', englishLevelRequired: 'Choose a level for your English class.', toeicListeningReading: 'TOEIC Listening and Reading', toeicSpeakingWriting: 'TOEIC Speaking and Writing', accentLabel: 'Mandarin accent', accentStandardGuoyu: "Standard Mandarin (Taiwan)", accentPutonghua: "Standard Mandarin (Mainland China)", accentTaiwanese: "Taiwanese Mandarin",
     voiceMale: "Adult male", voiceFemale: "Adult female", voiceBoy: 'Boy', voiceGirl: 'Girl',
     speakerName: 'Speaker name', speakerVoice: 'Speaker voice', speakerVoiceCycle: "Click to cycle through adult male, adult female, boy, and girl voices",
-    generateListeningText: "Generate a script at the class level",
-    includeListeningScreenshot: 'Show this image to students with the activity',
-    transcriptHidden: "Script · students can reveal it in audio-only activities", charCount: '{n} characters',
+    generateListeningText: "Generate script",
+    includeListeningScreenshot: 'Include image',
+    transcriptHidden: "Script", charCount: '{n} characters',
     transcriptPlaceholder: "Paste or edit the script. For dialogue, start each line with the speaker’s name followed by a colon.",
     dialogueNeedsSpeakers: "To use two voices, start each line with a speaker’s name followed by a colon. This script currently uses one voice.",
     audioReady: 'Audio ready', clipLength: '{n}s', toSpeech: "Generate audio",
     readAloudTime: "Recording time", listeningTimingNote: "These time settings apply only to read-aloud practice.",
     replayCount: "Playback limit",
-    sendAudioOnly: 'Audio only', sendReadAloud: "Send read-aloud practice", sendListeningQuiz: "Send listening quiz",
+    sendAudioOnly: 'Audio only', sendReadAloud: "Read aloud", sendListeningQuiz: "Listening quiz",
     synthesizeBeforeDispatch: "Enter a script and generate the audio before choosing an activity.",
 
     mainTeachingLanguage: "Teaching language",
@@ -1085,8 +1085,10 @@ const presenterLocales: readonly string[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko',
 // The track carries a language code in the caption pipeline's lower-case
 // spelling; the locale tables key on BCP-47. Converting here rather than
 // renaming either side keeps rows already written valid.
-export function presenterLocaleFor(teachingLanguage: string | null | undefined, systemLanguage?: string | null): PresenterLocale {
+export function presenterLocaleFor(teachingLanguage: string | null | undefined, systemLanguage?: string | null, guidanceLanguage?: string | null): PresenterLocale {
+  if (APP_PROFILE.id === 'ncacls') return 'zh-TW'
   if (APP_PROFILE.id === 'sc') return 'zh-CN'
+  if (teachingLanguage === 'en' && guidanceLanguage && presenterLocales.includes(guidanceLanguage)) return guidanceLanguage as PresenterLocale
   if (systemLanguage && presenterLocales.includes(systemLanguage)) return systemLanguage as PresenterLocale
   if (supportsChineseSystemLanguage && !teachingLanguage) return scSystemLanguage()
   const language = resolveTrack(teachingLanguage).language
@@ -1106,6 +1108,7 @@ export function savePresenterLocale(sessionId: string, locale: PresenterLocale) 
 }
 
 export function storedPresenterLocale(sessionId: string): PresenterLocale {
+  if (APP_PROFILE.id === 'ncacls') return 'zh-TW'
   const stored = window.localStorage.getItem(`${LOCALE_PREFIX}${sessionId}`)
   return (stored && presenterLocales.includes(stored) ? stored : 'zh-TW') as PresenterLocale
 }

@@ -1,0 +1,59 @@
+{
+  "author":"LingoAct",
+  "status":"editorial teaching metadata; not an official proficiency or frequency classification",
+  "topics": {
+    "learning":"learn study teach teacher student education knowledge ability skill practice review assess assessment examination exam school college university academic research analysis evidence conclusion",
+    "people-and-feelings":"person people family friend friendship parent child children emotion emotional happy happiness sad sadness delight delighted fear anxiety anxious confidence confident attitude character identity respect sympathy empathy",
+    "health-and-sport":"health healthy body mind mental physical exercise sport athletic athlete league champion championship competition compete competitive medicine medical disease illness treatment nutrition nutritious diet injury injured recovery",
+    "environment":"nature natural environment environmental climate pollution pollute protect protection conserve conservation recycle recycling resource energy forest wildlife habitat species biodiversity sustainable sustainability ecosystem",
+    "science-and-technology":"science scientific technology technological computer digital internet information data device innovation innovate invention invent discover discovery experiment artificial intelligence software hardware robot biological biology",
+    "society-and-economy":"society social community culture cultural economy economic economics finance financial business market trade industry employment employee employer job career income expense budget invest investment price cost profit bank demand supply policy responsibility responsible",
+    "arts-and-media":"art artist artistic music musical literature literary poetry poem novel story photography photograph image picture design creative creativity media journalist journalism audience communication communicate advertise advertisement",
+    "travel-and-daily-life":"travel journey transport transportation traffic vehicle bus train station airport flight passenger destination accommodation hotel reservation reserve ticket arrival departure depart arrive food meal restaurant shop shopping customer service",
+    "reasoning-and-discourse":"reason result cause effect influence impact consequence contrast comparison compare although however therefore nevertheless despite instead similarly moreover furthermore example particular perspective opinion argument argue support oppose evaluate interpret infer inference justify explain explanation solution solve problem challenge benefit advantage disadvantage"
+  },
+  "word_families": [
+    ["learn","learning","learner"], ["teach","teacher","teaching"],
+    ["educate","education","educational"], ["compete","competition","competitive","competitor"],
+    ["assess","assessment"], ["protect","protection","protective"],
+    ["pollute","pollution","pollutant"], ["create","creation","creative","creativity","creator"],
+    ["communicate","communication"], ["analyse","analyze","analysis","analytical"],
+    ["employ","employment","employee","employer"], ["invest","investment","investor"],
+    ["respond","response"], ["responsible","responsibility"], ["confident","confidence"],
+    ["science","scientific","scientist"], ["economy","economic","economics","economist"]
+  ],
+  "collocations": {
+    "ability":["the ability to solve problems"], "assess":["assess the evidence"],
+    "assessment":["a fair assessment"], "education":["access to education"],
+    "knowledge":["gain knowledge"], "skill":["develop a skill"],
+    "confidence":["build confidence"], "responsibility":["take responsibility for"],
+    "decision":["make an informed decision"], "research":["conduct research"],
+    "conclusion":["draw a conclusion"], "evidence":["provide evidence"],
+    "environment":["protect the environment"], "energy":["save energy"],
+    "pollution":["reduce pollution"], "climate":["climate change"],
+    "impact":["have an impact on"], "influence":["influence a decision"],
+    "health":["maintain good health"], "exercise":["get regular exercise"],
+    "injury":["recover from an injury"], "competition":["enter a competition"],
+    "champion":["the defending champion"], "league":["a professional league"],
+    "attendance":["school attendance"], "technology":["develop new technology"],
+    "information":["reliable information"], "data":["collect data"],
+    "budget":["stay within a budget"], "investment":["a long-term investment"],
+    "profit":["make a profit"], "customer":["customer service"],
+    "reservation":["make a reservation"], "destination":["reach a destination"],
+    "argument":["support an argument"], "solution":["find a solution"],
+    "opinion":["express an opinion"], "perspective":["from a different perspective"],
+    "contrast":["in contrast to"], "benefit":["benefit from"],
+    "although":["Although it was difficult, we kept trying."],
+    "because":["We stayed inside because it was raining."],
+    "however":["It looked simple. However, it took practice."],
+    "therefore":["The road was closed. Therefore, we took another route."]
+  },
+  "sense_cautions": {
+    "cap":"A spending limit and an item of clothing are different senses; choose the sense from context.",
+    "center":"A location and a basketball position are different senses; centre is an accepted spelling variant.",
+    "pick up":"Possible meanings include collect, learn informally and improve; do not assign one gloss to every occurrence.",
+    "present":"Check part of speech and meaning before selecting pronunciation.",
+    "record":"Noun and verb stress may differ; derive pronunciation from the sentence.",
+    "bank":"A financial institution and the side of a river are different senses."
+  }
+}

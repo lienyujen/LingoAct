@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Gauge, Headphones, Pause, Play } from '@phosphor-icons/react'
+import { englishTextRuns } from '../lib/englishText'
 import { participantText } from '../lib/participantI18n'
 import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -221,7 +222,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
               <input checked={showTranscript} type="checkbox" onChange={(event) => setShowTranscript(event.target.checked)} />
               <span>{participantText(locale, 'listeningShowText')}</span>
             </label>
-            {showTranscript && Boolean(readingFontUrl || readingRuby?.length || readingWords?.length) && (
+            {showTranscript && clip.language !== 'en' && Boolean(readingFontUrl || readingRuby?.length || readingWords?.length) && (
               <label className="listening-transcript-toggle">
                 <input checked={plainText} type="checkbox" onChange={(event) => setPlainText(event.target.checked)} />
                 <span>{participantText(locale, readingRuby?.length || readingWords?.length ? 'listeningHidePinyin' : 'listeningHideZhuyin')}</span>
@@ -230,6 +231,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
           </div>
           {showTranscript && (
             <KaraokeText
+              language={clip.language}
               activeCue={activeCue}
               cues={karaokeCues || []}
               fontFamily={plainText ? null : readingFamily}
@@ -258,7 +260,8 @@ function stripReadingSelectors(text: string) {
   return text.replace(/[\u{E0100}-\u{E01EF}]/gu, '')
 }
 
-function KaraokeText({ activeCue, cues, fontFamily, ruby, text, words }: {
+export function KaraokeText({ activeCue, cues, fontFamily, ruby, text, words, language }: {
+  language?: string
   activeCue: number
   cues: KaraokeCue[]
   fontFamily: string | null
@@ -266,6 +269,12 @@ function KaraokeText({ activeCue, cues, fontFamily, ruby, text, words }: {
   text: string
   words: ReadingWord[] | null
 }) {
+  if (language === 'en') {
+    const cue = activeCue >= 0 ? cues[activeCue] : null
+    return <p className="listening-karaoke english-karaoke" aria-live="off">{englishTextRuns(text).map(run =>
+      run.word ? <span key={run.offset} className={cue && run.start < cue.end_index && run.end > cue.start_index ? 'karaoke-word active' : 'karaoke-word'}>{run.text}</span> : run.text
+    )}</p>
+  }
   // A zhuyin variation selector belongs to the character before it. Grouping
   // them keeps the saved cue indexes aligned with the unannotated transcript.
   const units: string[] = []

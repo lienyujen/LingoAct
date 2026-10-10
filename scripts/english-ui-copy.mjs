@@ -356,7 +356,7 @@ export const literalEnglish = {
   '隨身設定已啟用：公開連線設定會儲存在程式同資料夾的 .env，搬移整個資料夾即可沿用。': 'Portable settings are enabled. Public connection settings are saved in .env alongside the app. Move the entire folder to keep using them.',
   '選 1–3 份；派送前請確認原文內沒有姓名等個人資訊。': 'Select 1–3 responses. Remove names and other personal details before sharing.',
   '高階級・B2': 'Upper-intermediate · B2',
-  '高中一年級': 'Senior high school · Year 1', '高中二年級': 'Senior high school · Year 2', '高中三年級': 'Senior high school · Year 3',
+  '高中一年級': 'Grade 10', '高中二年級': 'Grade 11', '高中三年級': 'Grade 12',
   '任務說明': 'Task instructions', '作品': 'Student work', '作答方式': 'Response format',
   '內容形式': 'Content format', '共同任務': 'Partner task', '兩人共同任務': 'Partner task',
   '共同結果（已送出）': 'Shared response (submitted)', '出題方向': 'Activity instructions',

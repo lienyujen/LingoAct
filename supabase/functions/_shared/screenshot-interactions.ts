@@ -1,3 +1,5 @@
+import { activityTitle } from './activity-language.ts'
+import { requireEnglishMaterial, englishMaterialIssue } from './english-material.ts'
 import { callAiJson, jsonResponse } from './ai.ts'
 import { getAdminClient } from './supabase.ts'
 import { trackInstruction } from './teaching.ts'
@@ -55,6 +57,11 @@ async function generate(db: Db, sessionId: string, input: Input) {
   { presenter_direction: typeof input.direction === 'string' ? input.direction.slice(0, 2000) : '', count: input.count },
   { type: 'object', additionalProperties: false, properties: { title: { type: 'string' }, ...fields }, required: ['title', Object.keys(fields)[0]] }, picture(input.image))
   if (result.status !== 'success') throw new Error('AI 出題未完成，請再試一次。')
+  if (session?.teaching_language === 'en') {
+    const output = result.output as Record<string, unknown>
+    const pairs = Array.isArray(output.pairs) ? output.pairs as Array<{left: string; right: string}> : []
+    requireEnglishMaterial(output.title, output.sentence, ...(Array.isArray(output.items) ? output.items : []), ...pairs.flatMap(pair => [pair.left, pair.right]))
+  }
   return result.output as { title: string; items?: string[]; sentence?: string; pairs?: Array<{ left: string; right: string }>; regions?: Array<{ box_2d: number[]; label: string }> }
 }
 
@@ -109,7 +116,7 @@ export async function screenshotInteraction(db: Db, sessionId: string, input: In
     }
     return jsonResponse({ success: true })
   }
-  const session = await db.from('sessions').select('status,current_question_id').eq('id', sessionId).single()
+  const session = await db.from('sessions').select('status,current_question_id,teaching_language').eq('id', sessionId).single()
   check(session.error)
   if (!session.data || session.data.status !== 'active') throw new Error('請在上課中派送。')
   const kind = input.kind === 'matching' ? 'matching' : 'ordering'
@@ -126,6 +133,13 @@ export async function screenshotInteraction(db: Db, sessionId: string, input: In
   const hasTiles = kind === 'ordering' && tiles.length > 0
   if (hasTiles) correct = tiles.map(() => crypto.randomUUID())
   if (correct.length < 2 || new Set(correct).size !== correct.length) throw new Error('找不到足夠且不同的項目，請換截圖或補充出題方向。')
+  const english = session.data.teaching_language === 'en'
+  if (english) {
+    if (englishMaterialIssue(title)) title = ''
+    requireEnglishMaterial(...correct, ...prompts)
+  }
+  const titleFallback = activityTitle(session.data.teaching_language, kind, kind === 'matching' ? '配對題' : '排序題')
+  const activityPrompt = english ? (kind === 'matching' ? 'Match each answer to its prompt.' : 'Put the items in order.') : session.data.teaching_language === 'putonghua' ? (kind === 'matching' ? '把答案匹配到对应的题目。' : '将项目按顺序排列。') : (kind === 'matching' ? '把答案配到對應的題目。' : '排出你認為的順序。')
   const id = crypto.randomUUID(), quizId = crypto.randomUUID(), itemId = crypto.randomUUID()
   const uploads: string[] = [], screenshotIds: string[] = []
   async function uploadImage(data: unknown) {
@@ -143,10 +157,10 @@ export async function screenshotInteraction(db: Db, sessionId: string, input: In
     // Upload shuffled, with opaque names: timestamps must not reveal the key.
     if (hasTiles) for (const value of options) images.push((await uploadImage(tiles[correct.indexOf(value)])).url)
     const source = input.shareScreenshot === true ? await uploadImage(input.image) : null
-    check((await db.from('questions').insert({ id, session_id: sessionId, type: 'custom_quiz', status: 'draft', title: title || (kind === 'matching' ? '配對題' : '排序題'), prompt_text: title || null, screenshot_id: source?.id || null })).error)
+    check((await db.from('questions').insert({ id, session_id: sessionId, type: 'custom_quiz', status: 'draft', title: title || titleFallback, prompt_text: title || null, screenshot_id: source?.id || null })).error)
     const graded = kind === 'matching' || input.hasAnswer !== false
-    check((await db.from('quizzes').insert({ id: quizId, session_id: sessionId, question_id: id, title: title || (kind === 'matching' ? '配對題' : '排序題'), direction: title || '完成拖曳後送出。', requested_type: kind, requested_count: 1, graded, interaction_mode: true })).error)
-    check((await db.from('quiz_items').insert({ id: itemId, quiz_id: quizId, position: 1, type: kind, prompt_text: title || (kind === 'matching' ? '把答案配到對應的題目。' : '排出你認為的順序。'), options, pair_prompts: prompts, option_images: images, sentence_mode: kind === 'ordering' && !hasTiles && input.sentenceMode === true, points: 100 })).error)
+    check((await db.from('quizzes').insert({ id: quizId, session_id: sessionId, question_id: id, title: title || titleFallback, direction: title || (english ? 'Arrange the items, then submit.' : '完成拖曳後送出。'), requested_type: kind, requested_count: 1, graded, interaction_mode: true })).error)
+    check((await db.from('quiz_items').insert({ id: itemId, quiz_id: quizId, position: 1, type: kind, prompt_text: title || activityPrompt, options, pair_prompts: prompts, option_images: images, sentence_mode: kind === 'ordering' && !hasTiles && input.sentenceMode === true, points: 100 })).error)
     check((await db.from('quiz_item_keys').insert({ item_id: itemId, accepted_answers: graded ? correct : [] })).error)
     check((await db.rpc('publish_teaching_question', { target_session: sessionId, target_question: id, expected_current: session.data.current_question_id })).error)
   } catch (error) {

@@ -30,7 +30,7 @@
   --radius-lg: 18px;
   /* Both variable fonts are bundled locally, including real weights 100–900.
      Chinese and Latin UI text share one family instead of OS font fallback. */
-  font-family: "Noto Sans TC Variable", sans-serif;
+  font-family: "Noto Sans TC Variable", "Noto Sans Myanmar", sans-serif;
   color: var(--text);
   background: transparent;
   font-synthesis: none;
@@ -39,16 +39,16 @@
 }
 
 :root:lang(zh-CN), :root:lang(zh-Hans) {
-  font-family: "Noto Sans SC Variable", sans-serif;
+  font-family: "Noto Sans SC Variable", "Noto Sans Myanmar", sans-serif;
 }
 
 /* Student translations change the UI language, never the class's Chinese face. */
 :root[data-chinese-font="tc"] {
-  font-family: "Noto Sans TC Variable", sans-serif;
+  font-family: "Noto Sans TC Variable", "Noto Sans Myanmar", sans-serif;
 }
 
 :root[data-chinese-font="sc"] {
-  font-family: "Noto Sans SC Variable", sans-serif;
+  font-family: "Noto Sans SC Variable", "Noto Sans Myanmar", sans-serif;
 }
 
 * {
@@ -680,6 +680,7 @@ h2 {
 }
 
 .desktop-shell .presenter-page {
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   display: grid;
   gap: 10px;
@@ -819,6 +820,8 @@ h2 {
    the audio player was there and simply never on screen. */
 .presenter-results {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 14px;
 }
 .presenter-controls-overlay.results-first .presenter-results {
@@ -830,6 +833,8 @@ h2 {
   border-left: 1px solid var(--border);
   box-shadow: -20px 0 48px rgb(23 22 26 / 20%);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 14px;
   max-height: calc(100svh - 24px);
   overflow: auto;
@@ -1996,6 +2001,7 @@ h2 {
 .quiz-graded-item > div {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   justify-content: space-between;
 }
@@ -2010,7 +2016,9 @@ h2 {
 .custom-quiz-heading-actions {
   align-items: center;
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 8px;
 }
 
@@ -2024,7 +2032,7 @@ h2 {
 .quiz-result-stats {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 18px 0;
 }
 
@@ -5774,7 +5782,28 @@ h2 {
 
 .ls-body {
   display: flex; flex-direction: column; gap: 12px;
+  flex: 1 1 auto; min-height: 0;
   padding: 14px 18px; overflow-y: auto;
+}
+
+/* Keep the script editable; the body scrolls instead of shrinking its fields. */
+.ls-body > *, .ls-head, .ls-foot { flex-shrink: 0; }
+.english-karaoke.listening-karaoke { font-size: 19px; font-weight: 500; line-height: 1.7; letter-spacing: normal; }
+.karaoke-word { display: inline; }
+.karaoke-word.active { background: var(--primary); color: #fff; border-radius: 4px; }
+.english-reading .reading-passage-body { font-size: 19px; line-height: 1.7; letter-spacing: normal; }
+.presenter-controls-overlay > *, .presenter-results > * { min-width: 0; }
+.custom-quiz-result .result-heading > div:first-child { flex: 1 1 180px; min-width: 0; }
+.custom-quiz-result h2 { overflow-wrap: anywhere; }
+.quiz-result-stats > div { min-width: 0; overflow-wrap: anywhere; }
+:root:lang(en) .workspace-navigation button,
+:root:lang(en) .activity-categories button,
+:root:lang(en) .teacher-workspace .control-action { font-size: 12px; }
+:root:lang(en) .listening-studio { width: min(600px, 94vw); }
+:root:lang(en) .custom-quiz-heading-actions { font-size: 12px; }
+:root:lang(en) .custom-quiz-result .result-heading h2 { font-size: 18px; line-height: 1.35; }
+@media (max-width: 480px) {
+  .ls-player { grid-template-columns: minmax(0, 1fr); }
 }
 
 .ls-tabs { display: flex; align-items: center; gap: 6px; }
@@ -6899,6 +6928,9 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
 }
+.school-grade-field { display: grid; gap: 8px; margin-top: 12px; }
+.language-pair-options > span { min-width: 0; max-width: 100%; }
+.language-pair-options .language-chip { max-width: 100%; overflow-wrap: anywhere; }
 .language-chip {
   align-items: flex-start;
   background: var(--surface);
@@ -9096,3 +9128,11 @@ h2 {
   margin-top: 3px;
   opacity: 0.85;
 }
+
+.toeic-level-groups { display: grid; gap: 16px; }
+.toeic-level-group { min-width: 0; }
+.toeic-level-group h4 { margin: 0 0 8px; font-size: 14px; line-height: 1.4; }
+.toeic-level-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(145px, 100%), 1fr)); gap: 8px; }
+.toeic-level-grid > span { min-width: 0; }
+.toeic-level-grid .language-chip { width: 100%; height: 100%; min-width: 0; min-height: 58px; justify-content: center; }
+.toeic-level-grid strong { display: grid; gap: 4px; font-size: 14px; line-height: 1.4; }

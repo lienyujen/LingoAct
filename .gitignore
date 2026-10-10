@@ -21,6 +21,7 @@ release
 /LingoAct-English/
 /LingoAct-Guoyu/
 /LingoAct-NCACLS/
+/LingoAct-TC/
 .codex-tmp/
 supabase/.temp/
 .env
@@ -49,3 +50,7 @@ supabase/.temp/
 
 # Local SC desktop folder; public releases are built separately.
 /LingoAct-SC/
+
+# Private research corpus includes sources with redistribution restrictions.
+/data/english/*.sqlite
+__pycache__/

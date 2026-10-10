@@ -24,7 +24,7 @@ const KEY = APP_PROFILE.id === 'full'
 const defaultTrack = resolveTrack(APP_PROFILE.defaultTrack)
 
 export const defaultCourse: CoursePreset = {
-  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: APP_PROFILE.id === 'sc' ? 'zh-CN' : 'zh-TW',
+  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: APP_PROFILE.id === 'sc' ? 'zh-CN' : defaultTrack.id === 'en' ? 'en' : 'zh-TW',
   levelFramework: defaultTrack.frameworks[0], levelCode: '',
   readingAnnotation: defaultTrack.annotation,
 }

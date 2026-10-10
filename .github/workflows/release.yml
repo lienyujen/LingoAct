@@ -25,7 +25,24 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    name: Prepare draft release
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create draft before uploading checked builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "LingoAct $TAG" --notes "Builds are being verified."
+          fi
+
   build:
+    needs: prepare
+    if: always() && (needs.prepare.result == 'success' || needs.prepare.result == 'skipped')
     name: Build ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -221,12 +238,25 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSScreenCaptureUsageDescription' "$app/Contents/Info.plist"
 
       - name: Upload build
-        if: github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest'
+        if: (github.event_name == 'push' || inputs.publish) && (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+          ARTIFACT: ${{ matrix.artifact }}
+        shell: bash
+        run: |
+          test -f "release/$ARTIFACT"
+          gh release upload "$TAG" "release/$ARTIFACT" --clobber
+
+      - name: Save a build-only preview
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish && (inputs.platform == 'all' || matrix.os == 'macos-latest')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.label }}
           path: release/${{ matrix.artifact }}
           if-no-files-found: error
+          retention-days: 1
 
   publish:
     name: Publish release
@@ -237,12 +267,6 @@ jobs:
     if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     steps:
-      - name: Download builds
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: builds
-          merge-multiple: true
-
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -250,6 +274,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
+          gh release download "$TAG" --dir builds --pattern '*.zip' --pattern '*.dmg'
           (cd builds && shopt -s nullglob && sha256sum -- *.zip *.dmg > SHA256SUMS.txt)
           notes=$(cat <<'MD'
           ## 下載
@@ -303,7 +328,9 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             # A same-version rebuild is intentional: replace only the assets
             # produced by this run and leave the other platform untouched.
-            gh release upload "$TAG" builds/* --clobber
+            gh release upload "$TAG" builds/SHA256SUMS.txt --clobber
+            printf '%s\n' "$notes" > release-notes.md
+            gh release edit "$TAG" --draft=false --latest --notes-file release-notes.md
           else
             gh release create "$TAG" \
               --title "LingoAct $TAG" \

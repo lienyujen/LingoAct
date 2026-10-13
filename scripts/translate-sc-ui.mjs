@@ -7,7 +7,7 @@ const key = env.split(/\r?\n/).find((line) => line.startsWith('GEMINI_API_KEY=')
 if (!key || key.startsWith('your-')) throw new Error('A configured Gemini key is required; no credentials were printed.')
 for (let offset = 0; offset < strings.length; offset += 100) {
   const batch = Object.fromEntries(strings.slice(offset, offset + 100).map((text, index) => [String(offset + index), text]))
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent', {
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent', {
     method: 'POST', signal: AbortSignal.timeout(60_000),
     headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ text: 'Translate this classroom software UI catalogue into concise, natural English. Return every numbered key as a JSON object. Preserve punctuation, spaces, placeholders, HSK, TBCL, TOCFL, API identifiers and product names. Keep Chinese text inside example quotes when it is teaching material, rather than translating the example itself. Do not add explanations.\n' + JSON.stringify(batch) }] }],

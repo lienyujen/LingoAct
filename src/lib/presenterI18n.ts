@@ -508,9 +508,9 @@ const messages = {
 
     // 課堂報告
     reportModeFast: '快速', reportModeStandard: '標準', reportModeDeep: '深入',
-    reportModeFastHint: 'gemini-3.7-flash · thinking low：最不容易逾時，建議先用這個',
-    reportModeStandardHint: 'gemini-3.7-flash · thinking medium：分析較深入，較慢',
-    reportModeDeepHint: 'gemini-3.7-flash · thinking high：最深入，最可能逾時',
+    reportModeFastHint: 'gemini-3.8-flash · thinking low：最不容易逾時，建議先用這個',
+    reportModeStandardHint: 'gemini-3.8-flash · thinking medium：分析較深入，較慢',
+    reportModeDeepHint: 'gemini-3.8-flash · thinking high：最深入，最可能逾時',
     typeTrueFalse: '是非題', typeListening: '聽力', typeReading: '閱讀',
     sessionAnalysisFailed: '整節課 AI 分析失敗。', notDetermined: '未判定',
     notEnoughData: '目前沒有足夠資料。', statusGrading: '批改中',
@@ -1016,9 +1016,9 @@ const messages = {
     noInterpretationTrack: "OpenAI did not return translated audio.",
 
     reportModeFast: 'Fast', reportModeStandard: 'Standard', reportModeDeep: "Detailed",
-    reportModeFastHint: "gemini-3.7-flash · low thinking: fastest and least likely to time out; recommended to start",
-    reportModeStandardHint: "gemini-3.7-flash · medium thinking: more detailed analysis, with a longer wait",
-    reportModeDeepHint: "gemini-3.7-flash · high thinking: most detailed analysis, with the longest wait and greater risk of timeout",
+    reportModeFastHint: "gemini-3.8-flash · low thinking: fastest and least likely to time out; recommended to start",
+    reportModeStandardHint: "gemini-3.8-flash · medium thinking: more detailed analysis, with a longer wait",
+    reportModeDeepHint: "gemini-3.8-flash · high thinking: most detailed analysis, with the longest wait and greater risk of timeout",
     typeTrueFalse: 'True or false', typeListening: 'Listening', typeReading: 'Reading',
     sessionAnalysisFailed: 'The whole-class analysis failed.', notDetermined: 'Not determined',
     notEnoughData: 'Not enough data yet.', statusGrading: "Grading",

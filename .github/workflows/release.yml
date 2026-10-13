@@ -100,6 +100,12 @@ jobs:
             product: LingoAct-TC
             target: --win zip --x64
             artifact: LingoAct-TC.zip
+          - label: Windows Guoyu
+            os: windows-latest
+            profile: guoyu
+            product: LingoAct-Guoyu
+            target: --win zip --x64
+            artifact: LingoAct-Guoyu.zip
           - label: macOS Huayu
             os: macos-latest
             profile: huayu
@@ -299,25 +305,21 @@ jobs:
           | 完整教學版 | `LingoAct-Full.zip` | — |
           | 英語教學版 | `LingoAct-English.zip` | `LingoAct-English.dmg` |
           | 繁體中文版（TC） | `LingoAct-TC.zip` | `LingoAct-TC.dmg` |
+          | 國語教學版 | `LingoAct-Guoyu.zip` | — |
 
           **Windows：** 解壓縮後執行裡面的 exe。
           **macOS：** 開啟 dmg，把 App 拖進「應用程式」。同一個檔案支援 Apple Silicon 與 Intel。
 
           ## 本次更新
 
-          - 英語教學版提供 CEFR、GEPT、TOEIC 與各級學校模式；國中七至九年級、高中 Grade 10–12 可分別選擇難度，教學內容、語音及閱讀標註使用英語。
-          - 重新整理 TOEIC 中英文分級排版，修正英語版中文介面的學員名單。
-          - 分數改為事件更新與短時間事件合併，降低重複全班查詢；舉手與教師放下手立即同步，防止舊資料覆蓋，保留重連補同步與定期校正。
-          - 原 NCACLS 版改名為 LingoAct-TC，預設繁體中文並恢復原品牌；學生端增加越南文、泰文、印尼文、日文、韓文與緬甸文說明。
-          - 華語教學版加入簡體／HSK 模式，預設仍是繁體；English 可選 HSK、TOCFL 或 TBCL。
-          - 簡體版固定使用簡體中文、HSK 與普通話。
-          - 看圖說寫同步派送建議詞彙與句型；學生切換外語介面時，題目和建議保留教學原文。
-          - 修正看圖說寫 AI 的簡體設定，以及慢速載入導致題目一直停在「出題中」的問題。
-          - 中文字型跟隨教師的簡繁設定，補上按需多語說明翻譯及瀏覽器整頁翻譯防護。
-          - 支援同資料夾 `.env` 隨身設定；更新時請保留自己的 `.env`。下載包只附 `.env.example`。
-          - 首頁授權連結改為公開的教學與授權頁：https://lingoact.ehuayu.org/about。
+          - 所有版本的通用 Gemini Flash 呼叫改為 3.8 為主、3.6 備援，涵蓋派題、評核、閱讀標註、說明翻譯與課堂分析。
+          - 舊設定中的 gemini-3.7-flash／gemini-3.5-flash 會自動轉換為 3.8／3.6；重複的備援模型會合併。
+          - 更新各語言介面的模型說明與翻譯產生工具；轉錄、即時翻譯和語音合成使用各自仍受支援的專用模型。
+          - 新增模型轉換與 3.8 無法使用時切換 3.6 的回歸測試。
+          - 既有自架 Supabase 專案請重新部署後端；更新程式時請保留自己的 .env。下載包只附 .env.example。
 
-          `SHA256SUMS.txt` 提供下載檔案的 SHA-256 校驗值。
+          六個 Windows 版、四個 macOS 通用版均執行型別、資料表、67 項離線回歸與啟動檢查；macOS 另外驗證簽章及 DMG。
+          SHA256SUMS.txt 提供下載檔案的 SHA-256 校驗值。
 
           ## 首次使用
 

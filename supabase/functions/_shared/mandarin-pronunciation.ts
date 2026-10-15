@@ -98,12 +98,12 @@ function applyCharacterSandhi(text: string, input: string[], accent: MandarinAcc
   return output
 }
 
-type RuleSpec = { terms: string[]; offsets: number[]; taiwan: string; mainland: string }
-type Rule = RuleSpec & { scope: 'character' | 'phrase' }
+type RuleSpec = { terms: string[]; offsets: number[]; taiwan: string; mainland: string; alternatives?: string[] }
+type Rule = RuleSpec & { scope: 'character' | 'phrase'; preserveSpeechText?: boolean }
 type TaiwanRuleSpec = Omit<RuleSpec, 'mainland'>
 
-const rule = (terms: string, offsets: number | number[], taiwan: string, mainland: string): RuleSpec => ({
-  terms: terms.split('|'), offsets: Array.isArray(offsets) ? offsets : [offsets], taiwan, mainland,
+const rule = (terms: string, offsets: number | number[], taiwan: string, mainland: string, alternatives?: string[]): RuleSpec => ({
+  terms: terms.split('|'), offsets: Array.isArray(offsets) ? offsets : [offsets], taiwan, mainland, alternatives,
 })
 
 const taiwanRule = (terms: string, offsets: number | number[], taiwan: string): TaiwanRuleSpec => ({
@@ -120,6 +120,10 @@ const PHRASE_RULES: RuleSpec[] = [
   // Same entries as the source list, occurring in the teacher's reported text.
   rule('暫時|暂时', 0, 'zhàn', 'zàn'),
   rule('危及', 0, 'wéi', 'wēi'),
+  // The Concised MOE dictionary, intended for teaching, gives shóu xī.
+  // The Revised historical dictionary also records shú; do not generalise
+  // this lexical choice to every occurrence of 熟.
+  rule('熟悉', 0, 'shóu', 'shú'),
 ]
 
 // Correct readings from Wiktionary's Taiwan common-misreading appendix, whose
@@ -238,7 +242,7 @@ const POLYPHONE_RULES: RuleSpec[] = [
   rule('嘵咋|晓咋', 1, 'zhà', 'zǎ'), rule('咋呼', 0, 'zé', 'zhā'),
   rule('勝任|胜任', 0, 'shēng', 'shèng'), rule('老撾|老挝', 1, 'zhuā', 'wō'),
   rule('品質|品质', 1, 'zhí', 'zhì'), rule('弛緩|弛缓', 0, 'shǐ', 'chí'),
-  rule('肉燥', 1, 'sào', 'zào'), rule('俄羅斯|俄罗斯', 0, 'è', 'é'),
+  rule('肉燥', 1, 'sào', 'zào'),
   rule('女巫', 1, 'wú', 'wū'), rule('海參崴|海参崴', 2, 'wēi', 'wǎi'),
   rule('崴腳|崴脚', 0, 'wēi', 'wǎi'), rule('古玩|珍玩', 1, 'wàn', 'wán'),
   rule('玩世不恭', 0, 'wàn', 'wán'),
@@ -255,6 +259,34 @@ const CROSS_STRAIT_RULES: Rule[] = [
   ...PHRASE_RULES.map((entry) => ({ ...entry, scope: 'phrase' as const })),
   ...CHARACTER_RULES.map((entry) => ({ ...entry, scope: 'phrase' as const })),
   ...POLYPHONE_RULES.map((entry) => ({ ...entry, scope: 'phrase' as const })),
+]
+
+// Shared readings from the teacher's 2026-10-15 workbook. These guards are
+// lexical, not character-wide: 女巫/巫術 and 勝任/勝利 must stay distinct.
+// MOE confirms 俄 é (è is obsolete), 模範 mó fàn, 暖和 nuǎn huo:
+// https://dict.revised.moe.edu.tw/dictView.jsp?ID=10266
+// https://dict.concised.moe.edu.tw/dictView.jsp?ID=3656
+// https://dict.concised.moe.edu.tw/dictView.jsp?ID=12986
+const SHARED_READING_RULES: RuleSpec[] = [
+  rule('俄羅斯|俄罗斯', 0, 'é', 'é', ['è']),
+  rule('模範|模范', 0, 'mó', 'mó', ['mú']),
+  rule('和平', 0, 'hé', 'hé', ['hàn']),
+  rule('附和|應和|应和', 1, 'hè', 'hè', ['hé', 'hàn']),
+  rule('和牌', 0, 'hú', 'hú', ['hé', 'hàn']),
+  rule('暖和', 1, 'huo', 'huo', ['hé', 'hàn', 'huò']),
+  rule('咋舌', 0, 'zé', 'zé', ['zhā']), rule('咋了', 0, 'zǎ', 'zǎ', ['zé', 'zhā']),
+  rule('依山傍水', 1, 'bàng', 'bàng', ['bāng']),
+  rule('勝利|胜利', 0, 'shèng', 'shèng', ['shēng']),
+  rule('人質|人质', 1, 'zhì', 'zhì', ['zhí']),
+  rule('鬆弛|松弛', 1, 'chí', 'chí', ['shǐ']),
+  rule('乾燥|干燥', 1, 'zào', 'zào', ['sào']),
+  rule('巫術|巫术', 0, 'wū', 'wū', ['wú']),
+  rule('玩笑|玩耍', 0, 'wán', 'wán', ['wàn']),
+  rule('方法|法律', 0, 'fǎ', 'fǎ', ['fà']),
+  rule('搜括', 1, 'guā', 'guā', ['kuò']),
+  rule('乘車|乘车|乘法', 0, 'chéng', 'chéng', ['shèng']),
+  rule('吃飯|吃饭', 0, 'chī', 'chī', ['jí']),
+  rule('沒轍|没辙', 1, 'zhé', 'zhé', ['chè']),
 ]
 
 export function usesMainlandStandard(accent: MandarinAccent | null) {
@@ -276,7 +308,11 @@ function matchingRules(text: string, accent: MandarinAccent | null) {
         ...entry, mainland: entry.taiwan, scope: 'phrase' as const,
       })),
     ]
-  return rules.flatMap((entry) => {
+  const allRules: Rule[] = [
+    ...rules,
+    ...SHARED_READING_RULES.map((entry) => ({ ...entry, scope: 'phrase' as const, preserveSpeechText: true })),
+  ]
+  return allRules.flatMap((entry) => {
     if (entry.scope === 'phrase') {
       return entry.terms.filter((term) => text.includes(term)).map((term) => ({ ...entry, term }))
     }
@@ -318,7 +354,7 @@ const SPEECH_SURROGATES: Record<string, string> = {
 const NON_CONJUNCTION_HE_TERMS = [
   '和平', '和氣', '和气', '和善', '和睦', '和諧', '和谐', '和解', '和談', '和谈',
   '和約', '和约', '和好', '和尚', '和服', '和風', '和风', '和室', '和食', '和歌',
-  '和棋', '和聲', '和声', '和弦', '和音', '和麵', '和面', '和稀泥', '攪和', '搅和',
+  '和棋', '和牌', '和聲', '和声', '和弦', '和音', '和麵', '和面', '和稀泥', '攪和', '搅和',
   '暖和', '附和', '應和', '应和', '唱和', '曲高和寡', '共和', '講和', '讲和',
   '媾和', '求和', '議和', '议和', '緩和', '缓和', '調和', '调和', '中和',
   '飽和', '饱和', '柔和', '溫和', '温和', '親和', '亲和', '祥和', '隨和',
@@ -383,7 +419,7 @@ export function regionalSpeechText(text: string, accent: MandarinAccent | null) 
       const start = [...text.slice(0, found)].length
       for (const offset of entry.offsets) {
         const reading = mainland ? entry.mainland : entry.taiwan
-        const surrogate = SPEECH_SURROGATES[reading]
+        const surrogate = entry.preserveSpeechText ? undefined : SPEECH_SURROGATES[reading]
         if (surrogate) characters[start + offset] = surrogate
       }
       from = found + entry.term.length
@@ -506,6 +542,7 @@ function applyWordSandhi<T extends { text: string; pinyin: string }>(input: T[],
 // 和平、溫和、和尚 or 和麵 in its other senses.
 export function applyRegionalWordPinyin<T extends { text: string; pinyin: string }>(text: string, words: T[], accent: MandarinAccent | null): T[] {
   const mainland = usesMainlandStandard(accent)
+  const { protectedHe } = heContextIndexes(text)
   const targets = new Map<number, { wanted: string; alternatives: string[] }>()
   for (const entry of matchingRules(text, accent)) {
     let from = 0
@@ -516,7 +553,7 @@ export function applyRegionalWordPinyin<T extends { text: string; pinyin: string
       for (const offset of entry.offsets) {
         targets.set(start + offset, {
           wanted: mainland ? entry.mainland : entry.taiwan,
-          alternatives: [entry.taiwan, entry.mainland],
+          alternatives: [entry.taiwan, entry.mainland, ...(entry.alternatives || [])],
         })
       }
       from = found + entry.term.length
@@ -529,7 +566,7 @@ export function applyRegionalWordPinyin<T extends { text: string; pinyin: string
     let pinyin = word.pinyin
     // Segmentation settles the ambiguous conjunction without guessing: 和 is
     // one word here, while the same character in 和平 or 溫和 is not.
-    if (word.text === '和') {
+    if (word.text === '和' && !protectedHe.has(cursor)) {
       const wanted = mainland ? 'hé' : 'hàn'
       targets.set(cursor, { wanted, alternatives: ['hàn', 'hé'] })
     }
@@ -542,12 +579,12 @@ export function applyRegionalWordPinyin<T extends { text: string; pinyin: string
         .find((candidate) => candidate.at >= 0)
       if (found) {
         const original = pinyin.slice(found.at, found.at + found.candidate.length)
-        const wanted = /^[A-Z]/.test(original)
+        const wanted = /^\p{Lu}/u.test(original)
           ? target.wanted.charAt(0).toUpperCase() + target.wanted.slice(1)
           : target.wanted
         pinyin = `${pinyin.slice(0, found.at)}${wanted}${pinyin.slice(found.at + found.candidate.length)}`
       } else if (length === 1) {
-        pinyin = /^[A-Z]/.test(pinyin)
+        pinyin = /^\p{Lu}/u.test(pinyin)
           ? target.wanted.charAt(0).toUpperCase() + target.wanted.slice(1)
           : target.wanted
       }
@@ -563,6 +600,22 @@ export function regionalPinyinOverrides(text: string, accent: MandarinAccent | n
   return new Map(applyRegionalPinyin(text, blank, accent)
     .map((reading, at) => [at, reading] as const)
     .filter((entry) => Boolean(entry[1])))
+}
+
+// An IVS selects an existing glyph; it cannot invent a missing pronunciation.
+// Report missing variants rather than silently displaying the default Taiwan
+// glyph for an explicitly requested Mainland reading (e.g. 熟 shú).
+export function unavailableRegionalBopomofoReadings(
+  text: string,
+  accent: MandarinAccent | null,
+  readingsBy: ReadonlyMap<number, readonly string[]>,
+) {
+  const characters = [...text]
+  return [...regionalPinyinOverrides(text, accent)].flatMap(([at, pinyin]) => {
+    const character = characters[at]
+    const candidates = readingsBy.get(character.codePointAt(0) as number) || []
+    return candidates.includes(pinyinToBopomofo(pinyin)) ? [] : [{ at, character, pinyin }]
+  })
 }
 
 const INITIALS: Array<[string, string]> = [

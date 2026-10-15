@@ -11,7 +11,7 @@ if (!project) throw new Error('Set LINGOACT_TEST_PROJECT; sign in to the Supabas
 const sessionId = randomUUID()
 const presenterToken = randomUUID() + randomUUID()
 const hash = (value) => createHash('sha256').update(value).digest('hex')
-const text = '中和的得和路得和永和的福和路接著，我和你暫時不會走錯路。'
+const text = '中和的得和路得和永和的福和路接著，我和你暫時不會走錯路。我很熟悉這位模範老師，他來自俄羅斯，今天很暖和。'
 
 const sql = query => fixtureSql(project, query)
 
@@ -48,6 +48,15 @@ try {
   assert.match(clips.get('putonghua').voices.instruction, /hé/)
   assert.match(clips.get('putonghua').voices.instruction, /zàn/)
   assert.match(clips.get('taiwanese').voices.instruction, /unmistakably Taiwanese cadence/)
+  for (const accent of ['standard_guoyu', 'putonghua', 'taiwanese']) {
+    const instruction = clips.get(accent).voices.instruction
+    assert.ok(instruction.includes(`as ${accent === 'putonghua' ? 'shú' : 'shóu'}.`))
+    for (const reading of ['mó', 'é', 'huo']) assert.ok(instruction.includes(`as ${reading}.`))
+    assert.ok(!instruction.includes('as è.'))
+    const file = await fetch(clips.get(accent).public_url)
+    assert.equal(file.status, 200)
+    assert.ok((await file.arrayBuffer()).byteLength > 1000)
+  }
 
   const repeated = await invoke('synthesize-listening', {
     sessionId, presenterToken, transcript: text, kind: 'passage', language: 'zh-tw', accent: 'standard_guoyu',
@@ -59,5 +68,11 @@ try {
   removed = true
   console.log('All three Mandarin speech plans passed with complete audio, KTV cues and the new cache key.')
 } finally {
-  if (!removed) await sql(`delete from sessions where id='${sessionId}'`)
+  if (!removed) {
+    try {
+      await invoke('presenter-action', { action: 'delete_session', sessionId, presenterToken })
+    } catch {
+      await sql(`delete from sessions where id='${sessionId}'`)
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
-import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction } from '../_shared/mandarin-pronunciation.ts'
+import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction, unavailableRegionalBopomofoReadings } from '../_shared/mandarin-pronunciation.ts'
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
 import { orthographyRules, settleWords } from '../_shared/reading.ts'
 import { HSK_PRONUNCIATION, applyHskWordPinyin, hskPinyinInstruction } from '../_shared/hsk.ts'
@@ -163,6 +163,15 @@ Deno.serve(async (req) => {
 
     const readingsBy = new Map<number, string[]>()
     for (const row of rows || []) readingsBy.set(row.codepoint, row.readings)
+
+    const unavailable = unavailableRegionalBopomofoReadings(text, accent, readingsBy)
+    if (unavailable.length) {
+      const examples = [...new Set(unavailable.map(item => `${item.character}（${item.pinyin}）`))].slice(0, 6).join('、')
+      return jsonResponse({
+        code: 'BOPOMOFO_READING_UNAVAILABLE',
+        message: `目前注音字型不支援所選口音的讀音：${examples}。請改用拼音標音。`,
+      }, 422)
+    }
 
     // Only the ambiguous ones are worth a question.
     const ambiguous: { at: number; character: string; candidates: string[] }[] = []

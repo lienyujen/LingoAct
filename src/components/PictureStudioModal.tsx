@@ -1,3 +1,4 @@
+import type { Question } from '../types'
 import { uiText } from '../lib/uiText'
 import { pictureStudentPrompt } from '../lib/pictureStudentPrompt'
 import { useEffect, useState } from 'react'
@@ -27,7 +28,7 @@ type Props = {
   // The desktop app's drag-select capture, absent in the browser.
   onCaptureScreen?: () => void
   onClose: () => void
-  onDispatched: () => void
+  onDispatched: (question?: Question) => void
   onDispatch: (file: File, draft: QuestionDraft) => Promise<void>
 }
 
@@ -167,7 +168,7 @@ export function PictureStudioModal({
     try {
       const studentPrompt = pictureStudentPrompt(promptText, picture.storyboard, { words: t('pictureVocabulary'), pattern: t('picturePattern') })
       if (mode === 'ordering') {
-        await dispatchPictureWriting({
+        const created = await dispatchPictureWriting({
           sessionId,
           presenterToken,
           file: picture.file,
@@ -175,7 +176,7 @@ export function PictureStudioModal({
           title: picture.storyboard.title,
           aiGrading,
         }, t)
-        onDispatched()
+        onDispatched(created)
         return
       }
       await onDispatch(picture.file, {

@@ -26,7 +26,7 @@ type Props = {
   teachingLanguage?: string
   framework?: string | null
   onClose: () => void
-  onDispatched: (questionId: string) => void
+  onDispatched: (questionId: string, warning?: string) => void
 }
 
 type Accent = import('../lib/speechAccent').SpeechAccent
@@ -263,8 +263,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
       }
 
       writeSettings({ stretch, withQuiz, quizCount, focus, withAudio, accent, useImage, shareShot, verbatim })
-      if (warnings.length) { setError(warnings.join(' ')); return }
-      onDispatched(writtenQuestionId)
+      onDispatched(writtenQuestionId, warnings.join(' '))
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : t('readingFailed'))
     } finally {

@@ -846,7 +846,12 @@ ipcMain.handle('window:open-board-review', (_event, sessionId, questionId) => {
   createCustomQuizReviewWindow(sessionId, questionId, 'board-review')
 })
 
-ipcMain.handle('capture:list', listCaptureSources)
+ipcMain.handle('capture:list', () => listCaptureSources())
+
+ipcMain.handle('capture:selection-content-bounds', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('Screen selection window is unavailable.')
+  return mainWindow.getContentBounds()
+})
 
 ipcMain.handle('capture:start-selection', async () => {
   if (!mainWindow || mainWindow.isDestroyed()) throw new Error('LingoAct presenter window is unavailable.')
@@ -869,7 +874,7 @@ ipcMain.handle('capture:start-selection', async () => {
     mainWindow.setBounds(targetDisplay.bounds)
     mainWindow.show()
     mainWindow.focus()
-    return captureSource
+    return { ...captureSource, displayBounds: targetDisplay.bounds }
   } catch (error) {
     overlayVisibilitySuppressed = false
     setControlBounds(false)

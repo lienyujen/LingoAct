@@ -1,3 +1,4 @@
+import type { Question } from '../types'
 import { resolveTrack } from './teachingTracks'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
@@ -114,7 +115,8 @@ export async function dispatchListeningQuestion(input: {
     body: { action: 'create_listening_question', ...input },
   })
   if (error) throw error
-  return data
+  if (!data?.question) throw new Error(data?.message || 'The activity could not be sent.')
+  return data as { question: Question }
 }
 
 
@@ -134,7 +136,8 @@ export async function dispatchListeningQuiz(input: {
     body: { action: 'create_custom_quiz', requestedType: 'random', ...input },
   })
   if (error) throw error
-  return data
+  if (!data?.question) throw new Error(data?.message || 'The activity could not be sent.')
+  return data as { question: Question }
 }
 
 

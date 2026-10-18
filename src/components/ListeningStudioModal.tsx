@@ -13,7 +13,7 @@ import {
   applyAnnotation,
 } from '../lib/listening'
 import type { ListeningAccent, SpeakerGender } from '../lib/listening'
-import type { ListeningKind, PresenterListeningClip } from '../types'
+import type { ListeningKind, PresenterListeningClip, Question } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 
@@ -44,7 +44,7 @@ type Props = {
   capturedScreen?: File | null
   onCapturedScreenRead?: () => void
   onClose: () => void
-  onDispatched: () => void
+  onDispatched: (question: Question) => void
 }
 
 type StudioKind = Extract<ListeningKind, 'passage' | 'dialogue'>
@@ -305,8 +305,9 @@ export function ListeningStudioModal({
     setError('')
     setBusy(target === 'quiz' ? t('generatingQuiz') : t('dispatching'))
     try {
+      let dispatched: { question: Question }
       if (target === 'quiz') {
-        await dispatchListeningQuiz({
+        dispatched = await dispatchListeningQuiz({
           sessionId,
           presenterToken,
           listeningClipId: clip.id,
@@ -315,7 +316,7 @@ export function ListeningStudioModal({
           requestedCount: null,
           screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
-      } else if (target === 'read_aloud' || target === 'audio') {
+      } else {
         // Marked up on the way out, not when the clip was made: only the two
         // teaching modes that deliberately show the transcript may carry its
         // reading. A comprehension quiz still receives neither text nor font.
@@ -346,7 +347,7 @@ export function ListeningStudioModal({
         }
         // Both modes carry the transcript. Audio keeps it folded until the
         // learner asks; read-aloud shows it in the ordinary prompt immediately.
-        await dispatchListeningQuestion({
+        dispatched = await dispatchListeningQuestion({
           sessionId,
           presenterToken,
           listeningClipId: clip.id,
@@ -358,7 +359,7 @@ export function ListeningStudioModal({
           screenshotId: source === 'screenshot' && includeScreenshot ? screenshotId : null,
         })
       }
-      onDispatched()
+      onDispatched(dispatched.question)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t('sendFailed'))
     } finally {

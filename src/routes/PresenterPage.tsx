@@ -1,3 +1,7 @@
+import { captureCrop } from '../lib/captureGeometry'
+import { createSerializedReload } from '../lib/serializedReload'
+import { createPresenterActivityFocus } from '../lib/presenterActivityFocus'
+import type { WorkspaceView } from '../lib/presenterActivityFocus'
 import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
@@ -128,15 +132,8 @@ export function PresenterPage() {
   const [workspaceView, setWorkspaceView] = useState<'activities' | 'current' | 'history'>('activities')
   const [plannedPrompt, setPlannedPrompt] = useState('')
   const [plannedActivity, setPlannedActivity] = useState<PlannedActivity | null>(null)
-  const previousActivity = useRef<string | null>(null)
-  useEffect(() => {
-    const current = session?.current_question_id || null
-    if (current && current !== previousActivity.current) {
-      setWorkspaceView('current')
-      setSelectedQuestionId(current)
-    }
-    previousActivity.current = current
-  }, [session?.current_question_id])
+  const [activityFocus] = useState(createPresenterActivityFocus)
+  const [serializedReload] = useState(createSerializedReload)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [answerCounts, setAnswerCounts] = useState<Record<string, number>>({})
@@ -152,6 +149,7 @@ export function PresenterPage() {
   const [hotspotImageUrl, setHotspotImageUrl] = useState<string | null>(null)
   const [analysisBusy, setAnalysisBusy] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
+  const [dispatchWarning, setDispatchWarning] = useState('')
   const [endClassConfirmOpen, setEndClassConfirmOpen] = useState(false)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [closingSession, setClosingSession] = useState(false)
@@ -338,13 +336,14 @@ export function PresenterPage() {
     })
   }, [])
 
-  const loadAll = useCallback(async () => {
+  const loadSnapshot = useCallback(async () => {
     if (!isSupabaseConfigured || !sessionId) return
 
+    const snapshot = activityFocus.snapshot()
     const supabase = requireSupabase()
     const presenterToken = getPresenterToken(sessionId) || ''
     const canPresent = Boolean(presenterToken || hasOwnerKey())
-    const [{ data: sessionData }, { data: participantData }, { data: questionListData }, { data: answerQuestionData }, { data: boardPostData }, { data: exitTicketData }] = await Promise.all([
+    const [{ data: sessionData, error: sessionError }, { data: participantData }, { data: questionListData, error: questionsError }, { data: answerQuestionData }, { data: boardPostData }, { data: exitTicketData }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', sessionId).single(),
       supabase.from('participants').select('*').eq('session_id', sessionId).order('joined_at'),
       supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at'),
@@ -357,8 +356,15 @@ export function PresenterPage() {
       supabase.from('exit_tickets').select('*').eq('session_id', sessionId).order('submitted_at'),
     ])
 
+    if (sessionError) throw sessionError
+    if (questionsError) throw questionsError
+    if (!activityFocus.accepts(snapshot)) return
     const nextSession = sessionData as Session | null
     const nextQuestions = (questionListData || []) as Question[]
+    const focus = activityFocus.reconcile(snapshot, nextSession?.current_question_id || null, nextQuestions.map(item => item.id))
+    if (!focus) return
+    setSelectedQuestionId(focus.questionId)
+    setWorkspaceView(focus.view)
     setSession(nextSession)
     setParticipants((participantData || []) as Participant[])
     setQuestions(nextQuestions)
@@ -379,23 +385,10 @@ export function PresenterPage() {
     for (const [questionId, responders] of boardResponders) nextAnswerCounts[questionId] = responders.size
     setAnswerCounts(nextAnswerCounts)
 
-    // A dispatch changes the class's current question. Keep a history selection
-    // only while that current id has not changed; otherwise the old selection
-    // made a freshly dispatched activity look as if it never arrived until the
-    // teacher visited 課堂紀錄 and came back.
-    const newlyActivatedId = nextSession?.current_question_id
-      && nextSession.current_question_id !== previousActivity.current
-      ? nextSession.current_question_id
-      : null
-    const selectedStillExists = selectedQuestionId && nextQuestions.some((item) => item.id === selectedQuestionId)
-    const targetQuestionId = newlyActivatedId
-      || (selectedStillExists ? selectedQuestionId : null)
-      || nextSession?.current_question_id
-      || nextQuestions.at(-1)?.id
-      || null
+    const targetQuestionId = focus.questionId
 
     if (targetQuestionId) {
-      const [{ data: questionData }, { data: answerData }, { data: summaryData }, { data: wallData }] = await Promise.all([
+      const [{ data: questionData, error: questionError }, { data: answerData }, { data: summaryData }, { data: wallData }] = await Promise.all([
         supabase.from('questions').select('*').eq('id', targetQuestionId).single(),
         supabase.from('answers').select('*').eq('question_id', targetQuestionId).order('submitted_at'),
         supabase
@@ -419,7 +412,8 @@ export function PresenterPage() {
           .limit(1)
           .maybeSingle(),
       ])
-      if (targetQuestionId !== selectedQuestionId) setSelectedQuestionId(targetQuestionId)
+      if (!activityFocus.accepts(snapshot)) return
+      if (questionError) throw questionError
       setQuestion(questionData as Question | null)
       setAnswers((answerData || []) as Answer[])
       setAnalysis(((summaryData as AiSummary | null)?.output_json as QuestionAnalysis | undefined) || null)
@@ -431,6 +425,7 @@ export function PresenterPage() {
           const { data: hotspotData } = await supabase.functions.invoke('presenter-action', {
             body: { action: 'get_hotspot_result', sessionId, presenterToken, questionId: targetQuestionId },
           })
+          if (!activityFocus.accepts(snapshot)) return
           setHotspotImageUrl((hotspotData as { imageUrl?: string | null } | null)?.imageUrl || null)
         }
         setAudioResponses([])
@@ -440,6 +435,7 @@ export function PresenterPage() {
           const { data: quizData } = await supabase.functions.invoke('presenter-action', {
             body: { action: 'get_custom_quiz_results', sessionId, presenterToken, questionId: targetQuestionId },
           })
+          if (!activityFocus.accepts(snapshot)) return
           setQuizResults((quizData as PresenterQuizResults | null) || null)
         }
         setAudioResponses([])
@@ -450,6 +446,7 @@ export function PresenterPage() {
           const { data: recordingData } = await supabase.functions.invoke('presenter-action', {
             body: { action: 'get_recording_results', sessionId, presenterToken, questionId: targetQuestionId },
           })
+          if (!activityFocus.accepts(snapshot)) return
           setAudioResponses((recordingData?.responses || []) as AudioResponse[])
         }
       } else {
@@ -464,7 +461,42 @@ export function PresenterPage() {
       setAnalysis(null)
       setWallComposition(null)
     }
-  }, [selectedQuestionId, sessionId])
+  }, [activityFocus, sessionId])
+
+  const loadAll = useCallback(() => serializedReload(loadSnapshot).catch((error: unknown) => {
+    logDiagnostic('presenter_reload_failed', { message: error instanceof Error ? error.message : String(error) })
+  }), [loadSnapshot, serializedReload])
+
+  // Every successful question dispatch uses the returned row immediately. It
+  // must not wait for Realtime or retain a historical selection/old result.
+  function showDispatchedQuestion(created: Question | string) {
+    const id = typeof created === 'string' ? created : created.id
+    activityFocus.dispatch(id)
+    setDispatchWarning('')
+    setSelectedQuestionId(id)
+    setWorkspaceView('current')
+    setControlsOpen(true)
+    setSession(current => current ? { ...current, current_question_id: id } : current)
+    setQuestion(typeof created === 'string' ? null : created)
+    setQuestions(current => {
+      const stopped = current.map(item => item.id !== id && item.status === 'active' ? { ...item, status: 'stopped' as const } : item)
+      return typeof created === 'string' ? stopped : [...stopped.filter(item => item.id !== id), created]
+    })
+    setAnswers([])
+    setAudioResponses([])
+    setQuizResults(null)
+    setAnalysis(null)
+    setWallComposition(null)
+    setHotspotImageUrl(null)
+    void loadAll()
+  }
+
+  function navigateWorkspace(view: WorkspaceView, questionId: string | null = session?.current_question_id || null) {
+    activityFocus.select(view, questionId)
+    setWorkspaceView(view)
+    setSelectedQuestionId(questionId)
+    void loadAll()
+  }
 
   // Everything that is not a participant row still reloads, but a whole class
   // answering at once is a hundred writes inside a few seconds and every one of
@@ -494,8 +526,8 @@ export function PresenterPage() {
   // ordinary answer events drive the usual reloads.
   useEffect(() => {
     if (question?.type !== 'custom_quiz' || quizResults?.quiz) return
-    const timer = window.setTimeout(() => void loadAll(), 1_500)
-    return () => window.clearTimeout(timer)
+    const timer = window.setInterval(() => void loadAll(), 1_500)
+    return () => window.clearInterval(timer)
   }, [loadAll, question?.id, question?.type, quizResults?.quiz])
 
   // 自訂測驗檢視 opens as its own desktop window with its own React root, and it
@@ -588,11 +620,26 @@ export function PresenterPage() {
           setBuzzerEvent(null)
         }
       })
-      .subscribe()
+      .subscribe(status => { if (status === 'SUBSCRIBED') scheduleReload() })
     return () => {
       supabase.removeChannel(channel)
     }
   }, [applyParticipantChange, loadAll, scheduleReload, sessionId])
+
+  // Reconnection and one low-frequency correction recover missed events. A
+  // confirmed dispatch itself updates immediately and never waits for this timer.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !sessionId) return
+    const refresh = () => { if (document.visibilityState !== 'hidden') scheduleReload() }
+    const timer = window.setInterval(refresh, 30_000)
+    window.addEventListener('online', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('online', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [scheduleReload, sessionId])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return
@@ -1044,7 +1091,7 @@ export function PresenterPage() {
         })
         if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
         if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
-        setSelectedQuestionId(data.question.id)
+        showDispatchedQuestion(data.question as Question)
         return
       }
       if (draft.interaction) {
@@ -1053,7 +1100,7 @@ export function PresenterPage() {
         } })
         if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
         if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
-        setSelectedQuestionId(data.question.id)
+        showDispatchedQuestion(data.question as Question)
         return
       }
       const { data: prepared, error: prepareError } = await supabase.functions.invoke('presenter-action', {
@@ -1109,7 +1156,7 @@ export function PresenterPage() {
       })
       if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
       if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
-      setSelectedQuestionId(data.question.id)
+      showDispatchedQuestion(data.question as Question)
     } finally {
       setBusy(false)
     }
@@ -1173,33 +1220,23 @@ export function PresenterPage() {
   async function cropCapture(rect: { x: number; y: number; width: number; height: number }) {
     if (!captureSource) return
 
+    const viewport = { width: window.innerWidth, height: window.innerHeight }
+    const content = await window.lingoActDesktop?.captureSelectionContentBounds()
+    if (!content || !captureSource.displayBounds) throw new Error(t('captureSendFailed'))
     const image = new Image()
     image.src = captureSource.thumbnailDataUrl
     await image.decode()
 
-    const scaleX = image.naturalWidth / window.innerWidth
-    const scaleY = image.naturalHeight / window.innerHeight
+    const crop = captureCrop(rect, viewport, content, captureSource.displayBounds, { width: image.naturalWidth, height: image.naturalHeight })
     const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(rect.width * scaleX))
-    canvas.height = Math.max(1, Math.round(rect.height * scaleY))
-
+    canvas.width = crop.width
+    canvas.height = crop.height
     const context = canvas.getContext('2d')
-    if (!context) return
-
-    context.drawImage(
-      image,
-      Math.round(rect.x * scaleX),
-      Math.round(rect.y * scaleY),
-      canvas.width,
-      canvas.height,
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    )
+    if (!context) throw new Error(t('captureSendFailed'))
+    context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height)
 
     const dataUrl = canvas.toDataURL('image/png')
-    const file = dataUrlToFile(dataUrl, `windows-selection-${Date.now()}.png`)
+    const file = dataUrlToFile(dataUrl, `screen-selection-${Date.now()}.png`)
     setSelectionMode(false)
     setCaptureSource(null)
     setSelectionRect(null)
@@ -1282,7 +1319,11 @@ export function PresenterPage() {
     }
 
     setSelectionRect(rect)
-    cropCapture(rect)
+    void cropCapture(rect).catch((error: unknown) => {
+      cancelSelection()
+      setAnalysisError(error instanceof Error ? error.message : t('captureSendFailed'))
+      setControlsOpen(true)
+    })
   }
 
   async function createScreenshotQuestion(draft: QuestionDraft) {
@@ -1358,13 +1399,7 @@ export function PresenterPage() {
     if (error) throw new Error(await edgeFunctionErrorMessage(error, t('resumeFailed')))
     if (!data?.question) throw new Error(data?.message || t('resumeFailed'))
     const activated = data.question as Question
-    setSession((current) => current ? { ...current, current_question_id: activated.id } : current)
-    setQuestion(activated)
-    setQuestions((current) => current.map((item) => item.id === activated.id
-      ? activated
-      : item.status === 'active' ? { ...item, status: 'stopped' as const } : item))
-    setSelectedQuestionId(activated.id)
-    setWorkspaceView('current')
+    showDispatchedQuestion(activated)
   }
 
   async function setCorrectAnswer(answer: string) {
@@ -1559,6 +1594,8 @@ export function PresenterPage() {
       if (error) throw error
       if (!data?.prompt) throw new Error(data?.message || t('noExitTicket'))
       await loadAll()
+      navigateWorkspace('current')
+      setControlsOpen(true)
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : t('exitTicketFailed'))
     } finally {
@@ -1860,7 +1897,7 @@ export function PresenterPage() {
     const presenterToken = requirePresenterToken()
     setBusy(true)
     try {
-      await callPresenter({
+      const data = await callPresenter({
         action: 'create_custom_quiz',
         sessionId,
         presenterToken,
@@ -1870,6 +1907,9 @@ export function PresenterPage() {
         requestedType: settings.requestedType,
         coaching: settings.coaching,
       }, t('quizCreateFailed'))
+      if (!data.question) throw new Error(t('questionCreateFailed'))
+      showDispatchedQuestion(data.question as Question)
+      setFileTransferOpen(false)
     } finally {
       setBusy(false)
     }
@@ -1952,9 +1992,11 @@ export function PresenterPage() {
       const data = await callPresenter({
         action: 'create_file_request', sessionId, presenterToken, promptText,
       }, t('collectStartFailed'))
+      if (!data.question) throw new Error(t('questionCreateFailed'))
       setCollectQuestion(data.question as Question)
       setRawFileResponses([])
-      await loadAll()
+      showDispatchedQuestion(data.question as Question)
+      setFileTransferOpen(false)
     } finally {
       setBusy(false)
     }
@@ -2011,7 +2053,7 @@ export function PresenterPage() {
         sessionId, presenterToken, promptText, answerSeconds,
       }, t)
       if (updated) setSession(updated)
-      setSelectedQuestionId(created.id)
+      showDispatchedQuestion(created)
       setWallComposition(null)
       setSentenceWallOpen(false)
     } catch (error) {
@@ -2035,7 +2077,7 @@ export function PresenterPage() {
       })
       if (error) throw new Error(await edgeFunctionErrorMessage(error, t('photoTaskFailed')))
       if (!data?.question) throw new Error(data?.message || t('photoTaskFailed'))
-      setSelectedQuestionId(data.question.id)
+      showDispatchedQuestion(data.question as Question)
       setPhotoTaskOpen(false)
     } catch (error) {
       setPhotoTaskError(error instanceof Error ? error.message : t('photoTaskFailed'))
@@ -2148,7 +2190,7 @@ export function PresenterPage() {
 
   function selectQuestion(questionId: string) {
     setAnalysisError('')
-    setSelectedQuestionId(questionId)
+    navigateWorkspace('history', questionId)
   }
 
   if (!session) {
@@ -2188,8 +2230,7 @@ export function PresenterPage() {
           {(['activities', 'current', 'history'] as const).map((view) => <button
             key={view} type="button" aria-current={workspaceView === view ? 'page' : undefined}
             onClick={() => {
-              setWorkspaceView(view)
-              if (view === 'current') setSelectedQuestionId(session.current_question_id)
+              navigateWorkspace(view)
             }}
           >{w[view]}</button>)}
         </nav>
@@ -2246,10 +2287,11 @@ export function PresenterPage() {
         />
         </div>
         <div className="presenter-results" hidden={workspaceView === 'activities' || (workspaceView === 'history' && selectedQuestionId === session.current_question_id)}>
+        {dispatchWarning && workspaceView === 'current' && <p className="panel" role="status">{uiText(dispatchWarning)}</p>}
         {question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
           presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
           active={session.status === 'active'} onDispatched={(next) => {
-            setSelectedQuestionId(next.id); setWorkspaceView('current'); void loadAll()
+            showDispatchedQuestion(next)
           }} />}
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
@@ -2311,7 +2353,7 @@ export function PresenterPage() {
           />
         )}
         </div>
-        {workspaceView === 'current' && <button className="workspace-next" type="button" onClick={() => setWorkspaceView('activities')}>{w.next}</button>}
+        {workspaceView === 'current' && <button className="workspace-next" type="button" onClick={() => navigateWorkspace('activities')}>{w.next}</button>}
       </aside>
       )}
       {!window.lingoActDesktop && session.captions_enabled && (
@@ -2359,12 +2401,11 @@ export function PresenterPage() {
         presenterToken={getPresenterToken(sessionId) || ''}
         sessionId={sessionId}
         onClose={() => { setReadingOpen(false); setReadingCapture(null) }}
-        onDispatched={(questionId) => {
+        onDispatched={(questionId, warning) => {
           setReadingOpen(false)
           setReadingCapture(null)
-          setSelectedQuestionId(questionId)
-          setWorkspaceView('current')
-          void loadAll()
+          showDispatchedQuestion(questionId)
+          setDispatchWarning(warning || '')
         }}
       />
 
@@ -2424,11 +2465,10 @@ export function PresenterPage() {
         onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'listening') : undefined}
         onCapturedScreenRead={() => setListeningCapture(null)}
         onClose={() => { setListeningCapture(null); setListeningOpen(false) }}
-        onDispatched={() => {
+        onDispatched={(created) => {
           setListeningCapture(null)
           setListeningOpen(false)
-          setWorkspaceView('current')
-          void loadAll()
+          showDispatchedQuestion(created)
         }}
       />
       <PictureStudioModal
@@ -2445,7 +2485,7 @@ export function PresenterPage() {
         onCaptureScreen={window.lingoActDesktop ? () => void captureWindowsScreen(null, 'picture') : undefined}
         onCapturedScreenRead={() => setPictureCapture(null)}
         onClose={() => { setPictureCapture(null); setPictureOpen(false) }}
-        onDispatched={() => { setPictureCapture(null); setPictureOpen(false); setWorkspaceView('activities') }}
+        onDispatched={(created) => { setPictureCapture(null); setPictureOpen(false); if (created) showDispatchedQuestion(created) }}
         onDispatch={uploadQuestionScreenshot}
       />
       <SentenceWallModal

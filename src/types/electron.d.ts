@@ -5,6 +5,7 @@ export {}
 declare global {
   interface LingoActCaptureSource {
     id: string
+    displayBounds?: { x: number; y: number; width: number; height: number }
     displayId: string | null
     name: string
     width: number
@@ -42,6 +43,7 @@ declare global {
       close: () => Promise<void>
       listCaptureSources: () => Promise<LingoActCaptureSource[]>
       startCaptureSelection: () => Promise<LingoActCaptureSource>
+      captureSelectionContentBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
       finishCaptureSelection: (expanded?: boolean) => Promise<void>
       logDiagnostic: (details: Record<string, string | number | boolean | null | undefined>) => Promise<void>
       supabaseManagement?: (request: {

@@ -9,11 +9,13 @@ export function createSerializedReload() {
     if (!running) {
       running = Promise.resolve().then(async () => {
         try {
+          let failure: unknown
           while (pending) {
             const next = pending
             pending = null
-            await next()
+            try { await next() } catch (error) { failure = error }
           }
+          if (failure) throw failure
         } finally { running = null; pending = null }
       })
     }

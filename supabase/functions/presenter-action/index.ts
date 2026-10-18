@@ -570,6 +570,8 @@ Deno.serve(async (req) => {
     if (action === 'create_file_request') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
       if (await isEnglishSession()) requireEnglishMaterial(promptText)
+      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, new Date().toISOString())
+      if (stopError) throw stopError
       const { data: question, error } = await supabase.from('questions').insert({
         session_id: sessionId,
         type: 'file_upload',

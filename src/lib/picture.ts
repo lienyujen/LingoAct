@@ -1,3 +1,4 @@
+import type { Question } from '../types'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
@@ -188,5 +189,5 @@ export async function dispatchPictureWriting(input: {
   })
   if (error) throw error
   if (!data?.question) throw new Error(data?.message || t('sendFailed'))
-  return data.question as { id: string }
+  return data.question as Question
 }

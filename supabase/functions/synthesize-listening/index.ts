@@ -1,7 +1,7 @@
 import { requireEnglishMaterial } from '../_shared/english-material.ts'
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
-import { buildVoicePlan, contentHash, durationMs, karaokeCues, synthesize, wavFromPcm } from '../_shared/listening.ts'
+import { buildVoicePlan, contentHash, durationMs, karaokeCues, needsKaraokeAlignment, synthesize, wavFromPcm } from '../_shared/listening.ts'
 import { speechAccent } from '../_shared/speech-accent.ts'
 import type { SpeechAccent } from '../_shared/speech-accent.ts'
 import type { ChineseScript, ClipKind, SpeakerGender } from '../_shared/listening.ts'
@@ -58,26 +58,37 @@ Deno.serve(async (req) => {
     // question, not the passage. Returning the clip already paid for keeps the
     // second press of the button free.
     const hash = await contentHash(transcript, language, accent, kind, speakers, speakerGenders)
-    const { data: existing } = await supabase
+    const existingQuery = supabase
       .from('listening_clips')
       .select('*')
       .eq('session_id', sessionId)
-      .eq('content_hash', hash)
+    // An explicit repair reuses the stored recording, even if a newer voice
+    // recipe changed the synthesis hash. It is still scoped to this class.
+    const { data: existing } = await (typeof input.realignClipId === 'string'
+      ? existingQuery.eq('id', input.realignClipId)
+      : existingQuery.eq('content_hash', hash))
       .maybeSingle()
+    if (input.realignClipId && !existing) return jsonResponse({ message: '音声が見つかりません。' }, 404)
     if (existing) {
-      if (!Array.isArray(existing.karaoke_cues) || existing.karaoke_cues.length === 0) {
+      if (input.realignClipId || needsKaraokeAlignment(existing.karaoke_cues, existing.language)) {
         try {
           const audioResponse = await fetch(existing.public_url, { signal: AbortSignal.timeout(8_000) })
           if (!audioResponse.ok) throw new Error(`Stored audio returned ${audioResponse.status}.`)
           const storedWav = new Uint8Array(await audioResponse.arrayBuffer())
-          const cachedPlan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, transcript)
-          const cues = await karaokeCues(storedWav, transcript, language, existing.duration_ms || 0, cachedPlan.speechText, cachedPlan.speakers)
+          const cachedPlan = buildVoicePlan(existing.kind, existing.language, existing.voices?.accent || null, existing.voices?.speakers || [], existing.voices?.speakerGenders || [], existing.transcript)
+          const cues = await karaokeCues(storedWav, existing.transcript, existing.language, existing.duration_ms || 0, cachedPlan.speechText, cachedPlan.speakers)
           const { data: aligned, error: alignError } = await supabase.from('listening_clips')
             .update({ karaoke_cues: cues }).eq('id', existing.id).select('*').single()
           if (alignError) throw alignError
+          // Dispatched activities keep a snapshot. Repairing only the clip
+          // would leave the class looking at the old paragraph-sized cues.
+          const { error: questionError } = await supabase.from('questions').update({ karaoke_cues: cues })
+            .eq('session_id', sessionId).eq('listening_clip_id', existing.id)
+          if (questionError) throw questionError
           return jsonResponse({ clip: aligned, reused: true })
         } catch (error) {
           console.warn('cached clip alignment failed', error instanceof Error ? error.message : error)
+          if (input.realignClipId) throw error
         }
       }
       return jsonResponse({ clip: existing, reused: true })

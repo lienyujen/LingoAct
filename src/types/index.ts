@@ -175,7 +175,7 @@ export type ListeningClip = {
 
 // The teacher's view, assembled server-side where the transcript is readable.
 export type PresenterListeningClip = ListeningClip & {
-  annotation: 'none' | 'zhuyin' | 'pinyin'
+  annotation: 'none' | 'zhuyin' | 'pinyin' | 'furigana'
   annotation_text: string | null
   // The same reading spelled as words. 拼音 only; 注音 has it in the glyphs.
   annotation_words?: ReadingWord[] | null
@@ -726,6 +726,9 @@ export interface FileResponse {
 }
 
 export type ReadingVocabulary = {
+  reading?: string
+  lemma?: string
+  form?: string
   word: string
   level: number
   pos: string
@@ -766,7 +769,7 @@ export type ReadingPassage = {
   // 注音 / 拼音 over this passage, in whichever system the class is set to.
   // zhuyin is the body with the readings set into the glyphs and needs
   // font_url; pinyin is a JSON array of syllables, one per character.
-  annotation?: 'none' | 'zhuyin' | 'pinyin'
+  annotation?: 'none' | 'zhuyin' | 'pinyin' | 'furigana'
   annotation_text?: string | null
   font_url?: string | null
   created_at: string

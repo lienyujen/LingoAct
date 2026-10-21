@@ -19,6 +19,7 @@ const profiles = {
   full: 'LingoAct',
   huayu: 'LingoAct-Huayu',
   english: 'LingoAct-English',
+  japanese: 'LingoAct-JP',
   guoyu: 'LingoAct-Guoyu',
   ncacls: 'LingoAct-TC',
 }

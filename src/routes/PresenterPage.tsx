@@ -1509,8 +1509,8 @@ export function PresenterPage() {
     const items = quizResults?.items || []
     if (!session || !question || quiz?.requested_type !== 'flashcard' || !items.length) return
     const mode = session.reading_annotation
-    if (mode !== 'zhuyin' && mode !== 'pinyin') return
-    if (!resolveTrack(session.teaching_language).language.startsWith('zh')) return
+    if (mode !== 'zhuyin' && mode !== 'pinyin' && mode !== 'furigana') return
+    if (!resolveTrack(session.teaching_language).language.startsWith('zh') && session.teaching_language !== 'ja') return
     // Already done, or being done: a deck is annotated once.
     if (items.some((item) => item.option_readings?.length || item.prompt_reading)) return
     if (annotatingDeck.current === question.id) return
@@ -2278,7 +2278,7 @@ export function PresenterPage() {
           onToggleRecording={toggleCourseRecording}
           onToggleCaptionVisibility={toggleCaptionVisibility}
         />
-        <div className="panel"><LessonPlan key={session.title} courseName={session.title} busy={busy}
+        <div className="panel"><LessonPlan key={session.title} courseName={session.title} teachingLanguage={session.teaching_language} busy={busy}
           onStart={(activity, goal) => openActivity(activity.kind, activity, goal)} /></div>
         </div>
         <div hidden={workspaceView !== 'history'}>

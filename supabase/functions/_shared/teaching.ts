@@ -1,6 +1,7 @@
 import type { Framework } from './proficiency.ts'
 import { levelInstruction } from './proficiency.ts'
 import { englishVocabularyInstruction } from './english.ts'
+import { JAPANESE_TEACHING } from './japanese.ts'
 
 // The class's track and its level, as one instruction, read from the session.
 //
@@ -71,7 +72,7 @@ export const TEACHING_TRACKS: Record<string, TeachingTrack> = {
     audience: 'The learners are native Mandarin-speaking schoolchildren in Taiwan following the 108 國語文 curriculum — 國語 in primary school, 國文 from junior high. Do not write as though for a foreign learner: never gloss ordinary words, and pitch the difficulty at what they can READ and WRITE at this stage rather than at what they can say.',
   },
   en: { id: 'en', frameworks: ['en108', 'cefr', 'gept', 'toeic'], language: 'en', promptLanguage: 'English', audience: 'The learners are studying English as an additional language. Follow their selected school curriculum, CEFR ability level, GEPT level or TOEIC target. Do not assume every learner has Mandarin as a first language. English passages, prompts, options, reference answers, target words and sentence patterns stay in English. Guidance and explanatory feedback follow the selected guidance language. Pronunciation focuses on intelligibility, word stress, sentence stress and connected speech; intelligible accepted American and British variants are not errors.' },
-  ja: { id: 'ja', frameworks: ['jlpt'], language: 'ja', promptLanguage: 'Japanese (日本語)', audience: 'The learners are studying Japanese as a foreign language in Taiwan.' },
+  ja: { id: 'ja', frameworks: ['jf', 'kana', 'jlpt'], language: 'ja', promptLanguage: 'Japanese (日本語)', audience: JAPANESE_TEACHING },
   ko: { id: 'ko', frameworks: ['topik'], language: 'ko', promptLanguage: 'Korean (한국어)', audience: 'The learners are studying Korean as a foreign language in Taiwan.' },
   fr: { id: 'fr', frameworks: ['cefr'], language: 'fr', promptLanguage: 'French (français)', audience: 'The learners are studying French as a foreign language in Taiwan.' },
   es: { id: 'es', frameworks: ['cefr'], language: 'es', promptLanguage: 'Spanish (español)', audience: 'The learners are studying Spanish as a foreign language in Taiwan.' },

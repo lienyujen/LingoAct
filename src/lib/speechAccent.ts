@@ -2,6 +2,7 @@ export { speechAccent } from '../../supabase/functions/_shared/speech-accent.ts'
 export type { SpeechAccent } from '../../supabase/functions/_shared/speech-accent.ts'
 
 export function accentChoices(language: string) {
+  if (language === 'ja') return [{ value: 'japanese' as const, label: 'accentJapanese' as const }]
   if (language === 'en' || language.startsWith('en-')) return [
     { value: 'american' as const, label: 'accentAmerican' as const },
     { value: 'british' as const, label: 'accentBritish' as const },

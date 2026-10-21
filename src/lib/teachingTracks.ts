@@ -23,7 +23,7 @@ import type { Framework } from './proficiency'
 // speak it, laddered by TBCL or by the TOCFL test they sit, and annotated in
 // 注音 or 拼音 depending on who is in the room. A question written for one is
 // wrong for the other even at a comparable reading level.
-export type Annotation = 'none' | 'zhuyin' | 'pinyin'
+export type Annotation = 'none' | 'zhuyin' | 'pinyin' | 'furigana'
 
 export type TeachingTrack = {
   id: string
@@ -75,7 +75,7 @@ export const TEACHING_TRACKS: TeachingTrack[] = [
     annotation: 'none',
     annotationChoice: false,
   },
-  { id: 'ja', label: '日語', note: '日本語能力試驗 JLPT', language: 'ja', frameworks: ['jlpt'], annotation: 'none', annotationChoice: false },
+  { id: 'ja', label: '日語', note: '假名入門・日常溝通・JLPT', language: 'ja', frameworks: ['jf', 'kana', 'jlpt'], annotation: 'furigana', annotationChoice: true },
   { id: 'ko', label: '韓語', note: '韓語能力測驗 TOPIK', language: 'ko', frameworks: ['topik'], annotation: 'none', annotationChoice: false },
   { id: 'fr', label: '法語', note: 'CEFR', language: 'fr', frameworks: ['cefr'], annotation: 'none', annotationChoice: false },
   { id: 'es', label: '西班牙語', note: 'CEFR', language: 'es', frameworks: ['cefr'], annotation: 'none', annotationChoice: false },

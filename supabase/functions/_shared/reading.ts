@@ -28,6 +28,7 @@ import type { MandarinAccent } from './mandarin-pronunciation.ts'
 import type { SpeechAccent } from './speech-accent.ts'
 import { englishWords, englishNewWords, englishReadingTargets, englishVocabularyInstruction } from './english.ts'
 import { HSK_GRAMMAR, applyHskWordPinyin, hskPinyinInstruction, hskLevelOf, hskWordLevel, hskOverLevelWords, hskOverLevelComplaint } from './hsk.ts'
+import { JAPANESE_READINGS, JAPANESE_GRAMMAR, japaneseReadingTarget, settleJapaneseWords } from './japanese.ts'
 
 export type ReadingAnnotationGloss = Record<string, string>
 
@@ -36,6 +37,9 @@ export type ReadingVocabulary = {
   level: number
   pos: string
   gloss: ReadingAnnotationGloss
+  reading?: string
+  lemma?: string
+  form?: string
 }
 
 export type ReadingGrammar = {
@@ -386,7 +390,7 @@ async function glossNewWords(
   const result = await callAiJson(
     [
       `這些是一篇${languageName}短文裡學生還沒學過的詞。請只做兩件事：給詞類，並翻譯。`,
-      languageName === 'English' ? 'Use English part-of-speech labels. Explain only the sense used in the supplied passage; keep English words and patterns unchanged inside explanations.' : '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
+      languageName === 'Japanese' ? 'Use Japanese part-of-speech labels (名詞、動詞、形容詞、副詞). Explain the sense in this passage using each requested explanation language. Keep Japanese quoted forms unchanged.' : languageName === 'English' ? 'Use English part-of-speech labels. Explain only the sense used in the supplied passage; keep English words and patterns unchanged inside explanations.' : '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
       '翻譯要短，說出這個詞在這篇文章裡的意思，不要只換一個同義詞。',
       '不要增加或刪除任何詞，回傳的順序與輸入相同。',
     ].join('\n'),
@@ -431,6 +435,7 @@ async function glossNewWords(
 export async function generateReadingPassage(input: ReadingInput): Promise<ReadingPassage | null> {
   input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
   if (resolveTrack(input.teachingLanguage).language === 'en') return generateEnglishReading(input)
+  if (resolveTrack(input.teachingLanguage).language === 'ja') return generateJapaneseReading(input)
   if (input.levelFramework === 'hsk' && !hskLevelOf(input.levelFramework, input.levelCode)) throw new Error('An HSK level is required for reading.')
   const hsk = input.levelFramework === 'hsk'
   const tbcl = hsk ? hskLevelOf(input.levelFramework, input.levelCode) : tbclLevelOf(input.levelFramework, input.levelCode)
@@ -541,6 +546,69 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   }
 }
 
+async function generateJapaneseReading(input: ReadingInput): Promise<ReadingPassage | null> {
+  const target = japaneseReadingTarget(input.levelFramework, input.levelCode, input.levelStretch)
+  const schema = passageSchema()
+  const japaneseSchema = {
+    ...schema,
+    properties: { ...schema.properties, vocabulary: {
+      type: 'array', items: { type: 'object', additionalProperties: false,
+        properties: { word: { type: 'string' }, reading: { type: 'string' }, lemma: { type: 'string' }, form: { type: 'string' } },
+        required: ['word', 'reading', 'lemma', 'form'],
+      },
+    } },
+    required: [...schema.required, 'vocabulary'],
+  }
+  const instruction = [
+    trackInstruction('ja'), levelInstruction(input.levelFramework, input.levelCode, input.direction),
+    `Write one coherent Japanese passage of about ${target.min}–${target.max} Japanese characters. This is an editorial classroom target, not an official examination specification.`,
+    target.instruction, JAPANESE_READINGS,
+    'Use the supplied material or image as the source. In kana-entry classes, write very short kana-only expressions within the selected practice range.',
+    'Nominate up to 10 useful vocabulary items from the body, omitting familiar function words and names. Copy each inflected surface word exactly; give its contextual hiragana reading, dictionary form (lemma), and a short Japanese form label (e.g. ます形・過去). Use an empty form for uninflected words. These are aids for this passage, not official JLPT list entries.',
+    `Identify up to four grammar points from this editorial menu: ${JAPANESE_GRAMMAR.join('、')}. Copy the exact evidence into span. Do not annotate a point without evidence.`,
+  ].join('\n')
+  const payload = { source: input.source, direction: input.direction }
+  let result = await callAiJson(instruction, payload, japaneseSchema, input.image || null, 'deep')
+  if (result.status !== 'success') return null
+  const output = result.output as Record<string, unknown>
+  const body = String(output.body || '').trim()
+  if (!body) return null
+  let words = settleJapaneseWords(output.words, body)
+  if (!words.length) {
+    result = await callAiJson(JAPANESE_READINGS, { text: body }, {
+      type: 'object', properties: { words: schema.properties.words }, required: ['words'], additionalProperties: false,
+    }, null, 'realtime')
+    if (result.status !== 'success') throw new Error('日本語の読み方を生成できませんでした。')
+    words = settleJapaneseWords((result.output as Record<string, unknown>).words, body)
+    if (!words.length) throw new Error('日本語の読み方が本文と一致しません。')
+  }
+  const spans = new Set(words.map(word => word.text))
+  const seen = new Set<string>()
+  const metadata = new Map<string, { reading: string; lemma: string; form: string }>()
+  for (const raw of Array.isArray(output.vocabulary) ? output.vocabulary : []) {
+    if (!raw || typeof raw !== 'object') continue
+    const item = raw as Record<string, unknown>
+    const word = String(item.word || '')
+    if (!spans.has(word) || seen.has(word) || seen.size >= 10) continue
+    seen.add(word)
+    const reading = words.find(entry => entry.text === word)?.pinyin || String(item.reading || '')
+    metadata.set(word, { reading: /^[\p{Script=Hiragana}ー]+$/u.test(reading) ? reading : '', lemma: String(item.lemma || ''), form: String(item.form || '') })
+  }
+  const locales = [...new Set(['ja', 'zh_tw', ...input.locales])]
+  const vocabulary = (await glossNewWords([...seen].map(word => ({ word, level: 0 })), locales, 'Japanese', body))
+    .filter(entry => metadata.has(entry.word)).map(entry => ({ ...entry, ...metadata.get(entry.word) }))
+  const points = new Set<string>()
+  const grammar: ReadingGrammar[] = (Array.isArray(output.grammar) ? output.grammar : []).flatMap(raw => {
+    if (!raw || typeof raw !== 'object') return []
+    const entry = raw as Record<string, unknown>
+    const point = String(entry.point || ''), span = String(entry.span || '')
+    if (!JAPANESE_GRAMMAR.includes(point) || !span || !body.includes(span) || points.has(point)) return []
+    points.add(point)
+    return [{ point: `Japanese: ${point}`, level: 0, example: '', span, note: {} }]
+  }).slice(0, 4)
+  return { title: String(output.title || '').trim(), body, words, vocabulary, grammar }
+}
+
 async function generateEnglishReading(input: ReadingInput): Promise<ReadingPassage | null> {
   const target = englishReadingTargets(input.levelFramework, input.levelCode, input.levelStretch)
   const menu = [...ENGLISH_GRAMMAR.map(entry => entry.point.toLowerCase()), 'present simple', 'present continuous', 'past simple', 'future forms', 'modal verbs', 'comparatives', 'relative clauses', 'passive voice', 'perfect aspect', 'conditionals', 'cause and result', 'contrast and concession', 'reference and cohesion']
@@ -623,7 +691,7 @@ export async function writeMissingGrammarNotes(
 
   const result = await callAiJson(
     [
-      points.every((entry) => entry.point.startsWith('English: ')) ? 'You explain English grammar to language learners. These are LingoAct teaching categories with examples from the passage, not official HSK or TBCL grammar. Explain in each requested guidance language, retaining English words and patterns as English.' : '你是華語文法說明助理。下面是臺灣華語文能力基準的語法點，每一個附了官方例句。',
+      points.every((entry) => entry.point.startsWith('Japanese: ')) ? 'Explain Japanese grammar to learners in each requested guidance language. These are editorial teaching categories, not official JLPT lists or Chinese grammar. Preserve Japanese patterns and illustrate their actual usage; do not invent an official example.' : points.every((entry) => entry.point.startsWith('English: ')) ? 'You explain English grammar to language learners. These are LingoAct teaching categories with examples from the passage, not official HSK or TBCL grammar. Explain in each requested guidance language, retaining English words and patterns as English.' : '你是華語文法說明助理。下面是臺灣華語文能力基準的語法點，每一個附了官方例句。',
       '請為每一個語法點寫一到兩句說明：這個句型在做什麼、什麼時候用。寫給學語言的人看，不是寫給語言學家看。',
       '用每一個要求的語言各寫一份，意思相同。不要重述例句，不要加上級別或術語。',
     ].join('\n'),

@@ -6,6 +6,8 @@ import { scPresenterMessages } from './scLocales.generated'
 import { supportsChineseSystemLanguage, scSystemLanguage } from './scSystemLanguage'
 import { setUiLanguage } from './uiText'
 import { APP_PROFILE } from './appProfiles'
+import { japanesePresenter } from './japaneseLocales'
+import { japaneseInterfaceLanguage } from './japaneseInterface'
 
 // The teacher's own interface, in the language of the class they are teaching.
 //
@@ -22,6 +24,8 @@ export type PresenterLocale = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'es' | 'f
 
 const messages = {
   'zh-TW': {
+    japaneseLevelRequired: '請先選擇日語學習範圍或程度，再開始上課。',
+    annotationFurigana: '振假名', accentJapanese: '標準日語',
     hskLevelRequired: '請先選擇 HSK 級別，再開始上課。',
     // 控制面板
     onlineCount: '線上 {n} 人',
@@ -555,6 +559,8 @@ const messages = {
     sendNow: '立即派送',
   },
   en: {
+    japaneseLevelRequired: 'Choose a Japanese learning range or level before starting class.',
+    annotationFurigana: 'Furigana', accentJapanese: 'Standard Japanese',
     hskLevelRequired: 'Choose an HSK level before starting class.',
     onlineCount: '{n} online',
     startBuzzer: 'Start buzz-in', restartBuzzer: 'Restart buzz-in', noOneOnline: "No students online",
@@ -1072,6 +1078,7 @@ export function presenterText(
 ) {
   const template = (locale === 'zh-TW' || locale === 'en')
     ? messages[locale][key]
+    : locale === 'ja' ? japanesePresenter[key] ?? messages.en[key]
     : locale === 'zh-CN' ? scPresenterMessages[key] ?? messages.en[key]
       : generatedPresenterLocales[locale]?.[key] ?? messages.en[key]
   if (!values) return template
@@ -1086,6 +1093,7 @@ const presenterLocales: readonly string[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko',
 // spelling; the locale tables key on BCP-47. Converting here rather than
 // renaming either side keeps rows already written valid.
 export function presenterLocaleFor(teachingLanguage: string | null | undefined, systemLanguage?: string | null, guidanceLanguage?: string | null): PresenterLocale {
+  if (APP_PROFILE.id === 'japanese') return japaneseInterfaceLanguage()
   if (APP_PROFILE.id === 'ncacls') return 'zh-TW'
   if (APP_PROFILE.id === 'sc') return 'zh-CN'
   if (teachingLanguage === 'en' && guidanceLanguage && presenterLocales.includes(guidanceLanguage)) return guidanceLanguage as PresenterLocale
@@ -1108,6 +1116,7 @@ export function savePresenterLocale(sessionId: string, locale: PresenterLocale) 
 }
 
 export function storedPresenterLocale(sessionId: string): PresenterLocale {
+  if (APP_PROFILE.id === 'japanese') return japaneseInterfaceLanguage()
   if (APP_PROFILE.id === 'ncacls') return 'zh-TW'
   const stored = window.localStorage.getItem(`${LOCALE_PREFIX}${sessionId}`)
   return (stored && presenterLocales.includes(stored) ? stored : 'zh-TW') as PresenterLocale

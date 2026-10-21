@@ -1,4 +1,5 @@
 import { usePresenterLocale } from './presenterI18n'
+import { japaneseWorkspace } from './japaneseLocales'
 
 const zh = {
   activities: '開始活動', current: '目前活動', history: '課堂紀錄',
@@ -46,4 +47,4 @@ export function useWorkspaceText() {
   return workspaceText(locale)
 }
 
-export function workspaceText(locale: string) { return locale === 'zh-CN' ? cn : locale === 'zh-TW' ? zh : en }
+export function workspaceText(locale: string): Record<keyof typeof zh, string> { return locale === 'ja' ? japaneseWorkspace as Record<keyof typeof zh, string> : locale === 'zh-CN' ? cn : locale === 'zh-TW' ? zh : en }

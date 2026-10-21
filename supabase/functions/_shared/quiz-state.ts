@@ -5,5 +5,6 @@ export function quizGenerationFailed(title: unknown) {
     '出題失敗，請重新派送', '出题失败，请重新发送',
     'Question generation failed. Please try again.',
     'Question generation failed. Please send it again.',
+    '問題を生成できませんでした。もう一度配信してください。',
   ]).has(title)
 }

@@ -28,7 +28,7 @@ export async function annotateCardDeck(input: {
   presenterToken: string
   questionId: string
   items: QuizItem[]
-  mode: 'zhuyin' | 'pinyin'
+  mode: 'zhuyin' | 'pinyin' | 'furigana'
 }, t: PresenterT = presenterLookup('zh-TW')) {
   // Every word in the deck, flattened, so the whole deck is one request and the
   // font subset is cut from every character at once. A card contributes its
@@ -57,6 +57,19 @@ export async function annotateCardDeck(input: {
   let perWord: string[]
   if (input.mode === 'zhuyin') {
     perWord = marked.annotationText.split(SEPARATOR)
+  } else if (input.mode === 'furigana') {
+    if (!marked.words?.length || marked.words.map(word => word.text).join('') !== joined) throw new Error(t('readingCountMismatch'))
+    // Whole words such as 今日 have one contextual reading. Splitting that
+    // reading across kanji would teach an invented character pronunciation.
+    perWord = ['']
+    for (const span of marked.words) {
+      const parts = span.text.split(SEPARATOR)
+      if (parts.length > 1 && span.pinyin) throw new Error(t('readingCountMismatch'))
+      for (const [index, part] of parts.entries()) {
+        if (index) perWord.push('')
+        perWord[perWord.length - 1] += span.pinyin || part
+      }
+    }
   } else {
     // A syllable per character of the joined text; walk it back into words.
     const syllables = JSON.parse(marked.annotationText) as string[]

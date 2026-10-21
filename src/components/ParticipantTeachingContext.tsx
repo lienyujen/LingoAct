@@ -8,7 +8,7 @@ type Context = { waiting?: boolean; role?: string; partner?: string; material?: 
 export function ParticipantTeachingContext({ question, sessionId, participantId, participantToken, locale, active }: {
   question: Question; sessionId: string; participantId: string; participantToken: string; locale: ParticipantLocale; active: boolean
 }) {
-  const zh = locale === 'zh-TW' || locale === 'zh-CN'
+  const zh = locale === 'zh-TW' || locale === 'zh-CN' || locale === 'ja'
   const [context, setContext] = useState<Context | null>(null)
   const [result, setResult] = useState('')
   const [error, setError] = useState('')

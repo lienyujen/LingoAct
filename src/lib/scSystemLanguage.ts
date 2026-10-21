@@ -20,5 +20,5 @@ function subscribe(changed: () => void) {
     window.removeEventListener('storage', changed)
   }
 }
-export function useScSystemLanguage() { return useSyncExternalStore(subscribe, scSystemLanguage) }
+export function useScSystemLanguage() { return useSyncExternalStore(subscribe, scSystemLanguage, scSystemLanguage) }
 export const supportsChineseSystemLanguage = APP_PROFILE.id === 'sc' || APP_PROFILE.id === 'huayu'

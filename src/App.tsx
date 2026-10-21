@@ -22,14 +22,29 @@ import { supportsChineseSystemLanguage, useScSystemLanguage } from './lib/scSyst
 import { setUiLanguage, useUiLanguage } from './lib/uiText'
 import { useEffect } from 'react'
 import { APP_PROFILE } from './lib/appProfiles'
+import { useJapaneseInterfaceLanguage } from './lib/japaneseInterface'
+import { brandFromSearch } from './lib/brand'
+import japaneseLogo from './assets/jp-logo.png'
 
 function AppRoutes() {
+  const japaneseLanguage = useJapaneseInterfaceLanguage()
   const systemLanguage = useScSystemLanguage()
   const location = useLocation()
   useEffect(() => {
+    if (brandFromSearch(new URLSearchParams(location.search)) !== 'japanese') return
+    document.title = 'LingoAct-JP'
+    const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (!icon) return
+    const previous = { href: icon.href, type: icon.type }
+    icon.href = japaneseLogo
+    icon.type = 'image/png'
+    return () => { icon.href = previous.href; icon.type = previous.type }
+  }, [location.search])
+  useEffect(() => {
+    if (APP_PROFILE.id === 'japanese' && !location.pathname.startsWith('/participant/') && !location.pathname.startsWith('/join/')) setUiLanguage(japaneseLanguage)
     if (APP_PROFILE.id === 'ncacls' && !location.pathname.startsWith('/participant/')) setUiLanguage('zh-TW')
     if (supportsChineseSystemLanguage && (location.pathname === '/' || location.pathname === '/presenter/new' || !isSupabaseConfigured)) setUiLanguage(systemLanguage)
-  }, [systemLanguage, location.pathname])
+  }, [systemLanguage, japaneseLanguage, location.pathname])
   const returnFromSessionReport = useSessionReportBack()
   const isDesktop = Boolean(window.lingoActDesktop)
   const isDesktopOverlay = location.pathname.startsWith('/desktop-overlay/')
@@ -82,15 +97,16 @@ function AppRoutes() {
 }
 
 export function App() {
+  const japaneseLanguage = useJapaneseInterfaceLanguage()
   const uiLanguage = useUiLanguage()
   const systemLanguage = useScSystemLanguage()
   useEffect(() => {
     document.documentElement.lang = uiLanguage
-    if (supportsChineseSystemLanguage) document.title = APP_PROFILE.productName
+    if (supportsChineseSystemLanguage || APP_PROFILE.id === 'japanese') document.title = APP_PROFILE.productName
   }, [uiLanguage])
   return (
     <HashRouter>
-      <PresenterLocaleContext.Provider value={supportsChineseSystemLanguage ? systemLanguage : APP_PROFILE.defaultTrack === 'en' ? (uiLanguage === 'zh-TW' ? 'zh-TW' : 'en') : presenterLocaleFor(APP_PROFILE.defaultTrack)}>
+      <PresenterLocaleContext.Provider value={APP_PROFILE.id === 'japanese' ? japaneseLanguage : supportsChineseSystemLanguage ? systemLanguage : APP_PROFILE.defaultTrack === 'en' ? (uiLanguage === 'zh-TW' ? 'zh-TW' : 'en') : presenterLocaleFor(APP_PROFILE.defaultTrack)}>
       <ErrorBoundary>
         <AppRoutes />
       </ErrorBoundary>

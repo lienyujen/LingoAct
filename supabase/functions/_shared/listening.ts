@@ -92,7 +92,8 @@ export function buildVoicePlan(
   const accent = accentFor(language, accentChoice)
   const pronunciation = language === 'zh-cn' ? 'Use standard Mainland Putonghua. Do not use Taiwan pronunciation or cross-strait vocabulary substitutions.'
     : language.startsWith('zh') ? regionalPronunciationInstruction(text, mandarinAccent)
-      : language.startsWith('en') ? englishPronunciationInstruction(accentChoice === 'british' ? 'british' : 'american') : ''
+      : language.startsWith('en') ? englishPronunciationInstruction(accentChoice === 'british' ? 'british' : 'american')
+        : language === 'ja' ? 'Read in natural standard Japanese. Preserve long vowels, small っ, ん, contracted sounds and natural mora timing. Pronounce particles は, へ and を in context. Keep all supplied words unchanged; do not read ruby, romaji or explanations aloud.' : ''
   let speechText = language.startsWith('zh') && language !== 'zh-cn' ? regionalSpeechText(text, mandarinAccent) : text
   if (kind === 'dialogue' && speakers.length >= 2) {
     if (language.startsWith('zh') && language !== 'zh-cn') {
@@ -432,7 +433,7 @@ function alignWordInfo(payload: unknown, transcript: string, language: string, t
 }
 
 function splitChineseCue(cue: KaraokeCue, transcript: string, language: string) {
-  if (!language.toLowerCase().startsWith('zh')) return [cue]
+  if (!/^(?:zh|ja)(?:-|$)/i.test(language)) return [cue]
   const indexes = [...transcript].slice(cue.start_index, cue.end_index)
     .map((character, offset) => /\p{L}|\p{N}/u.test(character) ? cue.start_index + offset : -1)
     .filter((index) => index >= 0)
@@ -458,7 +459,9 @@ function measuredPace(result: Array<KaraokeCue | null>, totalMs: number) {
 }
 
 function fallbackCues(transcript: string, totalMs: number, language: string) {
-  const matcher = language.toLowerCase().startsWith('zh')
+  // Japanese has no spaces either. Whole runs would discard word-sized ASR
+  // anchors in completeCues and light up an entire clause at once.
+  const matcher = /^(?:zh|ja)(?:-|$)/i.test(language)
     ? /[\p{L}\p{N}]/gu
     : /[\p{L}\p{N}]+/gu
   const tokens = [...transcript.matchAll(matcher)]
@@ -479,6 +482,11 @@ function fallbackCues(transcript: string, totalMs: number, language: string) {
     elapsed += span
     return cue
   })
+}
+
+export function needsKaraokeAlignment(cues: unknown, language: string) {
+  if (!Array.isArray(cues) || !cues.length) return true
+  return /^ja(?:-|$)/i.test(language) && cues.some((cue: KaraokeCue) => cue.end_index - cue.start_index > 1)
 }
 
 // ASR occasionally omits a short particle or recognises a homophone. Its

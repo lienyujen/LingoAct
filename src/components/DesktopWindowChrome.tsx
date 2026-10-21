@@ -1,5 +1,7 @@
 import { ArrowLeft, DotsSixVertical, Minus, X } from '@phosphor-icons/react'
 import { usePresenterText } from '../lib/presenterI18n'
+import { JapaneseInterfaceSelector } from './JapaneseInterfaceSelector'
+import { APP_PROFILE } from '../lib/appProfiles'
 
 interface DesktopWindowChromeProps {
   confirmClose?: boolean
@@ -22,9 +24,10 @@ export function DesktopWindowChrome({ confirmClose = true, onBack }: DesktopWind
     <header className="desktop-window-chrome">
       <div className="desktop-drag-handle" title={t('dragWindow')}>
         <DotsSixVertical size={16} />
-        <span>LingoAct</span>
+        <span>{APP_PROFILE.id === 'japanese' ? APP_PROFILE.productName : 'LingoAct'}</span>
       </div>
       <div className="desktop-window-actions">
+        <JapaneseInterfaceSelector />
         {onBack && (
           <button aria-label={t('backToSessions')} title={t('backToSessions')} type="button" onClick={() => void onBack()}>
             <ArrowLeft size={16} />

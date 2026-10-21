@@ -21,11 +21,12 @@ on:
           - mac
         default: all
       edition:
-        description: 'Choose all editions, English, or the three Mandarin teaching editions'
+        description: 'Choose all editions, English, Japanese, or the three Mandarin teaching editions'
         type: choice
         options:
           - all
           - english
+          - japanese
           - mandarin
         default: all
 
@@ -86,6 +87,18 @@ jobs:
             product: LingoAct
             target: --win zip --x64
             artifact: LingoAct-Full.zip
+          - label: Windows Japanese
+            os: windows-latest
+            profile: japanese
+            product: LingoAct-JP
+            target: --win zip --x64
+            artifact: LingoAct-JP.zip
+          - label: macOS Japanese
+            os: macos-latest
+            profile: japanese
+            product: LingoAct-JP
+            target: --mac dmg --universal
+            artifact: LingoAct-JP.dmg
           - label: Windows English
             os: windows-latest
             profile: english
@@ -124,13 +137,13 @@ jobs:
             artifact: LingoAct-TC.dmg
     steps:
       - name: Checkout
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup pnpm
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           # In step with the workflows and Cloudflare Pages: this repository's
@@ -138,21 +151,21 @@ jobs:
           version: 11.7.0
 
       - name: Setup Node
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install dependencies
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         run: pnpm install --frozen-lockfile
 
       # 17 MB of binary deliberately kept out of git, and named in
       # extraResources — so without this the packaging step fails outright
       # looking for resources/fonts, and it is the注音 every Chinese class uses.
       - name: Fetch the Bopomofo font
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         run: node scripts/fetch-bopomofo-font.mjs
 
       # pnpm lint starts with tsc -b and runs the schema checks. The schema ones
@@ -161,25 +174,25 @@ jobs:
       # this with a project that has no tables and a setup screen that only says
       # 建立資料表失敗.
       - name: Lint, typecheck and check the schema
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         run: pnpm lint
 
       # Deliberately built with no Supabase project configured: whoever downloads
       # this enters their own on first launch. Baking one in would send every
       # class to that project and bill its owner for everyone's AI usage.
       - name: Build
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         run: pnpm build
 
       - name: Check classroom synchronization and teaching regressions
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         run: pnpm test:offline
 
       # The build above is only credential-free because no .env reaches the runner.
       # Check the bundle rather than trust that, so a committed .env fails the
       # release instead of shipping one person's project to everyone who downloads it.
       - name: Verify no project is baked in
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         shell: bash
         run: |
           # Matches a real key, not the setup screen's own placeholder and
@@ -196,7 +209,7 @@ jobs:
       # only the second app was ever inspected; a bad Huayu DMG could therefore
       # be published beside a perfectly valid NCACLS one.
       - name: Package ${{ matrix.product }}
-        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         shell: bash
         env:
           APP_PROFILE: ${{ matrix.profile }}
@@ -207,12 +220,12 @@ jobs:
           pnpm exec electron-builder $TARGET --publish never
 
       - name: Distinguish the full edition download
-        if: (matrix.profile == 'full' && (github.event_name == 'push' || inputs.platform == 'all')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (matrix.profile == 'full' && (github.event_name == 'push' || inputs.platform == 'all')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         shell: bash
         run: mv release/LingoAct.zip release/LingoAct-Full.zip
 
       - name: Verify the Windows app starts
-        if: (matrix.os == 'windows-latest' && (github.event_name == 'push' || inputs.platform == 'all')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (matrix.os == 'windows-latest' && (github.event_name == 'push' || inputs.platform == 'all')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         env:
           PRODUCT: ${{ matrix.product }}
         shell: bash
@@ -229,7 +242,7 @@ jobs:
       # invoking --version makes macOS load the universal executable; lipo by
       # itself only proves both slices exist, not that the kernel accepts them.
       - name: Verify the Mac app and DMG
-        if: (matrix.os == 'macos-latest' && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'mac')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (matrix.os == 'macos-latest' && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'mac')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         env:
           PRODUCT: ${{ matrix.product }}
         run: |
@@ -261,7 +274,7 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSScreenCaptureUsageDescription' "$app/Contents/Info.plist"
 
       - name: Upload build
-        if: ((github.event_name == 'push' || inputs.publish) && (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: ((github.event_name == 'push' || inputs.publish) && (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
@@ -273,7 +286,7 @@ jobs:
           gh release upload "$TAG" "release/$ARTIFACT" --clobber
 
       - name: Save a build-only preview
-        if: (github.event_name == 'workflow_dispatch' && !inputs.publish && (inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (github.event_name == 'workflow_dispatch' && !inputs.publish && (inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.label }}
@@ -308,6 +321,7 @@ jobs:
           | LingoAct 簡體中文／HSK 版 | `LingoAct.zip` | `LingoAct.dmg` |
           | 華語教學版（預設繁體，可選簡體或 English） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
           | 完整教學版 | `LingoAct-Full.zip` | — |
+          | 日語教學版 | `LingoAct-JP.zip` | `LingoAct-JP.dmg` |
           | 英語教學版 | `LingoAct-English.zip` | `LingoAct-English.dmg` |
           | 繁體中文版（TC） | `LingoAct-TC.zip` | `LingoAct-TC.dmg` |
           | 國語教學版 | `LingoAct-Guoyu.zip` | — |
@@ -348,7 +362,7 @@ jobs:
           MD
           )
           if [[ "$EDITION" == "mandarin" ]]; then
-            notes=$(printf '%s\n' "$notes" | sed '/| 完整教學版 |/d; /| 英語教學版 |/d; /| 國語教學版 |/d')
+            notes=$(printf '%s\n' "$notes" | sed '/| 完整教學版 |/d; /| 英語教學版 |/d; /| 日語教學版 |/d; /| 國語教學版 |/d')
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             # A same-version rebuild is intentional: replace only the assets

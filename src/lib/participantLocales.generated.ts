@@ -1493,6 +1493,8 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "drawImportTooLarge": "Ảnh lớn hơn 20 MB. Hãy giảm kích thước trước khi tải lên."
   },
   "th": {
+    "listeningHideFurigana": "ซ่อนฟุริงานะ",
+    "listeningShowFurigana": "แสดงฟุริงานะ",
     "translating": "กำลังแปล…",
     "translationUnavailable": "ระบบแปลภาษาไม่พร้อมใช้งานชั่วคราว กำลังแสดงคำอธิบายภาษาอังกฤษ",
     "language": "ภาษา",
@@ -1807,6 +1809,8 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "บันทึกเสียงใหม่อีกครั้ง"
   },
   "id": {
+    "listeningHideFurigana": "Sembunyikan furigana",
+    "listeningShowFurigana": "Tampilkan furigana",
     "translating": "Menerjemahkan…",
     "translationUnavailable": "Terjemahan sedang tidak tersedia. Menampilkan penjelasan bahasa Inggris.",
     "language": "Bahasa",

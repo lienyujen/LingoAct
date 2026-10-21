@@ -24,7 +24,7 @@ const KEY = APP_PROFILE.id === 'full'
 const defaultTrack = resolveTrack(APP_PROFILE.defaultTrack)
 
 export const defaultCourse: CoursePreset = {
-  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: APP_PROFILE.id === 'sc' ? 'zh-CN' : defaultTrack.id === 'en' ? 'en' : 'zh-TW',
+  title: '', teachingTrack: defaultTrack.id, guidanceLanguage: APP_PROFILE.id === 'japanese' ? 'ja' : APP_PROFILE.id === 'sc' ? 'zh-CN' : defaultTrack.id === 'en' ? 'en' : 'zh-TW',
   levelFramework: defaultTrack.frameworks[0], levelCode: '',
   readingAnnotation: defaultTrack.annotation,
 }
@@ -44,7 +44,7 @@ export function readCoursePresets(): CoursePreset[] {
         && track.frameworks.some((id) => id === course.levelFramework)
         && (course.levelCode === '' || Boolean(framework?.levels.some((level) => level.code === course.levelCode)))
         && GUIDANCE_LOCALES.some((locale) => locale.code === course.guidanceLanguage)
-        && (track.annotationChoice ? ['none', 'zhuyin', 'pinyin'].includes(course.readingAnnotation) : course.readingAnnotation === track.annotation)
+        && (track.annotationChoice ? (track.id === 'ja' ? ['none', 'furigana'] : ['none', 'zhuyin', 'pinyin']).includes(course.readingAnnotation) : course.readingAnnotation === track.annotation)
     }).slice(0, 6)
   } catch {
     return []

@@ -123,7 +123,7 @@ export function LanguagePairFields({
             {choices.length > 1 ? <em>{uiText(framework.name)}</em> : <em>{t('levelFromTrack', { name: uiText(framework.name) })}</em>}
           </span>
           <div className={activeId === 'toeic' ? 'toeic-level-groups' : 'language-pair-options'}>
-            {activeId !== 'hsk' && track.id !== 'en' && <button
+            {activeId !== 'hsk' && track.id !== 'en' && track.id !== 'ja' && <button
               aria-pressed={!levelCode}
               className={!levelCode ? 'language-chip selected' : 'language-chip'}
               type="button"
@@ -168,11 +168,14 @@ export function LanguagePairFields({
           <span className="language-pair-label">{t('readingAnnotationLabel')}</span>
           <p className="language-pair-hint">{t('readingAnnotationHint')}</p>
           <div className="language-pair-options">
-            {[
+            {(track.id === 'ja' ? [
+              { code: 'furigana', label: t('annotationFurigana') },
+              { code: 'none', label: t('annotationNone') },
+            ] : [
               { code: 'zhuyin', label: t('annotationZhuyin') },
               { code: 'pinyin', label: t('annotationPinyin') },
               { code: 'none', label: t('annotationNone') },
-            ].map((option) => (
+            ]).map((option) => (
               <button
                 aria-pressed={readingAnnotation === option.code}
                 className={readingAnnotation === option.code ? 'language-chip selected' : 'language-chip'}
@@ -199,7 +202,7 @@ export function LanguagePairFields({
               type="button"
               onClick={() => onGuidanceChange(locale.code)}
             >
-              <strong>{locale.label}</strong>
+              <strong>{APP_PROFILE.id === 'japanese' && locale.code === 'zh-TW' ? '中文' : uiText(locale.label)}</strong>
             </button>
           ))}
         </div>

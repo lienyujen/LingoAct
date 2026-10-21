@@ -141,7 +141,7 @@ export async function dispatchListeningQuiz(input: {
 }
 
 
-export type AnnotationMode = 'none' | 'zhuyin' | 'pinyin'
+export type AnnotationMode = 'none' | 'zhuyin' | 'pinyin' | 'furigana'
 
 // Which reading system this class uses, if any. A track that is not Chinese has
 // no 注音 or 拼音 to put over anything, whatever the stored setting says.
@@ -150,7 +150,7 @@ export function classAnnotation(
 ): AnnotationMode {
   if (!session) return 'none'
   if (!resolveTrack(session.teaching_language).language.startsWith('zh')) return 'none'
-  return session.reading_annotation === 'zhuyin' || session.reading_annotation === 'pinyin'
+  return session.reading_annotation === 'zhuyin' || session.reading_annotation === 'pinyin' || session.reading_annotation === 'furigana'
     ? session.reading_annotation
     : 'none'
 }
@@ -206,7 +206,7 @@ export async function applyAnnotation(input: {
       listeningClipId: input.clipId,
       annotation: input.mode,
       annotationText: input.mode === 'none' ? '' : input.annotationText,
-      annotationWords: input.mode === 'pinyin' ? input.annotationWords || [] : [],
+      annotationWords: input.mode === 'pinyin' || input.mode === 'furigana' ? input.annotationWords || [] : [],
       fontBase64,
     },
   })
@@ -242,7 +242,7 @@ export async function applyReadingAnnotation(input: {
       questionId: input.questionId,
       annotation: input.mode,
       annotationText: input.annotationText,
-      annotationWords: input.mode === 'pinyin' ? input.annotationWords || [] : [],
+      annotationWords: input.mode === 'pinyin' || input.mode === 'furigana' ? input.annotationWords || [] : [],
       fontBase64,
     },
   })

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, desktopCapturer, ipcMain, screen, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
+const { createHash } = require('node:crypto')
 const { fitAndCentre, overlayBoundsFor } = require('./windowPlacement.cjs')
 const packageMetadata = require('../package.json')
 const { configDirectory, readPortableConfig, savePortableConfig } = require('./portableConfig.cjs')
@@ -10,6 +11,7 @@ const APP_PROFILES = {
   full: { appId: 'tw.lingoact.presenter.desktop', displayName: 'LingoAct' },
   huayu: { appId: 'tw.lingoact.huayu.desktop', displayName: 'LingoAct 華語教學版' },
   english: { appId: 'tw.lingoact.english.desktop', displayName: 'LingoAct English' },
+  japanese: { appId: 'tw.lingoact.japanese.desktop', displayName: 'LingoAct-JP' },
   guoyu: { appId: 'tw.lingoact.guoyu.desktop', displayName: 'LingoAct 國語文教學版' },
   ncacls: { appId: 'org.ncacls.lingoact.desktop', displayName: 'LingoAct TC' },
 }
@@ -19,6 +21,10 @@ const APP_PROFILE_ID = Object.hasOwn(APP_PROFILES, process.env.APP_PROFILE)
     ? packageMetadata.lingoactProfile
     : 'full'
 const APP_PROFILE = APP_PROFILES[APP_PROFILE_ID]
+if (APP_PROFILE_ID === 'japanese') {
+  app.setPath('userData', path.join(app.getPath('appData'), 'LingoAct-JP'))
+  app.commandLine.appendSwitch('lang', 'ja')
+}
 // Keep this edition's existing preferences when its visible product name changes.
 if (APP_PROFILE_ID === 'sc') app.setPath('userData', path.join(app.getPath('appData'), 'LingoAct-SC'))
 if (APP_PROFILE_ID === 'ncacls') app.setPath('userData', path.join(app.getPath('appData'), 'LingoAct-NCACLS'))
@@ -63,13 +69,29 @@ const isDesktopDev = process.env.LINGOACT_DESKTOP_DEV === '1'
 const isSmokeTest = process.argv.includes('--smoke-test')
 const APP_USER_MODEL_ID = APP_PROFILE.appId
 const APP_WINDOW_ICON_PATH = isDesktopDev
-  ? path.join(__dirname, '..', 'build', 'icon.ico')
+  ? path.join(__dirname, '..', 'build', APP_PROFILE_ID === 'japanese' ? 'LingoAct-JP.ico' : 'icon.ico')
   : path.join(process.resourcesPath, 'icon.ico')
 const APP_EXECUTABLE_PATH = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
 const PORTABLE_CONFIG_DIRECTORY = configDirectory(APP_EXECUTABLE_PATH, process.platform, isDesktopDev ? path.resolve(__dirname, '..') : undefined)
 ipcMain.on('config:portable-read', (event) => { event.returnValue = readPortableConfig(PORTABLE_CONFIG_DIRECTORY) })
 ipcMain.on('config:portable-save', (event, config) => { event.returnValue = savePortableConfig(PORTABLE_CONFIG_DIRECTORY, config) })
-const APP_RELAUNCH_ICON_PATH = isDesktopDev ? APP_WINDOW_ICON_PATH : APP_EXECUTABLE_PATH
+function taskbarIconPath() {
+  if (APP_PROFILE_ID !== 'japanese') return isDesktopDev ? APP_WINDOW_ICON_PATH : APP_EXECUTABLE_PATH
+  try {
+    // Explorer caches executable icons by path across rebuilds. A content-named
+    // ICO gives a changed logo its own cache entry without changing app identity.
+    const bytes = fs.readFileSync(APP_WINDOW_ICON_PATH)
+    const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 16)
+    const directory = path.join(app.getPath('userData'), 'icons')
+    const filename = path.join(directory, `taskbar-${digest}.ico`)
+    fs.mkdirSync(directory, { recursive: true })
+    if (!fs.existsSync(filename)) fs.writeFileSync(filename, bytes)
+    return filename
+  } catch {
+    return APP_WINDOW_ICON_PATH
+  }
+}
+const APP_RELAUNCH_ICON_PATH = taskbarIconPath()
 const CONTROL_COLLAPSED = { width: 194, height: 282 }
 const CONTROL_EXPANDED = { width: 420, height: 760 }
 const CONTROL_WITH_SETTINGS = { width: 1100, height: 760 }
@@ -161,7 +183,7 @@ function createWindow() {
     alwaysOnTop: false,
     skipTaskbar: false,
     show: false,
-    title: `${APP_PROFILE.displayName} Presenter`,
+    title: `${APP_PROFILE.displayName}${APP_PROFILE_ID === 'japanese' ? ' 教師用' : ' Presenter'}`,
     icon: APP_WINDOW_ICON_PATH,
     backgroundColor: '#00000000',
     webPreferences: {
@@ -382,7 +404,7 @@ function createReportWindow(sessionId, generate = false) {
     resizable: true,
     maximizable: true,
     backgroundColor: '#f7f8fb',
-    title: 'LingoAct 課堂互動報告',
+    title: APP_PROFILE_ID === 'japanese' ? 'LingoAct 授業レポート' : 'LingoAct 課堂互動報告',
     icon: APP_WINDOW_ICON_PATH,
     webPreferences: {
       contextIsolation: true,
@@ -454,7 +476,7 @@ function createRosterWindow(sessionId) {
     resizable: true,
     alwaysOnTop: true,
     backgroundColor: '#ffffff',
-    title: 'LingoAct 線上名單',
+    title: APP_PROFILE_ID === 'japanese' ? 'LingoAct 参加者一覧' : 'LingoAct 線上名單',
     icon: APP_WINDOW_ICON_PATH,
     webPreferences: {
       contextIsolation: true,
@@ -507,7 +529,7 @@ function createWordCloudWindow(sessionId) {
     maximizable: true,
     alwaysOnTop: true,
     backgroundColor: '#0b1020',
-    title: 'LingoAct 文字雲',
+    title: APP_PROFILE_ID === 'japanese' ? 'LingoAct ワードクラウド' : 'LingoAct 文字雲',
     icon: APP_WINDOW_ICON_PATH,
     webPreferences: {
       contextIsolation: true,
@@ -579,7 +601,7 @@ function createCustomQuizReviewWindow(sessionId, questionId, route = 'custom-qui
     maximizable: true,
     alwaysOnTop: true,
     backgroundColor: '#f7f8fb',
-    title: 'LingoAct 自訂測驗檢視',
+    title: APP_PROFILE_ID === 'japanese' ? 'LingoAct クイズの回答' : 'LingoAct 自訂測驗檢視',
     icon: APP_WINDOW_ICON_PATH,
     webPreferences: {
       contextIsolation: true,

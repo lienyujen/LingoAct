@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = path.join(root, 'build')
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
+const RENDER_SIZES = [...ICO_SIZES, 512]
 
 function arg(name, fallback = null) {
   const at = process.argv.indexOf(`--${name}`)
@@ -29,6 +30,8 @@ function arg(name, fallback = null) {
 
 const source = arg('source')
 const profile = arg('profile')
+const outputName = arg('name', `icon-${profile}`)
+if (!/^[A-Za-z0-9_-]+$/.test(outputName)) throw new Error('Invalid icon output name')
 const crop = Number(arg('crop', '72'))
 // A logo saved as a rounded tile without an alpha channel has black corners,
 // not transparent ones, and Windows draws them: a black square around the
@@ -80,7 +83,6 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({
     width: 512, height: 512, show: false, frame: false, transparent: true, useContentSize: true,
   })
-  const pagePath = path.join(outDir, '.profile-icon-page.html')
   for (const size of sizes) {
     const page = '<!doctype html><meta charset="utf-8">'
       + '<style>html,body{margin:0;padding:0;width:' + size + 'px;height:' + size + 'px;overflow:hidden}'
@@ -90,15 +92,13 @@ app.whenReady().then(async () => {
       + 'background-size:' + scale + '% auto;image-rendering:auto;'
       + 'border-radius:' + radius + '%}</style>'
       + '<div class="mark"></div>'
-    fs.writeFileSync(pagePath, page)
     win.setContentSize(size, size)
-    await win.loadFile(pagePath)
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(page))
     await new Promise((resolve) => setTimeout(resolve, 220))
     const image = await win.webContents.capturePage()
     const resized = image.getSize().width === size ? image : image.resize({ width: size, height: size })
     fs.writeFileSync(path.join(outDir, '.profile-' + size + '.png'), resized.toPNG())
   }
-  fs.unlinkSync(pagePath)
   win.destroy()
   app.quit()
 }).catch((error) => { console.error(error); process.exit(1) })
@@ -110,8 +110,8 @@ const electronPath = path.join(root, 'node_modules/electron/dist', electronBinar
 await new Promise((resolve, reject) => {
   const child = spawn(
     electronPath,
-    [electronMain, outDir, JSON.stringify(ICO_SIZES), String(scale), dataUrlPath, String(radius)],
-    { stdio: 'inherit', env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } },
+    [electronMain, outDir, JSON.stringify(RENDER_SIZES), String(scale), dataUrlPath, String(radius)],
+    { stdio: 'inherit', windowsHide: true, env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } },
   )
   child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`electron exited ${code}`))))
   child.on('error', reject)
@@ -144,9 +144,10 @@ function buildIco(pngs) {
 }
 
 const entries = ICO_SIZES.map((size) => ({ size, data: fs.readFileSync(path.join(outDir, `.profile-${size}.png`)) }))
-fs.writeFileSync(path.join(outDir, `icon-${profile}.ico`), buildIco(entries))
-fs.copyFileSync(path.join(outDir, '.profile-256.png'), path.join(outDir, `icon-${profile}-preview.png`))
-for (const { size } of entries) fs.unlinkSync(path.join(outDir, `.profile-${size}.png`))
+fs.writeFileSync(path.join(outDir, `${outputName}.ico`), buildIco(entries))
+fs.copyFileSync(path.join(outDir, '.profile-256.png'), path.join(outDir, `${outputName}-preview.png`))
+fs.copyFileSync(path.join(outDir, '.profile-512.png'), path.join(outDir, `${outputName}.png`))
+for (const size of RENDER_SIZES) fs.unlinkSync(path.join(outDir, `.profile-${size}.png`))
 
-console.log(`build/icon-${profile}.ico written — ${ICO_SIZES.join(', ')} px, keeping the middle ${crop}%${radius ? `, corners clipped at ${radius}%` : ''}`)
-console.log(`build/icon-${profile}-preview.png written — look at this before shipping it`)
+console.log(`build/${outputName}.ico written — ${ICO_SIZES.join(', ')} px, keeping the middle ${crop}%${radius ? `, corners clipped at ${radius}%` : ''}`)
+console.log(`build/${outputName}-preview.png and build/${outputName}.png written`)

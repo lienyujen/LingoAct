@@ -8,8 +8,9 @@
 
 import { HSK_GRAMMAR } from './hsk.ts'
 import { englishVocabularyInstruction } from './english.ts'
+import { KANA_LEVELS, JF_LEVELS, JAPANESE_TEACHING } from './japanese.ts'
 
-export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
+export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'kana' | 'jf' | 'topik' | 'ivpt'
 
 export type Level = {
   code: string
@@ -74,6 +75,8 @@ const SOURCE_ABOVE_LEVEL = [
 const STAY_AT_LEVEL = 'Do not aim below the level either: at the upper levels an item that merely locates a fact in the passage is too easy to be worth asking, however correct it is.'
 
 export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels: Level[]; unit: 'char' | 'word' }> = {
+  kana: { name: 'かな入門', note: 'LingoAct editorial pre-JLPT practice ranges; not an examination or CEFR level.', unit: 'char', levels: KANA_LEVELS },
+  jf: { name: 'JF Standard', note: 'Task-based Japanese communication in the JF A1–C2 framework. Descriptors here are LingoAct editorial summaries, not official word lists or a JLPT conversion.', unit: 'char', levels: JF_LEVELS },
   hsk: {
     name: '汉语水平考试 HSK（2025 年新版大纲）', unit: 'char',
     note: 'Use the official HSK syllabus published by the Center for Language Education and Cooperation in November 2025. Its vocabulary, character and grammar tables govern this class. HSK 7–9 is one combined syllabus band; do not invent separate official lists for levels 7, 8 and 9. Use simplified Chinese, Mainland vocabulary and standard Putonghua with Hanyu Pinyin. Never substitute TBCL, TOCFL or Taiwan pronunciation standards. Question length limits here are product guidance, not official HSK exam limits.',
@@ -336,28 +339,28 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
   },
   jlpt: {
     name: '日本語能力試験 (JLPT)',
-    note: 'Five grades from N5 up to N1. Kanji load is as much of the level as vocabulary is: a word inside the level written in kanji above it is still out of reach.',
+    note: 'Five grades from N5 up to N1. JLPT publishes competence descriptions, not a complete current graded vocabulary, kanji or grammar list. The examples here are editorial teaching guidance, never official cutoffs. Scaffold unfamiliar kanji. Do not infer speaking or writing ability from a JLPT grade.',
     unit: 'char',
     levels: [
       {
         code: 'N5', label: 'JLPT N5', band: 1, maxStem: 20,
-        ceiling: 'About 800 words and 100 kanji — the beginner\'s kanji only (日月人山川口手，一二三，学校先生). Topics: greetings, self-introduction, family, food, shopping, time, daily routine. です／ます throughout, は・が・を・に・で particles, い and な adjectives, past and negative. No 敬語 beyond ですます, no causative, no passive, no conditional beyond たら. Anything above N5 kanji must be in kana.',
+        ceiling: 'Very basic everyday Japanese: greetings, introductions, family, food, shopping, time and daily routines. Use short です/ます sentences, familiar particles, simple adjectives, past and negative. Use familiar basic kanji with kana support. These are editorial constraints, not an official N5 grammar or kanji inventory.',
       },
       {
         code: 'N4', label: 'JLPT N4', band: 2, maxStem: 28,
-        ceiling: 'About 1,500 words and 300 kanji. Everyday conversation and simple written passages. て form, potential, volitional, plain form, から／ので, たり, ながら. Up to about twenty-eight characters. Kanji above N4 must be in kana or furigana.',
+        ceiling: 'Basic everyday conversation and short familiar passages. Editorial grammar focus: て form, basic plain forms, reasons with から/ので and simple connected actions. Support unfamiliar kanji with kana. Do not claim these patterns form an official N4 syllabus.',
       },
       {
         code: 'N3', label: 'JLPT N3', band: 3, maxStem: 36,
-        ceiling: 'About 3,700 words and 650 kanji — the bridge level. Everyday topics in newspaper headlines and ordinary articles. Passive, causative, keigo in its common forms. Up to about thirty-six characters.',
+        ceiling: 'Everyday Japanese in connected passages, familiar public notices and accessible articles. Ask learners to follow relationships, reasons and intentions. Scaffold uncommon kanji and use register appropriate to the situation.',
       },
       {
         code: 'N2', label: 'JLPT N2', band: 4, maxStem: 48,
-        ceiling: 'About 6,000 words and 1,000 kanji. Newspapers and commentary on a range of topics, argument followed and weighed. Written register and set expressions are fair. Retrieval items are too easy here.',
+        ceiling: 'Everyday and broader social topics in articles and commentary. Follow argument structure, comparisons and implied intentions. Balance information retrieval with interpretation; do not require specialized knowledge absent from the text.',
       },
       {
         code: 'N1', label: 'JLPT N1', band: 5, maxStem: 65,
-        ceiling: 'About 10,000 words and 2,000 kanji. Abstract and logically complex writing, editorials and criticism, implication and nuance of register. Nothing in the language is off limits.',
+        ceiling: 'Complex and abstract writing, editorials and criticism. Interpret logical relationships, nuance and implied meaning. N1 does not justify unlimited specialist vocabulary or unsupported cultural assumptions.',
       },
     ],
   },
@@ -506,6 +509,18 @@ export function levelCeiling(framework: string | null, code: string | null) {
 // A dispatch override changes this request, not the stored class default.
 export function dispatchLevelCode(framework: string | null | undefined, code: string | null | undefined, direction = ''): string | null {
   if (!direction) return code || null
+  if (['jlpt', 'jf', 'kana'].includes(framework || '')) {
+    const entry = FRAMEWORKS[framework as Framework]
+    let chosen = code || null
+    for (const clause of direction.split(/[，,。;；\n]/)) {
+      if (/(?:不要|不用|不是|別|别|do\s+not|don't|not\s+|変更しない|変えない|使わない)/i.test(clause)) continue
+      if (!/(?:改|換|换|調|调|use|switch|change|set|JLPT|JF|変更|変え|にする|にして)/i.test(clause)) continue
+      for (const level of entry.levels) {
+        if (new RegExp(`(^|[^a-z0-9])${level.code}(?![a-z0-9])`, 'i').test(clause)) chosen = level.code
+      }
+    }
+    return chosen
+  }
   if (['en108','cefr','gept','toeic'].includes(framework || '')) {
     const entry = FRAMEWORKS[framework as Framework]
     const aliases: Record<string,string> = {國小三四年級:'p34',國小五六年級:'p56',七年級:'j7',八年級:'j8',九年級:'j9',國一:'j7',國二:'j8',國三:'j9',高一:'h1',高二:'h2',高三:'h3',高中一年級:'h1',高中二年級:'h2',高中三年級:'h3',grade7:'j7',grade8:'j8',grade9:'j9',grade10:'h1',grade11:'h2',grade12:'h3',seniorhighyear1:'h1',seniorhighyear2:'h2',seniorhighyear3:'h3',國中:'j',普通高中:'h',高中:'h',技術型高中:'v',技高:'v',初級:'elementary',中級:'intermediate',中高級:'high-intermediate',高級:'advanced',橘色:'orange',棕色:'brown',綠色:'green',藍色:'blue',金色:'gold'}
@@ -562,6 +577,7 @@ export function levelInstruction(framework: string | null, code: string | null, 
   return [
     `LEVEL. The class is working at ${level.label}, on the ${entry.name} scale. This is the hardest constraint on the whole task: an item above the level is worthless to this class however good a question it is, because they cannot read it.`,
     entry.note,
+    ['kana', 'jf', 'jlpt'].includes(framework || '') ? JAPANESE_TEACHING : '',
     ['en108','gept','toeic'].includes(framework || '') ? englishVocabularyInstruction(framework,code,direction) : '',
     framework === 'hsk' ? `Official HSK grammar at this band: ${(HSK_GRAMMAR[code === '7-9' ? 7 : Number(code)] || []).map((point) => point.point).join('; ')}. Also allow structures already introduced in lower HSK bands. Never use TBCL grammar as the reference.` : '',
     `What a learner at ${level.label} can read: ${level.ceiling}`,

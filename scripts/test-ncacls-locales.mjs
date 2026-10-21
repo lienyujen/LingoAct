@@ -15,7 +15,7 @@ test('NCACLS keeps Traditional teaching with every requested student guidance la
  const config = load('src/lib/appProfiles.ts')
  const brand = load('src/lib/brand.ts', {'./appProfiles': config})
  const generated = load('src/lib/participantLocales.generated.ts')
- const catalog = load('src/lib/participantI18n.ts', {'./participantLocales.generated':generated,'./scLocales.generated':{scParticipantMessages:{}}})
+ const catalog = load('src/lib/participantI18n.ts', {'./japaneseLocales':{japaneseParticipant:{}},'./participantLocales.generated':generated,'./scLocales.generated':{scParticipantMessages:{}}})
  assert.equal(config.APP_PROFILE.defaultTrack, 'huayu')
  assert.equal(config.profileAllowsTrack('putonghua'), false)
  assert.deepEqual(brand.guidanceLocalesForBrand(catalog.GUIDANCE_LOCALES, brand.brandFromSearch(new URLSearchParams('b=ncacls'))).map(item => item.code), ['zh-TW','en','es','vi','th','id','ja','ko','my'])

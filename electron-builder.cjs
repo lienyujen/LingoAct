@@ -8,6 +8,7 @@ const profiles = {
   full: { executable: 'LingoAct', appId: 'tw.lingoact.presenter.desktop' },
   huayu: { executable: 'LingoAct-Huayu', appId: 'tw.lingoact.huayu.desktop' },
   english: { executable: 'LingoAct-English', appId: 'tw.lingoact.english.desktop' },
+  japanese: { executable: 'LingoAct-JP', appId: 'tw.lingoact.japanese.desktop', icon: 'build/LingoAct-JP.ico', macIcon: 'build/LingoAct-JP.png' },
   guoyu: { executable: 'LingoAct-Guoyu', appId: 'tw.lingoact.guoyu.desktop' },
   ncacls: { executable: 'LingoAct-TC', appId: 'org.ncacls.lingoact.desktop' },
 }
@@ -70,7 +71,7 @@ module.exports = {
   ],
   // The UI only ships zh-TW and en-US strings; without this, electron-builder
   // bundles all ~55 Chromium locale .pak files (~49MB of unused languages).
-  electronLanguages: ['en-US', 'zh-TW'],
+  electronLanguages: ['en-US', 'zh-TW', ...(profileId === 'japanese' ? ['ja'] : [])],
   // macOS signs Contents as code; editable examples belong in Resources.
   // On Windows they are beside the executable, ready to rename and fill in.
   extraFiles: [

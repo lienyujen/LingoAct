@@ -8,6 +8,7 @@ import { CAPTION_DISPLAY_LANGUAGES, INTERPRETATION_LANGUAGES, SPEAKER_LANGUAGES,
 import type { Session } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 import { scTeachingMode } from '../lib/scTeachingMode'
+import { JapaneseInterfaceSelector } from './JapaneseInterfaceSelector'
 
 export type PresenterCaptionSettings = {
   sourceLanguage: string
@@ -169,6 +170,7 @@ export function PresenterSettingsModal({
         </div>
 
         <section className="presenter-settings-section">
+          <JapaneseInterfaceSelector />
           <div className="presenter-settings-section-heading"><span><Translate size={17} />{t('courseLanguages')}</span></div>
           <LanguagePairFields
             systemLanguage={session.system_language}
@@ -239,7 +241,7 @@ export function PresenterSettingsModal({
               }}>
                 {SPEAKER_LANGUAGES.map((language) => (
                   <option key={language.code} value={language.code}>
-                    {language.code === 'zh-tw' ? t('clearMandarin') : language.label}
+                    {language.code === 'zh-tw' ? t('clearMandarin') : uiText(language.label)}
                   </option>
                 ))}
               </select>
@@ -249,7 +251,7 @@ export function PresenterSettingsModal({
               <select value={displayLanguage} onChange={(event) => setDisplayLanguage(event.target.value)}>
                 {CAPTION_DISPLAY_LANGUAGES.map((language) => (
                   <option key={language.code} value={language.code}>
-                    {'labelKey' in language ? t(language.labelKey) : language.label}
+                    {'labelKey' in language ? t(language.labelKey) : uiText(language.label)}
                   </option>
                 ))}
               </select>
@@ -298,7 +300,7 @@ export function PresenterSettingsModal({
                         setInterpretationLanguages(next)
                       }}
                     />
-                    <span>{language.label}{language.code === 'en' && sourceLanguage !== 'en' ? t('defaultSuffix') : ''}</span>
+                    <span>{uiText(language.label)}{language.code === 'en' && sourceLanguage !== 'en' ? t('defaultSuffix') : ''}</span>
                   </label>
                 )
               })}

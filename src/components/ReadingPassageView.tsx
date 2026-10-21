@@ -244,7 +244,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   const readings = useMemo(() => perCharacter(passage), [passage])
   // 拼音 is written per word; 注音 is written per character and stays that way,
   // because that is how 注音 is written.
-  const byWord = useMemo(() => passage.annotation === 'zhuyin' ? null : wordReadings(passage), [passage])
+  const byWord = useMemo(() => passage.annotation === 'zhuyin' || (['jf', 'kana', 'jlpt'].includes(passage.level_framework || '') && passage.annotation !== 'furigana') ? null : wordReadings(passage), [passage])
   const glyphs = useMemo(() => byOffset(passage.body, readings.glyphs), [passage.body, readings.glyphs])
   const ruby = useMemo(() => byOffset(passage.body, readings.ruby), [passage.body, readings.ruby])
   const hasReadings = Boolean(glyphs || ruby)
@@ -363,7 +363,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
               type="button"
               onClick={() => setShowRuby((current) => !current)}
             >
-              {participantText(locale, readings.glyphs ? 'readingZhuyin' : 'readingPinyin')}
+              {passage.annotation === 'furigana' || ['jf', 'kana', 'jlpt'].includes(passage.level_framework || '') ? uiText('振假名') : participantText(locale, readings.glyphs ? 'readingZhuyin' : 'readingPinyin')}
             </button>
           )}
           {player}
@@ -453,12 +453,14 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
                 {open.entry.pos && <span className="reading-note-pos">{open.entry.pos}</span>}
                 {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : ['en108','cefr','gept','toeic'].includes(passage.level_framework || '') ? 'CEEC' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
+              {open.entry.reading && <p>{open.entry.reading}</p>}
+              {open.entry.lemma && <p>{uiText('辭書形')}：{open.entry.lemma}{open.entry.form ? `（${open.entry.form}）` : ''}</p>}
               <p><Translate size={15} />{glossFor(open.entry.gloss, locale)}</p>
             </>
           ) : (
             <>
               <p className="reading-note-head">
-                <strong>{open.entry.point.replace(/^English: /, '')}</strong>
+                <strong>{open.entry.point.replace(/^(English|Japanese): /, '')}</strong>
                 {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
               <p><Translate size={15} />{glossFor(open.entry.note, locale)}</p>

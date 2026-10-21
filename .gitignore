@@ -12,6 +12,7 @@ dist
 dist-ssr
 release
 /release-build/
+/build/.profile-icon-page.html
 /LingoAct.exe
 /LingoAct.zip
 # The unpacked build kept around to run directly: pnpm desktop:folder.
@@ -50,6 +51,7 @@ supabase/.temp/
 
 # Local SC desktop folder; public releases are built separately.
 /LingoAct-SC/
+/LingoAct-JP/
 
 # Private research corpus includes sources with redistribution restrictions.
 /data/english/*.sqlite

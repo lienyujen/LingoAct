@@ -1,4 +1,5 @@
 import { generatedLocales } from './participantLocales.generated'
+import { japaneseParticipant } from './japaneseLocales'
 import { scParticipantMessages } from './scLocales.generated'
 
 // A language class runs on two axes: the language being taught, and the language
@@ -27,6 +28,7 @@ export type ParticipantLocale = (typeof GUIDANCE_LOCALES)[number]['code']
 
 const messages = {
   'zh-TW': {
+    listeningHideFurigana: '隱藏振假名', listeningShowFurigana: '顯示振假名',
     translating: '翻譯中…', translationUnavailable: '暫時無法翻譯，先顯示英文說明。',
     language: '語言', chinese: '繁體中文', english: 'English', courseEnded: '課程已結束', classDismissed: '下課啦！',
     thankYou: '謝謝你的參與。', aiSummary: 'AI 課程總結', todayHighlights: '今天的課程重點', lessonKeyPoints: '課堂重點整理',
@@ -167,6 +169,7 @@ const messages = {
     recordAgain: '重錄一次',
   },
   en: {
+    listeningHideFurigana: 'Hide furigana', listeningShowFurigana: 'Show furigana',
     translating: 'Translating…', translationUnavailable: 'Translation is temporarily unavailable. Showing the English explanation.',
     language: 'Language', chinese: "Traditional Chinese", english: 'English', courseEnded: 'Class ended', classDismissed: "Class dismissed!",
     thankYou: 'Thank you for participating.', aiSummary: 'AI class summary', todayHighlights: 'Today’s class highlights', lessonKeyPoints: 'Key takeaways',
@@ -324,6 +327,7 @@ export function participantText(
 ) {
   const template = (locale === 'zh-TW' || locale === 'en')
     ? messages[locale][key]
+    : locale === 'ja' ? japaneseParticipant[key] ?? messages.en[key]
     : locale === 'zh-CN' ? scParticipantMessages[key] ?? messages.en[key]
       : generatedLocales[locale]?.[key] ?? messages.en[key]
   if (!values) return template
@@ -362,6 +366,7 @@ export function participantLocaleFromStorage(sessionDefault?: string | null): Pa
   if (isParticipantLocale(stored)) return stored
   if (isParticipantLocale(sessionDefault)) return sessionDefault
   const brand = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search).get('b')
+  if (brand === 'japanese' || import.meta.env.VITE_APP_PROFILE === 'japanese') return 'ja'
   return brand === 'sc' || import.meta.env.VITE_APP_PROFILE === 'sc' ? 'zh-CN' : (brand === 'english' || import.meta.env.VITE_APP_PROFILE === 'english') ? 'en' : 'zh-TW'
 }
 

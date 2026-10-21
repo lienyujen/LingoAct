@@ -915,7 +915,7 @@ export function ParticipantPage() {
       <main className="participant-page participant-ended-page">
         <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
         <SetupNotice />
-        <StudentSocialLinks />
+        <StudentSocialLinks teachingLanguage={teachingLanguage} />
         <section className="participant-ended-hero">
           <span className="participant-ended-icon"><Confetti size={34} /></span>
           <p className="eyebrow">{participantText(locale, 'courseEnded')}</p>
@@ -1014,7 +1014,7 @@ export function ParticipantPage() {
     <main className="participant-page">
       <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
       <SetupNotice />
-      <StudentSocialLinks />
+      <StudentSocialLinks teachingLanguage={teachingLanguage} />
       <header className="participant-header">
         <h1>
           <strong>{participant?.name || participantText(locale, 'attendee')}</strong>{participantText(locale, 'welcomeToSession', { title: session?.title || participantText(locale, 'session') })}

@@ -7,6 +7,12 @@ const simplified: Record<string,string> = {
   photo:'照片描述',sentence:'造句',picture_story:'图片排序写作',listening:'听力练习',reading:'阅读',
 }
 const english = {...ENGLISH_ACTIVITY_TITLES,followup:'Follow-up',discussion:'Discuss work',pair:'Pair task',matching:'Matching',ordering:'Ordering',photo:'Photo task',sentence:'Sentence practice',picture_story:'Picture story',listening:'Listening',reading:'Reading'}
+const japanese: Record<string, string> = {
+  send_screen: '画面を共有', poll: '投票', multiple_choice: '選択問題', true_false: '○×問題', short_answer: '記述問題',
+  pronunciation: '音読', oral_response: '話して回答', file_upload: 'ファイル提出', drawing: '手書き回答', hotspot: '画像にマーク', board: '意見共有ボード',
+  followup: 'もう一度練習', discussion: '作品について話し合う', pair: 'ペアの課題', matching: '組み合わせ', ordering: '並べ替え',
+  photo: '写真を撮って説明', sentence: '文づくり', picture_story: '絵を並べて物語を書く', listening: 'リスニング', reading: '読解',
+}
 export function activityTitle(track: string | null | undefined, type: string, traditional: string) {
-  return track === 'en' ? english[type] || 'Activity' : track === 'putonghua' ? simplified[type] || traditional : traditional
+  return track === 'ja' ? japanese[type] || '学習活動' : track === 'en' ? english[type] || 'Activity' : track === 'putonghua' ? simplified[type] || traditional : traditional
 }

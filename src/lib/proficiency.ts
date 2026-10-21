@@ -4,9 +4,12 @@
 // supabase/functions/_shared/proficiency.ts and stays there: it is prompt
 // material, the client never needs it, and one copy cannot drift from itself.
 
-export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'topik' | 'ivpt'
+import { KANA_LEVELS, JF_LEVELS } from '../../supabase/functions/_shared/japanese.ts'
+export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'kana' | 'jf' | 'topik' | 'ivpt'
 
 export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: { code: string; label: string }[] }[] = [
+  { id: 'kana', name: '假名入門', short: '假名入門', levels: KANA_LEVELS.map(({ code, label }) => ({ code, label })) },
+  { id: 'jf', name: '日常溝通・JF Standard', short: 'JF Standard', levels: JF_LEVELS.map(({ code, label }) => ({ code, label })) },
   {
     id: 'hsk', name: '汉语水平考试 HSK（新版大纲）', short: 'HSK',
     levels: [1, 2, 3, 4, 5, 6].map((level) => ({ code: String(level), label: `HSK ${level}` }))

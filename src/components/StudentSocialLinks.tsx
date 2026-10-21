@@ -1,5 +1,7 @@
 import { uiText, uiFormat } from '../lib/uiText'
 import type { ReactNode } from 'react'
+import { participantBrand } from '../lib/brand'
+import japaneseLogo from '../assets/jp-logo.png'
 
 type SocialLink = {
   href: string
@@ -35,8 +37,12 @@ const socialLinks: SocialLink[] = [
   },
 ]
 
-export function StudentSocialLinks() {
-  const links = socialLinks
+export function StudentSocialLinks({ teachingLanguage }: { teachingLanguage?: string } = {}) {
+  const brand = participantBrand(new URLSearchParams(window.location.hash.split('?')[1] || window.location.search), teachingLanguage)
+  const links: SocialLink[] = brand === 'japanese' ? [{
+    href: 'https://www.welearnjapanese.com/', label: 'towa', title: uiText('東禾國際外語學校'),
+    icon: <img src={japaneseLogo} alt={uiText('東禾國際外語學校')} />,
+  }] : socialLinks
 
   return (
     <nav aria-label={uiText("社群連結")} className="student-social-links">

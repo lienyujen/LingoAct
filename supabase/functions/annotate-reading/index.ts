@@ -4,6 +4,7 @@ import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regiona
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
 import { orthographyRules, settleWords } from '../_shared/reading.ts'
 import { HSK_PRONUNCIATION, applyHskWordPinyin, hskPinyinInstruction } from '../_shared/hsk.ts'
+import { JAPANESE_READINGS, settleJapaneseWords } from '../_shared/japanese.ts'
 
 // Deciding how each character should be read, and saying so in a way the font
 // understands.
@@ -89,8 +90,15 @@ Deno.serve(async (req) => {
     if (!await presenterAuthorized(supabase, input, sessionId, presenterToken)) {
       return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
     }
-    const { data: classroom, error: classError } = await supabase.from('sessions').select('level_framework').eq('id', sessionId).single()
+    const { data: classroom, error: classError } = await supabase.from('sessions').select('level_framework, teaching_language').eq('id', sessionId).single()
     if (classError) throw classError
+    if (classroom.teaching_language === 'ja') {
+      const result = await callAiJson(JAPANESE_READINGS, { text }, wordSchema, null, 'realtime')
+      if (result.status !== 'success') throw new Error('読み方を生成できませんでした。')
+      const words = settleJapaneseWords((result.output as { words?: unknown }).words, text)
+      if (!words.length) throw new Error('読み方が本文と一致しません。')
+      return jsonResponse({ mode: 'furigana', annotationText: '', words })
+    }
     const hsk = classroom.level_framework === 'hsk'
     if (hsk) { mode = 'pinyin'; accent = 'putonghua' }
 

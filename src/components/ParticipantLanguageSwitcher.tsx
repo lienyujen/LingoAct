@@ -1,7 +1,7 @@
 import { Check, Globe } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { brandFromSearch, guidanceLocalesForBrand } from '../lib/brand'
+import { participantBrand, guidanceLocalesForBrand } from '../lib/brand'
 import { GUIDANCE_LOCALES, guidanceLocaleShort, participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 
@@ -16,7 +16,7 @@ export function ParticipantLanguageSwitcher({ locale, onChange, teachingLanguage
   // Read from the link, not from the build: this page is one deployment shared
   // by every edition. See lib/brand.ts.
   const [searchParams] = useSearchParams()
-  const options = guidanceLocalesForBrand(GUIDANCE_LOCALES, teachingLanguage === 'en' ? 'english' : brandFromSearch(searchParams))
+  const options = guidanceLocalesForBrand(GUIDANCE_LOCALES, teachingLanguage === 'en' ? 'english' : participantBrand(searchParams, teachingLanguage))
 
   // A device that has been in a Chinese class before arrives holding zh-TW,
   // and the class default can be a language this edition does not offer

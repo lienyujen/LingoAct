@@ -225,7 +225,7 @@ export function ListeningPlayer({ clip, questionId, replayLimit, prompt, reading
             {showTranscript && clip.language !== 'en' && Boolean(readingFontUrl || readingRuby?.length || readingWords?.length) && (
               <label className="listening-transcript-toggle">
                 <input checked={plainText} type="checkbox" onChange={(event) => setPlainText(event.target.checked)} />
-                <span>{participantText(locale, readingRuby?.length || readingWords?.length ? 'listeningHidePinyin' : 'listeningHideZhuyin')}</span>
+                <span>{participantText(locale, clip.language === 'ja' ? 'listeningHideFurigana' : readingRuby?.length || readingWords?.length ? 'listeningHidePinyin' : 'listeningHideZhuyin')}</span>
               </label>
             )}
           </div>

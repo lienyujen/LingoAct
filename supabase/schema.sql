@@ -798,7 +798,7 @@ alter table public.sessions drop constraint if exists sessions_level_framework_c
 alter table public.sessions
   add constraint sessions_level_framework_check
   check (level_framework is null or level_framework in (
-    'hsk', 'tbcl', 'tocfl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'topik', 'ivpt'
+    'hsk', 'tbcl', 'tocfl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'kana', 'jf', 'topik', 'ivpt'
   ));
 
 alter table public.sessions add column if not exists system_language text null
@@ -809,6 +809,10 @@ alter table public.sessions add column if not exists system_language text null
 alter table public.sessions
   add column if not exists reading_annotation text not null default 'zhuyin'
   check (reading_annotation in ('none', 'zhuyin', 'pinyin'));
+
+alter table public.sessions drop constraint if exists sessions_reading_annotation_check;
+alter table public.sessions add constraint sessions_reading_annotation_check
+  check (reading_annotation in ('none', 'zhuyin', 'pinyin', 'furigana'));
 
 alter table public.sessions
   add column if not exists level_code text null check (level_code is null or char_length(level_code) between 1 and 20);
@@ -19610,6 +19614,10 @@ alter table public.listening_clips
   add column if not exists annotation text not null default 'none'
   check (annotation in ('none', 'zhuyin', 'pinyin'));
 
+alter table public.listening_clips drop constraint if exists listening_clips_annotation_check;
+alter table public.listening_clips add constraint listening_clips_annotation_check
+  check (annotation in ('none', 'zhuyin', 'pinyin', 'furigana'));
+
 -- For zhuyin this is the transcript with variation selectors woven in; for
 -- pinyin it is a JSON array of per-character syllables the page renders as ruby.
 -- Kept apart from `transcript` so the teacher can still edit plain text and
@@ -20287,6 +20295,10 @@ alter table public.reading_passages
 
 create unique index if not exists reading_passages_question_idx
   on public.reading_passages (question_id);
+
+alter table public.reading_passages drop constraint if exists reading_passages_annotation_check;
+alter table public.reading_passages add constraint reading_passages_annotation_check
+  check (annotation in ('none', 'zhuyin', 'pinyin', 'furigana'));
 
 alter table public.reading_passages enable row level security;
 

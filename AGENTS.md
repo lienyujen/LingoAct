@@ -54,9 +54,10 @@ The classroom machinery is InterAct's, which has been used in real classes. The
 language-teaching work on top of it is new to this repository and has been
 exercised against the live backend, but not yet in front of a class.
 
-The development backend is live: Supabase project `cgxhbpkndkzdmeswxgld` in
-`ap-northeast-1`, on an account kept entirely separate from InterAct's so the
-two never share a quota or an outage. Schema, four Storage buckets, thirteen
+The development backend is live: Supabase project `lzhnuzixpwlevsgtifqi` in
+`ap-southeast-1`, selected by the owner on 2026-10-20 to replace the previous
+`cgxhbpkndkzdmeswxgld` development target. It shares an account with InterAct,
+but is a separate project; do not deploy to InterAct. Schema, four Storage buckets, thirteen
 Realtime publications and all twelve Edge Functions are deployed; `LINGOACT_OWNER_KEY`,
 `GEMINI_API_KEY`, `OPENAI_API_KEY` and `REURL_API_KEY` are all set and have been
 exercised against the live services, not merely configured. The student page is

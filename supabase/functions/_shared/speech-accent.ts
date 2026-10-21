@@ -1,8 +1,9 @@
 export type MandarinAccent = 'standard_guoyu' | 'putonghua' | 'taiwanese'
 export type EnglishAccent = 'american' | 'british'
-export type SpeechAccent = MandarinAccent | EnglishAccent
+export type SpeechAccent = MandarinAccent | EnglishAccent | 'japanese'
 
 export function speechAccent(language: string, requested: unknown): SpeechAccent {
+  if (language === 'ja') return 'japanese'
   if (language === 'en' || language.startsWith('en-')) return requested === 'british' ? 'british' : 'american'
   if (language === 'zh-cn') return 'putonghua'
   return requested === 'putonghua' || requested === 'taiwanese' ? requested : 'standard_guoyu'

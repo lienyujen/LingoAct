@@ -48,6 +48,15 @@ export function mainlandFeedbackInstruction(settings?: FeedbackSettings) {
 }
 
 export function feedbackSystemPrompt(original: string, settings?: FeedbackSettings) {
+  if (settings?.teaching_language === 'ja') {
+    const japaneseGuidance = settings.guidance_language !== 'zh-TW'
+    const prompt = japaneseGuidance ? original.replaceAll('繁體中文', '日本語').replaceAll('Traditional Chinese', 'Japanese') : original
+    return [prompt,
+      'This is a Japanese language class. Assess against the selected class level and the task. Preserve learner quotations, transcripts, Japanese spelling, particles, inflected forms and corrections in their original Japanese. Never apply Chinese Pinyin, Bopomofo, TBCL or HSK rules. JLPT grades are not speaking or writing certifications.',
+      japaneseGuidance ? 'Write explanatory feedback in clear Japanese, including legacy base fields named zh_tw; these are compatibility keys. Keep any requested translations faithful to the same evidence.' : 'Write explanatory feedback in the existing Traditional Chinese style. Keep Japanese evidence and correction pairs unchanged.',
+      'Give concrete evidence and one or two achievable next steps. For pronunciation prioritize intelligibility and task completion. Do not invent a pitch-accent measurement or an official examination score. Writing coaching asks questions and identifies changes without rewriting the learner sentence.',
+    ].join('\n\n')
+  }
   if (settings?.teaching_language === 'en') {
     const englishGuidance = settings.guidance_language === 'en'
     const prompt = englishGuidance ? original.replaceAll('繁體中文', 'English').replaceAll('Traditional Chinese', 'English') : original

@@ -96,7 +96,7 @@ export function PresenterNewPage() {
   }
 
   function rememberCourse() {
-    if ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) { setCourseNotice(t(teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired')); return }
+    if ((levelFramework === 'hsk' || teachingTrack === 'en' || teachingTrack === 'ja') && !levelCode) { setCourseNotice(t(teachingTrack === 'ja' ? 'japaneseLevelRequired' : teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired')); return }
     if (!course.title) { setCourseNotice('請先填寫課程名稱。'); return }
     if (saveCoursePreset(course)) {
       setCourses(readCoursePresets())
@@ -121,8 +121,8 @@ export function PresenterNewPage() {
   async function createSession(event: FormEvent) {
     event.preventDefault()
     setError('')
-    if ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) {
-      setError(t(teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired'))
+    if ((levelFramework === 'hsk' || teachingTrack === 'en' || teachingTrack === 'ja') && !levelCode) {
+      setError(t(teachingTrack === 'ja' ? 'japaneseLevelRequired' : teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired'))
       setCourseSettingsOpen(true)
       return
     }
@@ -141,6 +141,7 @@ export function PresenterNewPage() {
           levelFramework,
           levelCode: levelCode || null,
           readingAnnotation,
+          ...(APP_PROFILE.id === 'japanese' ? { appProfile: 'japanese' } : {}),
           ...(APP_PROFILE.id === 'ncacls' ? { systemLanguage: 'zh-TW', appProfile: APP_PROFILE.id } : supportsChineseSystemLanguage ? { systemLanguage, appProfile: APP_PROFILE.id } : {}),
         },
         headers: { 'x-lingoact-client': 'desktop-app' },
@@ -254,9 +255,9 @@ export function PresenterNewPage() {
       <SetupNotice />
       <form className="panel form-panel" onSubmit={createSession}>
         <span className="form-heading-icon"><Sparkle size={24} /></span>
-        <h1>{uiText(supportsChineseSystemLanguage ? "讓學生愛上中文" : "今天，讓學生愛上互動")}</h1>
+        <h1>{uiText(APP_PROFILE.id === 'japanese' ? '聽、說、讀、寫，讓日語在課堂上活起來' : supportsChineseSystemLanguage ? "讓學生愛上中文" : "今天，讓學生愛上互動")}</h1>
         <SystemLanguageSelector />
-        <p className="muted">{APP_PROFILE.id === 'full' ? uiText("華語教學的 AI 助教。") : uiFormat(APP_PROFILE.id === 'english' ? "{0}・英語教學的 AI 助教。" : "{0}・華語教學的 AI 助教。", [uiText(APP_PROFILE.productName)])}</p>
+        <p className="muted">{APP_PROFILE.id === 'japanese' ? uiText('日語教學的 AI 助教。') : APP_PROFILE.id === 'full' ? uiText("華語教學的 AI 助教。") : uiFormat(APP_PROFILE.id === 'english' ? "{0}・英語教學的 AI 助教。" : "{0}・華語教學的 AI 助教。", [uiText(APP_PROFILE.productName)])}</p>
         {courses.length > 0 && <label>{uiText("最近的課程")}<select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
             const selected = courses.find((item) => item.title === event.target.value)
             if (selected) chooseCourse(selected)
@@ -267,7 +268,7 @@ export function PresenterNewPage() {
           </select>
         </label>}
         <label>
-          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={teachingTrack === 'en' ? 'e.g. Beginner English · Tuesday' : uiText("例如：華語初級班・週二")} />
+          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={teachingTrack === 'ja' ? uiText('例如：日語初級班・週二') : teachingTrack === 'en' ? 'e.g. Beginner English · Tuesday' : uiText("例如：華語初級班・週二")} />
         </label>
         <div className="course-summary"><strong>{courseSummary(course)}</strong><span>{uiText("每個教學活動，都有全新體驗。")}</span></div>
         <details className="teacher-disclosure" open={courseSettingsOpen} onToggle={(event) => setCourseSettingsOpen(event.currentTarget.open)}>
@@ -304,7 +305,7 @@ export function PresenterNewPage() {
         </details>
         <button className="ghost-button" type="button" onClick={rememberCourse}>{uiText("記住這個課程設定")}</button>
         {courseNotice && <p className="muted" role="status">{uiText(courseNotice)}</p>}
-        {title.trim() && <LessonPlan key={title.trim()} courseName={title.trim()} />}
+        {title.trim() && <LessonPlan key={title.trim()} courseName={title.trim()} teachingLanguage={teachingTrack} />}
         {error && <p className="error">{uiText(error)}</p>}
         <button disabled={busy} type="submit">
           {busy ? uiText("準備教室中...") : uiText("開始上課")}
@@ -316,7 +317,7 @@ export function PresenterNewPage() {
           <Gear size={18} />{uiText("系統設定")}</button>
         <p className="app-credit">
           <a href="https://lingoact.ehuayu.org/about" rel="noreferrer" target="_blank">LingoAct</a>
-          {' | Designed and Developed by '}
+          {APP_PROFILE.id === 'japanese' ? ` | ${uiText('設計與開發')} ` : ' | Designed and Developed by '}
           <a href="https://www.facebook.com/lienyujen/" rel="noreferrer" target="_blank">Yujen Lien</a>
         </p>
       </form>

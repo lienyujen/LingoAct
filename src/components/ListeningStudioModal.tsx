@@ -320,20 +320,20 @@ export function ListeningStudioModal({
         // Marked up on the way out, not when the clip was made: only the two
         // teaching modes that deliberately show the transcript may carry its
         // reading. A comprehension quiz still receives neither text nor font.
-        if (readingAnnotation !== 'none' && teachingLanguage.startsWith('zh')) {
+        if (readingAnnotation !== 'none' && (teachingLanguage.startsWith('zh') || teachingLanguage === 'ja')) {
           setBusy(t('annotating'))
           try {
             const marked = await annotateReading({
               sessionId, presenterToken, text: clip.transcript,
-              mode: readingAnnotation as 'zhuyin' | 'pinyin',
+              mode: readingAnnotation as 'zhuyin' | 'pinyin' | 'furigana',
               accent,
               // 朗讀 and 聽力 show the sentence as prose, so it is spelled as
               // words the way a passage is.
-              granularity: readingAnnotation === 'pinyin' ? 'words' : 'characters',
+              granularity: readingAnnotation === 'pinyin' || readingAnnotation === 'furigana' ? 'words' : 'characters',
             })
             await applyAnnotation({
               sessionId, presenterToken, clipId: clip.id,
-              mode: readingAnnotation as 'zhuyin' | 'pinyin',
+              mode: readingAnnotation as 'zhuyin' | 'pinyin' | 'furigana',
               annotationText: marked.annotationText,
               annotationWords: marked.words,
             }, t)

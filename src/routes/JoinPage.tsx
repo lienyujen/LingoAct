@@ -158,7 +158,7 @@ export function JoinPage() {
       <main className="participant-page participant-ended-page">
         <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
         <SetupNotice />
-        <StudentSocialLinks />
+        <StudentSocialLinks teachingLanguage={teachingLanguage} />
         <section className="participant-ended-hero">
           <span className="participant-ended-icon"><Waves size={34} /></span>
           <h1>{participantText(locale, 'sessionGoneTitle')}</h1>
@@ -188,7 +188,7 @@ export function JoinPage() {
     <main className="center-page">
       <ParticipantLanguageSwitcher teachingLanguage={teachingLanguage} locale={locale} onChange={changeLocale} />
       <SetupNotice />
-      <StudentSocialLinks />
+      <StudentSocialLinks teachingLanguage={teachingLanguage} />
       <form autoComplete="off" className="panel form-panel" onSubmit={join}>
         <span className="form-heading-icon"><User size={24} /></span>
         <h1>{participantText(locale, 'joinTitle', { title: session?.title || participantText(locale, 'untitledSession') })}</h1>

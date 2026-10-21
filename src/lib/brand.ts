@@ -13,24 +13,31 @@ import { APP_PROFILE } from './appProfiles'
 // JoinPage forwards the whole query string to the participant page, and this
 // reads it at runtime. The default costs nothing: no parameter means the
 // ordinary LingoAct page, so every existing link keeps working.
-export type BrandId = 'ncacls' | 'sc' | 'huayu' | 'english'
+export type BrandId = 'ncacls' | 'sc' | 'huayu' | 'english' | 'japanese'
 
 export const BRAND_PARAM = 'b'
 
 // True in the NCACLS desktop build itself, which is the fallback for the
 // presenter's own preview of the student page — there is no join URL there to
 // read the parameter from.
-export const buildBrand: BrandId | null = ['ncacls', 'sc', 'huayu', 'english'].includes(APP_PROFILE.id) ? APP_PROFILE.id as BrandId : null
+export const buildBrand: BrandId | null = ['ncacls', 'sc', 'huayu', 'english', 'japanese'].includes(APP_PROFILE.id) ? APP_PROFILE.id as BrandId : null
 
 export function brandFromSearch(search: URLSearchParams): BrandId | null {
   const value = search.get(BRAND_PARAM)
-  return value === 'ncacls' || value === 'sc' || value === 'huayu' || value === 'english' ? value : buildBrand
+  return value === 'ncacls' || value === 'sc' || value === 'huayu' || value === 'english' || value === 'japanese' ? value : buildBrand
+}
+
+export function participantBrand(search: URLSearchParams, teachingLanguage?: string): BrandId | null {
+  // Older shared-page links can predate the edition parameter. The loaded
+  // Japanese class still has enough context to show its student branding.
+  return brandFromSearch(search) || (teachingLanguage === 'ja' ? 'japanese' : null)
 }
 
 // Editions keep their teaching script while learners choose a guidance language.
 // NCACLS defaults to Traditional Chinese and includes its requested languages.
 // Ordering the allowed list makes the default deterministic for old join links.
 const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
+  japanese: ['ja', 'zh-TW', 'en'],
   english: ['en', 'zh-TW'],
   huayu: ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
   sc: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'vi', 'th', 'id'],
@@ -40,6 +47,6 @@ const BRAND_GUIDANCE_LOCALES: Record<BrandId, readonly string[]> = {
 export function guidanceLocalesForBrand<T extends { code: string }>(all: readonly T[], brand: BrandId | null) {
   const allowed = brand ? BRAND_GUIDANCE_LOCALES[brand] : null
   if (!allowed) return all.filter((option) => option.code !== 'zh-CN')
-  const kept = all.filter((option) => allowed.includes(option.code))
+  const kept = all.filter((option) => allowed.includes(option.code)).map(option => brand === 'japanese' && option.code === 'zh-TW' && 'label' in option ? { ...option, label: '中文' } : option)
   return kept.length ? kept.sort((a, b) => allowed.indexOf(a.code) - allowed.indexOf(b.code)) : [...all]
 }

@@ -347,9 +347,9 @@ export function SessionReportPage() {
   // The analysis itself is AI prose, not interface text, so it cannot come from
   // the message table. The report is written in Chinese and translated into
   // English in the same call; anything else falls back to what was written.
-  const report = (locale === 'zh-TW' || locale === 'zh-CN') ? analysis : { ...analysis, ...(analysis.translations?.en || {}) }
+  const report = (locale === 'zh-TW' || locale === 'zh-CN' || (locale === 'ja' && teachingLanguage === 'ja')) ? analysis : { ...analysis, ...(analysis.translations?.en || {}) }
   // 、 reads as a list in Chinese and as a typo in English.
-  const listJoin = (locale === 'zh-TW' || locale === 'zh-CN') ? '、' : ', '
+  const listJoin = (locale === 'zh-TW' || locale === 'zh-CN' || (locale === 'ja' && teachingLanguage === 'ja')) ? '、' : ', '
 
   return (
     <PresenterLanguageScope value={locale}>
@@ -437,7 +437,7 @@ export function SessionReportPage() {
               <tbody>
                 {reportData.audioResponses.map((response) => {
                   const stored = response.analysis_json
-                  const item = (locale === 'zh-TW' || locale === 'zh-CN') || !stored ? stored : { ...stored, ...(stored.translations?.en || {}) }
+                  const item = (locale === 'zh-TW' || locale === 'zh-CN' || (locale === 'ja' && teachingLanguage === 'ja')) || !stored ? stored : { ...stored, ...(stored.translations?.en || {}) }
                   const meta = questionMeta.get(response.question_id)
                   return (
                     <tr key={response.id}>
@@ -478,9 +478,9 @@ export function SessionReportPage() {
                           : fileAnalysisLabels[lead.analysis_status] ? t(fileAnalysisLabels[lead.analysis_status]) : '—'}
                         <br />{typeof item?.score === 'number' ? t('points', { n: item.score }) : '—'}
                       </td>
-                      <td>{((locale === 'zh-TW' || locale === 'zh-CN') ? item?.summary_zh_tw : item?.summary_en || item?.summary_zh_tw) || lead.error_message || '—'}</td>
-                      <td>{((locale === 'zh-TW' || locale === 'zh-CN') ? item?.strengths_zh_tw : item?.strengths_en?.length ? item.strengths_en : item?.strengths_zh_tw)?.join(listJoin) || '—'}</td>
-                      <td>{((locale === 'zh-TW' || locale === 'zh-CN') ? item?.improvements_zh_tw : item?.improvements_en?.length ? item.improvements_en : item?.improvements_zh_tw)?.join(listJoin) || '—'}</td>
+                      <td>{((locale === 'zh-TW' || locale === 'zh-CN' || (locale === 'ja' && teachingLanguage === 'ja')) ? item?.summary_zh_tw : item?.summary_en || item?.summary_zh_tw) || lead.error_message || '—'}</td>
+                      <td>{((locale === 'zh-TW' || locale === 'zh-CN' || (locale === 'ja' && teachingLanguage === 'ja')) ? item?.strengths_zh_tw : item?.strengths_en?.length ? item.strengths_en : item?.strengths_zh_tw)?.join(listJoin) || '—'}</td>
+                      <td>{((locale === 'zh-TW' || locale === 'zh-CN' || (locale === 'ja' && teachingLanguage === 'ja')) ? item?.improvements_zh_tw : item?.improvements_en?.length ? item.improvements_en : item?.improvements_zh_tw)?.join(listJoin) || '—'}</td>
                     </tr>
                   )
                 })}

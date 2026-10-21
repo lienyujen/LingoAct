@@ -246,7 +246,7 @@ export function BackendSetup({ onCancel }: Props) {
         </p>
 
         <label>
-          Publishable key
+          {uiText('Publishable key')}
           <input
             placeholder="sb_publishable_..."
             value={key}

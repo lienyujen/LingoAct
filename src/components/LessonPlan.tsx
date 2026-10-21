@@ -9,6 +9,8 @@ import type { PresenterMessageKey } from '../lib/presenterI18n'
 import { useWorkspaceText } from '../lib/workspaceText'
 import type { ListeningAccent } from '../lib/listening'
 import type { QuestionType, QuizRequestedType } from '../types'
+import { accentChoices, speechAccent } from '../lib/speechAccent'
+import { resolveTrack } from '../lib/teachingTracks'
 
 // The tools that are not one of the four skills: they sit above the skill tabs
 // in the panel and they belong here for the same reason, because a lesson that
@@ -110,9 +112,9 @@ function readPlan(v2Key: string, v1Key: string): Plan {
   } catch { return emptyPlan }
 }
 
-function initialActivity(kind: PlannedActivityKind): PlannedActivity {
+function initialActivity(kind: PlannedActivityKind, language = resolveTrack(APP_PROFILE.defaultTrack).language): PlannedActivity {
   return {
-    id: '', kind, prompt: '', listeningKind: 'passage', accent: 'standard_guoyu', dispatchTarget: 'audio', replayLimit: null,
+    id: '', kind, prompt: '', listeningKind: 'passage', accent: speechAccent(language, null), dispatchTarget: 'audio', replayLimit: null,
     source: 'screenshot', questionType: 'multiple_choice', options: ['A', 'B', 'C', 'D'], allowMultiple: false,
     quizType: 'random',
     count: 'auto', coaching: kind === 'writingCoach', pictureMode: 'spoken', aiGrading: false,
@@ -128,21 +130,22 @@ const TOOL_LABELS: Record<ToolKind, PresenterMessageKey> = {
   exitTicket: 'generateExitTicket',
 }
 
-export function LessonPlan({ courseName, busy = false, onStart }: {
-  courseName: string; busy?: boolean; onStart?: (activity: PlannedActivity, goal: string) => void
+export function LessonPlan({ courseName, teachingLanguage, busy = false, onStart }: {
+  courseName: string; teachingLanguage?: string; busy?: boolean; onStart?: (activity: PlannedActivity, goal: string) => void
 }) {
+  const language = resolveTrack(teachingLanguage || APP_PROFILE.defaultTrack).language
   const base = courseName.trim()
   const storageKey = `lingoact_lesson_plan_v2:${base}`
   const legacyKey = `lingoact_lesson_plan_v1:${base}`
   const [plan, setPlan] = useState(() => readPlan(storageKey, legacyKey))
   const [group, setGroup] = useState<string>(APP_PROFILE.defaultSkill)
   const [draft, setDraft] = useState<PlannedActivity>(() => initialActivity(
-    activitiesFor(APP_PROFILE.defaultSkill, APP_PROFILE.activityOrder?.[APP_PROFILE.defaultSkill])[0]?.id || 'reading',
+    activitiesFor(APP_PROFILE.defaultSkill, APP_PROFILE.activityOrder?.[APP_PROFILE.defaultSkill])[0]?.id || 'reading', language,
   ))
   const [notice, setNotice] = useState('')
   const t = usePresenterText()
   const w = useWorkspaceText()
-  const chinese = ['zh-TW', 'zh-CN'].includes(usePresenterLocale())
+  const chinese = ['zh-TW', 'zh-CN', 'ja'].includes(usePresenterLocale())
 
   // The same table the activity menu is built from, so the plan can never offer
   // something the app does not have — or miss something it does.
@@ -191,19 +194,19 @@ export function LessonPlan({ courseName, busy = false, onStart }: {
   }
   function chooseGroup(id: string) {
     const first = groups.find((item) => item.id === id)?.kinds[0] || 'reading'
-    setGroup(id); setDraft(initialActivity(first))
+    setGroup(id); setDraft(initialActivity(first, language))
   }
   function summary(item: PlannedActivity) {
     const parts = [item.prompt]
     if (item.kind === 'listeningStudio') {
-      parts.push(item.listeningKind === 'dialogue' ? (chinese ? '對話' : 'Dialogue') : (chinese ? '課文段落' : 'Passage'))
-      const accentKey = item.accent === 'putonghua' ? 'accentPutonghua' : item.accent === 'taiwanese' ? 'accentTaiwanese' : 'accentStandardGuoyu'
+      parts.push(item.listeningKind === 'dialogue' ? (chinese ? uiText('對話') : 'Dialogue') : (chinese ? uiText('課文段落') : 'Passage'))
+      const accentKey = accentChoices(language).find(choice => choice.value === speechAccent(language, item.accent))?.label || 'accentStandardGuoyu'
       const dispatchKey = item.dispatchTarget === 'quiz' ? 'sendListeningQuiz' : item.dispatchTarget === 'read_aloud' ? 'sendReadAloud' : 'sendAudioOnly'
       parts.push(t(accentKey), t(dispatchKey))
     }
-    if ((CONTROLS[item.kind] || []).includes('material')) parts.push(item.count === 'auto' ? (chinese ? '數量自動' : "Let AI decide") : `${item.count}`)
+    if ((CONTROLS[item.kind] || []).includes('material')) parts.push(item.count === 'auto' ? (chinese ? uiText('數量自動') : "Let AI decide") : `${item.count}`)
     if (item.kind === 'textDispatch' && item.url) parts.push(item.url)
-    return parts.filter(Boolean).join(' · ') || (chinese ? '開啟後再選擇教材' : 'Choose the material after opening')
+    return parts.filter(Boolean).join(' · ') || (chinese ? uiText('開啟後再選擇教材') : 'Choose the material after opening')
   }
   const promptRequired = !NOTE_ONLY.includes(draft.kind)
 
@@ -229,11 +232,11 @@ export function LessonPlan({ courseName, busy = false, onStart }: {
       {groups.map((item) => <button key={item.id} type="button" aria-pressed={group === item.id} onClick={() => chooseGroup(item.id)}>{item.label}</button>)}
     </div>
     <label>{chinese ? uiText("加入一個活動") : 'Add an activity'}
-      <select value={draft.kind} onChange={(event) => setDraft(initialActivity(event.target.value as PlannedActivityKind))}>{availableKinds.map((value) => <option key={value} value={value}>{labelFor(value)}</option>)}</select>
+      <select value={draft.kind} onChange={(event) => setDraft(initialActivity(event.target.value as PlannedActivityKind, language))}>{availableKinds.map((value) => <option key={value} value={value}>{labelFor(value)}</option>)}</select>
     </label>
     {has('listening') && <div className="lesson-plan-options">
       <select aria-label={chinese ? uiText("內容形式") : 'Format'} value={draft.listeningKind} onChange={(e) => setDraft({ ...draft, listeningKind: e.target.value as 'passage' | 'dialogue' })}><option value="passage">{chinese ? uiText("課文段落") : 'Passage'}</option><option value="dialogue">{chinese ? uiText("對話") : 'Dialogue'}</option></select>
-      <select aria-label={chinese ? uiText("中文口音") : 'Mandarin accent'} value={draft.accent} onChange={(e) => setDraft({ ...draft, accent: e.target.value as ListeningAccent })}><option value="standard_guoyu">{t('accentStandardGuoyu')}</option><option value="putonghua">{t('accentPutonghua')}</option><option value="taiwanese">{t('accentTaiwanese')}</option></select>
+      <select aria-label={uiText('發音')} value={speechAccent(language, draft.accent)} onChange={(e) => setDraft({ ...draft, accent: e.target.value as ListeningAccent })}>{accentChoices(language).map(choice => <option key={choice.value} value={choice.value}>{t(choice.label)}</option>)}</select>
       <select aria-label={chinese ? uiText("預計派送方式") : "Planned activity"} value={draft.dispatchTarget} onChange={(e) => setDraft({ ...draft, dispatchTarget: e.target.value as PlannedActivity['dispatchTarget'] })}><option value="audio">{t('sendAudioOnly')}</option><option value="read_aloud">{t('sendReadAloud')}</option><option value="quiz">{t('sendListeningQuiz')}</option></select>
       <select aria-label={t('replayCount')} value={draft.replayLimit ?? 'unlimited'} onChange={(e) => setDraft({ ...draft, replayLimit: e.target.value === 'unlimited' ? null : Number(e.target.value) })}><option value="unlimited">{chinese ? uiText("不限次") : 'Unlimited'}</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
       {draft.dispatchTarget === 'read_aloud' && <select aria-label={t('prepareTime')} value={draft.prepareSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, prepareSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noPrepare')}</option><option value="10">{uiText("10 秒")}</option><option value="20">{uiText("20 秒")}</option><option value="30">{uiText("30 秒")}</option></select>}
@@ -263,7 +266,7 @@ export function LessonPlan({ courseName, busy = false, onStart }: {
     <label>{uiText(promptMeta[0])}<textarea aria-label={uiText(promptMeta[0])} rows={3} maxLength={draft.kind === 'textDispatch' ? 5000 : 2000} value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={uiText(promptMeta[1])} /></label>
     {has('link') && <label>{chinese ? uiText("連結（選填）") : 'Link (optional)'}<input value={draft.url || ''} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://" /></label>}
     <button className="ghost-button" type="button" disabled={busy || (promptRequired && !draft.prompt.trim()) || plan.activities.length >= 20} onClick={() => {
-      save({ ...plan, activities: [...plan.activities, { ...draft, id: crypto.randomUUID(), prompt: draft.prompt.trim(), url: draft.url?.trim() }] }); setDraft(initialActivity(draft.kind))
+      save({ ...plan, activities: [...plan.activities, { ...draft, id: crypto.randomUUID(), prompt: draft.prompt.trim(), url: draft.url?.trim() }] }); setDraft(initialActivity(draft.kind, language))
     }}><Plus size={16} />{chinese ? uiText("加入錦囊") : 'Add to plan'}</button>
     {notice && <p className="error" role="status">{uiText(notice)}</p>}
   </details>

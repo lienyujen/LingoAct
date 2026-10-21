@@ -245,10 +245,12 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
         }
       }
 
-      if (written?.body && (annotation === 'zhuyin' || annotation === 'pinyin')) {
+      if (written?.body && (annotation === 'zhuyin' || annotation === 'pinyin' || annotation === 'furigana')) {
         setStatus(t('readingAnnotating'))
         try {
-          const marked = await annotateReading({ sessionId, presenterToken, text: written.body, mode: annotation, accent })
+          const marked = annotation === 'furigana' && written.words?.length
+            ? { annotationText: '', words: written.words }
+            : await annotateReading({ sessionId, presenterToken, text: written.body, mode: annotation, accent, granularity: annotation === 'furigana' ? 'words' : undefined })
           await applyReadingAnnotation({
             sessionId,
             presenterToken,

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { sentencePages } from '../lib/classroomProjection'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Answer, Question } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
 
@@ -25,6 +26,15 @@ export function SentenceWallOverlay({ question, answers, anonymousEnabled }: Pro
   // Which cards are new since the last render, so they can arrive rather than
   // appear. Held in a ref because it must not itself cause a render.
   const seenRef = useRef<Set<string>>(new Set())
+  const [pageIndex, setPageIndex] = useState(0)
+  const pages = useMemo(() => sentencePages(answers), [answers])
+  const page = pages[pageIndex % Math.max(1, pages.length)] || []
+  useEffect(() => { setPageIndex(0) }, [question?.id])
+  useEffect(() => {
+    if (pages.length < 2) return
+    const timer = window.setInterval(() => setPageIndex(index => (index + 1) % pages.length), 8000)
+    return () => window.clearInterval(timer)
+  }, [pages.length])
   const [arriving, setArriving] = useState<string[]>([])
 
   useEffect(() => {
@@ -49,13 +59,13 @@ export function SentenceWallOverlay({ question, answers, anonymousEnabled }: Pro
     <div className="sentence-wall">
       <header className="sentence-wall-head">
         <h1>{question.prompt_text || question.title}</h1>
-        <span className="sentence-wall-count">{sentences.length}</span>
+        <span className="sentence-wall-count">{sentences.length}{pages.length > 1 && ` · ${(pageIndex % pages.length) + 1}/${pages.length}`}</span>
       </header>
       {sentences.length === 0 ? (
         <p className="sentence-wall-waiting">{t('waitingForSentences')}</p>
       ) : (
-        <div className={`sentence-wall-grid ${sizeClass(sentences.length)}`}>
-          {sentences.map((answer, index) => (
+        <div className={`sentence-wall-grid ${sizeClass(page.length)}`}>
+          {page.map((answer, index) => (
             <article
               className={arriving.includes(answer.id) ? 'sentence-card is-arriving' : 'sentence-card'}
               key={answer.id}

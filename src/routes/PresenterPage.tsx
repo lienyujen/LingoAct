@@ -1,3 +1,4 @@
+import { onlineClassIds } from '../lib/classroomProjection'
 import { captureCrop } from '../lib/captureGeometry'
 import { createSerializedReload } from '../lib/serializedReload'
 import { createPresenterActivityFocus } from '../lib/presenterActivityFocus'
@@ -249,7 +250,7 @@ export function PresenterPage() {
     [participants],
   )
   const onlineParticipants = useMemo(
-    () => participants.filter((participant) => onlineParticipantIds.includes(participant.id)),
+    () => { const ids = new Set(onlineClassIds(participants, onlineParticipantIds)); return participants.filter(participant => ids.has(participant.id)) },
     [onlineParticipantIds, participants],
   )
 

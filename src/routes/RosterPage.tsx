@@ -1,3 +1,4 @@
+import { onlineClassIds } from '../lib/classroomProjection'
 import { createBatchedRefresh, createRealtimeSnapshot } from '../lib/realtimeSnapshot'
 import { createSerializedReload } from '../lib/serializedReload'
 import { uiText } from '../lib/uiText'
@@ -255,7 +256,8 @@ export function RosterPage() {
       boardPosts,
     }, t)
     const byParticipantId = new Map(computed.map((row) => [row.participant.id, row]))
-    const online = (participantId: string | null) => Boolean(participantId) && onlineParticipantIds.includes(participantId as string)
+    const liveIds = new Set(onlineClassIds(participants, onlineParticipantIds))
+    const online = (participantId: string | null) => Boolean(participantId) && liveIds.has(participantId as string)
 
     const toRow = (
       participation: ParticipationRow | null,

@@ -1,3 +1,5 @@
+import { answerBeforeComment } from '../lib/classroomProjection'
+import { createMessageSubmission } from '../lib/messageSubmission'
 import { createRevisionGuard } from '../lib/realtimeSnapshot'
 import { useClassChineseFont } from '../lib/classChineseFont'
 import { createSerializedReload } from '../lib/serializedReload'
@@ -63,6 +65,11 @@ export function ParticipantPage() {
   const { sessionId = '' } = useParams()
   const participantId = localStorage.getItem(`lingoact_participant_${sessionId}`)
   const participantToken = localStorage.getItem(`lingoact_participant_token_${sessionId}`)
+  const [messageSubmission] = useState(createMessageSubmission)
+  const [messageBusy, setMessageBusy] = useState(false)
+  const messageSending = useRef(false)
+  const historyEpoch = useRef(0)
+  const loadedHistorySignature = useRef('')
   const [participant, setParticipant] = useState<Participant | null>(null)
   const participantRevision = useRef(createRevisionGuard())
   const participantRef = useRef(participant)
@@ -192,7 +199,7 @@ export function ParticipantPage() {
     const participantReadRevision = participantRevision.current.current()
     const requestId = ++loadSequence.current
     const supabase = requireSupabase()
-    const [{ data: sessionData }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }, { data: sessionQuizzes }] = await Promise.all([
+    const [{ data: sessionData, error: sessionError }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }, { data: sessionQuizzes }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', sessionId).single(),
       supabase.from('participants').select('*').eq('id', participantId).single(),
       supabase.from('exit_tickets').select('*').eq('session_id', sessionId).eq('participant_id', participantId).maybeSingle(),
@@ -203,121 +210,19 @@ export function ParticipantPage() {
       supabase.from('quizzes').select('question_id, requested_type').eq('session_id', sessionId),
     ])
     if (requestId !== loadSequence.current) return
+    if (sessionError || !sessionData) return
     const nextSession = sessionData as Session | null
     setSession(nextSession)
 
-    // What the AI made of each question, kept the way the student's own answers
-    // are kept: a newly dispatched question does not take the last one's
-    // explanation away, and neither does the end of the class. Read here rather
-    // than per question so opening an old one costs nothing.
-    //
-    // This arrives the moment the teacher presses 批改 rather than at the next
-    // dispatch: the row is inserted already marked success, and this page is
-    // subscribed to inserts on ai_summaries, so the analysis triggers its own
-    // refresh. Ordered oldest first on purpose — a re-analysis writes a new row,
-    // and the last one written is the one that should win.
-    const { data: analysisData } = await supabase
-      .from('ai_summaries')
-      .select('question_id, output_json')
-      .eq('session_id', sessionId)
-      .eq('type', 'question_analysis')
-      .eq('status', 'success')
-      .order('created_at', { ascending: true })
-      .limit(500)
-    setQuestionAnalyses(Object.fromEntries(
-      ((analysisData || []) as Array<{ question_id: string | null; output_json: unknown }>)
-        .filter((row) => row.question_id)
-        .map((row) => [row.question_id as string, row.output_json as QuestionAnalysis]),
-    ))
     setSessionChecked(true)
-    if (participantRevision.current.accepts(participantReadRevision)) setParticipant(participantData as Participant | null)
     setExitTicket((exitTicketData as ExitTicket | null) || null)
     setSharedContents((sharedContentData || []) as SharedContent[])
     setBuzzerEvent((buzzerData as BuzzerSessionEvent | null) || null)
-    const participantAnswers = (allAnswers || []) as Answer[]
-    const answeredQuestionIds = new Set(participantAnswers.map((item) => item.question_id))
-    // Flashcards are class material as well as an answer activity. Keep every
-    // deck in history even when this student only reviewed it and never sent a
-    // try, so it remains available after another activity or after class.
-    for (const quiz of sessionQuizzes || []) {
-      if (quiz.requested_type === 'flashcard') answeredQuestionIds.add(quiz.question_id)
-    }
-    // Teacher audio is durable class material, even when it was sent as
-    // listen-only and therefore produced no answer row. Keep every dispatched
-    // clip in history so it survives the next activity and the end of class.
-    for (const item of (allQuestions || []) as Question[]) {
-      if (item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
-    }
-    // A passage is course material, not a submission. An article sent to be
-    // read produces no answer row at all, and a reading quiz keeps only its
-    // score — so without this the text and its vocabulary vanish the moment
-    // the teacher moves on, which is exactly what a student wants back.
-    const dispatchedIds = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft').map((item) => item.id)
-    const passagesByQuestion: Record<string, ReadingPassageRow> = {}
-    if (dispatchedIds.length) {
-      const { data: historyPassageData } = await supabase
-        .from('reading_passages').select('*').in('question_id', dispatchedIds)
-      if (requestId !== loadSequence.current) return
-      for (const row of (historyPassageData || []) as ReadingPassageRow[]) {
-        passagesByQuestion[row.question_id] = row
-        answeredQuestionIds.add(row.question_id)
-      }
-    }
-    setHistoryPassages(passagesByQuestion)
-
-    const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft' && answeredQuestionIds.has(item.id))
-    setHistoryAnswers(participantAnswers)
-    setHistoryQuestions(answeredQuestions)
-
-    // share_screenshot is the teacher's decision about whether the class may
-    // see the material a question was built from, and it does not expire when
-    // the question does. History was showing every capture regardless, which
-    // handed back the source page of a reading whose teacher had deliberately
-    // withheld it.
-    const screenshotIds = [...new Set(answeredQuestions
-      .filter((item) => item.share_screenshot !== false)
-      .map((item) => item.screenshot_id)
-      .filter((id): id is string => Boolean(id)))]
-    if (screenshotIds.length) {
-      const { data: historyScreenshotData } = await supabase.from('screenshots').select('*').in('id', screenshotIds)
-      if (requestId !== loadSequence.current) return
-      setHistoryScreenshots(Object.fromEntries(((historyScreenshotData || []) as Screenshot[]).map((item) => [item.id, item])))
-    } else {
-      setHistoryScreenshots({})
-    }
-
-    const listeningQuestions = answeredQuestions.filter((item) => Boolean(item.listening_clip_id))
-    if (listeningQuestions.length) {
-      const clips = await Promise.all(listeningQuestions.map(async (item) => [
-        item.id,
-        await fetchListeningClip(item.listening_clip_id!).catch(() => null),
-      ] as const))
-      if (requestId !== loadSequence.current) return
-      setHistoryListeningClips(Object.fromEntries(clips))
-    } else {
-      setHistoryListeningClips({})
-    }
-
-    if (nextSession?.status === 'ended') {
-      const { data: summaryData } = await supabase
-        .from('ai_summaries')
-        .select('*')
-        .eq('session_id', sessionId)
-        .eq('type', 'exit_ticket_summary')
-        .eq('status', 'success')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      setSessionSummary(((summaryData as AiSummary | null)?.output_json as SessionAnalysis | undefined) || null)
-    } else {
-      setSessionSummary(null)
-    }
-
+    if (participantRevision.current.accepts(participantReadRevision)) setParticipant(participantData as Participant | null)
     if (nextSession?.current_question_id) {
-      const [{ data: questionData }, { data: answerData }] = await Promise.all([
-        supabase.from('questions').select('*').eq('id', nextSession.current_question_id).single(),
-        supabase.from('answers').select('*').eq('question_id', nextSession.current_question_id).eq('participant_id', participantId).maybeSingle(),
-      ])
+      const cachedQuestion = ((allQuestions || []) as Question[]).find(item => item.id === nextSession.current_question_id)
+      const questionData = cachedQuestion || (await supabase.from('questions').select('*').eq('id', nextSession.current_question_id).single()).data
+      const answerData = ((allAnswers || []) as Answer[]).find(item => item.question_id === nextSession.current_question_id)
       if (requestId !== loadSequence.current) return
       const nextQuestion = questionData as Question | null
       setQuestion(nextQuestion)
@@ -398,27 +303,6 @@ export function ParticipantPage() {
       setScreenshot(null)
     }
 
-    // The board is loaded separately from the current question because it is
-    // not one: the presenter opens it for a topic and carries on dispatching
-    // other questions, and the class has to be able to go back to it the whole
-    // time. It sits on the page alongside whatever they are being asked now.
-    if (nextSession?.board_question_id) {
-      const { data: boardData } = await supabase
-        .from('questions').select('*').eq('id', nextSession.board_question_id).maybeSingle()
-      const nextBoard = boardData as Question | null
-      setBoardQuestion(nextBoard)
-      if (nextBoard?.screenshot_id && nextBoard.share_screenshot) {
-        const { data } = await supabase
-          .from('screenshots').select('public_url').eq('id', nextBoard.screenshot_id).maybeSingle()
-        setBoardImageUrl((data as { public_url: string } | null)?.public_url || null)
-      } else {
-        setBoardImageUrl(null)
-      }
-    } else {
-      setBoardQuestion(null)
-      setBoardImageUrl(null)
-    }
-
     // A reading is the current question rather than something alongside it, so
     // it is looked up from whatever the class is on — including when that
     // question is a custom_quiz, because a reading with questions over it is
@@ -449,8 +333,136 @@ export function ParticipantPage() {
       setPassage(null)
       setPassageImageUrl(null)
     }
+    const historySignature = JSON.stringify([allQuestions, allAnswers, sessionQuizzes, locale, nextSession?.status, historyEpoch.current])
+    if (loadedHistorySignature.current !== historySignature) {
+    // What the AI made of each question, kept the way the student's own answers
+    // are kept: a newly dispatched question does not take the last one's
+    // explanation away, and neither does the end of the class. Read here rather
+    // than per question so opening an old one costs nothing.
+    //
+    // This arrives the moment the teacher presses 批改 rather than at the next
+    // dispatch: the row is inserted already marked success, and this page is
+    // subscribed to inserts on ai_summaries, so the analysis triggers its own
+    // refresh. Ordered oldest first on purpose — a re-analysis writes a new row,
+    // and the last one written is the one that should win.
+    const { data: analysisData } = await supabase
+      .from('ai_summaries')
+      .select('question_id, output_json')
+      .eq('session_id', sessionId)
+      .eq('type', 'question_analysis')
+      .eq('status', 'success')
+      .order('created_at', { ascending: true })
+      .limit(500)
+    setQuestionAnalyses(Object.fromEntries(
+      ((analysisData || []) as Array<{ question_id: string | null; output_json: unknown }>)
+        .filter((row) => row.question_id)
+        .map((row) => [row.question_id as string, row.output_json as QuestionAnalysis]),
+    ))
+    const participantAnswers = (allAnswers || []) as Answer[]
+    const answeredQuestionIds = new Set(participantAnswers.map((item) => item.question_id))
+    // Flashcards are class material as well as an answer activity. Keep every
+    // deck in history even when this student only reviewed it and never sent a
+    // try, so it remains available after another activity or after class.
+    for (const quiz of sessionQuizzes || []) {
+      if (quiz.requested_type === 'flashcard') answeredQuestionIds.add(quiz.question_id)
+    }
+    // Teacher audio is durable class material, even when it was sent as
+    // listen-only and therefore produced no answer row. Keep every dispatched
+    // clip in history so it survives the next activity and the end of class.
+    for (const item of (allQuestions || []) as Question[]) {
+      if (item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
+    }
+    // A passage is course material, not a submission. An article sent to be
+    // read produces no answer row at all, and a reading quiz keeps only its
+    // score — so without this the text and its vocabulary vanish the moment
+    // the teacher moves on, which is exactly what a student wants back.
+    const dispatchedIds = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft').map((item) => item.id)
+    const passagesByQuestion: Record<string, ReadingPassageRow> = {}
+    if (dispatchedIds.length) {
+      const { data: historyPassageData } = await supabase
+        .from('reading_passages').select('*').in('question_id', dispatchedIds)
+      if (requestId !== loadSequence.current) return
+      for (const row of (historyPassageData || []) as ReadingPassageRow[]) {
+        passagesByQuestion[row.question_id] = row
+        answeredQuestionIds.add(row.question_id)
+      }
+    }
+    setHistoryPassages(passagesByQuestion)
+
+    const answeredQuestions = ((allQuestions || []) as Question[]).filter((item) => item.status !== 'draft' && answeredQuestionIds.has(item.id))
+    setHistoryAnswers(participantAnswers)
+    setHistoryQuestions(answeredQuestions)
+
+    // share_screenshot is the teacher's decision about whether the class may
+    // see the material a question was built from, and it does not expire when
+    // the question does. History was showing every capture regardless, which
+    // handed back the source page of a reading whose teacher had deliberately
+    // withheld it.
+    const screenshotIds = [...new Set(answeredQuestions
+      .filter((item) => item.share_screenshot !== false)
+      .map((item) => item.screenshot_id)
+      .filter((id): id is string => Boolean(id)))]
+    if (screenshotIds.length) {
+      const { data: historyScreenshotData } = await supabase.from('screenshots').select('*').in('id', screenshotIds)
+      if (requestId !== loadSequence.current) return
+      setHistoryScreenshots(Object.fromEntries(((historyScreenshotData || []) as Screenshot[]).map((item) => [item.id, item])))
+    } else {
+      setHistoryScreenshots({})
+    }
+
+    const listeningQuestions = answeredQuestions.filter((item) => Boolean(item.listening_clip_id))
+    if (listeningQuestions.length) {
+      const clips = await Promise.all(listeningQuestions.map(async (item) => [
+        item.id,
+        await fetchListeningClip(item.listening_clip_id!).catch(() => null),
+      ] as const))
+      if (requestId !== loadSequence.current) return
+      setHistoryListeningClips(Object.fromEntries(clips))
+    } else {
+      setHistoryListeningClips({})
+    }
+
+    if (nextSession?.status === 'ended') {
+      const { data: summaryData } = await supabase
+        .from('ai_summaries')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('type', 'exit_ticket_summary')
+        .eq('status', 'success')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setSessionSummary(((summaryData as AiSummary | null)?.output_json as SessionAnalysis | undefined) || null)
+    } else {
+      setSessionSummary(null)
+    }
+
+    loadedHistorySignature.current = historySignature
+    }
+
+    // The board is loaded separately from the current question because it is
+    // not one: the presenter opens it for a topic and carries on dispatching
+    // other questions, and the class has to be able to go back to it the whole
+    // time. It sits on the page alongside whatever they are being asked now.
+    if (nextSession?.board_question_id) {
+      const { data: boardData } = await supabase
+        .from('questions').select('*').eq('id', nextSession.board_question_id).maybeSingle()
+      const nextBoard = boardData as Question | null
+      setBoardQuestion(nextBoard)
+      if (nextBoard?.screenshot_id && nextBoard.share_screenshot) {
+        const { data } = await supabase
+          .from('screenshots').select('public_url').eq('id', nextBoard.screenshot_id).maybeSingle()
+        setBoardImageUrl((data as { public_url: string } | null)?.public_url || null)
+      } else {
+        setBoardImageUrl(null)
+      }
+    } else {
+      setBoardQuestion(null)
+      setBoardImageUrl(null)
+    }
+
   }, [locale, participantId, participantToken, sessionId])
-  const loadAll = useCallback(() => serializedReload(loadSnapshot), [loadSnapshot, serializedReload])
+  const loadAll = useCallback(() => serializedReload(loadSnapshot).catch(() => { /* Preserve the current round; reconnect/correction retries. */ }), [loadSnapshot, serializedReload])
 
   const loadHistoryDetails = useCallback(async (historyQuestion: Question) => {
     if (!participantId || !participantToken || !['custom_quiz', 'pronunciation', 'oral_response'].includes(historyQuestion.type)) return
@@ -558,9 +570,9 @@ export function ParticipantPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       // The readings and the audio are put on the passage a few seconds after
       // it is dispatched, so a student already looking at it has to be told.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reading_passages', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reading_passages', filter: `session_id=eq.${sessionId}` }, () => { historyEpoch.current++; scheduleLoad() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, () => { historyEpoch.current++; scheduleLoad() })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'participants', filter: `id=eq.${participantId}` }, payload => {
         const row = payload.new as Participant
@@ -590,6 +602,25 @@ export function ParticipantPage() {
       supabase.removeChannel(channel)
     }
   }, [liveSessionId, loadAll, participantId, scheduleLoad, sessionId])
+
+  const latestSession = useRef(session)
+  latestSession.current = session
+  useEffect(() => {
+    if (!sessionId || !participantId || session?.status === 'ended') return
+    const check = async () => {
+      if (document.visibilityState === 'hidden' || navigator.onLine === false) return
+      const { data, error } = await requireSupabase().from('sessions')
+        .select('id,current_question_id,status,sentence_wall_enabled,danmaku_enabled,board_question_id')
+        .eq('id', sessionId).maybeSingle()
+      if (error || !data) return
+      const current = latestSession.current
+      if (!current || Object.entries(data).some(([key, value]) => current[key as keyof Session] !== value)) scheduleLoad()
+    }
+    const timer = window.setInterval(() => void check(), 20_000 + Math.random() * 10_000)
+    const visible = () => { void check() }
+    document.addEventListener('visibilitychange', visible)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', visible) }
+  }, [participantId, session?.status, sessionId, scheduleLoad])
 
   useEffect(() => {
     if (session?.status !== 'ended') return
@@ -632,24 +663,28 @@ export function ParticipantPage() {
     event.preventDefault()
     const content = message.trim()
     if (!participant || session?.status !== 'active' || !content) return
-    if (onBreak || !danmakuOpen) return
+    if (onBreak || !danmakuOpen || messageSending.current || answerBeforeComment(question, Boolean(answer))) return
     if (!messageFitsLimit(content)) {
       setError(participantText(locale, 'limit'))
       return
     }
     setError('')
+    messageSending.current = true
     try {
-      await requireSupabase().from('messages').insert({
-        session_id: sessionId,
-        participant_id: participant.id,
-        participant_name: participant.name,
-        content,
-        anonymous_at_display: session?.anonymous_enabled ?? true,
+      setMessageBusy(true)
+      const sent = await messageSubmission(content, async id => {
+        const { error } = await requireSupabase().from('messages').insert({
+          id, session_id: sessionId, participant_id: participant.id,
+          participant_name: participant.name, content,
+          anonymous_at_display: session?.anonymous_enabled ?? true,
+        })
+        // A lost acknowledgement followed by the same ID is already delivered.
+        if (error && error.code !== '23505') throw error
       })
-      setMessage('')
+      if (sent) setMessage(current => current.trim() === content ? '' : current)
     } catch (err) {
       setError(err instanceof Error ? err.message : '送出失敗')
-    }
+    } finally { messageSending.current = false; setMessageBusy(false) }
   }
 
   async function submitAnswer(value: string | string[]) {
@@ -1200,7 +1235,7 @@ export function ParticipantPage() {
           invites a student to type a question into it that nobody will ever
           read, and a class left alone with a live text field is how the message
           table fills up with an hour of chatter aimed at an empty room. */}
-      {!onBreak && <form className={`panel message-form${danmakuOpen ? '' : ' is-closed'}`} onSubmit={sendMessage}>
+      {!onBreak && !answerBeforeComment(question, Boolean(answer)) && <form className={`panel message-form${danmakuOpen ? '' : ' is-closed'}`} onSubmit={sendMessage}>
         <label>
           {participantText(locale, 'sendFeedback')}
           <textarea
@@ -1219,7 +1254,7 @@ export function ParticipantPage() {
           {danmakuOpen && message && ` · ${participantText(locale, 'used')} ${Math.ceil(messageUsage(message).units)}/${MESSAGE_MAX_DENSE_CHARACTERS}`}
         </p>
         {error && <p className="error">{uiText(error)}</p>}
-        <button disabled={!danmakuOpen || !message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
+        <button disabled={messageBusy || !danmakuOpen || !message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
       </form>}
       <LotteryOverlay event={lotteryEvent} participantId={participant?.id} />
       <BuzzerOverlay

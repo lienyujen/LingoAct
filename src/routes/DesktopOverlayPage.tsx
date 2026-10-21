@@ -1,3 +1,5 @@
+import { createSerializedReload } from '../lib/serializedReload'
+import { createBatchedRefresh, createRealtimeSnapshot } from '../lib/realtimeSnapshot'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { resolvedCaptionLanguage } from '../lib/captionLanguages'
@@ -29,7 +31,7 @@ export function DesktopOverlayPage() {
   const [wallQuestion, setWallQuestion] = useState<Question | null>(null)
   const [wallAnswers, setWallAnswers] = useState<Answer[]>([])
   const messageCutoffRef = useRef(new Date().toISOString())
-  const loadingRef = useRef(false)
+  const [serializedOverlay] = useState(createSerializedReload)
   const captionHideTimersRef = useRef<Map<string, number>>(new Map())
 
   const showCaption = useCallback((language: string, text: string) => {
@@ -51,7 +53,8 @@ export function DesktopOverlayPage() {
     setMessages((current) => {
       const byId = new Map(current.map((message) => [message.id, message]))
       for (const message of incoming) byId.set(message.id, message)
-      return [...byId.values()].sort((left, right) => left.created_at.localeCompare(right.created_at))
+      if (byId.size === current.length && incoming.every(message => current.some(item => item.id === message.id))) return current
+      return [...byId.values()].sort((left, right) => left.created_at.localeCompare(right.created_at)).slice(-500)
     })
   }, [])
 
@@ -81,12 +84,11 @@ export function DesktopOverlayPage() {
     }
   }, [])
 
-  const loadOverlay = useCallback(async () => {
-    if (!isSupabaseConfigured || !sessionId || loadingRef.current) return
-    loadingRef.current = true
+  const loadOverlaySnapshot = useCallback(async () => {
+    if (!isSupabaseConfigured || !sessionId) return
     const supabase = requireSupabase()
     try {
-      const [{ data: sessionData }, { data: messageData }] = await Promise.all([
+      const [{ data: sessionData, error: sessionError }, { data: messageData, error: messageError }] = await Promise.all([
         supabase.from('sessions').select('*').eq('id', sessionId).single(),
         supabase
           .from('messages')
@@ -96,54 +98,58 @@ export function DesktopOverlayPage() {
           .order('created_at', { ascending: false })
           .limit(100),
       ])
+      if (sessionError || !sessionData) return
       const nextSession = sessionData as Session | null
       setSession(nextSession)
-      mergeMessages((messageData || []) as Message[])
+      if (!messageError) mergeMessages((messageData || []) as Message[])
     } catch {
       // Realtime remains primary; the next poll retries missed updates.
-    } finally {
-      loadingRef.current = false
     }
   }, [mergeMessages, sessionId])
 
+  const loadOverlay = useCallback(() => serializedOverlay(loadOverlaySnapshot), [serializedOverlay, loadOverlaySnapshot])
+
   const wallQuestionId = session?.sentence_wall_enabled ? session.current_question_id : null
 
-  const loadWall = useCallback(async () => {
-    if (!isSupabaseConfigured || !wallQuestionId) return
-    const supabase = requireSupabase()
-    const [{ data: questionData }, { data: answerData }] = await Promise.all([
-      supabase.from('questions').select('*').eq('id', wallQuestionId).maybeSingle(),
-      supabase.from('answers').select('*').eq('question_id', wallQuestionId).order('submitted_at'),
-    ])
-    setWallQuestion(questionData as Question | null)
-    setWallAnswers((answerData || []) as Answer[])
-  }, [wallQuestionId])
-
   useEffect(() => {
-    if (!wallQuestionId) {
-      setWallQuestion(null)
-      setWallAnswers([])
-      return
+    setWallQuestion(null)
+    setWallAnswers([])
+    if (!isSupabaseConfigured || !wallQuestionId) return
+    const supabase = requireSupabase(), cache = createRealtimeSnapshot(), reload = createSerializedReload()
+    let active = true
+    const publish = () => {
+      if (!active) return
+      setWallAnswers(cache.rows<Answer>('answers').sort((a, b) => a.submitted_at.localeCompare(b.submitted_at)))
     }
-    void loadWall()
-    if (!isSupabaseConfigured) return
-    const supabase = requireSupabase()
-    const channel = supabase
-      .channel(`sentence-wall:${wallQuestionId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers', filter: `question_id=eq.${wallQuestionId}` }, (payload) => {
-        // Appended rather than refetched: a sentence landing while thirty
-        // students type should cost one row, not thirty.
-        setWallAnswers((current) => (
-          current.some((answer) => answer.id === (payload.new as Answer).id)
-            ? current
-            : [...current, payload.new as Answer]
-        ))
-      })
-      .subscribe()
+    const batch = createBatchedRefresh(async () => publish(), 100, 100)
+    const refresh = () => void reload(async () => {
+      cache.begin()
+      try {
+        const [{ data: question, error: questionError }, { data: answers, error: answerError }] = await Promise.all([
+          supabase.from('questions').select('*').eq('id', wallQuestionId).maybeSingle(),
+          supabase.from('answers').select('*').eq('question_id', wallQuestionId).order('submitted_at'),
+        ])
+        if (!active) return
+        if (questionError || answerError) { cache.abort(); return }
+        cache.replace({ answers: answers || [] })
+        setWallQuestion(question as Question | null)
+        publish()
+      } catch { cache.abort() }
+    })
+    const channel = supabase.channel(`sentence-wall:${wallQuestionId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `question_id=eq.${wallQuestionId}` }, payload => {
+        cache.update('answers', payload)
+        batch.request()
+      }).subscribe(status => { if (status === 'SUBSCRIBED') refresh() })
+    refresh()
+    const timer = window.setInterval(refresh, 15_000)
+    window.addEventListener('online', refresh)
     return () => {
-      supabase.removeChannel(channel)
+      active = false; batch.stop(); window.clearInterval(timer)
+      window.removeEventListener('online', refresh)
+      void supabase.removeChannel(channel)
     }
-  }, [loadWall, wallQuestionId])
+  }, [wallQuestionId])
 
   useEffect(() => {
     loadOverlay()

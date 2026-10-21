@@ -21,3 +21,7 @@ test('short answer and comment entry stay separate until that question has been 
 test('rapid taps and a lost send acknowledgement use one message ID; an intentional next message gets a new ID',async()=>{
  const send=createMessageSubmission();let finish;const ids=[];const first=send('hello',async id=>{ids.push(id);await new Promise(r=>{finish=r});throw Error('lost acknowledgement')});assert.equal(await send('hello',async()=>{throw Error('duplicate write')}),false);finish();await assert.rejects(first);await send('hello',async id=>{ids.push(id)});assert.equal(ids[0],ids[1]);await send('hello',async id=>{ids.push(id)});assert.notEqual(ids[1],ids[2]);
 });
+
+test('late joins received during an old roster snapshot are retained rather than disappearing from online count',()=>{
+ const cache=createRealtimeSnapshot(),people=Array.from({length:93},(_,i)=>({id:String(i),last_seen_at:new Date().toISOString()}));cache.begin();for(const p of people.slice(80))cache.update('participants',{eventType:'INSERT',new:p,old:{}});cache.replace({participants:people.slice(0,80)});assert.equal(onlineClassIds(cache.rows('participants'),[]).length,93);
+});

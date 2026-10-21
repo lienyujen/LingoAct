@@ -1,3 +1,4 @@
+import { createRealtimeSnapshot } from '../lib/realtimeSnapshot'
 import { onlineClassIds } from '../lib/classroomProjection'
 import { captureCrop } from '../lib/captureGeometry'
 import { createSerializedReload } from '../lib/serializedReload'
@@ -136,6 +137,7 @@ export function PresenterPage() {
   const [activityFocus] = useState(createPresenterActivityFocus)
   const [serializedReload] = useState(createSerializedReload)
   const [participants, setParticipants] = useState<Participant[]>([])
+  const participantSnapshot = useRef(createRealtimeSnapshot())
   const [questions, setQuestions] = useState<Question[]>([])
   const [answerCounts, setAnswerCounts] = useState<Record<string, number>>({})
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null)
@@ -309,6 +311,7 @@ export function PresenterPage() {
     new: Record<string, unknown>
     old: Record<string, unknown>
   }) => {
+    participantSnapshot.current.update('participants', payload)
     setParticipants((current) => {
       if (payload.eventType === 'DELETE') {
         const goneId = payload.old?.id as string | undefined
@@ -341,6 +344,7 @@ export function PresenterPage() {
     if (!isSupabaseConfigured || !sessionId) return
 
     const snapshot = activityFocus.snapshot()
+    participantSnapshot.current.begin()
     const supabase = requireSupabase()
     const presenterToken = getPresenterToken(sessionId) || ''
     const canPresent = Boolean(presenterToken || hasOwnerKey())
@@ -367,7 +371,8 @@ export function PresenterPage() {
     setSelectedQuestionId(focus.questionId)
     setWorkspaceView(focus.view)
     setSession(nextSession)
-    setParticipants((participantData || []) as Participant[])
+    participantSnapshot.current.replace({ participants: participantData || [] })
+    setParticipants(participantSnapshot.current.rows<Participant>('participants'))
     setQuestions(nextQuestions)
     setExitTickets((exitTicketData || []) as ExitTicket[])
     const nextAnswerCounts = (answerQuestionData || []).reduce<Record<string, number>>((counts, answer) => {

@@ -1,3 +1,4 @@
+import { classroomRetryDelay, createClassroomReadCache } from '../lib/classroomReadCache'
 import { answerBeforeComment } from '../lib/classroomProjection'
 import { createMessageSubmission } from '../lib/messageSubmission'
 import { createRevisionGuard } from '../lib/realtimeSnapshot'
@@ -70,8 +71,10 @@ export function ParticipantPage() {
   const messageSending = useRef(false)
   const historyEpoch = useRef(0)
   const loadedHistorySignature = useRef('')
+  const readCache = useRef(createClassroomReadCache())
   const [participant, setParticipant] = useState<Participant | null>(null)
   const participantRevision = useRef(createRevisionGuard())
+  const handMutation = useRef(false)
   const participantRef = useRef(participant)
   participantRef.current = participant
   const ownRowLoader = useRef(createSerializedReload())
@@ -119,7 +122,8 @@ export function ParticipantPage() {
     if (!isSupabaseConfigured || !participantId || !sessionId || navigator.onLine === false || document.visibilityState === 'hidden') return
     const revision = participantRevision.current.current()
     const { data, error } = await requireSupabase().from('participants').select('*').eq('id', participantId).eq('session_id', sessionId).maybeSingle()
-    if (error || !data || !participantRevision.current.accepts(revision)) return
+    if (error || !data || handMutation.current || !participantRevision.current.accepts(revision)) return
+    readCache.current.invalidate('participants')
     participantRevision.current.changed()
     setParticipant(data as Participant)
   }), [participantId, sessionId])
@@ -199,15 +203,18 @@ export function ParticipantPage() {
     const participantReadRevision = participantRevision.current.current()
     const requestId = ++loadSequence.current
     const supabase = requireSupabase()
+    const cache = readCache.current
+    cache.scope(JSON.stringify([sessionId, participantId, locale]))
+    const read = cache.read.bind(cache)
     const [{ data: sessionData, error: sessionError }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }, { data: sessionQuizzes }] = await Promise.all([
-      supabase.from('sessions').select('*').eq('id', sessionId).single(),
-      supabase.from('participants').select('*').eq('id', participantId).single(),
-      supabase.from('exit_tickets').select('*').eq('session_id', sessionId).eq('participant_id', participantId).maybeSingle(),
-      supabase.from('shared_contents').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
-      supabase.from('session_events').select('*').eq('session_id', sessionId).eq('event_type', 'buzzer').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at'),
-      supabase.from('answers').select('*').eq('session_id', sessionId).eq('participant_id', participantId).order('submitted_at'),
-      supabase.from('quizzes').select('question_id, requested_type').eq('session_id', sessionId),
+      read('sessions', () => supabase.from('sessions').select('*').eq('id', sessionId).single(), 15000),
+      read('participants', () => supabase.from('participants').select('*').eq('id', participantId).single(), 30000),
+      read('exit_tickets', () => supabase.from('exit_tickets').select('*').eq('session_id', sessionId).eq('participant_id', participantId).maybeSingle(), 60000),
+      read('shared_contents', () => supabase.from('shared_contents').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }), 60000),
+      read('session_events', () => supabase.from('session_events').select('*').eq('session_id', sessionId).eq('event_type', 'buzzer').order('created_at', { ascending: false }).limit(1).maybeSingle(), 60000),
+      read('questions', () => supabase.from('questions').select('*').eq('session_id', sessionId).order('created_at'), 60000),
+      read('answers', () => supabase.from('answers').select('*').eq('session_id', sessionId).eq('participant_id', participantId).order('submitted_at'), 30000),
+      read('quizzes', () => supabase.from('quizzes').select('question_id, requested_type').eq('session_id', sessionId), 5000),
     ])
     if (requestId !== loadSequence.current) return
     if (sessionError || !sessionData) return
@@ -218,10 +225,10 @@ export function ParticipantPage() {
     setExitTicket((exitTicketData as ExitTicket | null) || null)
     setSharedContents((sharedContentData || []) as SharedContent[])
     setBuzzerEvent((buzzerData as BuzzerSessionEvent | null) || null)
-    if (participantRevision.current.accepts(participantReadRevision)) setParticipant(participantData as Participant | null)
+    if (!handMutation.current && participantRevision.current.accepts(participantReadRevision)) setParticipant(participantData as Participant | null)
     if (nextSession?.current_question_id) {
       const cachedQuestion = ((allQuestions || []) as Question[]).find(item => item.id === nextSession.current_question_id)
-      const questionData = cachedQuestion || (await supabase.from('questions').select('*').eq('id', nextSession.current_question_id).single()).data
+      const questionData = cachedQuestion || (await read(`questions:${nextSession.current_question_id}`, () => supabase.from('questions').select('*').eq('id', nextSession.current_question_id!).single())).data
       const answerData = ((allAnswers || []) as Answer[]).find(item => item.question_id === nextSession.current_question_id)
       if (requestId !== loadSequence.current) return
       const nextQuestion = questionData as Question | null
@@ -277,7 +284,7 @@ export function ParticipantPage() {
       }
 
       if (nextQuestion?.screenshot_id && nextQuestion.share_screenshot !== false) {
-        const { data } = await supabase.from('screenshots').select('*').eq('id', nextQuestion.screenshot_id).single()
+        const { data } = await read(`screenshots:${nextQuestion.screenshot_id}`, () => supabase.from('screenshots').select('*').eq('id', nextQuestion.screenshot_id!).single())
         if (requestId !== loadSequence.current) return
         setScreenshot(data as Screenshot | null)
       } else {
@@ -287,7 +294,7 @@ export function ParticipantPage() {
       if (nextQuestion?.listening_clip_id) {
         // Failing to load the clip must not take the rest of the page with it:
         // the student can still read the prompt and answer.
-        const clip = await fetchListeningClip(nextQuestion.listening_clip_id).catch(() => null)
+        const clip = await read(`listening:${nextQuestion.listening_clip_id}`, () => fetchListeningClip(nextQuestion.listening_clip_id!), 60_000, 2000).catch(() => null)
         if (requestId !== loadSequence.current) return
         setListeningClip(clip)
       } else {
@@ -308,20 +315,20 @@ export function ParticipantPage() {
     // question is a custom_quiz, because a reading with questions over it is
     // still a reading and the passage has to be there to answer them from.
     if (nextSession?.current_question_id) {
-      const { data: passageData } = await supabase
+      const { data: passageData } = await read(`reading_passages:${nextSession.current_question_id}`, () => supabase
         .from('reading_passages').select('*')
-        .eq('question_id', nextSession.current_question_id).maybeSingle()
+        .eq('question_id', nextSession.current_question_id!).maybeSingle(), 60_000, 15_000)
       const nextPassage = (passageData || null) as ReadingPassageRow | null
       setPassage(nextPassage)
       // Only when the teacher said so: share_screenshot is their decision about
       // whether the class should see the material or only the passage.
       if (nextPassage) {
-        const { data: readingQuestion } = await supabase.from('questions')
-          .select('screenshot_id, share_screenshot').eq('id', nextSession.current_question_id).maybeSingle()
+        const { data: readingQuestion } = await read(`questions:${nextSession.current_question_id}`, () => supabase.from('questions')
+          .select('*').eq('id', nextSession.current_question_id!).maybeSingle())
         const current = readingQuestion as { screenshot_id: string | null; share_screenshot: boolean } | null
         if (current?.screenshot_id && current.share_screenshot) {
-          const { data: shot } = await supabase
-            .from('screenshots').select('public_url').eq('id', current.screenshot_id).maybeSingle()
+          const { data: shot } = await read(`screenshots:${current.screenshot_id}`, () => supabase
+            .from('screenshots').select('*').eq('id', current.screenshot_id!).maybeSingle())
           setPassageImageUrl((shot as { public_url: string } | null)?.public_url || null)
         } else {
           setPassageImageUrl(null)
@@ -445,13 +452,13 @@ export function ParticipantPage() {
     // other questions, and the class has to be able to go back to it the whole
     // time. It sits on the page alongside whatever they are being asked now.
     if (nextSession?.board_question_id) {
-      const { data: boardData } = await supabase
-        .from('questions').select('*').eq('id', nextSession.board_question_id).maybeSingle()
+      const { data: boardData } = await read(`questions:${nextSession.board_question_id}`, () => supabase
+        .from('questions').select('*').eq('id', nextSession.board_question_id!).maybeSingle())
       const nextBoard = boardData as Question | null
       setBoardQuestion(nextBoard)
       if (nextBoard?.screenshot_id && nextBoard.share_screenshot) {
-        const { data } = await supabase
-          .from('screenshots').select('public_url').eq('id', nextBoard.screenshot_id).maybeSingle()
+        const { data } = await read(`screenshots:${nextBoard.screenshot_id}`, () => supabase
+          .from('screenshots').select('*').eq('id', nextBoard.screenshot_id!).maybeSingle())
         setBoardImageUrl((data as { public_url: string } | null)?.public_url || null)
       } else {
         setBoardImageUrl(null)
@@ -503,17 +510,21 @@ export function ParticipantPage() {
     return () => window.clearTimeout(timer)
   }, [loadAll, pageVisible])
 
+  const quizWaiting = quizData?.attempt?.status === 'grading'
+    || question?.type === 'custom_quiz' && !quizData && !quizLoadError
   useEffect(() => {
-    if (!pageVisible || quizData?.attempt?.status !== 'grading') return
-    const timer = window.setInterval(() => void loadAll(), 2000)
-    return () => window.clearInterval(timer)
-  }, [loadAll, pageVisible, quizData?.attempt?.status])
-
-  useEffect(() => {
-    if (!liveSessionId || question?.type !== 'custom_quiz' || quizData || quizLoadError) return
-    const timer = window.setInterval(() => void loadAll(), 1500)
-    return () => window.clearInterval(timer)
-  }, [liveSessionId, loadAll, question?.type, quizData, quizLoadError])
+    if (!liveSessionId || !quizWaiting) return
+    let active = true
+    let timer: ReturnType<typeof setTimeout>
+    const started = Date.now()
+    const poll = async () => {
+      if (!active) return
+      if (navigator.onLine !== false) await loadAll()
+      if (active) timer = setTimeout(poll, classroomRetryDelay(Date.now() - started))
+    }
+    timer = setTimeout(poll, classroomRetryDelay(0))
+    return () => { active = false; clearTimeout(timer) }
+  }, [liveSessionId, loadAll, question?.id, quizWaiting])
 
   // Dispatching one question writes a screenshot, a question and the session
   // row, so every student page used to run its queries three times over. In a
@@ -548,9 +559,10 @@ export function ParticipantPage() {
     const supabase = requireSupabase()
     const channel = supabase
       .channel(`participant:${sessionId}:${participantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, scheduleLoad)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, () => { readCache.current.invalidate('sessions'); scheduleLoad() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, () => { readCache.current.invalidate('questions', 'quizzes'); scheduleLoad() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, (payload) => {
+        readCache.current.invalidate('answers')
         // save_writing_review touches the ordinary answer row to wake this
         // page. Drop only that history cache entry so its full quiz payload —
         // article, revision, comments and score — is fetched again.
@@ -567,20 +579,22 @@ export function ParticipantPage() {
         }
         scheduleLoad()
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'screenshots', filter: `session_id=eq.${sessionId}` }, () => { readCache.current.invalidate('screenshots'); scheduleLoad() })
       // The readings and the audio are put on the passage a few seconds after
       // it is dispatched, so a student already looking at it has to be told.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reading_passages', filter: `session_id=eq.${sessionId}` }, () => { historyEpoch.current++; scheduleLoad() })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, scheduleLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reading_passages', filter: `session_id=eq.${sessionId}` }, () => { readCache.current.invalidate('reading_passages', 'listening', 'screenshots'); historyEpoch.current++; scheduleLoad() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exit_tickets', filter: `participant_id=eq.${participantId}` }, () => { readCache.current.invalidate('exit_tickets'); scheduleLoad() })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_summaries', filter: `session_id=eq.${sessionId}` }, () => { historyEpoch.current++; scheduleLoad() })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, scheduleLoad)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shared_contents', filter: `session_id=eq.${sessionId}` }, () => { readCache.current.invalidate('shared_contents'); scheduleLoad() })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'participants', filter: `id=eq.${participantId}` }, payload => {
         const row = payload.new as Participant
         if (row.id !== participantId || row.session_id !== sessionId) return
+        readCache.current.invalidate('participants')
         participantRevision.current.changed()
         setParticipant(current => current ? { ...current, ...row } : current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` }, (payload) => {
+        readCache.current.invalidate('session_events')
         const event = payload.new as SessionEvent
         if (event.event_type === 'buzzer') {
           setBuzzerEvent(event)
@@ -596,7 +610,7 @@ export function ParticipantPage() {
           }
         }
       })
-      .subscribe(status => { if (status === 'SUBSCRIBED') { void refreshParticipantRow(); scheduleLoad() } })
+      .subscribe(status => { if (status === 'SUBSCRIBED') { readCache.current.invalidate(); scheduleLoad() } })
 
     return () => {
       supabase.removeChannel(channel)
@@ -614,7 +628,7 @@ export function ParticipantPage() {
         .eq('id', sessionId).maybeSingle()
       if (error || !data) return
       const current = latestSession.current
-      if (!current || Object.entries(data).some(([key, value]) => current[key as keyof Session] !== value)) scheduleLoad()
+      if (!current || Object.entries(data).some(([key, value]) => current[key as keyof Session] !== value)) { readCache.current.invalidate(); scheduleLoad() }
     }
     const timer = window.setInterval(() => void check(), 20_000 + Math.random() * 10_000)
     const visible = () => { void check() }
@@ -636,6 +650,7 @@ export function ParticipantPage() {
     const previousHand = participant.hand_raised_at
     participantRevision.current.changed()
     const mutationRevision = participantRevision.current.current()
+    handMutation.current = true
     setHandBusy(true)
     setParticipant((current) => (
       current ? { ...current, hand_raised_at: raised ? new Date().toISOString() : null } : current
@@ -655,6 +670,8 @@ export function ParticipantPage() {
         setParticipant(current => current ? { ...current, hand_raised_at: previousHand } : current)
       }
     } finally {
+      readCache.current.invalidate('participants')
+      handMutation.current = false
       setHandBusy(false)
     }
   }
@@ -707,6 +724,7 @@ export function ParticipantPage() {
         .select('*')
         .single()
       if (insertError) throw insertError
+      readCache.current.invalidate('answers')
       setAnswer(data as Answer)
     } catch (err) {
       setError(err instanceof Error ? err.message : '作答失敗，可能已經提交過。')
@@ -723,6 +741,7 @@ export function ParticipantPage() {
       })
       if (submitError) throw submitError
       if (!data?.attempt) throw new Error(data?.message || '自訂測驗送出失敗。')
+      readCache.current.invalidate('answers', 'exit_tickets')
       await loadAll()
     } catch (caught) {
       setError(await participantFunctionMessage(caught, '自訂測驗送出失敗。'))
@@ -755,6 +774,7 @@ export function ParticipantPage() {
         body: { action: 'retry_custom_quiz_grading', sessionId, participantId: participant.id, participantToken, questionId: question.id },
       })
       if (retryError) throw retryError
+      readCache.current.invalidate('answers', 'exit_tickets')
       await loadAll()
     } catch (caught) {
       setError(await participantFunctionMessage(caught, '無法重新評分。'))
@@ -850,6 +870,7 @@ export function ParticipantPage() {
       })
       if (submitError) throw submitError
       if (!data?.response) throw new Error(data?.message || '錄音送出失敗。')
+      readCache.current.invalidate('answers', 'exit_tickets')
       await loadAll()
     } catch (caught) {
       setError(await participantFunctionMessage(caught, '錄音送出失敗，請稍後再試。'))

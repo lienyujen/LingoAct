@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {createDanmakuQueue,sentencePages,onlineClassIds,answerBeforeComment} from '../src/lib/classroomProjection.ts';
+import {createDanmakuQueue,sentencePages,onlineClassIds} from '../src/lib/classroomProjection.ts';
 import {createMessageSubmission} from '../src/lib/messageSubmission.ts';
 import {createRealtimeSnapshot} from '../src/lib/realtimeSnapshot.ts';
 test('93 simultaneous comments drain once; duplicate poll and update events cannot replay completed IDs',()=>{
@@ -17,7 +17,11 @@ test('all 93 wall answers survive a slow snapshot racing with realtime, and ever
 test('late joiners remain online during presence loss using fresh heartbeat, excluding removed and stale learners',()=>{
  const now=Date.now(),participants=Array.from({length:93},(_,i)=>({id:String(i),last_seen_at:new Date(now-10000).toISOString()}));participants.push({id:'stale',last_seen_at:new Date(now-120000).toISOString()},{id:'removed',last_seen_at:new Date(now).toISOString(),removed_at:'yes'});assert.equal(onlineClassIds(participants,[],now).length,93);assert.ok(onlineClassIds(participants,['stale'],now).includes('stale'));
 });
-test('short answer and comment entry stay separate until that question has been answered',()=>{assert.equal(answerBeforeComment({type:'short_answer',status:'active'},false),true);assert.equal(answerBeforeComment({type:'short_answer',status:'active'},true),false);assert.equal(answerBeforeComment({type:'short_answer',status:'stopped'},false),false);assert.equal(answerBeforeComment({type:'multiple_choice',status:'active'},false),false)});
+test('the real comment handler permits unanswered short answers and teacher Presence loss, but respects the stored switch',async()=>{
+ const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');const {default:ts}=await import('typescript');const page=readFileSync(new URL('../src/routes/ParticipantPage.tsx',import.meta.url),'utf8');const start=page.indexOf('  async function sendMessage('),end=page.indexOf('  async function submitAnswer',start);const source=ts.transpile(page.slice(start,end),{target:ts.ScriptTarget.ES2022});
+ for(const [onBreak,answered,open]of [[false,false,true],[true,false,true],[false,true,true],[false,false,false]]){let writes=0;const context={onBreak,answer:answered?{id:'answer'}:null,question:{type:'short_answer',status:'active'},message:'測試彈幕',participant:{id:'student',name:'QA'},session:{status:'active',anonymous_enabled:false},sessionId:'class',danmakuOpen:open,messageSending:{current:false},messageFitsLimit:()=>true,setError(){},setMessageBusy(){},setMessage(){},messageSubmission:createMessageSubmission(),requireSupabase:()=>({from:()=>({insert:async()=>{writes++;return{error:null}}})})};runInNewContext(source,context);await context.sendMessage({preventDefault(){}});assert.equal(writes,open?1:0,JSON.stringify({onBreak,answered,open}))}
+ assert.match(page,/\n      <form className=\{`panel message-form/);
+});
 test('rapid taps and a lost send acknowledgement use one message ID; an intentional next message gets a new ID',async()=>{
  const send=createMessageSubmission();let finish;const ids=[];const first=send('hello',async id=>{ids.push(id);await new Promise(r=>{finish=r});throw Error('lost acknowledgement')});assert.equal(await send('hello',async()=>{throw Error('duplicate write')}),false);finish();await assert.rejects(first);await send('hello',async id=>{ids.push(id)});assert.equal(ids[0],ids[1]);await send('hello',async id=>{ids.push(id)});assert.notEqual(ids[1],ids[2]);
 });

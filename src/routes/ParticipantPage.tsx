@@ -1,5 +1,4 @@
 import { classroomRetryDelay, createClassroomReadCache } from '../lib/classroomReadCache'
-import { answerBeforeComment } from '../lib/classroomProjection'
 import { createMessageSubmission } from '../lib/messageSubmission'
 import { createRevisionGuard } from '../lib/realtimeSnapshot'
 import { useClassChineseFont } from '../lib/classChineseFont'
@@ -680,7 +679,7 @@ export function ParticipantPage() {
     event.preventDefault()
     const content = message.trim()
     if (!participant || session?.status !== 'active' || !content) return
-    if (onBreak || !danmakuOpen || messageSending.current || answerBeforeComment(question, Boolean(answer))) return
+    if (!danmakuOpen || messageSending.current) return
     if (!messageFitsLimit(content)) {
       setError(participantText(locale, 'limit'))
       return
@@ -1252,11 +1251,9 @@ export function ParticipantPage() {
         passages={historyPassages}
         onLoadDetails={loadHistoryDetails}
       />
-      {/* The field goes away rather than being disabled. A disabled box still
-          invites a student to type a question into it that nobody will ever
-          read, and a class left alone with a live text field is how the message
-          table fills up with an hour of chatter aimed at an empty room. */}
-      {!onBreak && !answerBeforeComment(question, Boolean(answer)) && <form className={`panel message-form${danmakuOpen ? '' : ' is-closed'}`} onSubmit={sendMessage}>
+      {/* Comments remain independent of answer progress and transient teacher
+          Presence. Only the stored classroom switch controls whether to send. */}
+      <form className={`panel message-form${danmakuOpen ? '' : ' is-closed'}`} onSubmit={sendMessage}>
         <label>
           {participantText(locale, 'sendFeedback')}
           <textarea
@@ -1276,7 +1273,7 @@ export function ParticipantPage() {
         </p>
         {error && <p className="error">{uiText(error)}</p>}
         <button disabled={messageBusy || !danmakuOpen || !message.trim() || !messageFitsLimit(message)} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, 'send')}</button>
-      </form>}
+      </form>
       <LotteryOverlay event={lotteryEvent} participantId={participant?.id} />
       <BuzzerOverlay
         busy={buzzerBusy}

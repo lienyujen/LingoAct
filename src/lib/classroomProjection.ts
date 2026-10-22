@@ -1,4 +1,4 @@
-import type { Message, Participant, Question } from '../types'
+import type { Message, Participant } from '../types'
 
 // An ID is admitted once, not once per poll or CSS remount. Keep a bounded
 // backlog so a burst can finish without replaying old comments or growing RAM.
@@ -36,10 +36,6 @@ export function sentencePages<T extends { answer_text: string | null }>(answers:
   }
   if (page.length) pages.push(page)
   return pages
-}
-
-export function answerBeforeComment(question: Question | null, answered: boolean) {
-  return question?.type === 'short_answer' && question.status === 'active' && !answered
 }
 
 // Presence can drop during Wi-Fi changes. A recent authenticated heartbeat is

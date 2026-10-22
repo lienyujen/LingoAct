@@ -7,7 +7,7 @@ const packageMetadata = require('../package.json')
 const { configDirectory, readPortableConfig, savePortableConfig } = require('./portableConfig.cjs')
 
 const APP_PROFILES = {
-  sc: { appId: 'org.lingoact.sc.desktop', displayName: 'LingoAct' },
+  sc: { appId: 'org.lingoact.sc.desktop', displayName: 'LingoAct-SC' },
   full: { appId: 'tw.lingoact.presenter.desktop', displayName: 'LingoAct' },
   huayu: { appId: 'tw.lingoact.huayu.desktop', displayName: 'LingoAct 華語教學版' },
   english: { appId: 'tw.lingoact.english.desktop', displayName: 'LingoAct English' },

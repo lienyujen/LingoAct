@@ -66,15 +66,15 @@ jobs:
           - label: Windows SC
             os: windows-latest
             profile: sc
-            product: LingoAct
+            product: LingoAct-SC
             target: --win zip --x64
-            artifact: LingoAct.zip
+            artifact: LingoAct-SC.zip
           - label: macOS SC
             os: macos-latest
             profile: sc
-            product: LingoAct
+            product: LingoAct-SC
             target: --mac dmg --universal
-            artifact: LingoAct.dmg
+            artifact: LingoAct-SC.dmg
           - label: Windows Huayu
             os: windows-latest
             profile: huayu
@@ -318,7 +318,7 @@ jobs:
 
           | 版本 | Windows | macOS |
           |---|---|---|
-          | LingoAct 簡體中文／HSK 版 | `LingoAct.zip` | `LingoAct.dmg` |
+          | LingoAct-SC 簡體中文／HSK 版 | `LingoAct-SC.zip` | `LingoAct-SC.dmg` |
           | 華語教學版（預設繁體，可選簡體或 English） | `LingoAct-Huayu.zip` | `LingoAct-Huayu.dmg` |
           | 完整教學版 | `LingoAct-Full.zip` | — |
           | 日語教學版 | `LingoAct-JP.zip` | `LingoAct-JP.dmg` |
@@ -331,15 +331,16 @@ jobs:
 
           ## 本次更新
 
-          - 修正簡答題投影答案漏接：合併讀取期間的即時答案，斷線重連後補同步；多人回答會分頁輪播並顯示總數。
-          - 修正彈幕送出連點、網路回覆遺失後重送，以及投影讀取短暫失敗後重播舊彈幕；留言佇列限制同時播放數。
-          - 未作答的簡答題只顯示作答入口，避免把答案誤送到彈幕。
-          - 學生頁優先顯示目前題目，再載入歷史；相同歷史資料不重抓，另以小型課堂狀態檢查補救漏接派題。
-          - 線上名單整合即時 Presence 與最近心跳，減少網路切換時人數歸零或漏列。
-          - 完成 93 人模擬與實際學生／投影頁驗證，不會修改原有課堂答案或留言。
+          - 共用課堂同步降載：按資料來源快取與失效，減少等待評分時反覆讀取題目、文章、名單等資料；新題與結果仍由即時事件觸發。
+          - AI 等待採分散、單一進行中的重試，長時間等待會降低重試頻率；保留斷線重連及定期校正。
+          - 桌面與學生端均加入 Presence 發布失敗的有限重試；在線人數結合 Presence 與最近心跳，防止漏列。
+          - 包含 LingoAct-JP 日語教學版，Windows ZIP 與 macOS 通用 DMG 均提供。
+          - 簡體版統一命名 LingoAct-SC，程式、視窗標題與下載檔均加上 SC；沿用既有簡體版的設定資料夾。
+          - 保留 1.0.20 的簡答投影、彈幕防重播、派題同步與名單競態修正。
+          - 完成 200 條真實學生連線、200 份同時作答，以及兩分鐘持續連線測試；不代表整節課或 200 人同時 AI 語音評分的保證。測試說明見 docs/classroom-capacity.md。
           - 既有自架 Supabase 專案請保留自己的 .env；下載包只附 .env.example。
 
-          每個發布版本均執行型別、資料表、85 項離線回歸與啟動檢查；macOS 另外驗證簽章、雙架構及 DMG。
+          每個發布版本均執行型別、資料表、離線回歸與啟動檢查；macOS 另外驗證簽章、雙架構及 DMG。
           SHA256SUMS.txt 提供下載檔案的 SHA-256 校驗值。
 
           ## 首次使用

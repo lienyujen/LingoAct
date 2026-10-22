@@ -24,7 +24,7 @@ const profiles: Record<AppProfileId, AppProfile> = {
     defaultTrack: 'ja', allowedTracks: ['ja'], defaultSkill: 'listen',
   },
   sc: {
-    id: 'sc', productName: 'LingoAct', shortName: '中文教学版',
+    id: 'sc', productName: 'LingoAct-SC', shortName: '中文教学版',
     defaultTrack: 'putonghua', allowedTracks: ['putonghua'], defaultSkill: 'listen',
   },
   full: {

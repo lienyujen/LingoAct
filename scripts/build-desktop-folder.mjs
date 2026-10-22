@@ -83,4 +83,4 @@ if (fs.existsSync(target)) {
 fs.cpSync(unpacked, target, { recursive: true, force: true })
 fs.rmSync(staging, { recursive: true, force: true })
 
-console.log(`\nready: ${path.join(target, `${profileId === 'sc' ? 'LingoAct' : productName}.exe`)}`)
+console.log(`\nready: ${path.join(target, `${productName}.exe`)}`)

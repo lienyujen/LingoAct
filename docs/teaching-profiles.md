@@ -54,3 +54,10 @@ GitHub Release 工作流程會一次產生五版的 zip 與 portable exe；發�
 連到 `https://www.welearnjapanese.com/`。圖示隨程式打包，不向外站載入圖片。
 Windows 圖示為 `build/LingoAct-JP.ico`，macOS 圖示來源為同名 PNG。
 教學設定與驗證方式見 [日語版規格](japanese-teaching-spec.md)。
+
+## 簡體版正式名稱
+
+簡體中文／HSK 版的正式名稱為 **LingoAct-SC**，內部 profile 保持 `sc`。
+Windows 程式與下載檔為 `LingoAct-SC.exe`、`LingoAct-SC.zip`；macOS 為
+`LingoAct-SC.app`、`LingoAct-SC.dmg`。本機輸出資料夾保持 `LingoAct-SC/`。
+`appId` 及使用者設定資料夾沿用原值，名稱調整不會換掉既有課程設定。

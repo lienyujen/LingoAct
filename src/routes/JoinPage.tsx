@@ -8,7 +8,7 @@ import { StudentSocialLinks } from '../components/StudentSocialLinks'
 import { ParticipantLanguageSwitcher } from '../components/ParticipantLanguageSwitcher'
 import { getDeviceId } from '../lib/device'
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
-import { localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
+import { localeForDispatchedGuidance, participantLocaleFromStorage, participantText, rememberParticipantLocale } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import type { Participant, Session } from '../types'
 import { setUiLanguage, uiText } from '../lib/uiText'
@@ -24,7 +24,18 @@ export function JoinPage() {
   const [sessionChecked, setSessionChecked] = useState(false)
   const [sessionLookupError, setSessionLookupError] = useState('')
   const [returning, setReturning] = useState(false)
-  const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.id) return
+    const supabase = requireSupabase()
+    const id = session.id
+    const channel = supabase.channel(`join-session:${id}`)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sessions', filter: `id=eq.${id}` }, () => {
+        setSession(null)
+        setSessionChecked(true)
+      }).subscribe()
+    return () => { void supabase.removeChannel(channel) }
+  }, [session?.id])
+  const [locale, setLocale] = useState<ParticipantLocale>(() => participantLocaleFromStorage(undefined, sessionReference))
   useEffect(() => { setUiLanguage(locale) }, [locale])
   // The teacher's 導引語 is the starting point and it wins on a change; a
   // student's own pick stands until then. Same rule as the class page, so
@@ -37,7 +48,7 @@ export function JoinPage() {
   const location = useLocation()
 
   function changeLocale(nextLocale: ParticipantLocale) {
-    localStorage.setItem('lingoact_participant_locale', nextLocale)
+    rememberParticipantLocale(session?.id || sessionReference, nextLocale)
     setLocale(nextLocale)
   }
 

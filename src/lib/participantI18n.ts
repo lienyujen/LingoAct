@@ -361,13 +361,18 @@ export function guidanceLocaleShort(code: string) {
 
 // A student who has chosen keeps that choice; everyone else starts on whatever
 // the teacher set for the class.
-export function participantLocaleFromStorage(sessionDefault?: string | null): ParticipantLocale {
-  const stored = localStorage.getItem('lingoact_participant_locale')
+export function participantLocaleFromStorage(sessionDefault?: string | null, sessionId?: string): ParticipantLocale {
+  const stored = (sessionId && localStorage.getItem(`lingoact_participant_locale_${sessionId}`)) || localStorage.getItem('lingoact_participant_locale')
   if (isParticipantLocale(stored)) return stored
   if (isParticipantLocale(sessionDefault)) return sessionDefault
   const brand = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search).get('b')
   if (brand === 'japanese' || import.meta.env.VITE_APP_PROFILE === 'japanese') return 'ja'
   return brand === 'sc' || import.meta.env.VITE_APP_PROFILE === 'sc' ? 'zh-CN' : (brand === 'english' || import.meta.env.VITE_APP_PROFILE === 'english') ? 'en' : 'zh-TW'
+}
+
+export function rememberParticipantLocale(sessionId: string, locale: ParticipantLocale) {
+  localStorage.setItem('lingoact_participant_locale', locale)
+  if (sessionId) localStorage.setItem(`lingoact_participant_locale_${sessionId}`, locale)
 }
 
 // The 導引語 the teacher set, applied so that it actually wins.
@@ -386,7 +391,9 @@ export function localeForDispatchedGuidance(sessionId: string, dispatched: strin
   const appliedKey = `lingoact_guidance_applied_${sessionId}`
   if (localStorage.getItem(appliedKey) !== dispatched) {
     localStorage.setItem(appliedKey, dispatched)
-    localStorage.removeItem('lingoact_participant_locale')
+    localStorage.setItem(`lingoact_participant_locale_${sessionId}`, dispatched)
   }
-  return participantLocaleFromStorage(dispatched)
+  const locale = participantLocaleFromStorage(dispatched, sessionId)
+  localStorage.setItem(`lingoact_participant_locale_${sessionId}`, locale)
+  return locale
 }

@@ -153,6 +153,8 @@ export const studentJapanese = {
 }
 
 export const literalJapanese = {
+  '全班參考時間': 'クラス全体の目安',
+  '錄音由學生各自開始；此倒數為派送後的全班參考。': '録音は学習者ごとに開始します。この時計は配信後の目安です。',
   '發音': '発音',
   '東禾國際外語學校': '東禾国際外国語学校',
   'Publishable key': '公開用キー（Publishable key）', 'English': '英語', 'Español': 'スペイン語', '한국어': '韓国語', 'Tiếng Việt': 'ベトナム語',

@@ -9,7 +9,7 @@ type Need = { finding: string; evidenceIds: string[]; nextPrompt: string }
 type Props = { question: Question; sessionId: string; presenterToken: string; participants: Participant[]; active: boolean; onDispatched: (question: Question) => void }
 
 export function TeachingCyclePanel({ question, sessionId, presenterToken, participants, active, onDispatched }: Props) {
-  const zh = ['zh-TW', 'zh-CN'].includes(usePresenterLocale())
+  const zh = ['zh-TW', 'zh-CN', 'ja'].includes(usePresenterLocale())
   const [mode, setMode] = useState('')
   const [focus, setFocus] = useState('')
   const [samples, setSamples] = useState<Sample[]>([])

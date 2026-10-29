@@ -41,7 +41,7 @@ import { isSupabaseConfigured, requireSupabase } from '../lib/supabase'
 import { useSessionPresence } from '../lib/useSessionPresence'
 import { trackParticipantPresence } from '../lib/participantPresence'
 import { usePageVisibility } from '../lib/usePageVisibility'
-import { contentLocaleKey, localeForDispatchedGuidance, participantLocaleFromStorage, participantText } from '../lib/participantI18n'
+import { contentLocaleKey, localeForDispatchedGuidance, participantLocaleFromStorage, participantText, rememberParticipantLocale } from '../lib/participantI18n'
 import { exitTicketPrompt } from '../lib/sessionContent'
 import { fetchListeningClip } from '../lib/listening'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -147,9 +147,16 @@ export function ParticipantPage() {
   const [boardImageUrl, setBoardImageUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [sessionChecked, setSessionChecked] = useState(false)
-  const [locale, setLocale] = useState<ParticipantLocale>(participantLocaleFromStorage)
+  const [locale, setLocale] = useState<ParticipantLocale>(() => participantLocaleFromStorage(undefined, sessionId))
   useEffect(() => { setUiLanguage(locale) }, [locale])
   const loadSequence = useRef(0)
+  const markSessionGone = useCallback(() => {
+    loadSequence.current += 1
+    readCache.current.invalidate()
+    setSession(null)
+    setSessionChecked(true)
+    setQuestion(null)
+  }, [])
   const loadedQuizQuestionId = useRef('')
   const historyDetailLocales = useRef<Record<string, string>>({})
   const navigate = useNavigate()
@@ -192,7 +199,7 @@ export function ParticipantPage() {
   const participantName = participant?.name || localStorage.getItem(`lingoact_name_${sessionId}`) || ''
 
   function changeLocale(nextLocale: ParticipantLocale) {
-    localStorage.setItem('lingoact_participant_locale', nextLocale)
+    rememberParticipantLocale(sessionId, nextLocale)
     setLocale(nextLocale)
   }
 
@@ -206,7 +213,7 @@ export function ParticipantPage() {
     cache.scope(JSON.stringify([sessionId, participantId, locale]))
     const read = cache.read.bind(cache)
     const [{ data: sessionData, error: sessionError }, { data: participantData }, { data: exitTicketData }, { data: sharedContentData }, { data: buzzerData }, { data: allQuestions }, { data: allAnswers }, { data: sessionQuizzes }] = await Promise.all([
-      read('sessions', () => supabase.from('sessions').select('*').eq('id', sessionId).single(), 15000),
+      read('sessions', () => supabase.from('sessions').select('*').eq('id', sessionId).maybeSingle(), 15000),
       read('participants', () => supabase.from('participants').select('*').eq('id', participantId).single(), 30000),
       read('exit_tickets', () => supabase.from('exit_tickets').select('*').eq('session_id', sessionId).eq('participant_id', participantId).maybeSingle(), 60000),
       read('shared_contents', () => supabase.from('shared_contents').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }), 60000),
@@ -216,7 +223,11 @@ export function ParticipantPage() {
       read('quizzes', () => supabase.from('quizzes').select('question_id, requested_type').eq('session_id', sessionId), 5000),
     ])
     if (requestId !== loadSequence.current) return
-    if (sessionError || !sessionData) return
+    if (sessionError) return
+    if (!sessionData) {
+      markSessionGone()
+      return
+    }
     const nextSession = sessionData as Session | null
     setSession(nextSession)
 
@@ -467,7 +478,7 @@ export function ParticipantPage() {
       setBoardImageUrl(null)
     }
 
-  }, [locale, participantId, participantToken, sessionId])
+  }, [locale, markSessionGone, participantId, participantToken, sessionId])
   const loadAll = useCallback(() => serializedReload(loadSnapshot).catch(() => { /* Preserve the current round; reconnect/correction retries. */ }), [loadSnapshot, serializedReload])
 
   const loadHistoryDetails = useCallback(async (historyQuestion: Question) => {
@@ -558,7 +569,6 @@ export function ParticipantPage() {
     const supabase = requireSupabase()
     const channel = supabase
       .channel(`participant:${sessionId}:${participantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, () => { readCache.current.invalidate('sessions'); scheduleLoad() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, () => { readCache.current.invalidate('questions', 'quizzes'); scheduleLoad() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, (payload) => {
         readCache.current.invalidate('answers')
@@ -618,14 +628,31 @@ export function ParticipantPage() {
 
   const latestSession = useRef(session)
   latestSession.current = session
+  // Ended classes still need their lifecycle subscription: deleting one must
+  // replace the report with the farewell, even after activity channels close.
   useEffect(() => {
-    if (!sessionId || !participantId || session?.status === 'ended') return
+    if (!isSupabaseConfigured || !pageVisible || !sessionId || !participantId) return
+    const supabase = requireSupabase()
+    const channel = supabase.channel(`participant-session:${sessionId}:${participantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, payload => {
+        if (payload.eventType === 'DELETE') { markSessionGone(); return }
+        readCache.current.invalidate('sessions')
+        scheduleLoad()
+      }).subscribe()
+    return () => { void supabase.removeChannel(channel) }
+  }, [markSessionGone, pageVisible, participantId, scheduleLoad, sessionId])
+  useEffect(() => {
+    if (!sessionId || !participantId || (sessionChecked && !session)) return
     const check = async () => {
       if (document.visibilityState === 'hidden' || navigator.onLine === false) return
       const { data, error } = await requireSupabase().from('sessions')
-        .select('id,current_question_id,status,sentence_wall_enabled,danmaku_enabled,board_question_id')
+        .select('id,current_question_id,status,sentence_wall_enabled,danmaku_enabled,board_question_id,guidance_language,teaching_language')
         .eq('id', sessionId).maybeSingle()
-      if (error || !data) return
+      if (error) return
+      if (!data) {
+        markSessionGone()
+        return
+      }
       const current = latestSession.current
       if (!current || Object.entries(data).some(([key, value]) => current[key as keyof Session] !== value)) { readCache.current.invalidate(); scheduleLoad() }
     }
@@ -633,7 +660,7 @@ export function ParticipantPage() {
     const visible = () => { void check() }
     document.addEventListener('visibilitychange', visible)
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', visible) }
-  }, [participantId, session?.status, sessionId, scheduleLoad])
+  }, [markSessionGone, participantId, session?.status, sessionChecked, sessionId, scheduleLoad])
 
   useEffect(() => {
     if (session?.status !== 'ended') return

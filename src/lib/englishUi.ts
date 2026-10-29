@@ -1,6 +1,8 @@
 // Labels added for the English teaching scales. Older shared UI labels remain
 // in the reviewed multilingual catalogue.
 export const englishTeachingLabels: Record<string, string> = {
+  '全班參考時間': 'Class reference timer',
+  '錄音由學生各自開始；此倒數為派送後的全班參考。': 'Students start recording individually; this clock is a reference from dispatch.',
   '下一步教學': 'Follow-up',
   '挑作品討論': 'Discuss work',
   '看看全班卡在哪': 'Learning needs',

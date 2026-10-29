@@ -20,6 +20,17 @@ export function answerDeadline(question: Question): number | null {
   return Number.isFinite(startedAt) ? startedAt + question.answer_seconds * 1000 : null
 }
 
+export function presenterClock(question: Question | null, now = Date.now()) {
+  if (!question || question.status !== 'active' || !question.started_at) return null
+  const start = Date.parse(question.started_at)
+  if (!Number.isFinite(start)) return null
+  const individual = question.type === 'pronunciation' || question.type === 'oral_response'
+  const prepare = individual ? Math.max(0, question.prepare_seconds || 0) : 0
+  if (prepare && now < start + prepare * 1000) return { deadline: start + prepare * 1000, phase: 'prepare' as const, individual }
+  if (!question.answer_seconds) return null
+  return { deadline: start + (prepare + question.answer_seconds) * 1000, phase: 'answer' as const, individual }
+}
+
 // Whole seconds remaining, or null when nothing is being timed.
 //
 // The three seconds of slack the database allows for a slow round trip are

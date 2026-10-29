@@ -9,7 +9,8 @@ import { DragAnswers } from './DragAnswers'
 import { InteractionReadout } from './InteractionReadout'
 
 export function InteractionResults({ results, anonymousEnabled }: { results: PresenterQuizResults; anonymousEnabled: boolean }) {
-  const zh = ['zh-TW', 'zh-CN'].includes(usePresenterLocale()), item = results.items[0]
+  const locale = usePresenterLocale()
+  const zh = ['zh-TW', 'zh-CN', 'ja'].includes(locale), item = results.items[0]
   const incomingKey = results.keys.find(k => k.item_id === item?.id)?.accepted_answers || []
   const signature = JSON.stringify(incomingKey)
   const [key, setKey] = useState(incomingKey), [editing, setEditing] = useState(false), [draft, setDraft] = useState<string[]>([])
@@ -59,7 +60,7 @@ export function InteractionResults({ results, anonymousEnabled }: { results: Pre
       return <article key={i}><strong>{prompt}</strong>{marked && <p>{zh ? uiText("答對") : 'Correct'} {counts.get(key[i]) || 0}/{answers.length}</p>}{reveal && marked && <p>{key[i]}</p>}{wrong && <p>{zh ? marked ? uiText("最常誤選") : uiText("最多選擇") : 'Most selected'}：{wrong[0]} · {wrong[1]}</p>}</article>
     })}</div>}
     <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(!editing); setDraft(marked ? key : item.type === 'matching' ? [] : item.options) }}>{zh ? marked ? uiText("修改正確順序／配對") : uiText("改為有標準答案") : 'Edit answer key'}</button>
-    {editing && <><DragAnswers mode={item.type === 'matching' ? 'matching' : 'ordering'} options={item.options} values={draft} prompts={item.pair_prompts} images={item.option_images} locale={zh ? 'zh-TW' : 'en'} disabled={busy} onChange={setDraft} /><button type="button" disabled={busy || draft.filter(Boolean).length !== item.options.length} onClick={() => void save(draft)}>{zh ? uiText("儲存並重新批改") : "Save and regrade"}</button>{marked && <button type="button" disabled={busy} className="ghost-button" onClick={() => void save([])}>{zh ? uiText("改為無標準答案") : 'Remove answer key'}</button>}</>}
+    {editing && <><DragAnswers mode={item.type === 'matching' ? 'matching' : 'ordering'} options={item.options} values={draft} prompts={item.pair_prompts} images={item.option_images} locale={locale} disabled={busy} onChange={setDraft} /><button type="button" disabled={busy || draft.filter(Boolean).length !== item.options.length} onClick={() => void save(draft)}>{zh ? uiText("儲存並重新批改") : "Save and regrade"}</button>{marked && <button type="button" disabled={busy} className="ghost-button" onClick={() => void save([])}>{zh ? uiText("改為無標準答案") : 'Remove answer key'}</button>}</>}
     {error && <p role="alert" className="error">{uiText(error)}</p>}
     <details><summary>{zh ? uiText("學生的作答") : 'Student responses'}</summary>{answers.map((a, i) => {
       const student = results.attempts.find(attempt => attempt.id === a.attempt_id)

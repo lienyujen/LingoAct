@@ -28,6 +28,7 @@ import type { QuestionType, QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
 import { QuestionResult } from '../components/QuestionResult'
+import { PresenterQuestionClock } from '../components/PresenterQuestionClock'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
 import { fileDataUrl } from '../lib/screenshotInteraction'
 import type { InteractionGenerated } from '../lib/screenshotInteraction'
@@ -2240,6 +2241,7 @@ export function PresenterPage() {
             }}
           >{w[view]}</button>)}
         </nav>
+        <PresenterQuestionClock question={session.status === 'active' ? questions.find(item => item.id === session.current_question_id) || null : null} />
         <div hidden={workspaceView !== 'activities'}>
         <PresenterControlPanel
           busy={busy}

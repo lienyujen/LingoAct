@@ -147,7 +147,8 @@ export function buildVoicePlan(
 function speechConfig(plan: VoicePlan) {
   if (plan.speakers.length >= 2) {
     return {
-      mode: 'conversational',
+      // The service now rejects mode on structured_speech_config. The two
+      // assigned speakers and per-turn metadata already describe the dialogue.
       speakers: plan.speakers.map((speaker, index) => ({ speaker, voice: plan.voiceNames[index] })),
     }
   }

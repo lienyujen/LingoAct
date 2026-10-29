@@ -6748,6 +6748,27 @@ h2 {
   color: var(--danger);
 }
 
+.presenter-question-clock {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.presenter-question-clock strong { font-size: 26px; }
+.presenter-question-clock small { width: 100%; }
+.presenter-question-clock.spent { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
+
 /* 寫作教練 results: the writing itself is what the teacher came to read, so it
    gets room to be read rather than being squeezed onto the name row. */
 .quiz-written-answers {

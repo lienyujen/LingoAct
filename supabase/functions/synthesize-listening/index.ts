@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
     if (classroom.level_framework === 'hsk') { language = 'zh-cn'; accent = 'putonghua'; script = 'simplified' }
 
     if (classroom.teaching_language === 'en') { requireEnglishMaterial(transcript, ...speakers); language = 'en'; accent = speechAccent('en', accent); script = null }
+    if (classroom.teaching_language === 'ja') { language = 'ja'; accent = speechAccent('ja', null); script = null }
 
     // Asking for the same words twice is the common case: a teacher tweaks a
     // question, not the passage. Returning the clip already paid for keeps the

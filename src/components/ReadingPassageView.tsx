@@ -1,5 +1,6 @@
 import { useReadingTranslation, type LearningCredentials } from '../lib/useReadingTranslation'
 import { uiText } from '../lib/uiText'
+import { readingPartOfSpeech } from '../../supabase/functions/_shared/reading-pos'
 import { englishTextRuns } from '../lib/englishText'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -450,7 +451,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
             <>
               <p className="reading-note-head">
                 <strong>{open.entry.word}</strong>
-                {open.entry.pos && <span className="reading-note-pos">{open.entry.pos}</span>}
+                {open.entry.pos && <span className="reading-note-pos">{readingPartOfSpeech(open.entry.pos, passage.level_framework === 'hsk')}</span>}
                 {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : ['en108','cefr','gept','toeic'].includes(passage.level_framework || '') ? 'CEEC' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
               {open.entry.reading && <p>{open.entry.reading}</p>}

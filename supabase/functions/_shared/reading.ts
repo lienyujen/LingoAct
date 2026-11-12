@@ -28,6 +28,7 @@ import type { MandarinAccent } from './mandarin-pronunciation.ts'
 import type { SpeechAccent } from './speech-accent.ts'
 import { englishWords, englishNewWords, englishReadingTargets, englishVocabularyInstruction } from './english.ts'
 import { HSK_GRAMMAR, applyHskWordPinyin, hskPinyinInstruction, hskLevelOf, hskWordLevel, hskOverLevelWords, hskOverLevelComplaint } from './hsk.ts'
+import { readingPartOfSpeech } from './reading-pos.ts'
 import { JAPANESE_READINGS, JAPANESE_GRAMMAR, japaneseReadingTarget, settleJapaneseWords } from './japanese.ts'
 
 export type ReadingAnnotationGloss = Record<string, string>
@@ -385,12 +386,13 @@ async function glossNewWords(
   locales: string[],
   languageName: string,
   passage = '',
+  useSimplified = false,
 ): Promise<ReadingVocabulary[]> {
   if (!entries.length) return []
   const result = await callAiJson(
     [
       `這些是一篇${languageName}短文裡學生還沒學過的詞。請只做兩件事：給詞類，並翻譯。`,
-      languageName === 'Japanese' ? 'Use Japanese part-of-speech labels (名詞、動詞、形容詞、副詞). Explain the sense in this passage using each requested explanation language. Keep Japanese quoted forms unchanged.' : languageName === 'English' ? 'Use English part-of-speech labels. Explain only the sense used in the supplied passage; keep English words and patterns unchanged inside explanations.' : '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
+      languageName === 'Japanese' ? 'Use Japanese part-of-speech labels (名詞、動詞、形容詞、副詞). Explain the sense in this passage using each requested explanation language. Keep Japanese quoted forms unchanged.' : languageName === 'English' ? 'Use English part-of-speech labels. Explain only the sense used in the supplied passage; keep English words and patterns unchanged inside explanations.' : useSimplified ? '词类必须使用简体中文及中国大陆通用的语法术语（名词、动词、形容词、副词、量词、连词、代词、介词、助词、叹词等），不要使用繁体字。' : '詞類用中文寫（名詞、動詞、形容詞、副詞、量詞、連接詞、代詞…）。',
       '翻譯要短，說出這個詞在這篇文章裡的意思，不要只換一個同義詞。',
       '不要增加或刪除任何詞，回傳的順序與輸入相同。',
     ].join('\n'),
@@ -426,7 +428,7 @@ async function glossNewWords(
     return {
       word,
       level,
-      pos: String(row?.pos || '').trim(),
+      pos: readingPartOfSpeech(String(row?.pos || '').trim(), useSimplified),
       gloss: (row?.gloss || {}) as ReadingAnnotationGloss,
     }
   })
@@ -522,6 +524,8 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
     newWords(words, tbcl || 4, hsk ? hskWordLevel : wordLevel),
     locales,
     resolveTrack(input.teachingLanguage).promptLanguage,
+    body,
+    hsk,
   )
 
   return {

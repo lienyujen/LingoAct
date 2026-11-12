@@ -1,4 +1,5 @@
 import { englishTextRuns } from '../src/lib/englishText.ts'
+import { readingPartOfSpeech } from '../supabase/functions/_shared/reading-pos.ts'
 
 test('English karaoke keeps whole words, contractions, punctuation and Unicode cue offsets', () => {
   const text = "😀 Leo: Don't re-read each letter."
@@ -225,6 +226,7 @@ test('English reading UI never offers Pinyin or marks word fragments', () => {
   const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText
   const exports={}
   new Function('require','exports',compiled)(name=>{
+    if(name==='../../supabase/functions/_shared/reading-pos') return {readingPartOfSpeech}
     if(name==='../lib/englishText') return {englishTextRuns}
     if(name==='../lib/uiText') return {uiText:text=>text}
     if(name==='@phosphor-icons/react') return {BookOpen:()=>null,Translate:()=>null,X:()=>null}

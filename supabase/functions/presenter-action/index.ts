@@ -2416,9 +2416,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      const stoppedAt = new Date().toISOString()
-      const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
-      if (stopError) throw stopError
+      // A screenshot without replies is supporting material, so the class can
+      // keep answering its current assignment while looking at the new image.
+      if (type !== 'send_screen') {
+        const stoppedAt = new Date().toISOString()
+        const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
+        if (stopError) throw stopError
+      }
 
       if (hasBackdrop) {
         const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
@@ -2478,9 +2482,19 @@ Deno.serve(async (req) => {
         if (boardError) throw boardError
       }
 
+      // Keep stop, grading and result controls pointed at the response activity.
+      let currentQuestionId = question.id
+      if (type === 'send_screen') {
+        const { data: active, error } = await supabase.from('questions')
+          .select('id').eq('session_id', sessionId).eq('status', 'active')
+          .not('type', 'in', '(send_screen,board)')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (error) throw error
+        if (active) currentQuestionId = active.id
+      }
       const { error: sessionError } = await supabase
         .from('sessions')
-        .update({ current_question_id: question.id })
+        .update({ current_question_id: currentQuestionId })
         .eq('id', sessionId)
         .eq('status', 'active')
       if (sessionError) throw sessionError

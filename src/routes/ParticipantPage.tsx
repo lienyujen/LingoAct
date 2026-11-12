@@ -1,5 +1,6 @@
 import { classroomRetryDelay, createClassroomReadCache } from '../lib/classroomReadCache'
 import { createMessageSubmission } from '../lib/messageSubmission'
+import { screenDispatchQuestion, supportingScreenQuestion } from '../lib/screenDispatch'
 import { createRevisionGuard } from '../lib/realtimeSnapshot'
 import { useClassChineseFont } from '../lib/classChineseFont'
 import { createSerializedReload } from '../lib/serializedReload'
@@ -90,6 +91,7 @@ export function ParticipantPage() {
   const [quizBusy, setQuizBusy] = useState(false)
   const [quizLoadError, setQuizLoadError] = useState('')
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null)
+  const [supportingScreen, setSupportingScreen] = useState<Screenshot | null>(null)
   // Which stretch of a passage is being spoken. It lives here because the
   // player produces it and the reader draws it, and they are siblings.
   const [readingCue, setReadingCue] = useState(-1)
@@ -236,12 +238,21 @@ export function ParticipantPage() {
     setSharedContents((sharedContentData || []) as SharedContent[])
     setBuzzerEvent((buzzerData as BuzzerSessionEvent | null) || null)
     if (!handMutation.current && participantRevision.current.accepts(participantReadRevision)) setParticipant(participantData as Participant | null)
+    let activeQuestion: Question | null = null
     if (nextSession?.current_question_id) {
       const cachedQuestion = ((allQuestions || []) as Question[]).find(item => item.id === nextSession.current_question_id)
-      const questionData = cachedQuestion || (await read(`questions:${nextSession.current_question_id}`, () => supabase.from('questions').select('*').eq('id', nextSession.current_question_id!).single())).data
-      const answerData = ((allAnswers || []) as Answer[]).find(item => item.question_id === nextSession.current_question_id)
+      const dispatched = cachedQuestion || (await read(`questions:${nextSession.current_question_id}`, () => supabase.from('questions').select('*').eq('id', nextSession.current_question_id!).single())).data
+      const questionData = screenDispatchQuestion(dispatched as Question | null, (allQuestions || []) as Question[])
+      const supporting = supportingScreenQuestion(questionData, (allQuestions || []) as Question[])
+      if (supporting?.screenshot_id) {
+        const { data } = await read(`screenshots:${supporting.screenshot_id}`, () => supabase.from('screenshots').select('*').eq('id', supporting.screenshot_id!).single())
+        if (requestId !== loadSequence.current) return
+        setSupportingScreen((data as Screenshot | null) || null)
+      } else setSupportingScreen(null)
+      const answerData = ((allAnswers || []) as Answer[]).find(item => item.question_id === questionData?.id)
       if (requestId !== loadSequence.current) return
       const nextQuestion = questionData as Question | null
+      activeQuestion = nextQuestion
       setQuestion(nextQuestion)
       setAnswer((answerData as Answer | null) || null)
       if (nextQuestion?.type === 'custom_quiz') {
@@ -311,6 +322,7 @@ export function ParticipantPage() {
         setListeningClip(null)
       }
     } else {
+      setSupportingScreen(null)
       setQuestion(null)
       setAnswer(null)
       setAudioResponse(null)
@@ -324,18 +336,17 @@ export function ParticipantPage() {
     // it is looked up from whatever the class is on — including when that
     // question is a custom_quiz, because a reading with questions over it is
     // still a reading and the passage has to be there to answer them from.
-    if (nextSession?.current_question_id) {
-      const { data: passageData } = await read(`reading_passages:${nextSession.current_question_id}`, () => supabase
+    if (activeQuestion) {
+      const currentQuestion = activeQuestion
+      const { data: passageData } = await read(`reading_passages:${currentQuestion.id}`, () => supabase
         .from('reading_passages').select('*')
-        .eq('question_id', nextSession.current_question_id!).maybeSingle(), 60_000, 15_000)
+        .eq('question_id', currentQuestion.id).maybeSingle(), 60_000, 15_000)
       const nextPassage = (passageData || null) as ReadingPassageRow | null
       setPassage(nextPassage)
       // Only when the teacher said so: share_screenshot is their decision about
       // whether the class should see the material or only the passage.
       if (nextPassage) {
-        const { data: readingQuestion } = await read(`questions:${nextSession.current_question_id}`, () => supabase.from('questions')
-          .select('*').eq('id', nextSession.current_question_id!).maybeSingle())
-        const current = readingQuestion as { screenshot_id: string | null; share_screenshot: boolean } | null
+        const current = currentQuestion
         if (current?.screenshot_id && current.share_screenshot) {
           const { data: shot } = await read(`screenshots:${current.screenshot_id}`, () => supabase
             .from('screenshots').select('*').eq('id', current.screenshot_id!).maybeSingle())
@@ -387,7 +398,7 @@ export function ParticipantPage() {
     // listen-only and therefore produced no answer row. Keep every dispatched
     // clip in history so it survives the next activity and the end of class.
     for (const item of (allQuestions || []) as Question[]) {
-      if (item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
+      if (item.type === 'send_screen' || item.listening_clip_id || (item.teaching_mode && item.status !== 'draft')) answeredQuestionIds.add(item.id)
     }
     // A passage is course material, not a submission. An article sent to be
     // read produces no answer row at all, and a reading quiz keeps only its
@@ -1203,6 +1214,7 @@ export function ParticipantPage() {
           ones that do not, and it has to stay out of their way: every type
           listed here was drawing the same screenshot from the same question
           twice, once by its own component and once here. */}
+      {supportingScreen && <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={supportingScreen.public_url} />}
       {screenshot && !passage && question?.type !== 'file_upload' && question?.type !== 'drawing' && question?.type !== 'hotspot' && question?.type !== 'board' && (
         <img alt={participantText(locale, 'imageAlt')} className="participant-image" src={screenshot.public_url} />
       )}

@@ -31,6 +31,7 @@ import { QuestionResult } from '../components/QuestionResult'
 import { PresenterQuestionClock } from '../components/PresenterQuestionClock'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
 import { fileDataUrl } from '../lib/screenshotInteraction'
+import { screenDispatchQuestion } from '../lib/screenDispatch'
 import type { InteractionGenerated } from '../lib/screenshotInteraction'
 import { CustomQuizResult } from '../components/CustomQuizResult'
 import { SetupNotice } from '../components/SetupNotice'
@@ -477,17 +478,19 @@ export function PresenterPage() {
   // Every successful question dispatch uses the returned row immediately. It
   // must not wait for Realtime or retain a historical selection/old result.
   function showDispatchedQuestion(created: Question | string) {
-    const id = typeof created === 'string' ? created : created.id
+    const target = typeof created === 'string' ? null : screenDispatchQuestion(created, questions)
+    const id = typeof created === 'string' ? created : target!.id
     activityFocus.dispatch(id)
     setDispatchWarning('')
     setSelectedQuestionId(id)
     setWorkspaceView('current')
     setControlsOpen(true)
     setSession(current => current ? { ...current, current_question_id: id } : current)
-    setQuestion(typeof created === 'string' ? null : created)
+    setQuestion(target)
     setQuestions(current => {
-      const stopped = current.map(item => item.id !== id && item.status === 'active' ? { ...item, status: 'stopped' as const } : item)
-      return typeof created === 'string' ? stopped : [...stopped.filter(item => item.id !== id), created]
+      const stopped = current.map(item => (typeof created === 'string' || created.type !== 'send_screen')
+        && item.id !== id && item.status === 'active' ? { ...item, status: 'stopped' as const } : item)
+      return typeof created === 'string' ? stopped : [...stopped.filter(item => item.id !== created.id), created]
     })
     setAnswers([])
     setAudioResponses([])

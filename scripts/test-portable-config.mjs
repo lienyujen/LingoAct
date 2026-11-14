@@ -69,15 +69,16 @@ test('heartbeat requests are serialized, pause in background and remove pagehide
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
   const document = { visibilityState: 'visible', addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: (name) => listeners.delete(name) }
   const listeners = new Map()
-  let tick
-  const window = { setInterval: (callback) => { tick = callback; return 1 }, clearInterval: () => { tick = null }, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: (name) => listeners.delete(name) }
+  let tick, initial
+  const window = { setTimeout: (callback) => { initial = callback; return 2 }, clearTimeout: () => { initial = null }, setInterval: (callback) => { tick = callback; return 1 }, clearInterval: () => { tick = null }, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: (name) => listeners.delete(name) }
   let calls = 0
   let release
   const client = { functions: { invoke: (_name, options) => { calls++; assert.equal(options.timeout, 10000); return new Promise((resolve) => { release = () => resolve({ error: null }) }) } } }
   const exports = {}
-  new Function('require', 'exports', 'window', 'document', compiled)(() => ({ requireSupabase: () => client }), exports, window, document)
+  new Function('require', 'exports', 'window', 'document', 'navigator', compiled)(() => ({ requireSupabase: () => client }), exports, window, document, { onLine: true })
   const stop = exports.trackParticipantPresence({ sessionId: 'class', participantId: 'student', participantToken: 'test-token', locale: () => 'zh-TW' })
-  tick(); tick()
+  assert.equal(calls, 0)
+  initial(); tick(); tick()
   assert.equal(calls, 1)
   release(); await Promise.resolve(); await Promise.resolve()
   document.visibilityState = 'hidden'; listeners.get('visibilitychange')(); tick()

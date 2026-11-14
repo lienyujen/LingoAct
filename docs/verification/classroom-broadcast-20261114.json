@@ -1,0 +1,26 @@
+{
+  "learners": 150,
+  "channels": 900,
+  "dispatchRecipients": 150,
+  "answerRecipients": 150,
+  "profileRecipients": 1,
+  "readMs": {
+    "n": 300,
+    "p50": 486,
+    "p95": 4240,
+    "max": 4943
+  },
+  "answerMs": {
+    "n": 150,
+    "p50": 1798,
+    "p95": 1878,
+    "max": 1910
+  },
+  "errors": [],
+  "passed": true,
+  "project": "lzhnuzixpwlevsgtifqi",
+  "date": "2026-11-14",
+  "method": "150 real supabase-js clients, 6 channels each; eight-source cached snapshots; question update; telemetry suppression; one profile change; 150 concurrent REST answer inserts",
+  "scope": "Transport and database integration, not 150 full browser sessions or an extended classroom soak",
+  "fixture_removed": true
+}

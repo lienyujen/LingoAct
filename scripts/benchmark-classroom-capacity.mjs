@@ -2,6 +2,7 @@
 // makes no AI calls, refuses to start while real students are active, cleans up
 // its own UUID-scoped fixture. Run from the repository root with Node >=24.
 import fs from 'node:fs';import {randomUUID} from 'node:crypto';import {createClient} from '@supabase/supabase-js';import {fixtureSql} from './live-test-db.mjs';import {guardRealtimeTables} from '../src/lib/realtimeGuard.ts';
+import {classroomChanges} from '../src/lib/classroomBroadcast.ts';
 import {createPresencePublisher} from '../src/lib/presencePublisher.ts';import {onlineClassIds} from '../src/lib/classroomProjection.ts';
 const publishers=[],heartbeatTimers=[];let closing=false;
 if(process.env.LINGOACT_CAPACITY_TEST!=='1')throw Error('Set LINGOACT_CAPACITY_TEST=1 and LINGOACT_TEST_PROJECT explicitly to run the real 200-client benchmark.');
@@ -22,12 +23,12 @@ try{
  const tp=teacher.channel('teacher-presence:'+sid,{config:{presence:{key:'teacher',enabled:false}}});await subscribe(tp);await tp.track({role:'presenter'});
  await parallel(Array.from({length:N},(_,i)=>i),12,async i=>{const start=performance.now();const r=await fetch(url+'/functions/v1/participant-action',{method:'POST',headers:{apikey:key,authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({action:'join_session',sessionReference:sid,name:'QA '+i,deviceId:'qa-'+randomUUID()})});const d=await r.json();if(!r.ok||!d.participant||!d.participantToken)throw Error('Join failed '+r.status);students[i]=d.participant;tokens[i]=d.participantToken;stats.joins.push(performance.now()-start)});console.log('200 authenticated joins complete',JSON.stringify(quant(stats.joins)));save();
  for(let i=0;i<N;i++)heartbeatTimers.push(setInterval(async()=>{try{const r=await fetch(url+'/functions/v1/participant-action',{method:'POST',headers:{apikey:key,'content-type':'application/json'},body:JSON.stringify({action:'heartbeat',sessionId:sid,participantId:students[i].id,participantToken:tokens[i],unfocusedMs:0,focusStreakMs:30000,locale:'zh-TW'})});if(!r.ok)errors.push('Heartbeat HTTP '+r.status)}catch(e){errors.push('Heartbeat '+e.message)}},30000+Math.random()*10000));
- // Four live channels per learner, plus the shared-files channel, match the page's transport shape.
+ // Exercise the migrated broadcast transport alongside personal row subscriptions.
  for(let i=0;i<N;i++){
   const c=client(),pid=students[i].id,pc=c.channel('classroom-presence:'+sid,{config:{presence:{key:pid,enabled:false}}});await subscribe(pc);const publisher=createPresencePublisher(()=>pc.track({role:'participant',participant_id:pid}));publishers.push(publisher);publisher.start();
   await Promise.all([
    subscribe(c.channel('teacher-presence:'+sid,{config:{presence:{key:pid,enabled:true}}}).on('presence',{event:'sync'},()=>{})),
-   subscribe(c.channel('participant:'+sid+':'+pid).on('postgres_changes',{event:'UPDATE',schema:'public',table:'sessions',filter:'id=eq.'+sid},()=>{if(!events.has(pid))events.set(pid,Date.now());stats.dispatchReceived=events.size}).on('postgres_changes',{event:'*',schema:'public',table:'questions',filter:'session_id=eq.'+sid},()=>{}).on('postgres_changes',{event:'*',schema:'public',table:'answers',filter:'participant_id=eq.'+pid},()=>{}).on('postgres_changes',{event:'*',schema:'public',table:'participants',filter:'id=eq.'+pid},()=>{})),
+   subscribe(classroomChanges(c,sid,pid,true).on('postgres_changes',{event:'UPDATE',schema:'public',table:'sessions',filter:'id=eq.'+sid},()=>{}).on('postgres_changes',{event:'*',schema:'public',table:'questions',filter:'session_id=eq.'+sid},()=>{if(!events.has(pid))events.set(pid,Date.now());stats.dispatchReceived=events.size}).on('postgres_changes',{event:'*',schema:'public',table:'answers',filter:'participant_id=eq.'+pid},()=>{}).on('postgres_changes',{event:'*',schema:'public',table:'participants',filter:'id=eq.'+pid},()=>{})),
    subscribe(c.channel('standings:'+sid).on('broadcast',{event:'standings'},()=>{})),
    subscribe(c.channel('shared-files:'+sid).on('postgres_changes',{event:'*',schema:'public',table:'shared_files',filter:'session_id=eq.'+sid},()=>{}))]);stats.connections=i+1;
   if(i%25===24){console.log('Live learners',i+1);save()}await delay(80);
@@ -35,7 +36,7 @@ try{
  await delay(1500);console.log('Presence count',stats.presenceCount);save();
  // Exercise HTTP reads with actual publishable-key RLS, not a service-role bypass.
  await parallel(students,20,async(p,i)=>{const start=performance.now();for(const q of [teacher.from('sessions').select('id,current_question_id,status').eq('id',sid).single(),teacher.from('questions').select('*').eq('session_id',sid),teacher.from('answers').select('*').eq('session_id',sid).eq('participant_id',p.id)]){const r=await q;if(r.error)throw Error('Read failed '+r.error.code)}stats.reads.push(performance.now()-start)});
- await fixtureSql(project,`update sessions set title='QA dispatch ${Date.now()}' where id='${sid}'`);await delay(4000);if(events.size!==N)errors.push('Dispatch delivered to '+events.size+'/'+N);const times=[...events.values()].sort();stats.dispatchFanoutMs=times.length?times.at(-1)-times[0]:null;
+ await fixtureSql(project,`update questions set prompt_text='QA dispatch ${Date.now()}' where id='${qid}'`);await delay(4000);if(events.size!==N)errors.push('Dispatch delivered to '+events.size+'/'+N);const times=[...events.values()].sort();stats.dispatchFanoutMs=times.length?times.at(-1)-times[0]:null;
  await parallel(students,200,async(p,i)=>{const start=performance.now(),r=await teacher.from('answers').insert({session_id:sid,question_id:qid,participant_id:p.id,participant_name:p.name,answer_text:'QA answer '+i});if(r.error)throw Error('Answer failed '+r.error.code);stats.answers.push(performance.now()-start)});await delay(5000);if(received.size!==N)errors.push('Projection received '+received.size+'/'+N);
  const rows=await fixtureSql(project,`select count(*)::int as count from answers where session_id='${sid}'`);stats.persistedAnswers=rows[0].count;
  console.log('200-answer burst complete; holding all connections for 120 seconds');await delay(120000);

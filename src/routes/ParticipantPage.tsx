@@ -1,3 +1,4 @@
+import { classroomChanges, createClassroomReconnect } from '../lib/classroomBroadcast'
 import { classroomRetryDelay, createClassroomReadCache } from '../lib/classroomReadCache'
 import { createMessageSubmission } from '../lib/messageSubmission'
 import { screenDispatchQuestion, supportingScreenQuestion } from '../lib/screenDispatch'
@@ -118,6 +119,7 @@ export function ParticipantPage() {
   // One line, sent by the presenter's window. No queries from the class — see
   // the note in lib/standings.
   const pageVisible = usePageVisibility()
+  const broadcastSync = (session?.classroom_sync_version || 0) >= 1
   const liveSessionId = pageVisible && session?.status === 'active' ? sessionId : ''
   const refreshParticipantRow = useCallback(() => ownRowLoader.current(async () => {
     if (!isSupabaseConfigured || !participantId || !sessionId || navigator.onLine === false || document.visibilityState === 'hidden') return
@@ -560,7 +562,7 @@ export function ParticipantPage() {
     reloadTimer.current = window.setTimeout(() => {
       reloadTimer.current = null
       if (document.visibilityState !== 'hidden') void loadAll()
-    }, 150 + Math.random() * 600)
+    }, 250 + Math.random() * 1750)
   }, [loadAll])
 
   useEffect(() => {
@@ -578,8 +580,14 @@ export function ParticipantPage() {
   useEffect(() => {
     if (!isSupabaseConfigured || !liveSessionId || !participantId) return
     const supabase = requireSupabase()
-    const channel = supabase
-      .channel(`participant:${sessionId}:${participantId}`)
+    const reconnect = createClassroomReconnect(wasConnected => {
+      readCache.current.invalidate(...(wasConnected
+        ? ['sessions', 'questions', 'quizzes', 'answers', 'participants', 'exit_tickets', 'shared_contents', 'session_events', 'screenshots', 'reading_passages', 'listening']
+        : ['sessions', 'questions', 'quizzes']))
+      if (wasConnected) historyEpoch.current++
+      scheduleLoad()
+    })
+    const channel = classroomChanges(supabase, sessionId, participantId, broadcastSync)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions', filter: `session_id=eq.${sessionId}` }, () => { readCache.current.invalidate('questions', 'quizzes'); scheduleLoad() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `participant_id=eq.${participantId}` }, (payload) => {
         readCache.current.invalidate('answers')
@@ -630,12 +638,13 @@ export function ParticipantPage() {
           }
         }
       })
-      .subscribe(status => { if (status === 'SUBSCRIBED') { readCache.current.invalidate(); scheduleLoad() } })
+      .subscribe(status => { if (status === 'SUBSCRIBED') reconnect.subscribed() })
 
     return () => {
+      reconnect.stop()
       supabase.removeChannel(channel)
     }
-  }, [liveSessionId, loadAll, participantId, scheduleLoad, sessionId])
+  }, [broadcastSync, liveSessionId, loadAll, participantId, scheduleLoad, sessionId])
 
   const latestSession = useRef(session)
   latestSession.current = session
@@ -665,7 +674,7 @@ export function ParticipantPage() {
         return
       }
       const current = latestSession.current
-      if (!current || Object.entries(data).some(([key, value]) => current[key as keyof Session] !== value)) { readCache.current.invalidate(); scheduleLoad() }
+      if (!current || Object.entries(data).some(([key, value]) => current[key as keyof Session] !== value)) { readCache.current.invalidate('sessions', 'questions', 'quizzes'); scheduleLoad() }
     }
     const timer = window.setInterval(() => void check(), 20_000 + Math.random() * 10_000)
     const visible = () => { void check() }

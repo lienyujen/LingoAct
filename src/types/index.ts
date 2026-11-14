@@ -5,6 +5,7 @@
 export type Translated<T> = Record<string, T | undefined>
 
 export type Session = {
+  classroom_sync_version?: number
   id: string
   title: string
   code: string

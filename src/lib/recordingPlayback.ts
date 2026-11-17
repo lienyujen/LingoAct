@@ -5,7 +5,7 @@ import { requireSupabase } from './supabase'
 export async function refreshRecordingUrl(recording: AudioResponse, student: boolean) {
   const sessionId = recording.session_id
   const body = student ? {
-    action: 'get_recording_result', sessionId, questionId: recording.question_id,
+    action: 'get_recording_result', sessionId, questionId: recording.question_id, responseId: recording.id,
     participantId: localStorage.getItem(`lingoact_participant_${sessionId}`),
     participantToken: localStorage.getItem(`lingoact_participant_token_${sessionId}`),
   } : {

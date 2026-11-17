@@ -5,7 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 test('legacy translations never replace classroom questions, options, matching columns or active flashcards', async () => {
-  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } })
   try {
     const { ParticipantQuestionView } = await server.ssrLoadModule('/src/components/ParticipantQuestionView.tsx')
     const { ParticipantCustomQuiz } = await server.ssrLoadModule('/src/components/ParticipantCustomQuiz.tsx')

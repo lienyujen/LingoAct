@@ -146,7 +146,7 @@ test('Japanese profile, language selector and setup render in Japanese and exist
   const storage = new Map()
   globalThis.localStorage = {getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)}
   globalThis.window = {location:{hash:'#/presenter/new',search:''},localStorage:globalThis.localStorage,addEventListener(){},removeEventListener(){},dispatchEvent(){}}
-  const server = await createServer({server:{middlewareMode:true,hmr:false},appType:'custom',define:{'import.meta.env.VITE_APP_PROFILE':JSON.stringify('japanese')}})
+  const server = await createServer({server:{middlewareMode:true,hmr:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]},define:{'import.meta.env.VITE_APP_PROFILE':JSON.stringify('japanese')}})
   try {
     const {APP_PROFILE} = await server.ssrLoadModule('/src/lib/appProfiles.ts')
     const {PresenterLocaleContext} = await server.ssrLoadModule('/src/lib/presenterI18n.ts')
@@ -198,7 +198,7 @@ test('Japanese profile, language selector and setup render in Japanese and exist
 
 test('shared student build shows Japanese branding and only ja/zh-TW/en, including legacy links', async () => {
   const oldWindow=globalThis.window
-  const server=await createServer({server:{middlewareMode:true,hmr:false},appType:'custom',define:{'import.meta.env.VITE_APP_PROFILE':JSON.stringify('full')}})
+  const server=await createServer({server:{middlewareMode:true,hmr:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]},define:{'import.meta.env.VITE_APP_PROFILE':JSON.stringify('full')}})
   try{
     const {participantBrand,guidanceLocalesForBrand}=await server.ssrLoadModule('/src/lib/brand.ts')
     const {GUIDANCE_LOCALES}=await server.ssrLoadModule('/src/lib/participantI18n.ts')

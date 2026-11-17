@@ -533,7 +533,7 @@ export function ParticipantPage() {
     return () => window.clearTimeout(timer)
   }, [loadAll, pageVisible])
 
-  const quizWaiting = quizData?.attempt?.status === 'grading'
+  const quizWaiting = audioResponse?.analysis_status === 'pending' || audioResponse?.translation_status === 'pending' || quizData?.attempt?.status === 'grading'
     || question?.type === 'custom_quiz' && !quizData && !quizLoadError
   useEffect(() => {
     if (!liveSessionId || !quizWaiting) return

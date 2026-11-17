@@ -1,3 +1,4 @@
+import { recordingForClient } from '../_shared/recording-results.ts'
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { attachBoardUrls, BOARD_BUCKET, boardStoragePrefix } from '../_shared/board.ts'
 import { analyzeAudioResponse, removeRecording } from '../_shared/audio-analysis.ts'
@@ -966,13 +967,13 @@ Deno.serve(async (req) => {
       if (action === 'get_recording_result') {
         const { data: response, error } = await supabase
           .from('audio_responses')
-          .select('id, session_id, question_id, participant_id, participant_name, mime_type, duration_ms, analysis_status, detected_language, transcript, score, analysis_json, error_message, submitted_at, analyzed_at, storage_path')
+          .select('id, session_id, question_id, participant_id, participant_name, mime_type, duration_ms, analysis_status, detected_language, transcript, score, analysis_json, error_message, submitted_at, analyzed_at, storage_path, attempt_number, previous_attempt')
           .eq('question_id', questionId)
           .eq('participant_id', participantId)
           .maybeSingle()
         if (error) throw error
         if (!response) return jsonResponse({ response: null })
-        if (question.status === 'active') {
+        if (question.status === 'active' && question.type !== 'pronunciation') {
           return jsonResponse({ response: {
             id: response.id,
             session_id: sessionId,
@@ -991,12 +992,12 @@ Deno.serve(async (req) => {
             analyzed_at: null,
           } })
         }
-        const { data: signed, error: signedError } = await supabase.storage
-          .from('lingoact-recordings')
-          .createSignedUrl(response.storage_path, 3600)
-        if (signedError) throw signedError
-        const { storage_path: _storagePath, ...safeResponse } = response
-        return jsonResponse({ response: await translateAudioFeedback(supabase, sessionId, typeof input.locale === 'string' ? input.locale : '', { ...safeResponse, signed_url: signed.signedUrl }) })
+        const safeResponse = await recordingForClient(supabase, response)
+        const selected = typeof input.responseId === 'string' && input.responseId === (safeResponse.previous_attempt as { id?: string } | undefined)?.id
+          ? safeResponse.previous_attempt : safeResponse
+        return jsonResponse({ response: selected === safeResponse
+          ? await translateAudioFeedback(supabase, sessionId, typeof input.locale === 'string' ? input.locale : '', safeResponse as never)
+          : selected })
       }
 
       // What the teacher's AI made of this student's own upload.
@@ -1009,17 +1010,21 @@ Deno.serve(async (req) => {
 
       const { data: activeSession, error: activeSessionError } = await supabase
         .from('sessions')
-        .select('status')
+        .select('status,teaching_language,level_framework')
         .eq('id', sessionId)
         .maybeSingle()
       if (activeSessionError) throw activeSessionError
       if (activeSession?.status !== 'active') return jsonResponse({ message: '課程已經結束，無法送出錄音。' }, 409)
 
-      // 錄音朗讀 is practice, not a test: the point is to hear the model, hear
-      // yourself, and go again. The take is replaced rather than kept beside the
-      // old one — the comparison that matters is against the model recording,
-      // which stays put, and keeping every attempt would fill the bucket with
-      // rehearsals nobody listens to.
+      const { data: existingTake, error: takeError } = await supabase.from('audio_responses')
+        .select('id,attempt_number,analysis_status,previous_attempt').eq('question_id', questionId).eq('participant_id', participantId).maybeSingle()
+      if (takeError) throw takeError
+      const canRetry = question.type === 'pronunciation' && existingTake && existingTake.attempt_number < 2 && existingTake.analysis_status !== 'pending'
+      const simplifiedRecording = activeSession?.teaching_language === 'putonghua' || activeSession?.level_framework === 'hsk'
+      const retryMessage = activeSession?.teaching_language === 'en' ? 'You cannot submit another recording yet. Read-aloud practice allows two attempts.'
+        : activeSession?.teaching_language === 'ja' ? '今は再提出できません。音読は2回まで提出できます。'
+        : simplifiedRecording ? '暂时无法再次提交。朗读练习每题最多提交两次，请先等待当前录音评测完成。' : '暫時無法再次提交。朗讀練習每題最多提交兩次，請先等待目前錄音評測完成。'
+      if (question.type === 'pronunciation' && action === 'discard_recording') return jsonResponse({ message: 'Read-aloud takes are retained for comparison.' }, 409)
       if (action === 'discard_recording') {
         if (question.status !== 'active') {
           return jsonResponse({ message: '本題已停止作答，無法重錄。' }, 409)
@@ -1049,13 +1054,7 @@ Deno.serve(async (req) => {
         if (!Number.isInteger(fileSize) || fileSize < 1 || fileSize > 10 * 1024 * 1024) {
           return jsonResponse({ message: '錄音檔不可超過 10 MB。' }, 400)
         }
-        const { count, error: countError } = await supabase
-          .from('answers')
-          .select('id', { count: 'exact', head: true })
-          .eq('question_id', questionId)
-          .eq('participant_id', participantId)
-        if (countError) throw countError
-        if (count) return jsonResponse({ message: '本題已經送出錄音。' }, 409)
+        if (existingTake && !canRetry) return jsonResponse({ message: retryMessage }, 409)
         const recordingId = crypto.randomUUID()
         const storagePath = `sessions/${sessionId}/recordings/${questionId}/${participantId}/${recordingId}.wav`
         const { data, error } = await supabase.storage.from('lingoact-recordings').createSignedUploadUrl(storagePath)
@@ -1077,35 +1076,17 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '錄音檔大小不符合限制。' }, 400)
       }
 
-      const { data: response, error: responseError } = await supabase
-        .from('audio_responses')
-        .insert({
-          id: recordingId,
-          session_id: sessionId,
-          question_id: questionId,
-          participant_id: participantId,
-          participant_name: participant.name,
-          storage_path: storagePath,
-          mime_type: 'audio/wav',
-          duration_ms: durationMs,
-          file_size: audioBlob.size,
-        })
-        .select('id, analysis_status, submitted_at')
-        .single()
-      if (responseError) throw responseError
-
-      const { error: answerError } = await supabase.from('answers').insert({
-        session_id: sessionId,
-        question_id: questionId,
-        participant_id: participantId,
-        participant_name: participant.name,
-        answer_text: '[錄音已送出]',
-      })
-      if (answerError) {
-        await supabase.from('audio_responses').delete().eq('id', recordingId)
-        await removeRecording(storagePath)
-        throw answerError
+      const { data: saved, error: responseError } = await supabase.rpc('submit_recording_take', { p_take: {
+        id: recordingId, session_id: sessionId, question_id: questionId, participant_id: participantId,
+        participant_name: participant.name, storage_path: storagePath, duration_ms: durationMs, file_size: audioBlob.size,
+      } })
+      if (responseError) {
+        if (existingTake?.id !== recordingId && existingTake?.previous_attempt?.id !== recordingId) await removeRecording(storagePath)
+        if (responseError.code === '23505' || /RECORDING_/.test(responseError.message || '')) return jsonResponse({ message: /RECORDING_CLOSED/.test(responseError.message || '') ? (simplifiedRecording ? '本题已停止作答，无法提交新录音。' : '本題已停止作答，無法提交新錄音。') : retryMessage }, 409)
+        throw responseError
       }
+      const response = { id: saved.id, analysis_status: saved.analysis_status, submitted_at: saved.submitted_at }
+      if (saved.already_saved) return jsonResponse({ response })
 
       try {
         // A 朗讀發音 from 截圖派題 carries the screenshot the class was reading

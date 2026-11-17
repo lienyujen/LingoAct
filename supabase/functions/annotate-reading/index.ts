@@ -1,3 +1,4 @@
+import { annotateReadingChunks } from '../_shared/reading-annotation-chunks.ts'
 import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction, unavailableRegionalBopomofoReadings } from '../_shared/mandarin-pronunciation.ts'
@@ -107,23 +108,34 @@ Deno.serve(async (req) => {
     // Words for prose a learner reads, characters for a flashcard. Asking for
     // both in one response is what broke 標音 on a full-length article: it
     // roughly doubles the output, and this runs on the realtime profile with a
-    // twelve second budget, so the call timed out and the teacher was told
+    // short interaction budget, so the call timed out and the teacher was told
     // 標音失敗 about an article that had already gone out. Each caller needs
     // one of the two anyway.
     if (mode === 'pinyin' && granularity === 'words') {
-      const result = await callAiJson(
-        [
-          'Cut the text into words and give each word its Hanyu Pinyin reading.',
-          hsk ? hskPinyinInstruction(text) : regionalPronunciationInstruction(text, accent),
-          ...orthographyRules('text'),
-        ].join('\n'),
-        { text },
-        wordSchema,
-        null,
-        'realtime',
-      )
-      if (result.status !== 'success') throw new Error('AI 標音沒有回應。')
-      const segmented = settleWords((result.output as { words?: unknown })?.words, text)
+      const parts = await annotateReadingChunks(text, async (chunk, context) => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const result = await callAiJson(
+            [
+              'Cut the text into words and give each word its Hanyu Pinyin reading.',
+              'Annotate ONLY the text field. preceding_context and following_context are pronunciation hints: never include them in the output. Never change, omit, add or translate characters or punctuation in text.',
+              attempt ? 'The previous segmentation did not reassemble to text. Copy every character of text exactly, including punctuation, and return ALL words in order.' : '',
+              hsk ? hskPinyinInstruction(chunk) : regionalPronunciationInstruction(chunk, accent),
+              'Use word-based Hanyu Pinyin with tone marks. Capitalize proper names. Keep punctuation as separate entries with empty pinyin. Use context for polyphonic characters.',
+            ].join('\n'),
+            { text: chunk, ...context, instruction: 'Annotate only text. Use neighboring context for polyphonic readings and sentence-start capitalization; do not include context in the output.' },
+            wordSchema,
+            null,
+            'deep',
+            undefined,
+            { primaryTimeoutMs: attempt ? 20_000 : 30_000, fallbackTimeoutMs: 12_000 },
+          )
+          if (result.status !== 'success') throw new Error(`${hsk ? 'AI 标音失败' : 'AI 標音失敗'}：${errorDetail(result.output, hsk ? 'AI 暂时没有返回结果，请重试。' : 'AI 暫時沒有返回結果，請重試。')}`)
+          const words = settleWords((result.output as { words?: unknown })?.words, chunk, false)
+          if (words.length) return words
+        }
+        throw new Error(hsk ? '拼音分词与原文不一致，请重试。' : '拼音分詞與原文不一致，請重試。')
+      })
+      const segmented = settleWords(parts.flat(), text)
       const words = hsk ? applyHskWordPinyin(segmented) : applyRegionalWordPinyin(text, segmented, accent)
       if (!words.length) throw new Error('AI 標音的分詞對不上原文。')
       return jsonResponse({ mode, annotationText: '', words })
@@ -133,25 +145,32 @@ Deno.serve(async (req) => {
       // Pinyin needs no font, so there is no fixed list to choose from and the
       // model writes the syllables itself. Alignment is what matters: one entry
       // per character, blank for anything that is not a Han character.
-      const result = await callAiJson(
-        [
-          'Give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
-          'Use tone marks (nǐ hǎo), not tone numbers. Choose the reading the character takes in THIS context.',
-          hsk ? HSK_PRONUNCIATION : regionalPronunciationInstruction(text, accent),
-          'For anything that is not a Han character — punctuation, spaces, Latin letters, digits, newlines — return an empty string in its slot.',
-          'The array must contain exactly as many entries as the character count given.',
-        ].join('\n'),
-        { text, character_count: characters.length },
-        syllableSchema,
-        null,
-        'realtime',
-      )
-      if (result.status !== 'success') throw new Error('AI 標音沒有回應。')
+      const parts = await annotateReadingChunks(text, async (chunk, context) => {
+        const result = await callAiJson(
+          [
+            'Give the Hanyu Pinyin reading of every character in the text, in order, one array entry per character.',
+            'Use tone marks (nǐ hǎo), not tone numbers. Choose the reading the character takes in THIS context.',
+            hsk ? HSK_PRONUNCIATION : regionalPronunciationInstruction(text, accent),
+            'For anything that is not a Han character — punctuation, spaces, Latin letters, digits, newlines — return an empty string in its slot.',
+            'The array must contain exactly as many entries as the character count given.',
+          ].join('\n'),
+          { text: chunk, character_count: [...chunk].length, ...context },
+          syllableSchema,
+          null,
+          'deep',
+          undefined,
+          { primaryTimeoutMs: 30_000, fallbackTimeoutMs: 12_000 },
+        )
+        if (result.status !== 'success') throw new Error(`${hsk ? 'AI 标音失败' : 'AI 標音失敗'}：${errorDetail(result.output, hsk ? 'AI 暂时没有返回结果，请重试。' : 'AI 暫時沒有返回結果，請重試。')}`)
 
-      const syllables = (result.output as { syllables?: unknown })?.syllables
-      const list = Array.isArray(syllables) ? syllables : []
+        const syllables = (result.output as { syllables?: unknown })?.syllables
+        const list = Array.isArray(syllables) ? syllables : []
+        if (list.length !== [...chunk].length) throw new Error(hsk ? '拼音标注与原文长度不一致，请重试。' : '拼音標注與原文長度不一致，請重試。')
+        return list
+      })
+      const list = parts.flat()
       // A misaligned array would put every reading over the wrong character, so
-      // it is padded or trimmed rather than trusted.
+      // each chunk is validated before its readings are published.
       const readings = characters.map((_, index) => (typeof list[index] === 'string' ? list[index] : ''))
       const aligned = hsk ? readings : applyRegionalPinyin(text, readings, accent)
       return jsonResponse({ mode, annotationText: JSON.stringify(aligned), words: [] })
@@ -210,7 +229,7 @@ Deno.serve(async (req) => {
         },
         zhuyinSchema,
         null,
-        'realtime',
+        'deep',
       )
       if (result.status !== 'success') throw new Error('AI 讀音判定沒有回應。')
       const choices = (result.output as { choices?: unknown })?.choices

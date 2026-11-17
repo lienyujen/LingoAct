@@ -6,7 +6,7 @@ import ts from 'typescript'
 
 function load(values = {}, fetch = () => { throw Error('Unexpected API call') }) {
   const env = new Map(Object.entries(values))
-  const context = { exports: {}, Deno: { env: { get: key => env.get(key) } }, fetch, AbortSignal, console: { warn() {} } }
+  const context = { exports: {}, Deno: { env: { get: key => env.get(key) } }, fetch, AbortSignal, Response, console: { warn() {} } }
   vm.createContext(context)
   const source = readFileSync(new URL('../supabase/functions/_shared/ai.ts', import.meta.url), 'utf8')
   vm.runInContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, context)
@@ -40,4 +40,14 @@ test('unavailable 3.8 calls fall back to 3.6 without calling retired Flash model
   assert.equal(calls.length, 2)
   assert.match(calls[0], /models\/gemini-3\.8-flash:generateContent$/)
   assert.match(calls[1], /models\/gemini-3\.6-flash:generateContent$/)
+})
+
+test('a streamed Gemini body failure falls back even after successful HTTP headers', async () => {
+  let calls = 0
+  const ai = load({ GEMINI_API_KEY: 'fixture-only' }, async () => ++calls === 1
+    ? new Response(new ReadableStream({ start(controller) { controller.error(new DOMException('Body timed out', 'TimeoutError')) } }))
+    : new Response('{"ok":true}'))
+  const result = await ai.requestGemini('{}', 'realtime')
+  assert.equal(calls, 2)
+  assert.deepEqual(await result.json(), { ok: true })
 })

@@ -345,6 +345,8 @@ export type AudioAnalysis = {
 }
 
 export type AudioResponse = {
+  attempt_number?: number
+  previous_attempt?: AudioResponse | null
   translation_status?: 'pending' | 'failed'
   id: string
   session_id: string

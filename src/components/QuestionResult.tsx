@@ -1,3 +1,5 @@
+import { activityNotice } from '../lib/classroomMessages'
+import { RecordingComparison } from './RecordingComparison'
 import { uiText } from '../lib/uiText'
 import { RecordingPlayer } from './RecordingPlayer'
 import { ArrowCounterClockwise, ArrowsOut, CaretLeft, CaretRight, CheckCircle, CircleNotch, DiceFive, DownloadSimple, Eye, EyeSlash, Faders, FileArrowUp, Play, Sparkle, Square, Waveform, X, XSquare } from '@phosphor-icons/react'
@@ -558,6 +560,7 @@ function UploadResults({
 // eighteen pins in one place is the next thing to explain.
 function HotspotResults(props: Props & { question: Question }) {
   const { anonymousEnabled, answers, question, screenshotUrl } = props
+  const locale = usePresenterLocale()
   const t = usePresenterText()
   const [expanded, setExpanded] = useState(false)
 
@@ -590,7 +593,7 @@ function HotspotResults(props: Props & { question: Question }) {
           </span>
         )}
       </div>
-      {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
+      {question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
       <p className="muted">{t('hotspotTally', { people: answers.length, pins: pins.length })}</p>
       {screenshotUrl
         ? (
@@ -625,6 +628,7 @@ const BOARD_FORMAT_LABELS: Array<[BoardPostKind, PresenterMessageKey]> = [
 // The wall as the presenter sees it, beside the class list.
 function BoardResults(props: Props & { question: Question }) {
   const { question } = props
+  const locale = usePresenterLocale()
   const t = usePresenterText()
   const [snapshot, setSnapshot] = useState<BoardSnapshot | null>(null)
   const [busy, setBusy] = useState(false)
@@ -691,7 +695,7 @@ function BoardResults(props: Props & { question: Question }) {
           )}
         </span>
       </div>
-      {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
+      {question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
       <p className="muted">
         {t('boardTally', { cards: cards.filter((post) => !post.deleted_at).length, people: contributors })}
         {maxPosts === null ? t('boardCapNone') : t('boardCapSome', { n: maxPosts })}
@@ -842,7 +846,7 @@ export function QuestionResult(props: Props) {
             <h2><FileArrowUp size={20} />{question.type === 'drawing' && (!question.title || drawingDefaultTitles.has(question.title)) ? t('typeDrawing') : question.title}</h2>
             <QuestionStatusActions {...props} question={question} />
           </div>
-          {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
+          {question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
           <UploadResults
             anonymousEnabled={anonymousEnabled}
             fileBusyId={props.fileBusyId}
@@ -863,7 +867,7 @@ export function QuestionResult(props: Props) {
           <h2><Waveform size={20} />{question.title}</h2>
           <QuestionStatusActions {...props} question={question} />
         </div>
-        {question.prompt_text && <p className="detected-question">{question.prompt_text}</p>}
+        {question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
         <p className="muted">{t('recordedPeople', { n: answers.length })}</p>
         {question.status === 'active' ? (
           <p className="muted">{t('audioAfterStop')}</p>
@@ -877,6 +881,7 @@ export function QuestionResult(props: Props) {
                     <strong>{anonymousEnabled ? t('anonymousAnswer', { n: index + 1 }) : response.participant_name}</strong>
                     {typeof response.score === 'number' && <span className="audio-result-score">{t('points', { n: response.score })}</span>}
                   </div>
+                  <RecordingComparison response={response} locale={locale} />
                   <RecordingPlayer recording={response} locale={locale} />
                   {response.analysis_status === 'success' && result ? (
                     <>

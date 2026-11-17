@@ -220,7 +220,7 @@ async function requestQuizGeneration(
         body,
         signal: AbortSignal.timeout(timeoutMilliseconds),
       })
-      if (response.ok) return { response, failureMessage: '', failureStatus: null }
+      if (response.ok) return { response: new Response(await response.text(), { status: response.status, headers: response.headers }), failureMessage: '', failureStatus: null }
 
       failureStatus = response.status
       failureMessage = (await response.text()).slice(0, 1000) || `request failed with status ${response.status}`
@@ -373,10 +373,10 @@ ${input.sourceText}` }] : []),
 
   async function generate(complaint = '') {
     const body = requestBodyForModel(complaint)
-    let result = await requestQuizGeneration(apiKey!, model, body, 1, 12_000)
+    let result = await requestQuizGeneration(apiKey!, model, body, 1, 45_000)
     if (!result.response && fallbackModel && fallbackModel !== model && (result.failureStatus === null || retryableStatus(result.failureStatus))) {
       console.warn(`Gemini quiz generation unavailable on ${model}; retrying with ${fallbackModel}.`)
-      result = await requestQuizGeneration(apiKey!, fallbackModel, body, 1, 18_000)
+      result = await requestQuizGeneration(apiKey!, fallbackModel, body, 1, 30_000)
     }
     if (!result.response) {
       const status = result.failureStatus ? ` (${result.failureStatus})` : ''

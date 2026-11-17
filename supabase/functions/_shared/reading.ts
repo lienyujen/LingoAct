@@ -257,7 +257,7 @@ export function orthographyRules(field: string) {
 // must give it again, or the readings would sit over the wrong words — better
 // no pinyin than pinyin on the wrong syllables. Whitespace is excused because
 // a model reflows line breaks and that changes nothing about the reading.
-export function settleWords(raw: unknown, text: string): ReadingWord[] {
+export function settleWords(raw: unknown, text: string, applyCase = true): ReadingWord[] {
   const segmented = (Array.isArray(raw) ? raw : [])
     .map((entry) => {
       const word = entry as Record<string, unknown>
@@ -288,7 +288,7 @@ export function settleWords(raw: unknown, text: string): ReadingWord[] {
     aligned.push({ text: text.slice(start, cursor), pinyin: word.pinyin })
   }
   if (cursor < text.length) aligned.push({ text: text.slice(cursor), pinyin: '' })
-  return applyOrthography(aligned)
+  return applyCase ? applyOrthography(aligned) : aligned
 }
 
 // 正詞法 rules a program can apply itself, applied after the model answers.

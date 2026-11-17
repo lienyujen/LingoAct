@@ -83,7 +83,9 @@ export async function requestGemini(
         body,
         signal: AbortSignal.timeout(index === 0 ? primaryTimeoutMs : fallbackTimeoutMs),
       })
-      if (response.ok) return response
+      // Streaming providers can send headers well before generation finishes.
+      // Keep body reading inside the timeout/fallback boundary as well.
+      if (response.ok) return new Response(await response.text(), { status: response.status, headers: response.headers })
 
       failureMessage = (await response.text()).slice(0, 1000) || `AI request failed with status ${response.status}.`
       if (!retryableStatus(response.status)) {
@@ -115,6 +117,7 @@ export async function callAiJson(
   image?: { mimeType: string; base64: string } | null,
   profile: AiProfile = 'realtime',
   thinkingLevel?: ThinkingLevel,
+  requestOptions: GeminiRequestOptions = {},
 ) {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
 
@@ -141,7 +144,7 @@ export async function callAiJson(
         thinkingConfig: geminiThinkingConfig(profile, thinkingLevel),
         responseFormat: { text: { mimeType: 'APPLICATION_JSON', ...(schema ? { schema } : {}) } },
       },
-    }), profile)
+    }), profile, requestOptions)
   } catch (error) {
     return { status: 'failed', output: { message: error instanceof Error ? error.message : 'AI request failed.' } }
   }

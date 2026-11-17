@@ -447,7 +447,7 @@ export function PresenterPage() {
           setQuizResults((quizData as PresenterQuizResults | null) || null)
         }
         setAudioResponses([])
-      } else if (loadedQuestion && ['pronunciation', 'oral_response'].includes(loadedQuestion.type) && loadedQuestion.status !== 'active') {
+      } else if (loadedQuestion && ['pronunciation', 'oral_response'].includes(loadedQuestion.type) && (loadedQuestion.status !== 'active' || loadedQuestion.type === 'pronunciation')) {
         setQuizResults(null)
         const presenterToken = getPresenterToken(sessionId) || ''
         if (presenterToken || hasOwnerKey()) {

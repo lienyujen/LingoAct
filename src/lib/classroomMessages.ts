@@ -1,4 +1,6 @@
 const en = {
+  readingQuizFailed: 'The questions could not be generated. Read the passage, or ask your teacher to send the activity again.',
+  secondAttempt: 'Record a second attempt', firstAttempt: 'First recording and feedback', attemptComparison: 'Compare attempts', attemptScore: 'Attempt {n}: {score}',
   playRecording: 'Play recording', loadingRecording: 'Loading audio…', retryPlayback: 'Reload audio',
   recordingUnavailable: 'Audio could not be loaded. Reload it and try again.', downloadRecording: 'Download audio',
   photoConvertFailed: 'This photo could not be converted. Try taking another photo or choose a JPG or PNG image.',
@@ -11,6 +13,8 @@ const en = {
 const translations: Record<string, Partial<typeof en>> = {
   en,
   'zh-TW': {
+    readingQuizFailed: '這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。',
+    secondAttempt: '再錄一次（保留第一次）', firstAttempt: '第一次錄音與評語', attemptComparison: '兩次成績比較', attemptScore: '第 {n} 次：{score} 分',
     playRecording: '播放錄音', loadingRecording: '載入錄音中…', retryPlayback: '重新載入錄音',
     recordingUnavailable: '無法載入錄音，請重新載入後再試。', downloadRecording: '下載錄音',
     photoConvertFailed: '這張照片無法轉成 JPG，請重新拍攝或選擇 JPG、PNG 圖片。', photoTooLarge: '請選擇小於 20 MB 的照片。', closeWall: '關閉句子牆',
@@ -20,6 +24,8 @@ const translations: Record<string, Partial<typeof en>> = {
     reference: '參考答案', showNames: '顯示姓名', answerDetails: '逐題作答明細',
   },
   'zh-CN': {
+    readingQuizFailed: '这篇文章的测验题生成失败。你可以先阅读文章，或请老师重新发送。',
+    secondAttempt: '再录一次（保留第一次）', firstAttempt: '第一次录音与评语', attemptComparison: '两次成绩对比', attemptScore: '第 {n} 次：{score} 分',
     playRecording: '播放录音', loadingRecording: '正在加载录音…', retryPlayback: '重新加载录音',
     recordingUnavailable: '无法加载录音，请重新加载后再试。', downloadRecording: '下载录音',
     photoConvertFailed: '这张照片无法转成 JPG，请重新拍摄或选择 JPG、PNG 图片。', photoTooLarge: '请选择小于 20 MB 的照片。', closeWall: '关闭句子墙',
@@ -29,6 +35,8 @@ const translations: Record<string, Partial<typeof en>> = {
     reference: '参考答案', showNames: '显示姓名', answerDetails: '逐题作答详情',
   },
   ja: {
+    readingQuizFailed: '問題を生成できませんでした。本文を読むか、先生に再配信をお願いしてください。',
+    secondAttempt: 'もう一度録音する（初回を保存）', firstAttempt: '初回の録音と講評', attemptComparison: '2回の結果を比較', attemptScore: '{n}回目：{score}点',
     playRecording: '録音を再生', loadingRecording: '音声を読み込み中…', retryPlayback: '音声を再読み込み',
     recordingUnavailable: '音声を読み込めませんでした。再読み込みしてください。', downloadRecording: '音声をダウンロード',
     photoConvertFailed: '写真を JPG に変換できませんでした。撮り直すか JPG・PNG 画像を選んでください。', photoTooLarge: '20 MB 未満の写真を選んでください。', closeWall: '文の一覧を閉じる',
@@ -45,4 +53,10 @@ const translations: Record<string, Partial<typeof en>> = {
 }
 export function classroomMessage(locale: string, key: keyof typeof en, values: Record<string, string | number> = {}) {
   return (translations[locale]?.[key] || en[key]).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole)
+}
+
+const readingFailureNotices = new Set(['這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。', '这篇文章的测验题生成失败。你可以先阅读文章，或请老师重新发送。'])
+// Only recognized system notices are localized; teacher text is never translated.
+export function activityNotice(text: string, locale: string) {
+  return readingFailureNotices.has(text) ? classroomMessage(locale, 'readingQuizFailed') : text
 }

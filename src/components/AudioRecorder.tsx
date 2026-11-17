@@ -1,3 +1,5 @@
+import { RecordingComparison } from './RecordingComparison'
+import { classroomMessage } from '../lib/classroomMessages'
 import { uiText } from '../lib/uiText'
 import { RecordingPlayer } from './RecordingPlayer'
 import { ArrowCounterClockwise, Microphone, StopCircle } from '@phosphor-icons/react'
@@ -28,6 +30,8 @@ function formatDuration(milliseconds: number) {
 }
 
 export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, locale = 'zh-TW' }: Props) {
+  const [retryForId, setRetryForId] = useState('')
+  const retrying = response && retryForId === response.id && question.status === 'active'
   const [recording, setRecording] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -140,13 +144,15 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
   }
 
-  if (response) {
+  if (response && !retrying) {
     const originalAnalysis = response.analysis_json
     const analysis = localizedFields(originalAnalysis?.translations, locale) || originalAnalysis
     return (
       <div className="audio-response-card" aria-live="polite">
+        <RecordingComparison response={response} locale={locale} student />
+        {question.type === 'pronunciation' && question.status === 'active' && (response.attempt_number || 1) < 2 && response.analysis_status !== 'pending' && <button type="button" className="ghost-button" disabled={busy} onClick={() => setRetryForId(response.id)}><ArrowCounterClockwise size={17} />{classroomMessage(locale, 'secondAttempt')}</button>}
         {response.translation_status && <p className="muted">{participantText(locale, response.translation_status === 'pending' ? 'translating' : 'translationUnavailable')}</p>}
-        {question.status === 'active' ? (
+        {question.status === 'active' && question.type !== 'pronunciation' ? (
           <div className="audio-sent-row">
             <p className="success">{participantText(locale, 'recordingSent')}</p>
             {response.signed_url && <RecordingPlayer recording={response} locale={locale} student />}
@@ -192,6 +198,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
 
   return (
     <div className="audio-recorder">
+      {response && <p>{classroomMessage(locale, 'attemptScore', { n: 1, score: response.score ?? '—' })}</p>}
       <p className="muted">{answerSeconds === null
         ? participantText(locale, 'recordingHint')
         : prepareSeconds === null
@@ -205,7 +212,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
       )}
       <button
         className={recording ? 'recording-button active' : 'recording-button'}
-        disabled={busy || processing || preparing}
+        disabled={busy || processing || preparing || (!recording && question.status !== 'active')}
         type="button"
         onClick={recording ? stopRecording : prepareSeconds ? () => setPrepareLeft(prepareSeconds) : startRecording}
       >

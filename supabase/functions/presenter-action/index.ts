@@ -1,3 +1,5 @@
+import { readingQuizFailureMessage } from '../_shared/reading-failure.ts'
+import { recordingForClient } from '../_shared/recording-results.ts'
 import { notifyHandsLowered } from '../_shared/classroom-sync.ts'
 import { activityTitle } from '../_shared/activity-language.ts'
 import { quizGenerationFailed } from '../_shared/quiz-state.ts'
@@ -2591,9 +2593,9 @@ Deno.serve(async (req) => {
         .select('status,type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
       if (playbackError) throw playbackError
       if (!playbackQuestion || !['pronunciation', 'oral_response'].includes(playbackQuestion.type)) return jsonResponse({ message: '找不到錄音題目。' }, 404)
-      if (playbackQuestion.status === 'active') return jsonResponse({ message: '請先停止作答。' }, 409)
+      if (playbackQuestion.status === 'active' && playbackQuestion.type !== 'pronunciation') return jsonResponse({ message: '請先停止作答。' }, 409)
       const { data: response, error } = await supabase.from('audio_responses')
-        .select('storage_path').eq('id', responseId).eq('session_id', sessionId).eq('question_id', questionId).maybeSingle()
+        .select('id,storage_path,previous_attempt').or(`id.eq.${responseId},previous_attempt->>id.eq.${responseId}`).eq('session_id', sessionId).eq('question_id', questionId).maybeSingle()
       if (error) throw error
       if (!response) return jsonResponse({ message: '找不到錄音。' }, 404)
       const { data: signed, error: signError } = await supabase.storage.from('lingoact-recordings').createSignedUrl(response.storage_path, 3600)
@@ -2614,30 +2616,26 @@ Deno.serve(async (req) => {
       if (!question || !['pronunciation', 'oral_response'].includes(question.type)) {
         return jsonResponse({ message: '找不到錄音題目。' }, 404)
       }
-      if (question.status === 'active') return jsonResponse({ responses: [] })
+      if (question.status === 'active' && question.type !== 'pronunciation') return jsonResponse({ responses: [] })
 
       const { data: responses, error } = await supabase
         .from('audio_responses')
-        .select('id, session_id, question_id, participant_id, participant_name, storage_path, mime_type, duration_ms, analysis_status, detected_language, transcript, score, analysis_json, error_message, submitted_at, analyzed_at')
+        .select('id, session_id, question_id, participant_id, participant_name, storage_path, mime_type, duration_ms, analysis_status, detected_language, transcript, score, analysis_json, error_message, submitted_at, analyzed_at, attempt_number, previous_attempt')
         .eq('question_id', questionId)
         .order('submitted_at')
       if (error) throw error
-      const signedResponses = await Promise.all((responses || []).map(async (response) => {
-        const { data: signed } = await supabase.storage.from('lingoact-recordings').createSignedUrl(response.storage_path, 3600)
-        const { storage_path: _storagePath, ...safeResponse } = response
-        return { ...safeResponse, signed_url: signed?.signedUrl || null }
-      }))
+      const signedResponses = await Promise.all((responses || []).map(response => recordingForClient(supabase, response)))
       return jsonResponse({ responses: signedResponses })
     }
 
     if (action === 'get_session_recording_results') {
       const { data: responses, error } = await supabase
         .from('audio_responses')
-        .select('id, session_id, question_id, participant_id, participant_name, mime_type, duration_ms, analysis_status, detected_language, transcript, score, analysis_json, error_message, submitted_at, analyzed_at')
+        .select('id, session_id, question_id, participant_id, participant_name, mime_type, duration_ms, analysis_status, detected_language, transcript, score, analysis_json, error_message, submitted_at, analyzed_at, attempt_number, previous_attempt')
         .eq('session_id', sessionId)
         .order('submitted_at')
       if (error) throw error
-      return jsonResponse({ responses: responses || [] })
+      return jsonResponse({ responses: (responses || []).map(({previous_attempt, ...response}) => ({...response, ...(previous_attempt ? { previous_attempt: { ...previous_attempt, storage_path: undefined, previous_attempt: undefined } } : {})})) })
     }
 
     if (action === 'grade_question') {
@@ -3264,7 +3262,7 @@ Deno.serve(async (req) => {
             // coming, with the vocabulary locked behind finishing it.
             await supabase.from('questions').update({
               type: 'reading',
-              prompt_text: classRow?.teaching_language === 'ja' ? '問題を生成できませんでした。本文を読むか、先生に再配信をお願いしてください。' : classRow?.teaching_language === 'en' ? 'The questions could not be generated. Read the passage, or ask your teacher to send the activity again.' : '這篇的題目沒有生成成功，可以直接讀，或請老師重新派送。',
+              prompt_text: readingQuizFailureMessage(classRow?.teaching_language, classRow?.level_framework, detail),
             }).eq('id', questionId)
           }
         }

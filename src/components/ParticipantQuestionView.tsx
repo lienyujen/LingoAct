@@ -1,3 +1,4 @@
+import { activityNotice } from '../lib/classroomMessages'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PaperPlaneTilt } from '@phosphor-icons/react'
@@ -66,7 +67,7 @@ export function ParticipantQuestionView({ question, answer, imageUrl, audioBusy,
   }
   const typeKey = typeTitles[question.type]
   const fallbackTitle = question.title || (typeKey ? participantText(locale, typeKey) : '')
-  const prompt = question.prompt_text || fallbackTitle || participantText(locale, 'interactiveQuestion')
+  const prompt = activityNotice(question.prompt_text || fallbackTitle || participantText(locale, 'interactiveQuestion'), locale)
   // Something to put away: 注音 set into the font, or 拼音 above the line.
   const hasReading = Boolean(readingFamily || question.reading_words?.length || question.reading_ruby?.length)
   const translatedOptions = question.options

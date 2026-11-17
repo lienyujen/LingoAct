@@ -1,3 +1,4 @@
+import { RecordingComparison } from './RecordingComparison'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RecordingPlayer } from './RecordingPlayer'
 import { CaretDown, CaretUp, CheckCircle, Clock, ClockCounterClockwise, MicrophoneStage } from '@phosphor-icons/react'
@@ -295,6 +296,7 @@ export function ParticipantQuestionHistory({ analyses,
                     ) : question.type === 'pronunciation' || question.type === 'oral_response' ? (
                       audio && <div className="participant-history-audio">
                         <p><MicrophoneStage size={17} />{participantText(locale, 'recordingSubmitted')}{audio.score !== null ? ` · ${audio.score} ${participantText(locale, 'points')}` : ''}</p>
+                        <RecordingComparison response={audio} locale={locale} student />
                         <RecordingPlayer recording={audio} locale={locale} student />
                         {audio.analysis_json?.summary && <p>{localizedFields(audio.analysis_json.translations, locale)?.summary || audio.analysis_json.summary}</p>}
                         {audio.transcript && <small>{participantText(locale, 'transcriptLabel')}{audio.transcript}</small>}

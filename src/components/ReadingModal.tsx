@@ -1,3 +1,4 @@
+import { reusableReadingWords } from '../lib/readingAnnotationReuse'
 import { accentChoices, speechAccent } from '../lib/speechAccent'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
@@ -248,9 +249,9 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
       if (written?.body && (annotation === 'zhuyin' || annotation === 'pinyin' || annotation === 'furigana')) {
         setStatus(t('readingAnnotating'))
         try {
-          const marked = annotation === 'furigana' && written.words?.length
+          const marked = (annotation === 'furigana' && written.words?.length) || (annotation === 'pinyin' && reusableReadingWords(written.body, written.words))
             ? { annotationText: '', words: written.words }
-            : await annotateReading({ sessionId, presenterToken, text: written.body, mode: annotation, accent, granularity: annotation === 'furigana' ? 'words' : undefined })
+            : await annotateReading({ sessionId, presenterToken, text: written.body, mode: annotation, accent, granularity: annotation === 'furigana' || annotation === 'pinyin' ? 'words' : undefined })
           await applyReadingAnnotation({
             sessionId,
             presenterToken,

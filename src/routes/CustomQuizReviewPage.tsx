@@ -250,6 +250,7 @@ export function CustomQuizReviewPage() {
     onUpdateAnswer: updateAnswer,
     showAnswers,
     writing: Boolean(writing),
+    anonymousEnabled: results?.anonymousEnabled ?? true,
   } : null
 
   return (

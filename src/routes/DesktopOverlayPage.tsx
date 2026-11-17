@@ -228,13 +228,30 @@ export function DesktopOverlayPage() {
       // The presenter owns the close button for the whole round. Once the
       // buzzer opened this window used to become click-through, so the X was
       // still visible but could no longer receive a click.
-      || isBuzzerPending(buzzerEvent),
+      || isBuzzerPending(buzzerEvent)
+      || (session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer'),
     )
     void window.lingoActDesktop?.setLotteryInteraction(interactive)
     return () => {
       if (interactive) void window.lingoActDesktop?.setLotteryInteraction(false)
     }
-  }, [buzzerEvent, lotteryEvent])
+  }, [buzzerEvent, lotteryEvent, session?.sentence_wall_enabled, wallQuestion?.type])
+
+  const wallVisible = Boolean(session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer')
+  useEffect(() => {
+    void window.lingoActDesktop?.setSentenceWallVisible?.(wallVisible)
+    return () => { if (wallVisible) void window.lingoActDesktop?.setSentenceWallVisible?.(false) }
+  }, [wallVisible])
+
+  async function closeSentenceWall() {
+    const presenterToken = getPresenterToken(sessionId)
+    if (!presenterToken) throw new Error(t('noControlRights'))
+    const { error } = await requireSupabase().functions.invoke('presenter-action', {
+      body: { action: 'update_session', sessionId, presenterToken, sentenceWallEnabled: false },
+    })
+    if (error) throw error
+    setSession(current => current ? { ...current, sentence_wall_enabled: false } : current)
+  }
 
   useEffect(() => {
     if (!buzzerEvent || buzzerEvent.payload.finalized || buzzerEvent.payload.cancelled) return
@@ -306,6 +323,7 @@ export function DesktopOverlayPage() {
           anonymousEnabled={session.anonymous_enabled}
           answers={wallAnswers}
           question={wallQuestion}
+          onClose={closeSentenceWall}
         />
       )}
       <LotteryOverlay event={lotteryEvent} onSelect={selectLotteryCandidate} />

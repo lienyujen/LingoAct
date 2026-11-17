@@ -599,14 +599,23 @@ export function PresenterPage() {
     }
   }, [session])
 
+  const wallProjected = Boolean(window.lingoActDesktop && session?.sentence_wall_enabled && questions.some(item => item.id === session.current_question_id && item.type === 'short_answer'))
+  const wasWallProjected = useRef(false)
+  useEffect(() => {
+    if (wallProjected) setControlsOpen(false)
+    else if (wasWallProjected.current) setControlsOpen(true)
+    wasWallProjected.current = wallProjected
+  }, [wallProjected])
+
   useEffect(() => {
     if (!window.lingoActDesktop || !session?.id || selectionMode) return
     window.lingoActDesktop.setPresenterExpanded(
-      controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen || photoTaskOpen || readingOpen,
+      wallProjected ? false
+        : controlsOpen || editorOpen || textDispatchOpen || settingsOpen || endClassConfirmOpen || closeConfirmOpen || fileTransferOpen || listeningOpen || pictureOpen || sentenceWallOpen || photoTaskOpen || readingOpen,
       settingsOpen,
       editorOpen || fileTransferOpen,
     )
-  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, readingOpen, selectionMode, sentenceWallOpen, session?.id, settingsOpen, textDispatchOpen])
+  }, [closeConfirmOpen, controlsOpen, editorOpen, endClassConfirmOpen, fileTransferOpen, listeningOpen, photoTaskOpen, pictureOpen, readingOpen, selectionMode, sentenceWallOpen, session?.id, wallProjected, settingsOpen, textDispatchOpen])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !sessionId) return

@@ -1,4 +1,5 @@
 import { uiText } from '../lib/uiText'
+import { RecordingPlayer } from './RecordingPlayer'
 import { ArrowCounterClockwise, Microphone, StopCircle } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { recordingToWav } from '../lib/audio'
@@ -28,6 +29,7 @@ function formatDuration(milliseconds: number) {
 
 export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, locale = 'zh-TW' }: Props) {
   const [recording, setRecording] = useState(false)
+  const [processing, setProcessing] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState('')
   // Counts down while the student plans; recording then begins on its own, which
@@ -42,6 +44,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
   const startedAtRef = useRef(0)
   const chunksRef = useRef<Blob[]>([])
   const cancelledRef = useRef(false)
+  const generationRef = useRef(0)
   const startRecordingRef = useRef<() => Promise<void>>(async () => {})
 
   function releaseMicrophone() {
@@ -51,6 +54,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
 
   useEffect(() => () => {
     cancelledRef.current = true
+    generationRef.current++
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
     releaseMicrophone()
   }, [question.id])
@@ -86,6 +90,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
     }
     try {
       cancelledRef.current = false
+      const generation = ++generationRef.current
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
       streamRef.current = stream
       const preferred = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((type) => MediaRecorder.isTypeSupported(type))
@@ -110,11 +115,15 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
           return
         }
         try {
+          setProcessing(true)
           const source = new Blob(chunksRef.current, { type: recorder.mimeType })
           const wav = await recordingToWav(source)
+          if (cancelledRef.current || generation !== generationRef.current) return
           await onSubmit(new File([wav], `lingoact-${question.id}.wav`, { type: 'audio/wav' }), durationMs)
         } catch (caught) {
-          setError(caught instanceof Error ? caught.message : '錄音處理失敗，請重新錄製。')
+          if (!cancelledRef.current && generation === generationRef.current) setError(caught instanceof Error ? caught.message : '錄音處理失敗，請重新錄製。')
+        } finally {
+          if (generation === generationRef.current) setProcessing(false)
         }
       }
       startedAtRef.current = Date.now()
@@ -140,7 +149,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
         {question.status === 'active' ? (
           <div className="audio-sent-row">
             <p className="success">{participantText(locale, 'recordingSent')}</p>
-            {response.signed_url && <audio controls preload="metadata" src={response.signed_url} />}
+            {response.signed_url && <RecordingPlayer recording={response} locale={locale} student />}
             <button className="ghost-button" disabled={busy} type="button" onClick={() => void onDiscard()}>
               <ArrowCounterClockwise size={17} />{participantText(locale, 'recordAgain')}
             </button>
@@ -155,7 +164,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
               <div className="audio-score"><strong>{analysis.score}</strong><span>{participantText(locale, 'points')}</span></div>
             </div>
             <p className="audio-feedback-summary">{analysis.summary}</p>
-            {response.signed_url && <audio controls preload="metadata" src={response.signed_url} />}
+            <RecordingPlayer recording={response} locale={locale} student />
             <div className="audio-analysis-grid">
               <div><strong>{participantText(locale, 'relevance')}</strong><p>{analysis.relevance}</p></div>
               <div><strong>{participantText(locale, 'clarity')}</strong><p>{analysis.clarity}</p></div>
@@ -196,14 +205,14 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
       )}
       <button
         className={recording ? 'recording-button active' : 'recording-button'}
-        disabled={busy || preparing}
+        disabled={busy || processing || preparing}
         type="button"
         onClick={recording ? stopRecording : prepareSeconds ? () => setPrepareLeft(prepareSeconds) : startRecording}
       >
-        {recording ? <StopCircle size={28} /> : busy ? <ArrowCounterClockwise className="spin" size={28} /> : <Microphone size={28} />}
+        {recording ? <StopCircle size={28} /> : busy || processing ? <ArrowCounterClockwise className="spin" size={28} /> : <Microphone size={28} />}
         <span>{recording
           ? `${participantText(locale, 'stopRecording')} ${formatDuration(remainingMs ?? elapsed)}${remainingMs === null ? '' : ' ' + participantText(locale, 'recordingLeft')}`
-          : busy
+          : busy || processing
             ? participantText(locale, 'uploading')
             : preparing
               ? participantText(locale, 'preparing')

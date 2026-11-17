@@ -1,4 +1,6 @@
 import { uiText } from '../lib/uiText'
+import { prepareStudentImage } from '../lib/studentImages'
+import { classroomMessage } from '../lib/classroomMessages'
 import { DownloadSimple, Image, Link, Microphone, Paperclip, Pencil, PencilLine, Square, TextT, Trash } from '@phosphor-icons/react'
 import { BoardDrawing } from './BoardDrawing'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -187,6 +189,7 @@ export function ParticipantBoard({ locale, locked, participant, participantToken
   }
 
   const upload = useCallback(async (kind: BoardPostKind, file: File, durationMs?: number) => {
+    if (kind === 'image' || kind === 'file') file = await prepareStudentImage(file)
     const prepared = await invoke({
       action: 'prepare_board_upload',
       questionId: question.id,
@@ -215,8 +218,10 @@ export function ParticipantBoard({ locale, locked, participant, participantToken
     try {
       await upload(kind, file)
       setComposing(null)
-    } catch {
-      setError(full ? participantText(locale, 'boardFull') : participantText(locale, 'boardOpenFailed'))
+    } catch (caught) {
+      setError(caught instanceof Error && caught.message.startsWith('PHOTO_')
+        ? classroomMessage(locale, caught.message === 'PHOTO_TOO_LARGE' ? 'photoTooLarge' : 'photoConvertFailed')
+        : full ? participantText(locale, 'boardFull') : participantText(locale, 'boardOpenFailed'))
     } finally {
       setBusy(false)
     }

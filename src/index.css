@@ -6161,6 +6161,16 @@ h2 {
 }
 
 .sentence-wall-head { display: flex; align-items: baseline; gap: 18px; }
+.sentence-wall-close { pointer-events: auto; flex-shrink: 0; align-self: flex-start; display: grid; place-items: center; width: 46px; height: 46px; padding: 8px; color: inherit; background: rgb(255 255 255 / 12%); border: 1px solid currentColor; border-radius: 12px; }
+.recording-player { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.recording-player audio { max-width: 100%; }
+.recording-player p { flex-basis: 100%; }
+.quiz-item-responses { min-width: 0; margin: 10px 0; }
+.quiz-item-responses details, .quiz-student-details { margin: 8px 0; }
+.quiz-item-student-list { display: grid; gap: 8px; margin: 8px 0; }
+.quiz-item-student-list article { border: 1px solid var(--border); padding: 10px; border-radius: 10px; min-width: 0; }
+.quiz-item-student-list header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.quiz-item-student-list p, .quiz-student-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .sentence-wall-head h1 {
   margin: 0; flex-grow: 1;
   font-size: clamp(22px, 2.6vw, 40px); font-weight: 800; line-height: 1.35;

@@ -9,6 +9,8 @@ import { QuestionActivityStatus } from './QuestionActivityStatus'
 import { InteractionResults } from './InteractionResults'
 import { ListeningPlayer } from './ListeningPlayer'
 import { ReadingPassageView } from './ReadingPassageView'
+import { QuizItemResponses } from './QuizItemResponses'
+import { classroomMessage } from '../lib/classroomMessages'
 
 type Props = {
   anonymousEnabled: boolean
@@ -32,6 +34,7 @@ type Props = {
 }
 
 export type QuizReviewProps = {
+  anonymousEnabled?: boolean
   // Hidden by default: the presenter reviews these on a screen the class can see.
   showAnswers: boolean
   // A writing exercise has no answer key to reveal or correct, so the review
@@ -48,10 +51,13 @@ function acceptedAnswersFor(results: PresenterQuizResults, itemId: string) {
   return results.keys.find((key) => key.item_id === itemId)?.accepted_answers || []
 }
 
-export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswers, results, onDraftChange, onUpdateAnswer }: QuizReviewProps) {
+export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswers, results, onDraftChange, onUpdateAnswer, anonymousEnabled = true }: QuizReviewProps) {
   const t = usePresenterText()
+  const locale = usePresenterLocale()
+  const [namesVisible, setNamesVisible] = useState<boolean | null>(null)
   return (
     <div className="presenter-quiz-review-list">
+      {!writing && <label className="show-answers-toggle"><input type="checkbox" checked={namesVisible ?? !anonymousEnabled} onChange={event => setNamesVisible(event.target.checked)} />{classroomMessage(locale, 'showNames')}</label>}
       {results.items.map((item, index) => {
         const acceptedAnswers = acceptedAnswersFor(results, item.id)
         return (
@@ -61,6 +67,7 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
               <strong>{item.prompt_text}</strong>
               {!writing && <small>{t('points', { n: item.points })}</small>}
             </div>
+            {!writing && <QuizItemResponses results={results} itemId={item.id} anonymousEnabled={!(namesVisible ?? !anonymousEnabled)} />}
             {writing ? null : item.type === 'matching' ? (
               !showAnswers ? (
                 <p className="muted presenter-answer-hidden">{t('matchingAnswerHidden')}</p>
@@ -370,6 +377,7 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   }
 
   const reviewProps: QuizReviewProps = {
+    anonymousEnabled,
     showAnswers,
     writing,
     busyItemId,
@@ -521,6 +529,18 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
                   ? `${attempt.total_score}/${attempt.max_score}`
                   : attempt.status === 'failed' ? t('gradeFailed') : t('grading')}</span>
             </div>
+            {!writing && !flashcard && <details className="quiz-student-details">
+              <summary>{classroomMessage(locale, 'answerDetails')}</summary>
+              {results.items.map((item, itemIndex) => {
+                const answer = (answersByAttempt.get(attempt.id) || []).find(value => value.item_id === item.id)
+                return <div className="quiz-written-answer" key={item.id}>
+                  <strong>{itemIndex + 1}. {item.prompt_text}</strong>
+                  <p>{answer?.answer_values?.length ? answer.answer_values.join(' → ') : answer?.answer_text || classroomMessage(locale, 'noAnswer')}</p>
+                  <span>{answer?.score === null || answer?.score === undefined ? classroomMessage(locale, 'pending') : `${answer.score}/${item.points}`}</span>
+                  {answer?.feedback && <p className="muted">{locale === 'en' ? answer.feedback.en || answer.feedback.zh_tw : answer.feedback.zh_tw || answer.feedback.en}</p>}
+                </div>
+              })}
+            </details>}
             {/* The writing itself is the result here — a score would be the one
                 thing the teacher did not ask for, and the words are the thing
                 they did. */}

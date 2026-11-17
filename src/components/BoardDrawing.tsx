@@ -1,4 +1,5 @@
 import { uiText } from '../lib/uiText'
+import { prepareStudentImage } from '../lib/studentImages'
 import { ArrowCounterClockwise, Camera, Check, Cursor, Eraser, Pen, TextT, Trash, X } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { participantText } from '../lib/participantI18n'
@@ -208,13 +209,15 @@ export function BoardDrawing({ busy, locale, backgroundUrl, onSubmit }: Props) {
 
   async function importImage(file: File) {
     if (busy || importing) return
-    if (!file.type.startsWith('image/')) { setImageError(participantText(locale, 'drawImportFailed')); return }
+    if (!file.type.startsWith('image/') && !/\.(hei[cf]|jpe?g|png|webp|bmp|avif)$/i.test(file.name)) { setImageError(participantText(locale, 'drawImportFailed')); return }
     if (file.size > 20 * 1024 * 1024) { setImageError(participantText(locale, 'drawImportTooLarge')); return }
     const request = ++importRequest.current
-    const url = URL.createObjectURL(file)
+    let url = ''
     setImporting(true)
     setImageError('')
     try {
+      const converted = await prepareStudentImage(file)
+      url = URL.createObjectURL(converted)
       const image = new Image()
       image.src = url
       await image.decode()

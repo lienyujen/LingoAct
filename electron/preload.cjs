@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('lingoActDesktop', {
   enterPresenterMode: (sessionId) => ipcRenderer.invoke('window:presenter-mode', sessionId),
   setPresenterExpanded: (expanded, settingsOpen = false, interactiveOpen = false) => ipcRenderer.invoke('window:set-expanded', expanded, settingsOpen, interactiveOpen),
   setLotteryInteraction: (enabled) => ipcRenderer.invoke('lottery:set-interactive', enabled),
+  setSentenceWallVisible: (visible) => ipcRenderer.invoke('sentence-wall:set-visible', visible),
   showLottery: (event) => ipcRenderer.invoke('lottery:show', event),
   getLatestLottery: () => ipcRenderer.invoke('lottery:get-latest'),
   onLottery: (callback) => {

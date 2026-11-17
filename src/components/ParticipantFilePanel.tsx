@@ -1,4 +1,6 @@
 import { uiText } from '../lib/uiText'
+import { prepareStudentImage } from '../lib/studentImages'
+import { classroomMessage } from '../lib/classroomMessages'
 import { useEffect, useRef, useState } from 'react'
 import { Camera, CircleNotch, DownloadSimple, FileArrowUp, PencilLine, Sparkle, UploadSimple } from '@phosphor-icons/react'
 import { BoardDrawing } from './BoardDrawing'
@@ -294,7 +296,8 @@ export function ParticipantFileUpload({
     setError('')
     const supabase = requireSupabase()
     try {
-      for (const file of files) {
+      for (const original of files) {
+        const file = await prepareStudentImage(original)
         const { data: prepared, error: prepareError } = await supabase.functions.invoke('participant-action', {
           body: {
             action: 'prepare_file_upload',
@@ -341,7 +344,9 @@ export function ParticipantFileUpload({
         setUploaded((current) => (drawing ? [item] : [...current, item]))
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : participantText(locale, 'uploadFailed'))
+      setError(caught instanceof Error && caught.message.startsWith('PHOTO_')
+        ? classroomMessage(locale, caught.message === 'PHOTO_TOO_LARGE' ? 'photoTooLarge' : 'photoConvertFailed')
+        : caught instanceof Error ? caught.message : participantText(locale, 'uploadFailed'))
       return false
     } finally {
       setBusy(false)

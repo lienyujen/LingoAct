@@ -329,6 +329,7 @@ function scheduleFollowControlDisplay() {
 }
 
 function closeOverlayWindow() {
+  sentenceWallVisible = false
   stopOverlayKeepAlive()
   const target = overlayWindow
   overlayWindow = null
@@ -771,12 +772,20 @@ ipcMain.handle('bopomofo:subset', async (_event, text) => {
   }
 })
 
+let sentenceWallVisible = false
 ipcMain.handle('window:set-expanded', (_event, expanded, settingsOpen = false, interactiveOpen = false) => {
   // Reapplying always-on-top closes native Windows select popups. Temporarily
   // suspend the presenter topmost reinforcement while settings are interactive.
   setPresenterTopmost(!(settingsOpen || interactiveOpen))
-  setControlBounds(Boolean(expanded), false, settingsOpen)
+  setControlBounds(sentenceWallVisible ? false : Boolean(expanded), sentenceWallVisible, sentenceWallVisible ? false : settingsOpen)
   setTimeout(() => bringControlToFront(false), 30)
+})
+
+ipcMain.handle('sentence-wall:set-visible', (event, visible) => {
+  if (!overlayWindow || event.sender !== overlayWindow.webContents) return
+  sentenceWallVisible = Boolean(visible)
+  setControlBounds(!sentenceWallVisible, sentenceWallVisible)
+  if (!sentenceWallVisible) bringControlToFront(false)
 })
 
 ipcMain.handle('lottery:set-interactive', (_event, enabled) => {

@@ -2,11 +2,15 @@ import { sentencePages } from '../lib/classroomProjection'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Answer, Question } from '../types'
 import { usePresenterText } from '../lib/presenterI18n'
+import { usePresenterLocale } from '../lib/presenterI18n'
+import { classroomMessage } from '../lib/classroomMessages'
+import { X } from '@phosphor-icons/react'
 
 type Props = {
   question: Question | null
   answers: Answer[]
   anonymousEnabled: boolean
+  onClose?: () => Promise<void>
 }
 
 // 即時造句牆 on the projector: everyone's sentence, as it arrives.
@@ -21,8 +25,18 @@ function sizeClass(count: number) {
   return 'is-packed'
 }
 
-export function SentenceWallOverlay({ question, answers, anonymousEnabled }: Props) {
+export function SentenceWallOverlay({ question, answers, anonymousEnabled, onClose }: Props) {
   const t = usePresenterText()
+  const locale = usePresenterLocale()
+  const [closing, setClosing] = useState(false)
+  const [error, setError] = useState('')
+
+  async function closeWall() {
+    if (!onClose || closing) return
+    setClosing(true)
+    setError('')
+    try { await onClose() } catch { setError(t('actionFailed')) } finally { setClosing(false) }
+  }
   // Which cards are new since the last render, so they can arrive rather than
   // appear. Held in a ref because it must not itself cause a render.
   const seenRef = useRef<Set<string>>(new Set())
@@ -58,9 +72,11 @@ export function SentenceWallOverlay({ question, answers, anonymousEnabled }: Pro
   return (
     <div className="sentence-wall">
       <header className="sentence-wall-head">
+        {onClose && <button className="sentence-wall-close" type="button" aria-label={classroomMessage(locale, 'closeWall')} disabled={closing} onClick={() => void closeWall()}><X size={24} /></button>}
         <h1>{question.prompt_text || question.title}</h1>
         <span className="sentence-wall-count">{sentences.length}{pages.length > 1 && ` · ${(pageIndex % pages.length) + 1}/${pages.length}`}</span>
       </header>
+      {error && <p role="alert">{error}</p>}
       {sentences.length === 0 ? (
         <p className="sentence-wall-waiting">{t('waitingForSentences')}</p>
       ) : (

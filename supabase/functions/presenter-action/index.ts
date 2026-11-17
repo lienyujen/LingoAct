@@ -2584,6 +2584,23 @@ Deno.serve(async (req) => {
       return jsonResponse({ question })
     }
 
+    if (action === 'get_recording_playback') {
+      const { responseId, questionId } = input
+      if (!validUuid(responseId) || !validUuid(questionId)) return jsonResponse({ message: '錄音資料格式不正確。' }, 400)
+      const { data: playbackQuestion, error: playbackError } = await supabase.from('questions')
+        .select('status,type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
+      if (playbackError) throw playbackError
+      if (!playbackQuestion || !['pronunciation', 'oral_response'].includes(playbackQuestion.type)) return jsonResponse({ message: '找不到錄音題目。' }, 404)
+      if (playbackQuestion.status === 'active') return jsonResponse({ message: '請先停止作答。' }, 409)
+      const { data: response, error } = await supabase.from('audio_responses')
+        .select('storage_path').eq('id', responseId).eq('session_id', sessionId).eq('question_id', questionId).maybeSingle()
+      if (error) throw error
+      if (!response) return jsonResponse({ message: '找不到錄音。' }, 404)
+      const { data: signed, error: signError } = await supabase.storage.from('lingoact-recordings').createSignedUrl(response.storage_path, 3600)
+      if (signError) throw signError
+      return jsonResponse({ signed_url: signed.signedUrl })
+    }
+
     if (action === 'get_recording_results') {
       const questionId = input.questionId
       if (!validUuid(questionId)) return jsonResponse({ message: '題目資料格式不正確。' }, 400)

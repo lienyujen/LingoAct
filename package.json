@@ -57,6 +57,7 @@
     "@supabase/supabase-js": "^2.110.8",
     "d3-cloud": "1.2.9",
     "exceljs": "^4.4.0",
+    "heic-to": "1.6.7",
     "html2canvas": "^1.4.1",
     "opencc-js": "1.4.1",
     "qrcode.react": "^4.2.0",

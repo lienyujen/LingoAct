@@ -1,4 +1,5 @@
 import { uiText } from '../lib/uiText'
+import { RecordingPlayer } from './RecordingPlayer'
 import { ArrowCounterClockwise, ArrowsOut, CaretLeft, CaretRight, CheckCircle, CircleNotch, DiceFive, DownloadSimple, Eye, EyeSlash, Faders, FileArrowUp, Play, Sparkle, Square, Waveform, X, XSquare } from '@phosphor-icons/react'
 import { createPortal } from 'react-dom'
 import { BoardWall } from './BoardWall'
@@ -17,7 +18,7 @@ import { FileTypeIcon } from './FileTypeIcon'
 import { createZip, safeFileName, uniqueName } from '../lib/zip'
 import type { ZipEntry } from '../lib/zip'
 import { answerDeadline, useSecondsLeft } from '../lib/questionTiming'
-import { usePresenterText } from '../lib/presenterI18n'
+import { usePresenterText, usePresenterLocale } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 import type { Answer, AudioResponse, FileResponse, Question, QuestionAnalysis } from '../types'
 import { QuestionActivityStatus } from './QuestionActivityStatus'
@@ -765,6 +766,7 @@ function BoardResults(props: Props & { question: Question }) {
 
 export function QuestionResult(props: Props) {
   const t = usePresenterText()
+  const locale = usePresenterLocale()
   const { anonymousEnabled, question, answers, audioResponses, analysis, onSetCorrectAnswer } = props
 
   if (!question) {
@@ -875,7 +877,7 @@ export function QuestionResult(props: Props) {
                     <strong>{anonymousEnabled ? t('anonymousAnswer', { n: index + 1 }) : response.participant_name}</strong>
                     {typeof response.score === 'number' && <span className="audio-result-score">{t('points', { n: response.score })}</span>}
                   </div>
-                  {response.signed_url && <audio controls preload="metadata" src={response.signed_url} />}
+                  <RecordingPlayer recording={response} locale={locale} />
                   {response.analysis_status === 'success' && result ? (
                     <>
                       <p className="audio-feedback-summary">{result.summary}</p>

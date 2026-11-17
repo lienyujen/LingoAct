@@ -23,6 +23,7 @@ declare global {
       enterPresenterMode: (sessionId: string) => Promise<void>
       setPresenterExpanded: (expanded: boolean, settingsOpen?: boolean, interactiveOpen?: boolean) => Promise<void>
       setLotteryInteraction: (enabled: boolean) => Promise<void>
+      setSentenceWallVisible?: (visible: boolean) => Promise<void>
       showLottery: (event: SessionEvent) => Promise<void>
       getLatestLottery: () => Promise<SessionEvent | null>
       onLottery: (callback: (event: SessionEvent) => void) => () => void

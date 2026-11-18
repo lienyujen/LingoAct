@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('code, short_join_url, teaching_language')
+      .select('code, short_join_url, short_join_target, teaching_language')
       .eq('id', sessionId)
       .single()
     if (sessionError) throw sessionError
@@ -55,18 +55,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: '國語文場次請使用正式學生站網址。' }, 400)
     }
 
-    if (guoyu && /^https:\/\/reurl\.cc\/[a-z0-9]+$/i.test(session.short_join_url || '')) {
-      // Older Guoyu builds may have shortened a preview URL into this column.
-      try {
-        const redirect = await fetch(session.short_join_url, { redirect: 'manual', signal: AbortSignal.timeout(3500) })
-        const destination = redirect.headers.get('location')
-        await redirect.body?.cancel()
-        if (redirect.status >= 300 && redirect.status < 400 && destination === longUrl) {
-          return jsonResponse({ shortUrl: session.short_join_url, cached: true, destination: longUrl })
-        }
-      } catch {
-        // Reurl can still return a new link if the old link is unavailable.
-      }
+    // Legacy cached links have no recorded target and may point at a preview.
+    if (guoyu && session.short_join_url && session.short_join_target === longUrl) {
+      return jsonResponse({ shortUrl: session.short_join_url, cached: true, destination: longUrl })
     }
 
     const apiKey = Deno.env.get('REURL_API_KEY')
@@ -87,7 +78,7 @@ Deno.serve(async (req) => {
     }
 
     const shortUrl = result.short_url.startsWith('http') ? result.short_url : `https://${result.short_url}`
-    const { error: updateError } = await supabase.from('sessions').update({ short_join_url: shortUrl }).eq('id', sessionId)
+    const { error: updateError } = await supabase.from('sessions').update({ short_join_url: shortUrl, ...(guoyu ? { short_join_target: longUrl } : {}) }).eq('id', sessionId)
     if (updateError) throw updateError
 
     return jsonResponse({ shortUrl, cached: false, ...(guoyu ? { destination: longUrl } : {}) })

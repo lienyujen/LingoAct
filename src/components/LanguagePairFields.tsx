@@ -123,7 +123,7 @@ export function LanguagePairFields({
             {choices.length > 1 ? <em>{uiText(framework.name)}</em> : <em>{t('levelFromTrack', { name: uiText(framework.name) })}</em>}
           </span>
           <div className={activeId === 'toeic' ? 'toeic-level-groups' : 'language-pair-options'}>
-            {activeId !== 'hsk' && track.id !== 'en' && track.id !== 'ja' && <button
+            {activeId !== 'hsk' && track.id !== 'en' && track.id !== 'ja' && track.id !== 'guoyu' && <button
               aria-pressed={!levelCode}
               className={!levelCode ? 'language-chip selected' : 'language-chip'}
               type="button"

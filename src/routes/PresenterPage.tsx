@@ -27,6 +27,7 @@ import type { QuestionDraft } from '../components/QuestionEditor'
 import type { QuestionType, QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
+import { HandwritingResults } from '../components/HandwritingResults'
 import { QuestionResult } from '../components/QuestionResult'
 import { PresenterQuestionClock } from '../components/PresenterQuestionClock'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
@@ -599,7 +600,7 @@ export function PresenterPage() {
     }
   }, [session])
 
-  const wallProjected = Boolean(window.lingoActDesktop && session?.sentence_wall_enabled && questions.some(item => item.id === session.current_question_id && item.type === 'short_answer'))
+  const wallProjected = Boolean(window.lingoActDesktop && session?.sentence_wall_enabled && questions.some(item => item.id === session.current_question_id && item.type === 'short_answer' && item.teaching_mode !== 'reading_evidence'))
   const wasWallProjected = useRef(false)
   useEffect(() => {
     if (wallProjected) setControlsOpen(false)
@@ -2315,6 +2316,7 @@ export function PresenterPage() {
           }} />}
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
+            writingContext={{ track: session.teaching_language, framework: session.level_framework, level: session.level_code }}
             anonymousEnabled={session.anonymous_enabled}
             isCurrentQuestion={question?.id === session.current_question_id}
             onlineCount={onlineParticipants.length}
@@ -2363,6 +2365,11 @@ export function PresenterPage() {
             />
           ) : undefined}
         />}
+        {question && ['custom_quiz', 'reading'].includes(question.type) && session.teaching_language === 'guoyu'
+          && session.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '') && (
+          <HandwritingResults key={question.id} sessionId={sessionId} questionId={question.id}
+            presenterToken={getPresenterToken(sessionId) || ''} />
+        )}
         {session.exit_ticket_prompt && session.exit_ticket_category && (
           <ExitTicketResult
             anonymousEnabled={session.anonymous_enabled}
@@ -2413,6 +2420,7 @@ export function PresenterPage() {
         </div>
       )}
       <ReadingModal
+        allowEvidence={session.teaching_language === 'guoyu'}
         teachingLanguage={resolveTrack(session.teaching_language).language}
         framework={session.level_framework}
         annotation={classAnnotation(session)}

@@ -5,7 +5,7 @@
 // material, the client never needs it, and one copy cannot drift from itself.
 
 import { KANA_LEVELS, JF_LEVELS } from '../../supabase/functions/_shared/japanese.ts'
-export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'kana' | 'jf' | 'topik' | 'ivpt'
+export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'collegeChinese' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'kana' | 'jf' | 'topik' | 'ivpt'
 
 export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: { code: string; label: string }[] }[] = [
   { id: 'kana', name: '假名入門', short: '假名入門', levels: KANA_LEVELS.map(({ code, label }) => ({ code, label })) },
@@ -37,6 +37,10 @@ export const FRAMEWORKS: { id: Framework; name: string; short: string; levels: {
       { code: 'h3', label: '高中三年級' },
     ],
   },
+  { id: 'collegeChinese', name: '大學國文', short: '大學國文', levels: [
+    { code: 'freshman', label: '大一國文' },
+    { code: 'advanced', label: '大學進階國文' },
+  ] },
   {
     id: 'tbcl',
     name: '臺灣華語文能力基準 TBCL',

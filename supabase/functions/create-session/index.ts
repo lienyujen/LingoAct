@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
       ? input.readingAnnotation as string
       : track.id === 'guoyu' ? 'zhuyin' : 'none'
     if (levelFramework === 'hsk' && !levelCode) return jsonResponse({ message: '请选择 HSK 级别。 / Choose an HSK level.' }, 400)
+    if (teachingTrack === 'guoyu' && !levelCode) return jsonResponse({ message: '請選擇國語文年級或大學國文級別。' }, 400)
     if (teachingTrack === 'en' && !levelCode) return jsonResponse({ message: 'Choose a level for your English class.' }, 400)
     if (teachingTrack === 'ja' && !levelCode) return jsonResponse({ message: '学習範囲またはレベルを選んでください。' }, 400)
     const presenterToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')

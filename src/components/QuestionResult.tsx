@@ -1,3 +1,4 @@
+import { ReadingEvidenceComparison } from './ReadingEvidence'
 import { activityNotice } from '../lib/classroomMessages'
 import { RecordingComparison } from './RecordingComparison'
 import { uiText } from '../lib/uiText'
@@ -804,6 +805,17 @@ export function QuestionResult(props: Props) {
         <p className="muted">{t('listeningOnly')}</p>
       </section>
     )
+  }
+
+  if (question.teaching_mode === 'reading_evidence') {
+    return <section className="panel result-panel">
+      <div className="panel-heading">
+        <h2>圈選原文證據</h2>
+        <QuestionStatusActions {...props} question={question} />
+      </div>
+      <p>{question.prompt_text}</p>
+      <ReadingEvidenceComparison key={question.id} answers={answers} prompt={question.prompt_text || ''} />
+    </section>
   }
 
   if (question.type === 'short_answer') {

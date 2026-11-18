@@ -66,10 +66,10 @@ export const TEACHING_TRACKS: Record<string, TeachingTrack> = {
   },
   guoyu: {
     id: 'guoyu',
-    frameworks: ['guoyu108'],
+    frameworks: ['guoyu108', 'collegeChinese'],
     language: 'zh-tw',
     promptLanguage: 'Traditional Chinese as written in Taiwan (臺灣繁體中文)',
-    audience: 'The learners are native Mandarin-speaking schoolchildren in Taiwan following the 108 國語文 curriculum — 國語 in primary school, 國文 from junior high. Do not write as though for a foreign learner: never gloss ordinary words, and pitch the difficulty at what they can READ and WRITE at this stage rather than at what they can say.',
+    audience: 'Teach Taiwan 國語文: use the selected 108 curriculum school grade or the selected university Chinese level. Ignore Chinese-as-a-second-language templates, HSK/TBCL/TOCFL vocabulary and grammar bands, and foreign-learner analysis criteria. Assess comprehension, interpretation, use of textual evidence, and expression at the selected level. Preserve supplied classical text and edition when quoting it. Never reconstruct missing lines, invent readings, or assume a single correct literary interpretation without textual support.',
   },
   en: { id: 'en', frameworks: ['en108', 'cefr', 'gept', 'toeic'], language: 'en', promptLanguage: 'English', audience: 'The learners are studying English as an additional language. Follow their selected school curriculum, CEFR ability level, GEPT level or TOEIC target. Do not assume every learner has Mandarin as a first language. English passages, prompts, options, reference answers, target words and sentence patterns stay in English. Guidance and explanatory feedback follow the selected guidance language. Pronunciation focuses on intelligibility, word stress, sentence stress and connected speech; intelligible accepted American and British variants are not errors.' },
   ja: { id: 'ja', frameworks: ['jf', 'kana', 'jlpt'], language: 'ja', promptLanguage: 'Japanese (日本語)', audience: JAPANESE_TEACHING },
@@ -108,7 +108,9 @@ export const teachingTrackIds = new Set(Object.keys(TEACHING_TRACKS))
 export function trackInstruction(trackId: string | null | undefined) {
   const track = resolveTrack(trackId)
   return [
-    track.id === 'en'
+    track.id === 'guoyu'
+      ? 'Write teaching materials, tasks, answer keys, and teacher analysis in Taiwan Traditional Chinese. English is a separate student translation for EMI.'
+      : track.id === 'en'
       ? 'This is an English class. Every teaching passage, question, option, task instruction and reference answer must remain in English, even when the teacher gives directions in another language. Only separate explanatory notes may use the selected guidance language.'
       : `This class is a ${track.promptLanguage} class. Every question, option, instruction and reference answer must be written in ${track.promptLanguage} unless the teacher's direction explicitly asks for another language.`,
     track.audience,

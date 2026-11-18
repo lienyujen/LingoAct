@@ -96,7 +96,7 @@ export function PresenterNewPage() {
   }
 
   function rememberCourse() {
-    if ((levelFramework === 'hsk' || teachingTrack === 'en' || teachingTrack === 'ja') && !levelCode) { setCourseNotice(t(teachingTrack === 'ja' ? 'japaneseLevelRequired' : teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired')); return }
+    if ((levelFramework === 'hsk' || teachingTrack === 'en' || teachingTrack === 'ja' || teachingTrack === 'guoyu') && !levelCode) { setCourseNotice(teachingTrack === 'guoyu' ? '請選擇國語文年級或大學國文級別。' : t(teachingTrack === 'ja' ? 'japaneseLevelRequired' : teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired')); return }
     if (!course.title) { setCourseNotice('請先填寫課程名稱。'); return }
     if (saveCoursePreset(course)) {
       setCourses(readCoursePresets())
@@ -121,8 +121,8 @@ export function PresenterNewPage() {
   async function createSession(event: FormEvent) {
     event.preventDefault()
     setError('')
-    if ((levelFramework === 'hsk' || teachingTrack === 'en' || teachingTrack === 'ja') && !levelCode) {
-      setError(t(teachingTrack === 'ja' ? 'japaneseLevelRequired' : teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired'))
+    if ((levelFramework === 'hsk' || teachingTrack === 'en' || teachingTrack === 'ja' || teachingTrack === 'guoyu') && !levelCode) {
+      setError(teachingTrack === 'guoyu' ? '請選擇國語文年級或大學國文級別。' : t(teachingTrack === 'ja' ? 'japaneseLevelRequired' : teachingTrack === 'en' ? 'englishLevelRequired' : 'hskLevelRequired'))
       setCourseSettingsOpen(true)
       return
     }

@@ -54,6 +54,7 @@ test('the actual vocabulary popup follows the passage script even when the stude
       if (name === '../lib/uiText') return { uiText: text => text }
       if (name === 'react') return { ...require(name), useState: initial => [initial === null ? { kind: 'word', entry } : typeof initial === 'function' ? initial() : initial, () => {}] }
       if (name === '@phosphor-icons/react') return { BookOpen: () => null, Translate: () => null, X: () => null }
+      if (name === './StrokePracticeLinks') return { StrokePracticeLinks: () => null }
       if (name === '../lib/readingFont') return { useReadingFont: () => null }
       if (name === '../lib/useReadingTranslation') return { useReadingTranslation: passage => ({ passage }) }
       if (name === '../lib/participantI18n') return { participantText: (_, key) => key, contentLocaleKey: value => value }

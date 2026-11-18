@@ -48,12 +48,14 @@ export async function synthesizeListening(input: {
   accent?: ListeningAccent | null
   script?: 'traditional' | 'simplified' | null
   speakers?: string[]
+  approvedOnly?: boolean
+  classicalVoice?: 'male' | 'female' | 'unknown'
   speakerGenders?: SpeakerGender[]
   screenshotId?: string | null
 }) {
   const { data, error } = await requireSupabase().functions.invoke('synthesize-listening', { body: input })
   if (error) throw new Error(await edgeFunctionErrorMessage(error, '語音合成失敗。'))
-  return data as { clip: PresenterListeningClip; reused: boolean }
+  return data as { clip: PresenterListeningClip; reused: boolean; approvedAudio?: boolean }
 }
 
 

@@ -85,7 +85,9 @@ Deno.serve(async (req) => {
       '',
       `The teacher chose ${requestedKind === 'dialogue' ? 'a dialogue' : 'a listening passage'}. Return exactly that kind; do not decide another format.`,
       'First read all useful information in the image, including printed text, labels, people, actions, objects and setting.',
-      'Then turn that source into natural listening material in the language being taught, at the class level above. Preserve the source meaning and facts, but rewrite vocabulary, sentence length and organisation when needed for the learners.',
+      teachingTrack === 'guoyu' && requestedKind === 'passage'
+        ? 'For classical poetry or prose, transcribe the visible original verbatim with original punctuation, variant characters and heading. Do not translate, modernize or fill gaps. For other sources, prepare a coherent 國語文 listening passage.'
+        : 'Then turn that source into natural listening material in the language being taught, at the class level above. Preserve the source meaning and facts, but rewrite vocabulary, sentence length and organisation when needed for the learners.',
       requestedKind === 'dialogue'
         ? 'Write a natural two-speaker dialogue. Prefix every turn with a short speaker name and a colon. List the same two names in speakers, in first-speaking order. Return one speaker_genders entry per speaker: boy or girl for a clearly child role, male or female for a clearly adult role, and unknown when age or gender is ambiguous. Use names, titles, roles, and visible people as evidence; never guess from an ambiguous name.'
         : 'Write one coherent passage that sounds natural when read aloud. Keep speakers and speaker_genders empty.',

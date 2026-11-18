@@ -5,6 +5,7 @@ import { englishTextRuns } from '../lib/englishText'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BookOpen, Translate, X } from '@phosphor-icons/react'
+import { StrokePracticeLinks } from './StrokePracticeLinks'
 import { useReadingFont } from '../lib/readingFont'
 import { contentLocaleKey, participantText } from '../lib/participantI18n'
 import type { ParticipantLocale } from '../lib/participantI18n'
@@ -12,6 +13,7 @@ import type { KaraokeCue, ReadingPassage, ReadingGrammar, ReadingVocabulary } fr
 
 type Props = {
   passage: ReadingPassage
+  strokePractice?: boolean
   learningCredentials?: LearningCredentials
   locale: ParticipantLocale
   // The capture the passage was written from, when the teacher chose to show
@@ -211,7 +213,7 @@ function glossFor(gloss: Record<string, string> | undefined, locale: Participant
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
 }
 
-export function ReadingPassageView({ passage: originalPassage, learningCredentials, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false }: Props) {
+export function ReadingPassageView({ passage: originalPassage, learningCredentials, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false, strokePractice = false }: Props) {
   // The student's own switches, separate from the teacher's. A teacher who
   // turned the grammar on wants it available; a reader who finds it busy can
   // put it away without losing the vocabulary colouring, and the other way
@@ -454,6 +456,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
                 {open.entry.pos && <span className="reading-note-pos">{readingPartOfSpeech(open.entry.pos, passage.level_framework === 'hsk')}</span>}
                 {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : ['en108','cefr','gept','toeic'].includes(passage.level_framework || '') ? 'CEEC' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
+              {strokePractice && <StrokePracticeLinks text={open.entry.word} locale={locale} credentials={learningCredentials ? { ...learningCredentials, questionId: passage.question_id } : undefined} />}
               {open.entry.reading && <p>{open.entry.reading}</p>}
               {open.entry.lemma && <p>{uiText('辭書形')}：{open.entry.lemma}{open.entry.form ? `（${open.entry.form}）` : ''}</p>}
               <p><Translate size={15} />{glossFor(open.entry.gloss, locale)}</p>

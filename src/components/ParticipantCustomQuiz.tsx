@@ -1,3 +1,5 @@
+import { StrokePracticeLinks } from './StrokePracticeLinks'
+import type { StrokeCredentials } from './StrokePracticeLinks'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowsClockwise, CheckCircle, Clock, PaperPlaneTilt } from '@phosphor-icons/react'
@@ -17,6 +19,7 @@ export type QuizSubmission = Array<{ itemId: string; answerText?: string; answer
 type Props = {
   data: ParticipantQuizData
   busy: boolean
+  strokeCredentials?: StrokeCredentials
   locale: ParticipantLocale
   onRetry: () => Promise<void>
   onSubmit: (answers: QuizSubmission, composition: string) => Promise<void>
@@ -27,7 +30,7 @@ type Props = {
 // limit is actually enforced; this only decides what the button says.
 const COACH_ROUNDS = 3
 
-export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, onAskCoach }: Props) {
+export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, onAskCoach, strokeCredentials }: Props) {
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({})
   const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>({})
   // Seeded from the shuffled fragments the server sent, so an untouched item is
@@ -174,6 +177,12 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
             </article>
           )
         })}
+        {graded && strokeCredentials && Boolean(data.missedWords?.length) && (
+          <section>
+            <strong>{locale === 'en' ? 'Practise missed vocabulary' : '易錯生字重練'}</strong>
+            <StrokePracticeLinks text={data.missedWords!.join(' ')} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />
+          </section>
+        )}
         {failed && <button disabled={busy} type="button" onClick={() => void onRetry()}><ArrowsClockwise size={18} />{participantText(locale, 'retryGrading')}</button>}
       </section>
     )

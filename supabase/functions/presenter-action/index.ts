@@ -21,6 +21,7 @@ import { classLevelInstruction, resolveFramework, resolveTrack, teachingTrackIds
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
+import { CLASSICS_REVIEW_REQUIRED, isUnreviewedClassic } from '../_shared/guoyu-classics-library.ts'
 import { comprehensionInstruction, generateReadingPassage, settleWords, writeMissingGrammarNotes } from '../_shared/reading.ts'
 import { settleJapaneseWords } from '../_shared/japanese.ts'
 
@@ -409,6 +410,14 @@ Deno.serve(async (req) => {
         const code = 'level_code' in values ? values.level_code : sessionMode.level_code
         if (typeof code !== 'string' || !/^(?:[1-6]|7-9)$/.test(code)) {
           return jsonResponse({ message: '请选择 HSK 级别。 / Choose an HSK level.' }, 400)
+        }
+      }
+      if ((values.teaching_language || sessionMode.teaching_language) === 'guoyu'
+        && ('level_framework' in values || 'level_code' in values || 'teaching_language' in values)) {
+        const framework = String(values.level_framework || sessionMode.level_framework)
+        const code = 'level_code' in values ? values.level_code : sessionMode.level_code
+        if (!['guoyu108', 'collegeChinese'].includes(framework) || !resolveLevel(framework, typeof code === 'string' ? code : null)) {
+          return jsonResponse({ message: '請選擇有效的國語文年級或大學國文級別。' }, 400)
         }
       }
       if ((values.teaching_language || sessionMode.teaching_language) === 'en') {
@@ -1129,8 +1138,9 @@ Deno.serve(async (req) => {
           return jsonResponse({ message: '重播次數請填 1 到 10，或留空表示不限。' }, 400)
         }
         const { data: clip } = await supabase.from('listening_clips')
-          .select('transcript').eq('id', listeningClipId).eq('session_id', sessionId).maybeSingle()
+          .select('transcript, voices').eq('id', listeningClipId).eq('session_id', sessionId).maybeSingle()
         if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+        if (await sessionTrack() === 'guoyu' && isUnreviewedClassic(clip.transcript, clip.voices)) return jsonResponse({ message: CLASSICS_REVIEW_REQUIRED }, 409)
         if (input.screenshotId !== null && input.screenshotId !== undefined && input.screenshotId !== '') {
           if (!validUuid(input.screenshotId)) return jsonResponse({ message: '圖片資料不正確。' }, 400)
           const { data: sourceScreenshot } = await supabase.from('screenshots')
@@ -1684,6 +1694,20 @@ Deno.serve(async (req) => {
       })
     }
 
+    if (action === 'get_handwriting_checks') {
+      const questionId = input.questionId
+      if (!validUuid(questionId)) return jsonResponse({ message: '手寫題目不正確。' }, 400)
+      const page = Number.isSafeInteger(input.page) && input.page >= 0 && input.page <= 1000 ? Number(input.page) : 0
+      const pageSize = 40
+      const { data, error } = await supabase.from('handwriting_checks')
+        .select('id, participant_id, character, ink, result, wrong_stroke, expected_strokes, created_at, participants(name)')
+        .eq('question_id', questionId).eq('session_id', sessionId)
+        .order('created_at', { ascending: false }).order('id', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize)
+      if (error) throw error
+      return jsonResponse({ checks: (data || []).slice(0, pageSize), hasMore: (data || []).length > pageSize })
+    }
+
     if (action === 'get_custom_quiz_results') {
       const questionId = input.questionId
       if (!validUuid(questionId)) return jsonResponse({ message: '測驗資料格式不正確。' }, 400)
@@ -1947,11 +1971,12 @@ Deno.serve(async (req) => {
 
       const { data: clip } = await supabase
         .from('listening_clips')
-        .select('id, transcript, annotation, annotation_text, annotation_words, font_url, karaoke_cues')
+        .select('id, transcript, voices, annotation, annotation_text, annotation_words, font_url, karaoke_cues')
         .eq('id', clipId)
         .eq('session_id', sessionId)
         .maybeSingle()
       if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+      if (await sessionTrack() === 'guoyu' && isUnreviewedClassic(clip.transcript, clip.voices)) return jsonResponse({ message: CLASSICS_REVIEW_REQUIRED }, 409)
 
       let listeningScreenshotId: string | null = null
       if (input.screenshotId !== null && input.screenshotId !== undefined && input.screenshotId !== '') {
@@ -2984,7 +3009,9 @@ Deno.serve(async (req) => {
       if (!validUuid(questionId) || !validUuid(clipId)) return jsonResponse({ message: '資料格式不正確。' }, 400)
 
       const { data: clip } = await supabase.from('listening_clips')
-        .select('karaoke_cues').eq('id', clipId).eq('session_id', sessionId).maybeSingle()
+        .select('karaoke_cues, transcript, voices').eq('id', clipId).eq('session_id', sessionId).maybeSingle()
+      if (!clip) return jsonResponse({ message: '找不到這段語音。' }, 404)
+      if (await sessionTrack() === 'guoyu' && isUnreviewedClassic(clip.transcript, clip.voices)) return jsonResponse({ message: CLASSICS_REVIEW_REQUIRED }, 409)
 
       const { error: passageError } = await supabase.from('reading_passages')
         .update({ listening_clip_id: clipId }).eq('question_id', questionId).eq('session_id', sessionId)
@@ -3007,6 +3034,7 @@ Deno.serve(async (req) => {
     if (action === 'dispatch_reading') {
       const sourceText = typeof input.sourceText === 'string' ? input.sourceText.trim().slice(0, 8000) : ''
       const direction = typeof input.direction === 'string' ? input.direction.trim().slice(0, 2000) : ''
+      if (await sessionTrack() === 'guoyu' && isUnreviewedClassic(sourceText + '\n' + direction)) return jsonResponse({ message: CLASSICS_REVIEW_REQUIRED }, 409)
       const shareScreenshot = input.shareScreenshot === true
       // Whether the model should read the capture at all. Off means the
       // teacher's own text is the material and the picture, if it is going out,
@@ -3015,7 +3043,11 @@ Deno.serve(async (req) => {
       const useImage = input.useImage === true
       // Already at the right level: store it as written and make no rewrite
       // call at all.
-      const verbatim = input.verbatim === true
+      const evidencePrompt = typeof input.evidencePrompt === 'string' ? input.evidencePrompt.trim().slice(0, 1000) : ''
+      if (evidencePrompt && (await sessionTrack() !== 'guoyu' || !sourceText)) {
+        return jsonResponse({ message: '請在國語文場次貼上原文，並填寫圈選證據的題目。' }, 400)
+      }
+      const verbatim = Boolean(evidencePrompt) || input.verbatim === true
       const accent = ['american', 'british', 'standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
         ? input.accent as import('../_shared/speech-accent.ts').SpeechAccent
         : 'standard_guoyu'
@@ -3028,7 +3060,7 @@ Deno.serve(async (req) => {
 
       const stretch = Number(input.levelStretch)
       const levelStretch = Number.isInteger(stretch) && stretch >= 0 && stretch <= 2 ? stretch : 0
-      const withQuiz = input.withQuiz === true
+      const withQuiz = !evidencePrompt && input.withQuiz === true
       const askedCount = Number(input.quizCount)
       const quizCount = Number.isInteger(askedCount) && askedCount >= 1 && askedCount <= 10 ? askedCount : 5
       const comprehension = Array.isArray(input.comprehension)
@@ -3103,6 +3135,7 @@ Deno.serve(async (req) => {
         locales,
       })
       if (!passage) return jsonResponse({ message: '文章生成失敗，請再試一次。' }, 502)
+      if (classRow?.teaching_language === 'guoyu' && isUnreviewedClassic(passage.title + '\n' + passage.body)) return jsonResponse({ message: CLASSICS_REVIEW_REQUIRED }, 409)
 
       // What each pattern does is the same sentence whatever passage it turns
       // up in, so it is looked up rather than rewritten. Only the points this
@@ -3156,14 +3189,15 @@ Deno.serve(async (req) => {
         level_stretch: levelStretch,
         // A reading with a quiz is still a reading: the passage is the thing
         // the class is given, and the quiz hangs off it.
-        type: withQuiz ? 'custom_quiz' : 'reading',
+        type: evidencePrompt ? 'short_answer' : withQuiz ? 'custom_quiz' : 'reading',
+        ...(evidencePrompt ? { teaching_mode: 'reading_evidence' } : {}),
         // Whether the class sees the capture the passage was written from. A
         // photograph usually should go out; a textbook page usually should not,
         // because the passage is the readable version of it.
         share_screenshot: shareScreenshot,
         status: 'active',
         title: passage.title || (classRow?.teaching_language === 'ja' ? '読解' : classRow?.teaching_language === 'en' ? 'Reading' : classRow?.level_framework === 'hsk' ? '阅读' : '閱讀'),
-        prompt_text: withQuiz ? (classRow?.teaching_language === 'ja' ? '文章を読んで、次の質問に答えてください。' : classRow?.teaching_language === 'en' ? 'Read the passage, then answer the questions below.' : classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : '',
+        prompt_text: evidencePrompt || (withQuiz ? (classRow?.teaching_language === 'ja' ? '文章を読んで、次の質問に答えてください。' : classRow?.teaching_language === 'en' ? 'Read the passage, then answer the questions below.' : classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : ''),
         options: [],
         allow_multiple: false,
       }).select('*').single()

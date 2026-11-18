@@ -798,7 +798,7 @@ alter table public.sessions drop constraint if exists sessions_level_framework_c
 alter table public.sessions
   add constraint sessions_level_framework_check
   check (level_framework is null or level_framework in (
-    'hsk', 'tbcl', 'tocfl', 'guoyu108', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'kana', 'jf', 'topik', 'ivpt'
+    'hsk', 'tbcl', 'tocfl', 'guoyu108', 'collegeChinese', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'kana', 'jf', 'topik', 'ivpt'
   ));
 
 alter table public.sessions add column if not exists system_language text null
@@ -20455,3 +20455,21 @@ end;
 $$;
 revoke all on function public.submit_recording_take(jsonb) from public,anon,authenticated;
 grant execute on function public.submit_recording_take(jsonb) to service_role;
+
+create table if not exists public.handwriting_checks (
+  id uuid primary key,
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  participant_id uuid not null references public.participants(id) on delete cascade,
+  character text not null check (char_length(character) = 1),
+  ink jsonb not null check (jsonb_typeof(ink) = 'array'),
+  result text not null check (result in ('match', 'count', 'stroke')),
+  wrong_stroke smallint,
+  expected_strokes smallint not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists handwriting_checks_question_idx
+  on public.handwriting_checks (question_id, created_at desc, id desc);
+alter table public.handwriting_checks enable row level security;
+revoke all on public.handwriting_checks from anon, authenticated;
+grant all on public.handwriting_checks to service_role;

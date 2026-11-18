@@ -16,7 +16,7 @@ export function ParticipantLanguageSwitcher({ locale, onChange, teachingLanguage
   // Read from the link, not from the build: this page is one deployment shared
   // by every edition. See lib/brand.ts.
   const [searchParams] = useSearchParams()
-  const options = guidanceLocalesForBrand(GUIDANCE_LOCALES, teachingLanguage === 'en' ? 'english' : participantBrand(searchParams, teachingLanguage))
+  const options = teachingLanguage === 'guoyu' ? GUIDANCE_LOCALES.filter(({ code }) => code === 'en') : guidanceLocalesForBrand(GUIDANCE_LOCALES, teachingLanguage === 'en' ? 'english' : participantBrand(searchParams, teachingLanguage))
 
   // A device that has been in a Chinese class before arrives holding zh-TW,
   // and the class default can be a language this edition does not offer
@@ -25,6 +25,7 @@ export function ParticipantLanguageSwitcher({ locale, onChange, teachingLanguage
   useEffect(() => {
     if (!options.some((option) => option.code === locale)) onChange(options[0].code as ParticipantLocale)
   }, [locale, onChange, options])
+  if (teachingLanguage === 'guoyu') return null
   return (
     <div className="participant-language-switcher">
       {open && (

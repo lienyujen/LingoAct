@@ -1,3 +1,5 @@
+import type { StrokeCredentials } from './StrokePracticeLinks'
+import { StrokePracticeLinks } from './StrokePracticeLinks'
 import { uiText } from '../lib/uiText'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle, SpeakerHigh, SpinnerGap, XCircle } from '@phosphor-icons/react'
@@ -13,6 +15,8 @@ type Props = {
   data: ParticipantQuizData
   locale: ParticipantLocale
   active: boolean
+  strokePractice?: boolean
+  strokeCredentials?: StrokeCredentials
   onTry: (itemId: string, answerValue: string) => Promise<{ correct: boolean; correctAnswer: string | null }>
 }
 
@@ -50,10 +54,11 @@ function reviewSides(item: QuizItem, answer: string, locale: ParticipantLocale) 
 // During answering this is retrieval practice. Once the teacher stops it, the
 // same deck becomes a reference students can keep turning over instead of a
 // completion screen that makes the vocabulary disappear.
-export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry }: Props) {
+export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry, strokePractice, strokeCredentials }: Props) {
   const readingFamily = useReadingFont(cardFontUrl)
   const initialLearned = useMemo(() => learnedFrom(data), [data])
   const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id).filter((id) => !initialLearned[id]))
+  const [missed, setMissed] = useState<string[]>([])
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -114,6 +119,10 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
       const result = await onTry(current.id, option)
       setVerdict({ ...result, chosen: option })
       const correctAnswer = result.correct ? option : result.correctAnswer
+      if (strokePractice && !result.correct) {
+        const word = current.prompt_is_word ? current.prompt_text : correctAnswer
+        if (word) setMissed(previous => previous.includes(word) ? previous : [...previous, word])
+      }
       if (correctAnswer) setLearnedAnswers((answers) => ({ ...answers, [current.id]: correctAnswer }))
       if (result.correct) {
         setCleared((list) => (list.includes(current.id) ? list : [...list, current.id]))
@@ -158,6 +167,13 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
   }
 
   if (!data.items.length) return null
+  const missedWords = [...new Set([...(data.missedWords || []), ...missed])]
+  const remediation = strokePractice && missedWords.length > 0 && (
+    <section aria-label={locale === 'en' ? 'Missed words' : '易錯字重練'}>
+      <strong>{locale === 'en' ? 'Practise characters from missed cards' : '易錯字重練'}</strong>
+      <StrokePracticeLinks text={missedWords.join(' ')} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />
+    </section>
+  )
 
   if (reviewMode) {
     const reviewItem = data.items[reviewIndex]
@@ -198,6 +214,8 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
           </button>
         </div>
         {error && <p className="error">{uiText(error)}</p>}
+        {strokePractice && <StrokePracticeLinks text={sides.word} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />}
+        {remediation}
         <div className="flashcard-review-controls">
           <button className="ghost-button" disabled={reviewIndex === 0} type="button" onClick={() => { setReviewIndex((value) => value - 1); setFlipped(false) }}>
             <ArrowLeft size={17} />{participantText(locale, 'flashcardPrevious')}
@@ -227,6 +245,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
           ? <span style={{ fontFamily: readingFamily }}>{promptReading}</span>
           : <span className="flashcard-word">{promptText}{promptReading && <small>{promptReading}</small>}</span>}
       </p>
+      {strokePractice && promptIsWord && <StrokePracticeLinks text={promptText} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />}
       <div className="flashcard-options">
         {current.options.map((option, index) => {
           const chosen = verdict?.chosen === option
@@ -247,8 +266,10 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
         })}
       </div>
       {error && <p className="error">{uiText(error)}</p>}
+      {remediation}
       {verdict && (
         <div className="flashcard-verdict">
+          {strokePractice && !promptIsWord && <StrokePracticeLinks text={(verdict.correct ? verdict.chosen : verdict.correctAnswer) || ''} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />}
           <p className={verdict.correct ? 'success' : 'muted'}>{participantText(locale, verdict.correct ? 'flashcardRight' : 'flashcardWrong')}</p>
           <button type="button" onClick={next}>{participantText(locale, verdict.correct ? 'flashcardNext' : 'flashcardTryLater')}<ArrowRight size={17} /></button>
         </div>

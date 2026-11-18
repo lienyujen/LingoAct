@@ -10,7 +10,7 @@ import { HSK_GRAMMAR } from './hsk.ts'
 import { englishVocabularyInstruction } from './english.ts'
 import { KANA_LEVELS, JF_LEVELS, JAPANESE_TEACHING } from './japanese.ts'
 
-export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'kana' | 'jf' | 'topik' | 'ivpt'
+export type Framework = 'hsk' | 'tbcl' | 'tocfl' | 'guoyu108' | 'collegeChinese' | 'en108' | 'gept' | 'toeic' | 'cefr' | 'jlpt' | 'kana' | 'jf' | 'topik' | 'ivpt'
 
 export type Level = {
   code: string
@@ -93,6 +93,15 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
   // few hundred characters, so a question they could answer aloud can still be
   // unreadable on the page. Competencies are defined per 學習階段, which is why
   // each year names the stage it belongs to.
+  collegeChinese: {
+    name: '大學國文',
+    note: 'Taiwan university Chinese. Follow the instructor’s objectives and materials. Require close reading, verifiable quotation, and reasoned interpretation. Do not invent citations or treat defensible readings as errors.',
+    unit: 'char',
+    levels: [
+      { code: 'freshman', label: '大一國文', band: 6, maxStem: 120, ceiling: 'Close reading, contextual interpretation, evidence-based discussion, and introductory academic writing.' },
+      { code: 'advanced', label: '大學進階國文', band: 6, maxStem: 150, ceiling: 'Compare interpretations and sources, evaluate evidence, and develop sustained arguments that address counterarguments.' },
+    ],
+  },
   guoyu108: {
     name: '十二年國民基本教育課程綱要・語文領域－國語文',
     note: [
@@ -136,7 +145,7 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
       },
       {
         code: 'j3', label: '國中九年級（第四學習階段）', band: 5, maxStem: 80,
-        ceiling: 'Junior high, third year, working towards 會考. 文言文 read closely, implication and tone, an argument weighed on its evidence. Up to about eighty characters. An item answerable by locating one sentence is below this level.',
+        ceiling: 'Junior high, third year, working towards 會考. 文言文 read closely, implication and tone, an argument weighed on its evidence. Up to about eighty characters. Combine explicit comprehension with inference and evidence when appropriate.',
       },
       {
         code: 'h1', label: '高中一年級（第五學習階段）', band: 5, maxStem: 90,
@@ -148,7 +157,7 @@ export const FRAMEWORKS: Record<Framework, { name: string; note: string; levels:
       },
       {
         code: 'h3', label: '高中三年級（第五學習階段）', band: 6, maxStem: 110,
-        ceiling: 'Senior high, third year, working towards 學測 and 分科測驗. Multi-text comparison, 文本互涉, evaluating a position. Nothing in the language is off limits.',
+        ceiling: 'Senior high, third year, working towards 學測國綜 and 國寫. Multi-text comparison, 文本互涉, evaluating a position. Nothing in the language is off limits.',
       },
     ],
   },

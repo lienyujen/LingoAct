@@ -15,6 +15,8 @@ import { ListeningPlayer } from '../components/ListeningPlayer'
 import { Hand } from '@phosphor-icons/react'
 import { useMyStanding } from '../lib/standings'
 import { ParticipantBoard } from '../components/ParticipantBoard'
+import { edgeFunctionErrorMessage } from '../lib/edgeError'
+import { ReadingEvidence } from '../components/ReadingEvidence'
 import { ReadingPassageView } from '../components/ReadingPassageView'
 import type { ReadingPassage as ReadingPassageRow } from '../types'
 import { ParticipantQuestionHistory } from '../components/ParticipantQuestionHistory'
@@ -83,6 +85,7 @@ export function ParticipantPage() {
   useEffect(() => { participantRevision.current.changed() }, [participantId, sessionId])
   const [session, setSession] = useState<Session | null>(null)
   const teachingLanguage = session?.teaching_language
+  const strokePractice = teachingLanguage === 'guoyu' && session?.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '')
   useClassChineseFont(session)
   const [question, setQuestion] = useState<Question | null>(null)
   const [answer, setAnswer] = useState<Answer | null>(null)
@@ -186,8 +189,8 @@ export function ParticipantPage() {
   // of storage alone did not.
   useEffect(() => {
     if (!session?.guidance_language) return
-    setLocale(localeForDispatchedGuidance(sessionId, session.guidance_language))
-  }, [session?.guidance_language, sessionId])
+    setLocale(teachingLanguage === 'guoyu' ? 'en' : localeForDispatchedGuidance(sessionId, session.guidance_language))
+  }, [session?.guidance_language, teachingLanguage, sessionId])
 
   // Read through a ref so switching language does not tear down the heartbeat
   // and start a new one; the next beat simply carries the new value.
@@ -777,6 +780,16 @@ export function ParticipantPage() {
     }
   }
 
+  async function submitReadingEvidence(quote: string, explanation: string) {
+    if (!participant || !participantToken || !question) throw new Error('Please rejoin the class.')
+    const { data, error } = await requireSupabase().functions.invoke('participant-action', {
+      body: { action: 'submit_reading_evidence', sessionId, participantId: participant.id, participantToken, questionId: question.id, quote, explanation },
+    })
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, 'Unable to submit.'))
+    readCache.current.invalidate('answers')
+    setAnswer(data.answer as Answer)
+  }
+
   async function submitCustomQuiz(answers: QuizSubmission, composition: string) {
     if (!participant || !participantToken || !question || question.type !== 'custom_quiz') return
     setQuizBusy(true)
@@ -1044,6 +1057,7 @@ export function ParticipantPage() {
         {/* Files stay downloadable after class until the presenter deletes the session. */}
         <ParticipantSharedFiles locale={locale} sessionId={sessionId} live={false} />
         <ParticipantQuestionHistory
+          strokePractice={strokePractice}
           analyses={questionAnalyses}
           teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
           answers={historyAnswers}
@@ -1131,7 +1145,7 @@ export function ParticipantPage() {
       {session && (
         <ParticipantInterpretationAudio
           enabled={session.interpretation_enabled && session.interpretation_audio_enabled}
-          languages={session.interpretation_languages}
+          languages={teachingLanguage === 'guoyu' ? session.interpretation_languages?.filter((language) => language === 'en') : session.interpretation_languages}
           sessionId={sessionId}
           locale={locale}
         />
@@ -1183,8 +1197,13 @@ export function ParticipantPage() {
       {/* The passage and its picture come before the questions, because the
           questions are about them — and a student scrolling past the questions
           to find the text is being asked to answer from memory. */}
-      {passage && (
+      {passage && question?.teaching_mode === 'reading_evidence' ? (
+        <ReadingEvidence key={question.id} body={passage.body} prompt={question.prompt_text || ''}
+          active={question.status === 'active' && session?.status === 'active'} answer={answer}
+          english={locale === 'en'} onSubmit={submitReadingEvidence} />
+      ) : passage && (
         <ReadingPassageView
+          strokePractice={strokePractice}
           learningCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined}
           activeCue={readingCue}
           cues={question?.karaoke_cues}
@@ -1248,10 +1267,10 @@ export function ParticipantPage() {
           repeats the topic in the language it was written in rather than the
           one this student is reading, because the board heading is translated
           and a stored title is not. */}
-      {question?.teaching_mode === 'pair' || question?.type === 'board' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
+      {question?.teaching_mode === 'pair' || question?.teaching_mode === 'reading_evidence' || question?.type === 'board' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
-          : <ParticipantCustomQuiz key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
+          ? <ParticipantFlashcards strokePractice={strokePractice} strokeCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          : <ParticipantCustomQuiz strokeCredentials={strokePractice && participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
           <h2>{participantText(locale, 'customQuiz')}</h2>
@@ -1285,6 +1304,7 @@ export function ParticipantPage() {
         />
       )}
       <ParticipantQuestionHistory
+          strokePractice={strokePractice}
           analyses={questionAnalyses}
         teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
         activeQuestionId={question?.id}

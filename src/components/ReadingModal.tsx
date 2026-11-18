@@ -1,3 +1,4 @@
+import { readingEvidenceExamples, readingEvidenceText } from '../lib/readingEvidenceExamples'
 import { reusableReadingWords } from '../lib/readingAnnotationReuse'
 import { accentChoices, speechAccent } from '../lib/speechAccent'
 import { uiText } from '../lib/uiText'
@@ -26,6 +27,7 @@ type Props = {
   annotation?: AnnotationMode
   teachingLanguage?: string
   framework?: string | null
+  allowEvidence?: boolean
   onClose: () => void
   onDispatched: (questionId: string, warning?: string) => void
 }
@@ -79,10 +81,11 @@ const FOCUS = [
   ['evaluate', 'readingEvaluate'],
 ] as const
 
-export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', framework, teachingLanguage = 'zh-tw', onClose, onDispatched }: Props) {
+export function ReadingModal({ open, sessionId, presenterToken, screenshotId, capture, annotation = 'none', framework, allowEvidence = false, teachingLanguage = 'zh-tw', onClose, onDispatched }: Props) {
   const t = usePresenterText()
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
+  const [evidence, setEvidence] = useState(false)
   const [stretch, setStretch] = useState(0)
   const [withQuiz, setWithQuiz] = useState(true)
   const [quizCount, setQuizCount] = useState(5)
@@ -116,6 +119,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
     const saved = readSettings()
     setSourceText('')
     setDirection('')
+    setEvidence(false)
     setStretch(saved.stretch ?? 0)
     setWithQuiz(saved.withQuiz ?? true)
     setQuizCount(saved.quizCount ?? 5)
@@ -133,6 +137,10 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
   async function dispatch() {
     if (busy) return
+    if (evidence && (!sourceText.trim() || !direction.trim())) {
+      setError('請貼上原文並填寫題目。')
+      return
+    }
     if (verbatim && !sourceText.trim()) {
       setError(t('readingNeedsText'))
       return
@@ -185,9 +193,10 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           sessionId,
           presenterToken,
           sourceText: sourceText.trim(),
-          direction: direction.trim(),
+          direction: evidence ? '' : direction.trim(),
+          evidencePrompt: evidence ? direction.trim() : undefined,
           levelStretch: stretch,
-          withQuiz,
+          withQuiz: !evidence && withQuiz,
           quizCount,
           comprehension: focus,
           screenshotId: shotId,
@@ -217,7 +226,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
       // meant a failed clip also cost the class their 注音.
       const warnings: string[] = []
 
-      if (withAudio && written?.body) {
+      if (!evidence && withAudio && written?.body) {
         // Read aloud after the fact rather than before: the passage the class
         // hears has to be the passage they were given, and until it is written
         // there is nothing to read.
@@ -321,14 +330,30 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           />
         </label>
 
-        <label className="interaction-check reading-check">
+        {allowEvidence && (
+          <div className="reading-field">
+            <label className="interaction-check">
+              <input checked={evidence} type="checkbox" onChange={(event) => setEvidence(event.target.checked)} />
+              圈選原文證據
+            </label>
+            {evidence && <div className="segmented-control">
+              {readingEvidenceExamples.map(({ label, prompt }) => (
+                <button key={label} type="button" onClick={() => { setSourceText(readingEvidenceText); setDirection(prompt) }}>
+                  {label}示範
+                </button>
+              ))}
+            </div>}
+          </div>
+        )}
+
+        {!evidence && <><label className="interaction-check reading-check">
           <input checked={verbatim} type="checkbox" onChange={(event) => setVerbatim(event.target.checked)} />
           {t('readingVerbatim')}
         </label>
-        <small className="muted">{t('readingVerbatimHint')}</small>
+        <small className="muted">{t('readingVerbatimHint')}</small></>}
 
         <label className="reading-field">
-          {t('readingDirection')}
+          {evidence ? '證據題目' : t('readingDirection')}
           <input
             placeholder={t('readingDirectionPlaceholder')}
             value={direction}
@@ -338,7 +363,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
         {/* 超綱: i+1 and i+2. Off by default, because a class is set to a level
             for a reason and stretching them is a decision, not a default. */}
-        {!verbatim && (
+        {!evidence && !verbatim && (
         <div className="reading-field">
           {t('readingStretch')}
           <div className="segmented-control">
@@ -357,7 +382,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
         </div>
         )}
 
-        <label className="interaction-check reading-check">
+        {!evidence && <><label className="interaction-check reading-check">
           <input checked={withQuiz} type="checkbox" onChange={(event) => setWithQuiz(event.target.checked)} />
           {t('readingWithQuiz')}
         </label>
@@ -430,6 +455,8 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
             ))}
           </div>
         )}
+
+        </>}
 
         {error && <p className="error">{uiText(error)}</p>}
         {passage && <p className="muted">{t('readingSent', { n: passage.vocabulary?.length || 0, g: passage.grammar?.length || 0 })}</p>}

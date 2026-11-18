@@ -6,6 +6,7 @@ import type { ParticipantLocale } from '../lib/participantI18n'
 import { participantText } from '../lib/participantI18n'
 import { listSeparator, localizedFeedback, localizedFields } from '../lib/localizedContent'
 import type { Answer, AudioResponse, ListeningClip, ParticipantQuizData, Question, QuestionAnalysis, ReadingPassage, Screenshot } from '../types'
+import { StrokePracticeLinks } from './StrokePracticeLinks'
 import { ReadingPassageView } from './ReadingPassageView'
 import { MyUploadMarking } from './ParticipantFilePanel'
 import { ParticipantFlashcards } from './ParticipantFlashcards'
@@ -37,10 +38,12 @@ type Props = {
   // is locked here: history only holds questions that are over, and the words
   // and grammar notes are the entire reason to return to a passage.
   passages: Record<string, ReadingPassage>
+  strokePractice?: boolean
   unlimitedListening?: boolean
 }
 
 function answerText(question: Question, answer: Answer, locale: ParticipantLocale) {
+  if (question.teaching_mode === 'reading_evidence') return [answer.answer_value, answer.answer_text].filter(Boolean).join(' \u2014 ')
   const translatedOptions = question.options
   const display = (value: string) => {
     const index = question.options.indexOf(value)
@@ -73,6 +76,7 @@ export function ParticipantQuestionHistory({ analyses,
   quizData,
   screenshots,
   passages,
+  strokePractice = false,
   unlimitedListening = false,
 }: Props) {
   const history = useMemo(() => questions.filter((item) => item.status !== 'draft' && item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
@@ -198,6 +202,7 @@ export function ParticipantQuestionHistory({ analyses,
                     )}
                     {passage && (
                       <ReadingPassageView
+                        strokePractice={strokePractice}
                         learningCredentials={teachingCredentials}
                         imageUrl={screenshot?.public_url || null}
                         locale={locale}
@@ -242,6 +247,8 @@ export function ParticipantQuestionHistory({ analyses,
                     )}
                     {question.type === 'custom_quiz' && quiz?.quiz.requested_type === 'flashcard' ? (
                       <ParticipantFlashcards
+                        strokePractice={strokePractice}
+                        strokeCredentials={teachingCredentials}
                         active={false}
                         cardFontUrl={question.card_font_url}
                         data={quiz}
@@ -250,6 +257,9 @@ export function ParticipantQuestionHistory({ analyses,
                       />
                     ) : question.type === 'custom_quiz' && quiz?.attempt ? (
                       <div className="participant-history-quiz">
+                        {strokePractice && Boolean(quiz.missedWords?.length) && (
+                          <StrokePracticeLinks text={quiz.missedWords!.join(' ')} locale={locale} credentials={teachingCredentials ? { ...teachingCredentials, questionId: question.id } : undefined} />
+                        )}
                         <p><CheckCircle size={17} />{quiz.quiz.interaction_mode && !quiz.quiz.graded ? participantText(locale, 'submittedAnswer') : writingQuiz && quiz.attempt.total_score === null ? participantText(locale, 'writingSubmitted') : <>{participantText(locale, 'submittedScoreLabel')}{quiz.attempt.total_score ?? '-'}/{quiz.attempt.max_score ?? 100}</>}</p>
                         {writingQuiz && quiz.attempt.feedback && <p className="quiz-overall-feedback">{localizedFeedback(quiz.attempt.feedback, locale)}</p>}
                         {writingQuiz && quiz.attempt.composition && (

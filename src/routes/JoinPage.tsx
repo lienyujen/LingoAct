@@ -42,8 +42,8 @@ export function JoinPage() {
   // arriving through either door lands on the same language.
   useEffect(() => {
     if (!session?.id || !session.guidance_language) return
-    setLocale(localeForDispatchedGuidance(session.id, session.guidance_language))
-  }, [session?.id, session?.guidance_language])
+    setLocale(teachingLanguage === 'guoyu' ? 'en' : localeForDispatchedGuidance(session.id, session.guidance_language))
+  }, [session?.id, session?.guidance_language, teachingLanguage])
   const navigate = useNavigate()
   const location = useLocation()
 

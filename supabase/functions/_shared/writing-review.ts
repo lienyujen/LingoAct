@@ -1,3 +1,4 @@
+import { guoyuWritingInstruction } from './guoyu-writing-rubric.ts'
 import { callAiJson, errorDetail } from './ai.ts'
 import { feedbackSystemPrompt, type FeedbackSettings } from './feedback-language.ts'
 import { levelInstruction } from './proficiency.ts'
@@ -116,6 +117,7 @@ export async function reviewWriting(input: {
     RULES,
     trackInstruction(input.trackId),
     levelInstruction(input.framework, input.levelCode, input.direction),
+    guoyuWritingInstruction(input.trackId, input.framework, input.levelCode),
   ].join('\n\n'), input.feedbackSettings)
 
   const result = await callAiJson(

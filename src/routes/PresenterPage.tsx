@@ -576,21 +576,22 @@ export function PresenterPage() {
     }
   }, [session?.id])
 
+  const activeJoinSessionId = session?.id
+  const cachedJoinUrl = guoyuJoin ? null : session?.short_join_url
   useEffect(() => {
-    if (!session) return
-    if (session.teaching_language === 'guoyu') return
-    const fallback = buildJoinUrl(session.code)
-    setJoinUrl(session.short_join_url || fallback)
-    if (session.short_join_url) return
+    if (!activeJoinSessionId) return
+    setJoinUrl(cachedJoinUrl || fallbackJoinUrl)
+    if (cachedJoinUrl) return
 
-    const presenterToken = getPresenterToken(session.id)
+    const presenterToken = getPresenterToken(activeJoinSessionId)
     if (!presenterToken) return
     let cancelled = false
 
     requireSupabase().functions.invoke('shorten-url', {
-      body: { sessionId: session.id, presenterToken, url: fallback },
+      body: { sessionId: activeJoinSessionId, presenterToken, url: fallbackJoinUrl },
     }).then(({ data, error }) => {
-      if (!cancelled && !error && typeof data?.shortUrl === 'string') {
+      const verified = !guoyuJoin || data?.destination === fallbackJoinUrl || data?.cached === false
+      if (!cancelled && !error && verified && typeof data?.shortUrl === 'string') {
         setJoinUrl(data.shortUrl)
       }
     })
@@ -598,7 +599,7 @@ export function PresenterPage() {
     return () => {
       cancelled = true
     }
-  }, [session])
+  }, [activeJoinSessionId, cachedJoinUrl, fallbackJoinUrl, guoyuJoin])
 
   const wallProjected = Boolean(window.lingoActDesktop && session?.sentence_wall_enabled && questions.some(item => item.id === session.current_question_id && item.type === 'short_answer' && item.teaching_mode !== 'reading_evidence'))
   const wasWallProjected = useRef(false)
@@ -2228,7 +2229,7 @@ export function PresenterPage() {
       {!selectionMode && (
         <aside className="qr-floating">
           <QRCodePanel
-            joinUrl={guoyuJoin ? fallbackJoinUrl : joinUrl}
+            joinUrl={joinUrl}
             linkable={guoyuJoin}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
             onMinimize={window.lingoActDesktop ? () => window.lingoActDesktop?.minimize() : undefined}

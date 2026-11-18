@@ -67,6 +67,6 @@ export function courseSummary(course: CoursePreset): string {
   const framework = frameworkById(course.levelFramework)
   return [resolveTrack(course.teachingTrack).label, framework?.short,
     framework?.levels.find((level) => level.code === course.levelCode)?.label,
-    APP_PROFILE.id === 'sc' ? null : GUIDANCE_LOCALES.find((locale) => locale.code === course.guidanceLanguage)?.label,
+    APP_PROFILE.id === 'sc' || course.teachingTrack === 'guoyu' ? null : GUIDANCE_LOCALES.find((locale) => locale.code === course.guidanceLanguage)?.label,
   ].filter(Boolean).map((text) => uiText(text as string)).join(' · ')
 }

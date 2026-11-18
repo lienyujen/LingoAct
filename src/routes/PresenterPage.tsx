@@ -56,6 +56,7 @@ import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import { endManagedSession } from '../lib/presenterSessions'
 import { isBuzzerPending } from '../lib/buzzer'
 import { buildJoinUrl } from '../lib/qrcode'
+import { APP_PROFILE } from '../lib/appProfiles'
 import { createRealtimeCaptionConnection } from '../lib/liveCaptions'
 import { createGeminiCaptionConnection } from '../lib/geminiCaptions'
 import { createInterpretationAudioBroadcaster } from '../lib/liveInterpretation'
@@ -241,10 +242,8 @@ export function PresenterPage() {
     if (audioContext.state !== 'running') void audioContext.resume()
     return audioContext
   }
-  const fallbackJoinUrl = useMemo(
-    () => buildJoinUrl(session?.code || sessionId),
-    [session?.code, sessionId],
-  )
+  const guoyuJoin = (session?.teaching_language || APP_PROFILE.defaultTrack) === 'guoyu'
+  const fallbackJoinUrl = buildJoinUrl(session?.code || sessionId, guoyuJoin)
   const [joinUrl, setJoinUrl] = useState(fallbackJoinUrl)
   const { onlineParticipantIds } = useSessionPresence(sessionId, { role: 'presenter' })
   // Worked out here rather than in the roster window, which is only open when
@@ -579,6 +578,7 @@ export function PresenterPage() {
 
   useEffect(() => {
     if (!session) return
+    if (session.teaching_language === 'guoyu') return
     const fallback = buildJoinUrl(session.code)
     setJoinUrl(session.short_join_url || fallback)
     if (session.short_join_url) return
@@ -1034,7 +1034,7 @@ export function PresenterPage() {
           sessionId,
           presenterToken,
           teachingLanguage: teaching.teachingLanguage,
-          guidanceLanguage: teaching.guidanceLanguage,
+          guidanceLanguage: teaching.teachingLanguage === 'guoyu' ? 'zh-TW' : teaching.guidanceLanguage,
           levelFramework: teaching.levelFramework,
           levelCode: teaching.levelCode || null,
           readingAnnotation: teaching.readingAnnotation,
@@ -2228,7 +2228,8 @@ export function PresenterPage() {
       {!selectionMode && (
         <aside className="qr-floating">
           <QRCodePanel
-            joinUrl={joinUrl}
+            joinUrl={guoyuJoin ? fallbackJoinUrl : joinUrl}
+            linkable={guoyuJoin}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
             onMinimize={window.lingoActDesktop ? () => window.lingoActDesktop?.minimize() : undefined}
             qrInteractionProps={{

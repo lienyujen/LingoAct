@@ -9,7 +9,7 @@ import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { BookOpen, Coffee, Confetti, PaperPlaneTilt, Sparkle, Waves } from '@phosphor-icons/react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ParticipantQuestionView } from '../components/ParticipantQuestionView'
 import { ListeningPlayer } from '../components/ListeningPlayer'
 import { Hand } from '@phosphor-icons/react'
@@ -84,7 +84,8 @@ export function ParticipantPage() {
   const handSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => { participantRevision.current.changed() }, [participantId, sessionId])
   const [session, setSession] = useState<Session | null>(null)
-  const teachingLanguage = session?.teaching_language
+  const [searchParams] = useSearchParams()
+  const teachingLanguage = session?.teaching_language || (searchParams.get('b') === 'guoyu' ? 'guoyu' : undefined)
   const strokePractice = teachingLanguage === 'guoyu' && session?.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '')
   useClassChineseFont(session)
   const [question, setQuestion] = useState<Question | null>(null)
@@ -154,7 +155,8 @@ export function ParticipantPage() {
   const [boardImageUrl, setBoardImageUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [sessionChecked, setSessionChecked] = useState(false)
-  const [locale, setLocale] = useState<ParticipantLocale>(() => participantLocaleFromStorage(undefined, sessionId))
+  const [preferredLocale, setLocale] = useState<ParticipantLocale>(() => participantLocaleFromStorage(undefined, sessionId))
+  const locale = teachingLanguage === 'guoyu' ? 'zh-TW' : preferredLocale
   useEffect(() => { setUiLanguage(locale) }, [locale])
   const loadSequence = useRef(0)
   const markSessionGone = useCallback(() => {
@@ -189,7 +191,8 @@ export function ParticipantPage() {
   // of storage alone did not.
   useEffect(() => {
     if (!session?.guidance_language) return
-    setLocale(teachingLanguage === 'guoyu' ? 'en' : localeForDispatchedGuidance(sessionId, session.guidance_language))
+    if (teachingLanguage === 'guoyu') return
+    setLocale(localeForDispatchedGuidance(sessionId, session.guidance_language))
   }, [session?.guidance_language, teachingLanguage, sessionId])
 
   // Read through a ref so switching language does not tear down the heartbeat
@@ -1204,6 +1207,7 @@ export function ParticipantPage() {
       ) : passage && (
         <ReadingPassageView
           strokePractice={strokePractice}
+          englishGlossOption={teachingLanguage === 'guoyu'}
           learningCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined}
           activeCue={readingCue}
           cues={question?.karaoke_cues}

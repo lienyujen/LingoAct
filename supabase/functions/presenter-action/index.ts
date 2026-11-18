@@ -402,7 +402,10 @@ Deno.serve(async (req) => {
         }
         values.reading_annotation = input.readingAnnotation
       }
-      if (typeof input.guidanceLanguage === 'string') {
+      const nextTeachingTrack = values.teaching_language || sessionMode.teaching_language
+      if (nextTeachingTrack === 'guoyu') {
+        values.guidance_language = 'zh-TW'
+      } else if (typeof input.guidanceLanguage === 'string') {
         if (!guidanceLanguages.has(input.guidanceLanguage)) return jsonResponse({ message: '不支援這個導引語。' }, 400)
         values.guidance_language = input.guidanceLanguage
       }
@@ -465,6 +468,7 @@ Deno.serve(async (req) => {
         const interpretationLanguages: string[] = Array.isArray(input.interpretationLanguages)
           ? [...new Set((input.interpretationLanguages as unknown[]).filter((language: unknown): language is string => (
             typeof language === 'string' && interpretationLanguagesSupported.has(language) && language !== sourceLanguage
+            && (nextTeachingTrack !== 'guoyu' || language === 'en')
           )))]
           : []
         const interpretationAudioEnabled = Boolean(input.interpretationAudioEnabled) && interpretationLanguages.length > 0

@@ -190,7 +190,7 @@ export function LanguagePairFields({
         </div>
       )}
 
-      {!supportsChineseSystemLanguage && APP_PROFILE.id !== 'ncacls' && <div className="language-pair-field">
+      {!supportsChineseSystemLanguage && APP_PROFILE.id !== 'ncacls' && track.id !== 'guoyu' && <div className="language-pair-field">
         <span className="language-pair-label">{t('mainGuidanceLanguage')}</span>
         <p className="language-pair-hint">{t('mainGuidanceHint')}</p>
         <div className="language-pair-options">

@@ -57,7 +57,8 @@ export function PresenterNewPage() {
   // All of it travels with the session, so the class is set up before anyone
   // joins and no activity has to ask again.
   const [teachingTrack, setTeachingTrack] = useState(initialCourse.teachingTrack)
-  const [guidanceLanguage, setGuidanceLanguage] = useState(APP_PROFILE.id === 'ncacls' ? 'zh-TW' : initialCourse.guidanceLanguage)
+  const [selectedGuidanceLanguage, setGuidanceLanguage] = useState(APP_PROFILE.id === 'ncacls' ? 'zh-TW' : initialCourse.guidanceLanguage)
+  const guidanceLanguage = teachingTrack === 'guoyu' ? 'zh-TW' : selectedGuidanceLanguage
   useEffect(() => {
     if (APP_PROFILE.defaultTrack === 'en') setUiLanguage(guidanceLanguage === 'zh-TW' ? 'zh-TW' : 'en')
   }, [guidanceLanguage])
@@ -257,7 +258,7 @@ export function PresenterNewPage() {
         <span className="form-heading-icon"><Sparkle size={24} /></span>
         <h1>{uiText(APP_PROFILE.id === 'japanese' ? '聽、說、讀、寫，讓日語在課堂上活起來' : supportsChineseSystemLanguage ? "讓學生愛上中文" : "今天，讓學生愛上互動")}</h1>
         <SystemLanguageSelector />
-        <p className="muted">{APP_PROFILE.id === 'japanese' ? uiText('日語教學的 AI 助教。') : APP_PROFILE.id === 'full' ? uiText("華語教學的 AI 助教。") : uiFormat(APP_PROFILE.id === 'english' ? "{0}・英語教學的 AI 助教。" : "{0}・華語教學的 AI 助教。", [uiText(APP_PROFILE.productName)])}</p>
+        <p className="muted">{APP_PROFILE.id === 'guoyu' ? '國語文教學的 AI 助教。' : APP_PROFILE.id === 'japanese' ? uiText('日語教學的 AI 助教。') : APP_PROFILE.id === 'full' ? uiText("華語教學的 AI 助教。") : uiFormat(APP_PROFILE.id === 'english' ? "{0}・英語教學的 AI 助教。" : "{0}・華語教學的 AI 助教。", [uiText(APP_PROFILE.productName)])}</p>
         {courses.length > 0 && <label>{uiText("最近的課程")}<select value={courses.some((item) => item.title === title) ? title : ''} onChange={(event) => {
             const selected = courses.find((item) => item.title === event.target.value)
             if (selected) chooseCourse(selected)
@@ -268,7 +269,7 @@ export function PresenterNewPage() {
           </select>
         </label>}
         <label>
-          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={teachingTrack === 'ja' ? uiText('例如：日語初級班・週二') : teachingTrack === 'en' ? 'e.g. Beginner English · Tuesday' : uiText("例如：華語初級班・週二")} />
+          {uiText("課程名稱")}<input autoFocus maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={teachingTrack === 'guoyu' ? '例如：六年級國語・週二' : teachingTrack === 'ja' ? uiText('例如：日語初級班・週二') : teachingTrack === 'en' ? 'e.g. Beginner English · Tuesday' : uiText("例如：華語初級班・週二")} />
         </label>
         <div className="course-summary"><strong>{courseSummary(course)}</strong><span>{uiText("每個教學活動，都有全新體驗。")}</span></div>
         <details className="teacher-disclosure" open={courseSettingsOpen} onToggle={(event) => setCourseSettingsOpen(event.currentTarget.open)}>

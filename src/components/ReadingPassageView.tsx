@@ -16,6 +16,7 @@ type Props = {
   strokePractice?: boolean
   learningCredentials?: LearningCredentials
   locale: ParticipantLocale
+  englishGlossOption?: boolean
   // The capture the passage was written from, when the teacher chose to show
   // it. A photograph belongs with the text; a page of source material does not,
   // and that is the teacher’s call rather than ours.
@@ -213,18 +214,20 @@ function glossFor(gloss: Record<string, string> | undefined, locale: Participant
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
 }
 
-export function ReadingPassageView({ passage: originalPassage, learningCredentials, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false, strokePractice = false }: Props) {
+export function ReadingPassageView({ passage: originalPassage, learningCredentials, locale, imageUrl, player, locked = false, cues, activeCue = -1, fontControls = false, strokePractice = false, englishGlossOption = false }: Props) {
   // The student's own switches, separate from the teacher's. A teacher who
   // turned the grammar on wants it available; a reader who finds it busy can
   // put it away without losing the vocabulary colouring, and the other way
   // round. They start on for a passage sent to be read — and off under a quiz,
   // where they would be the answer key.
-  const translation = useReadingTranslation(originalPassage, locale, learningCredentials, locked)
-  const passage = translation.passage
   const [showGrammar, setShowGrammar] = useState(!locked)
   const [showWords, setShowWords] = useState(!locked)
   const [showRuby, setShowRuby] = useState(false)
   const [selection, setOpen] = useState<Mark | null>(null)
+  const [englishGloss, setEnglishGloss] = useState(false)
+  const glossLocale = englishGlossOption && englishGloss ? 'en' : locale
+  const translation = useReadingTranslation(originalPassage, glossLocale, learningCredentials, locked)
+  const passage = translation.passage
   const open: Mark | null = selection?.kind === 'word'
     ? { kind: 'word', entry: passage.vocabulary.find(entry => entry.word === selection.entry.word) || selection.entry }
     : selection?.kind === 'grammar' ? { kind: 'grammar', entry: passage.grammar.find(entry => entry.point === selection.entry.point && entry.span === selection.entry.span) || selection.entry } : null
@@ -440,6 +443,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
 
       {open && (
         <aside className="reading-note" role="status">
+          {englishGlossOption && <button type="button" aria-pressed={englishGloss} onClick={() => setEnglishGloss((active) => !active)}>{englishGloss ? '中文解釋' : '英文翻譯'}</button>}
           {translation.status && <p className="muted">{participantText(locale, translation.status === 'pending' ? 'translating' : 'translationUnavailable')}</p>}
           <button
             aria-label={participantText(locale, 'close')}
@@ -459,7 +463,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
               {strokePractice && <StrokePracticeLinks text={open.entry.word} locale={locale} credentials={learningCredentials ? { ...learningCredentials, questionId: passage.question_id } : undefined} />}
               {open.entry.reading && <p>{open.entry.reading}</p>}
               {open.entry.lemma && <p>{uiText('辭書形')}：{open.entry.lemma}{open.entry.form ? `（${open.entry.form}）` : ''}</p>}
-              <p><Translate size={15} />{glossFor(open.entry.gloss, locale)}</p>
+              <p><Translate size={15} />{glossFor(open.entry.gloss, glossLocale)}</p>
             </>
           ) : (
             <>
@@ -467,7 +471,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
                 <strong>{open.entry.point.replace(/^(English|Japanese): /, '')}</strong>
                 {open.entry.level > 0 && <span className="reading-note-level">{passage.level_framework === 'hsk' ? 'HSK' : 'TBCL'} {passage.level_framework === 'hsk' && open.entry.level === 7 ? '7–9' : open.entry.level}</span>}
               </p>
-              <p><Translate size={15} />{glossFor(open.entry.note, locale)}</p>
+              <p><Translate size={15} />{glossFor(open.entry.note, glossLocale)}</p>
               {open.entry.example && <p className="reading-note-example">{open.entry.example}</p>}
             </>
           )}

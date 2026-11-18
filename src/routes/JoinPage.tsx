@@ -2,7 +2,7 @@ import { useClassChineseFont } from '../lib/classChineseFont'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowRight, User, Waves } from '@phosphor-icons/react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { SetupNotice } from '../components/SetupNotice'
 import { StudentSocialLinks } from '../components/StudentSocialLinks'
 import { ParticipantLanguageSwitcher } from '../components/ParticipantLanguageSwitcher'
@@ -16,7 +16,8 @@ import { setUiLanguage, uiText } from '../lib/uiText'
 export function JoinPage() {
   const { sessionId: sessionReference = '' } = useParams()
   const [session, setSession] = useState<Session | null>(null)
-  const teachingLanguage = session?.teaching_language
+  const [searchParams] = useSearchParams()
+  const teachingLanguage = session?.teaching_language || (searchParams.get('b') === 'guoyu' ? 'guoyu' : undefined)
   useClassChineseFont(session)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
@@ -35,14 +36,16 @@ export function JoinPage() {
       }).subscribe()
     return () => { void supabase.removeChannel(channel) }
   }, [session?.id])
-  const [locale, setLocale] = useState<ParticipantLocale>(() => participantLocaleFromStorage(undefined, sessionReference))
+  const [preferredLocale, setLocale] = useState<ParticipantLocale>(() => participantLocaleFromStorage(undefined, sessionReference))
+  const locale = teachingLanguage === 'guoyu' ? 'zh-TW' : preferredLocale
   useEffect(() => { setUiLanguage(locale) }, [locale])
   // The teacher's 導引語 is the starting point and it wins on a change; a
   // student's own pick stands until then. Same rule as the class page, so
   // arriving through either door lands on the same language.
   useEffect(() => {
     if (!session?.id || !session.guidance_language) return
-    setLocale(teachingLanguage === 'guoyu' ? 'en' : localeForDispatchedGuidance(session.id, session.guidance_language))
+    if (teachingLanguage === 'guoyu') return
+    setLocale(localeForDispatchedGuidance(session.id, session.guidance_language))
   }, [session?.id, session?.guidance_language, teachingLanguage])
   const navigate = useNavigate()
   const location = useLocation()

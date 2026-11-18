@@ -222,7 +222,6 @@ jobs:
           APP_PROFILE: ${{ matrix.profile }}
           TARGET: ${{ matrix.target }}
           VITE_APP_PROFILE: ${{ matrix.profile }}
-          VITE_PUBLIC_APP_URL: ${{ inputs.edition == 'guoyu' && 'https://codex-guoyu-1-0-25.lingoact.pages.dev' || '' }}
         run: |
           pnpm build
           pnpm exec electron-builder $TARGET --publish never

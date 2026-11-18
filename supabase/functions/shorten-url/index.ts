@@ -19,11 +19,12 @@ Deno.serve(async (req) => {
 
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('code, short_join_url')
+      .select('code, short_join_url, short_join_target, teaching_language')
       .eq('id', sessionId)
       .single()
     if (sessionError) throw sessionError
-    if (session.short_join_url) return jsonResponse({ shortUrl: session.short_join_url, cached: true })
+    const guoyu = session.teaching_language === 'guoyu'
+    if (session.short_join_url && !guoyu) return jsonResponse({ shortUrl: session.short_join_url, cached: true })
 
     // The join hash carries the Supabase project so students can use the shared
     // page, and which edition's student page to show: accept those three
@@ -50,6 +51,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: '加入網址格式不正確。' }, 400)
     }
 
+    if (guoyu && (parsedUrl.origin !== 'https://lingo.ehuayu.org' || parsedUrl.pathname !== '/' || parsedUrl.search)) {
+      return jsonResponse({ message: '國語文場次請使用正式學生站網址。' }, 400)
+    }
+
+    // Legacy cached links have no recorded target and may point at a preview.
+    if (guoyu && session.short_join_url && session.short_join_target === longUrl) {
+      return jsonResponse({ shortUrl: session.short_join_url, cached: true, destination: longUrl })
+    }
+
     const apiKey = Deno.env.get('REURL_API_KEY')
     if (!apiKey) return jsonResponse({ message: '尚未設定 Reurl API key。' }, 503)
 
@@ -68,10 +78,10 @@ Deno.serve(async (req) => {
     }
 
     const shortUrl = result.short_url.startsWith('http') ? result.short_url : `https://${result.short_url}`
-    const { error: updateError } = await supabase.from('sessions').update({ short_join_url: shortUrl }).eq('id', sessionId)
+    const { error: updateError } = await supabase.from('sessions').update({ short_join_url: shortUrl, ...(guoyu ? { short_join_target: longUrl } : {}) }).eq('id', sessionId)
     if (updateError) throw updateError
 
-    return jsonResponse({ shortUrl, cached: false })
+    return jsonResponse({ shortUrl, cached: false, ...(guoyu ? { destination: longUrl } : {}) })
   } catch (error) {
     console.error('shorten-url failed', error)
     return jsonResponse({ message: 'Reurl 短網址產生失敗。' }, 502)

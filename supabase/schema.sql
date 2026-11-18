@@ -801,6 +801,7 @@ alter table public.sessions
     'hsk', 'tbcl', 'tocfl', 'guoyu108', 'collegeChinese', 'en108', 'gept', 'toeic', 'cefr', 'jlpt', 'kana', 'jf', 'topik', 'ivpt'
   ));
 
+alter table public.sessions add column if not exists short_join_target text;
 alter table public.sessions add column if not exists system_language text null
   check (system_language is null or system_language in ('zh-CN', 'zh-TW', 'en'));
 

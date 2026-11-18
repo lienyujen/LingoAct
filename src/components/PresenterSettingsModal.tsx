@@ -139,9 +139,10 @@ export function PresenterSettingsModal({
     }
   }, [microphoneId, open, t])
 
+  const guoyu = teachingTrack === 'guoyu'
   const availableInterpretationLanguages = useMemo(
-    () => INTERPRETATION_LANGUAGES.filter((language) => language.code !== sourceLanguage),
-    [sourceLanguage],
+    () => INTERPRETATION_LANGUAGES.filter((language) => language.code !== sourceLanguage && (!guoyu || language.code === 'en')),
+    [sourceLanguage, guoyu],
   )
 
   if (!open) return null
@@ -150,7 +151,7 @@ export function PresenterSettingsModal({
     event.preventDefault()
     if ((levelFramework === 'hsk' || teachingTrack === 'en') && !levelCode) return
     onSave(
-      { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages },
+      { sourceLanguage, displayLanguage, fontSize, fontBold, position, interpretationAudioEnabled, interpretationLanguages: guoyu ? ['en'] : interpretationLanguages },
       microphoneId,
       { teachingLanguage: teachingTrack, guidanceLanguage, levelFramework, levelCode, readingAnnotation },
     )
@@ -279,12 +280,12 @@ export function PresenterSettingsModal({
           <label className="caption-interpretation-toggle interpretation-audio-toggle">
             <input checked={interpretationAudioEnabled} type="checkbox" onChange={(event) => {
               const enabled = event.target.checked
-              if (enabled && !interpretationLanguages.length) setInterpretationLanguages(defaultInterpretationLanguages(sourceLanguage))
+              if (enabled && (guoyu || !interpretationLanguages.length)) setInterpretationLanguages(guoyu ? ['en'] : defaultInterpretationLanguages(sourceLanguage))
               setInterpretationAudioEnabled(enabled)
             }} />
-            <span>{t('sendInterpretation')}</span>
+            <span>{guoyu ? '提供英文即時口譯' : t('sendInterpretation')}</span>
           </label>
-          {interpretationAudioEnabled && (
+          {interpretationAudioEnabled && !guoyu && (
             <div className="caption-language-options" aria-label={t('interpretationLanguagesLabel')}>
               {availableInterpretationLanguages.map((language) => {
                 const checked = interpretationLanguages.includes(language.code)

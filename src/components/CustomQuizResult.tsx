@@ -1,3 +1,4 @@
+import { guoyuWritingRubric } from '../../supabase/functions/_shared/guoyu-writing-rubric'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -14,6 +15,7 @@ import { classroomMessage } from '../lib/classroomMessages'
 
 type Props = {
   anonymousEnabled: boolean
+  writingContext?: { track: string | null; framework: string | null; level: string | null }
   question: Question
   results: PresenterQuizResults | null
   onlineCount: number
@@ -140,7 +142,7 @@ export function QuizAnswerEditor({ showAnswers, writing, busyItemId, draftAnswer
   )
 }
 
-export function CustomQuizResult({ anonymousEnabled, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onSaveWritingReview, onEditDeck, onActivateQuestion, onStopQuestion, onResumeQuestion }: Props) {
+export function CustomQuizResult({ anonymousEnabled, writingContext, question, results, onlineCount, isCurrentQuestion, onUpdateAnswer, onReviewWriting, onSaveWritingReview, onEditDeck, onActivateQuestion, onStopQuestion, onResumeQuestion }: Props) {
   const t = usePresenterText()
   const locale = usePresenterLocale()
   const [expanded, setExpanded] = useState(false)
@@ -294,6 +296,8 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
   // 寫作教練 and a deck both begin with graded=false, but only the writing can
   // receive a later whole-piece mark. They therefore stay separate branches.
   const writing = results.quiz.graded === false && !flashcard && !pictureWriting && !results.quiz.interaction_mode
+  const rubric = writing && writingContext ? guoyuWritingRubric(writingContext.track, writingContext.framework, writingContext.level) : null
+
   const graded = results.attempts.filter((attempt) => attempt.status === 'graded')
   const grading = results.attempts.filter((attempt) => attempt.status === 'grading')
   const average = graded.length
@@ -506,6 +510,17 @@ export function CustomQuizResult({ anonymousEnabled, question, results, onlineCo
       {/* AI is a first pass, never the last word. Already reviewed students are
           skipped, so a second press costs nothing; the teacher can also mark a
           piece themselves without spending a call. */}
+      {rubric && (
+        <details className="writing-history">
+          <summary>{rubric.label}寫作批改標準</summary>
+          <p>{rubric.guidance}</p>
+          <dl>
+            {rubric.criteria.map(([criterion, weight, description]) => (
+              <div key={criterion}><dt><strong>{criterion} · {weight}%</strong></dt><dd>{description}</dd></div>
+            ))}
+          </dl>
+        </details>
+      )}
       {writing && results.attempts.length > 0 && (
         <div className="writing-review-bar">
           <button disabled={Boolean(reviewingId) || !unreviewed.length} type="button" onClick={() => void reviewAll()}>

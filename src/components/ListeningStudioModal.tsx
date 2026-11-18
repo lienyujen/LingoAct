@@ -136,6 +136,10 @@ function HiddenIcon() {
   )
 }
 
+import { GUOYU_CLASSICS, classicalVoiceForTitle } from '../../supabase/functions/_shared/guoyu-classics'
+import { approvedClassicalAudio, GUOYU_CLASSICS_LIBRARY, CLASSICS_REVIEW_REQUIRED, isUnreviewedClassic } from '../../supabase/functions/_shared/guoyu-classics-library'
+import type { ClassicalVoice } from '../../supabase/functions/_shared/guoyu-classics'
+
 export function ListeningStudioModal({
   initialTranscript = '',
   initialKind = 'passage',
@@ -163,6 +167,7 @@ export function ListeningStudioModal({
   const nextAccent = (current: ListeningAccent) => ACCENTS[(ACCENTS.findIndex(choice => choice.value === current) + 1) % ACCENTS.length].value
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
+  const [classicalSelection, setClassicalSelection] = useState('auto')
   const [kind, setKind] = useState<StudioKind>('passage')
   const [accent, setAccent] = useState<ListeningAccent>('standard_guoyu')
   const [speakers, setSpeakers] = useState<string[]>([])
@@ -182,6 +187,7 @@ export function ListeningStudioModal({
 
   useEffect(() => {
     if (!open) return
+    setClassicalSelection('auto')
     if (initialTranscript) setSource('text')
     setTranscript(initialTranscript)
     setKind(initialKind)
@@ -225,6 +231,25 @@ export function ListeningStudioModal({
     // the captured file is what actually changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capturedScreen])
+
+  const classicalVoice = teachingTrack === 'guoyu' && kind === 'passage'
+          ? classicalSelection === 'auto' ? classicalVoiceForTitle(transcript)
+            : classicalSelection === 'modern' ? undefined
+              : GUOYU_CLASSICS.find(([title]) => title === classicalSelection)?.[1] ?? classicalSelection as ClassicalVoice
+          : undefined
+  const selectedClassic = GUOYU_CLASSICS_LIBRARY.find(({ title }) => title === classicalSelection)
+  const needsClassicalReview = teachingTrack === 'guoyu' && (Boolean(classicalVoice) || isUnreviewedClassic(transcript))
+
+  const approved = teachingTrack === 'guoyu' && kind === 'passage' ? approvedClassicalAudio(transcript) : null
+  const approvedTranscript = approved?.transcript
+  useEffect(() => {
+    if (!open || !approvedTranscript) return
+    let cancelled = false
+    synthesizeListening({ sessionId, presenterToken, transcript: approvedTranscript, language: 'zh-tw', kind: 'passage', approvedOnly: true })
+      .then(({ clip }) => { if (!cancelled) { setError(''); setClip(clip) } })
+      .catch((error: unknown) => { if (!cancelled) setError(error instanceof Error ? error.message : '無法載入校訂音檔。') })
+    return () => { cancelled = true }
+  }, [open, approvedTranscript, transcript, sessionId, presenterToken])
 
   if (!open) return null
 
@@ -290,6 +315,7 @@ export function ListeningStudioModal({
         accent: teachingLanguage.startsWith('zh') || teachingLanguage.startsWith('en') ? accent : null,
         speakers: kind === 'dialogue' ? speakers : [],
         speakerGenders: kind === 'dialogue' ? speakerGenders : [],
+        classicalVoice,
         screenshotId,
       })
       setClip(result.clip)
@@ -301,7 +327,7 @@ export function ListeningStudioModal({
   }
 
   async function dispatch(target: 'audio' | 'quiz' | 'read_aloud') {
-    if (!clip) return
+    if (!clip || needsClassicalReview) return
     setError('')
     setBusy(target === 'quiz' ? t('generatingQuiz') : t('dispatching'))
     try {
@@ -320,7 +346,7 @@ export function ListeningStudioModal({
         // Marked up on the way out, not when the clip was made: only the two
         // teaching modes that deliberately show the transcript may carry its
         // reading. A comprehension quiz still receives neither text nor font.
-        if (readingAnnotation !== 'none' && (teachingLanguage.startsWith('zh') || teachingLanguage === 'ja')) {
+        if (!classicalVoice && readingAnnotation !== 'none' && (teachingLanguage.startsWith('zh') || teachingLanguage === 'ja')) {
           setBusy(t('annotating'))
           try {
             const marked = await annotateReading({
@@ -464,6 +490,35 @@ export function ListeningStudioModal({
                 </label>
               )}
 
+              {teachingTrack === 'guoyu' && kind === 'passage' && (
+                <label>
+                  古文朗讀
+                  <select value={classicalSelection} onChange={(event) => { setClassicalSelection(event.target.value); setClip(null) }}>
+                    <option value="auto">依原稿首行篇名辨識</option>
+                    <option value="modern">一般朗讀</option>
+                    <option value="male">古文・男聲</option>
+                    <option value="female">古文・女聲</option>
+                    <option value="unknown">古文・預設聲線</option>
+                    {GUOYU_CLASSICS.map(([title]) => <option key={title} value={title}>{title}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {selectedClassic && (
+                <p className="ls-note">
+                  <a href={selectedClassic.curriculum} target="_blank" rel="noreferrer">課綱篇目</a>
+                  {selectedClassic.draft && (
+                    <>
+                      {' · '}<a href={selectedClassic.draft.source} target="_blank" rel="noreferrer">底本來源</a>
+                      {' · '}<button type="button" onClick={() => {
+                        setTranscript(selectedClassic.draft!.paragraphs.join('\n\n'))
+                        setClip(null)
+                      }}>載入待校稿</button>
+                    </>
+                  )}
+                </p>
+              )}
+
               {kind === 'dialogue' && speakers.length < 2 && (
                 <p className="ls-note">{t('dialogueNeedsSpeakers')}</p>
               )}
@@ -507,14 +562,14 @@ export function ListeningStudioModal({
               {clip ? (
                 <div className="ls-player">
                   <div className="ls-player-meta">
-                    <strong>{t('audioReady')}</strong>
+                    <strong>{approved ? '已載入校訂音檔' : t('audioReady')}</strong>
                     <span>{t('clipLength', { n: ((clip.duration_ms || 0) / 1000).toFixed(1) })}</span>
                   </div>
                   <audio ref={audioRef} controls preload="metadata" src={clip.public_url} />
                 </div>
               ) : (
                 <button className="ls-synth" disabled={!canSynthesize} type="button" onClick={() => void synthesize()}>
-                  {busy || t('toSpeech')}
+                  {busy || (approved ? '載入校訂音檔' : t('toSpeech'))}
                 </button>
               )}
 
@@ -544,10 +599,11 @@ export function ListeningStudioModal({
         </div>
 
         <footer className="ls-foot">
+          {needsClassicalReview && <p className="ls-dispatch-hint">{CLASSICS_REVIEW_REQUIRED}</p>}
           {!clip && <p className="ls-dispatch-hint">{t('synthesizeBeforeDispatch')}</p>}
-          <button className="ls-dispatch" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>{t('sendAudioOnly')}</button>
-          <button className="ls-dispatch" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>{t('sendReadAloud')}</button>
-          <button className="ls-dispatch" disabled={!clip || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>{t('sendListeningQuiz')}</button>
+          <button className="ls-dispatch" disabled={!clip || needsClassicalReview || Boolean(busy)} type="button" onClick={() => void dispatch('audio')}>{t('sendAudioOnly')}</button>
+          <button className="ls-dispatch" disabled={!clip || needsClassicalReview || Boolean(busy)} type="button" onClick={() => void dispatch('read_aloud')}>{t('sendReadAloud')}</button>
+          <button className="ls-dispatch" disabled={!clip || needsClassicalReview || Boolean(busy)} type="button" onClick={() => void dispatch('quiz')}>{t('sendListeningQuiz')}</button>
         </footer>
       </div>
     </div>

@@ -230,6 +230,7 @@ test('English reading UI never offers Pinyin or marks word fragments', () => {
     if(name==='../lib/englishText') return {englishTextRuns}
     if(name==='../lib/uiText') return {uiText:text=>text}
     if(name==='@phosphor-icons/react') return {BookOpen:()=>null,Translate:()=>null,X:()=>null}
+    if (name === './StrokePracticeLinks') return { StrokePracticeLinks: () => null }
     if(name==='../lib/readingFont') return {useReadingFont:()=>null}
     if(name==='../lib/useReadingTranslation') return {useReadingTranslation:passage=>({passage})}
     if(name==='../lib/participantI18n') return {participantText:(_locale,key)=>key,contentLocaleKey:locale=>locale}

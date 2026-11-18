@@ -5,12 +5,13 @@ import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   joinUrl: string
+  linkable?: boolean
   onClose?: () => void
   onMinimize?: () => void
   qrInteractionProps?: Pick<HTMLAttributes<HTMLDivElement>, 'onDoubleClick'>
 }
 
-export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps }: Props) {
+export function QRCodePanel({ joinUrl, linkable, onClose, onMinimize, qrInteractionProps }: Props) {
   const t = usePresenterText()
   return (
     <section className="panel qr-panel">
@@ -47,7 +48,9 @@ export function QRCodePanel({ joinUrl, onClose, onMinimize, qrInteractionProps }
       <div className="qr-box" {...qrInteractionProps}>
         <QRCodeSVG marginSize={2} value={joinUrl} size={172} />
       </div>
-      <p className="join-url" title={joinUrl}>{joinUrl}</p>
+      {linkable
+        ? <a className="join-url" href={joinUrl} target="_blank" rel="noreferrer" title={joinUrl}>{joinUrl}</a>
+        : <p className="join-url" title={joinUrl}>{joinUrl}</p>}
     </section>
   )
 }

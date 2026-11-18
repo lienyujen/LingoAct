@@ -23,8 +23,10 @@ export function ParticipantLanguageSwitcher({ locale, onChange, teachingLanguage
   // either. Without this the page renders in a language whose entry is not in
   // the menu, so there is nothing to press to get out of it.
   useEffect(() => {
+    if (teachingLanguage === 'guoyu') return
     if (!options.some((option) => option.code === locale)) onChange(options[0].code as ParticipantLocale)
-  }, [locale, onChange, options])
+  }, [locale, onChange, options, teachingLanguage])
+  if (teachingLanguage === 'guoyu') return null
   return (
     <div className="participant-language-switcher">
       {open && (

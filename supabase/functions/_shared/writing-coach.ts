@@ -1,3 +1,4 @@
+import { guoyuWritingInstruction } from './guoyu-writing-rubric.ts'
 import { callAiJson, errorDetail } from './ai.ts'
 import { feedbackSystemPrompt, type FeedbackSettings } from './feedback-language.ts'
 import { guidanceLanguageName } from './languages.ts'
@@ -65,6 +66,7 @@ export async function askWritingCoach(input: {
     RULES,
     trackInstruction(input.trackId),
     levelInstruction(input.framework, input.levelCode, input.direction),
+    guoyuWritingInstruction(input.trackId, input.framework, input.levelCode, true),
     `The learner is writing in ${track.promptLanguage}. Write everything you say to them in ${guidanceLanguageName(input.guidanceLanguage)}, quoting their own words where you need to point at something. Talking about their writing is explaining, and explaining happens in the language they understand best.`,
     input.previous.length
       ? 'You have spoken to this learner before about this same piece. Their earlier drafts and what you asked are below. Do not ask again for something they have now put in — notice it instead — and do not repeat a question they have already answered.'

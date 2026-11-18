@@ -27,6 +27,7 @@ import type { QuestionDraft } from '../components/QuestionEditor'
 import type { QuestionType, QuizRequestedType } from '../types'
 import type { CustomQuizSettings } from '../lib/customQuiz'
 import { QuestionHistory } from '../components/QuestionHistory'
+import { HandwritingResults } from '../components/HandwritingResults'
 import { QuestionResult } from '../components/QuestionResult'
 import { PresenterQuestionClock } from '../components/PresenterQuestionClock'
 import { TeachingCyclePanel } from '../components/TeachingCyclePanel'
@@ -55,6 +56,7 @@ import { useStableSignedUrls } from '../lib/stableSignedUrls'
 import { endManagedSession } from '../lib/presenterSessions'
 import { isBuzzerPending } from '../lib/buzzer'
 import { buildJoinUrl } from '../lib/qrcode'
+import { APP_PROFILE } from '../lib/appProfiles'
 import { createRealtimeCaptionConnection } from '../lib/liveCaptions'
 import { createGeminiCaptionConnection } from '../lib/geminiCaptions'
 import { createInterpretationAudioBroadcaster } from '../lib/liveInterpretation'
@@ -240,10 +242,8 @@ export function PresenterPage() {
     if (audioContext.state !== 'running') void audioContext.resume()
     return audioContext
   }
-  const fallbackJoinUrl = useMemo(
-    () => buildJoinUrl(session?.code || sessionId),
-    [session?.code, sessionId],
-  )
+  const guoyuJoin = (session?.teaching_language || APP_PROFILE.defaultTrack) === 'guoyu'
+  const fallbackJoinUrl = buildJoinUrl(session?.code || sessionId, guoyuJoin)
   const [joinUrl, setJoinUrl] = useState(fallbackJoinUrl)
   const { onlineParticipantIds } = useSessionPresence(sessionId, { role: 'presenter' })
   // Worked out here rather than in the roster window, which is only open when
@@ -578,6 +578,7 @@ export function PresenterPage() {
 
   useEffect(() => {
     if (!session) return
+    if (session.teaching_language === 'guoyu') return
     const fallback = buildJoinUrl(session.code)
     setJoinUrl(session.short_join_url || fallback)
     if (session.short_join_url) return
@@ -599,7 +600,7 @@ export function PresenterPage() {
     }
   }, [session])
 
-  const wallProjected = Boolean(window.lingoActDesktop && session?.sentence_wall_enabled && questions.some(item => item.id === session.current_question_id && item.type === 'short_answer'))
+  const wallProjected = Boolean(window.lingoActDesktop && session?.sentence_wall_enabled && questions.some(item => item.id === session.current_question_id && item.type === 'short_answer' && item.teaching_mode !== 'reading_evidence'))
   const wasWallProjected = useRef(false)
   useEffect(() => {
     if (wallProjected) setControlsOpen(false)
@@ -1033,7 +1034,7 @@ export function PresenterPage() {
           sessionId,
           presenterToken,
           teachingLanguage: teaching.teachingLanguage,
-          guidanceLanguage: teaching.guidanceLanguage,
+          guidanceLanguage: teaching.teachingLanguage === 'guoyu' ? 'zh-TW' : teaching.guidanceLanguage,
           levelFramework: teaching.levelFramework,
           levelCode: teaching.levelCode || null,
           readingAnnotation: teaching.readingAnnotation,
@@ -2227,7 +2228,8 @@ export function PresenterPage() {
       {!selectionMode && (
         <aside className="qr-floating">
           <QRCodePanel
-            joinUrl={joinUrl}
+            joinUrl={guoyuJoin ? fallbackJoinUrl : joinUrl}
+            linkable={guoyuJoin}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
             onMinimize={window.lingoActDesktop ? () => window.lingoActDesktop?.minimize() : undefined}
             qrInteractionProps={{
@@ -2315,6 +2317,7 @@ export function PresenterPage() {
           }} />}
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
+            writingContext={{ track: session.teaching_language, framework: session.level_framework, level: session.level_code }}
             anonymousEnabled={session.anonymous_enabled}
             isCurrentQuestion={question?.id === session.current_question_id}
             onlineCount={onlineParticipants.length}
@@ -2363,6 +2366,11 @@ export function PresenterPage() {
             />
           ) : undefined}
         />}
+        {question && ['custom_quiz', 'reading'].includes(question.type) && session.teaching_language === 'guoyu'
+          && session.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '') && (
+          <HandwritingResults key={question.id} sessionId={sessionId} questionId={question.id}
+            presenterToken={getPresenterToken(sessionId) || ''} />
+        )}
         {session.exit_ticket_prompt && session.exit_ticket_category && (
           <ExitTicketResult
             anonymousEnabled={session.anonymous_enabled}
@@ -2413,6 +2421,7 @@ export function PresenterPage() {
         </div>
       )}
       <ReadingModal
+        allowEvidence={session.teaching_language === 'guoyu'}
         teachingLanguage={resolveTrack(session.teaching_language).language}
         framework={session.level_framework}
         annotation={classAnnotation(session)}

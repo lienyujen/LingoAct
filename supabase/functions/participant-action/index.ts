@@ -1,3 +1,7 @@
+import { checkHanWriting, hanCharacters } from '../_shared/han-stroke-match.ts'
+import type { Ink } from '../_shared/han-stroke-match.ts'
+import { extractMoeStrokeXml, parseMoeStrokeTracks } from '../_shared/moe-stroke-xml.ts'
+import { readingEvidenceSentences } from '../_shared/reading-evidence.ts'
 import { recordingForClient } from '../_shared/recording-results.ts'
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { attachBoardUrls, BOARD_BUCKET, boardStoragePrefix } from '../_shared/board.ts'
@@ -120,6 +124,112 @@ Deno.serve(async (req) => {
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId : ''
     const participantId = typeof input.participantId === 'string' ? input.participantId : ''
     const participantToken = typeof input.participantToken === 'string' ? input.participantToken : ''
+    if (action === 'get_stroke_reference' || action === 'submit_handwriting_check') {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: 'Participant authorization failed.' }, 403)
+      const character = typeof input.character === 'string' ? input.character : ''
+      if (!/^\p{Unified_Ideograph}$/u.test(character)) return jsonResponse({ message: '請指定一個漢字。' }, 400)
+      const { data: room, error } = await supabase.from('sessions').select('teaching_language, level_framework, level_code')
+        .eq('id', sessionId).maybeSingle()
+      if (error) throw error
+      if (room?.teaching_language !== 'guoyu' || room.level_framework !== 'guoyu108' || !/^g[1-6]$/.test(room.level_code || '')) {
+        return jsonResponse({ message: '這項練習適用國小國語場次。' }, 403)
+      }
+      const { questionId, checkId } = input
+      let ink: Ink = []
+      if (action === 'submit_handwriting_check') {
+        if (!validUuid(questionId) || !validUuid(checkId)) return jsonResponse({ message: '手寫檢查沒有題目。' }, 400)
+        const raw = input.ink
+        if (!Array.isArray(raw) || raw.length === 0 || raw.length > 64 || raw.some(stroke =>
+          !Array.isArray(stroke) || stroke.length === 0 || stroke.length > 80 || stroke.some(point =>
+            !point || ![point.x, point.y].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 320)))) {
+          return jsonResponse({ message: '手寫筆跡格式不正確。' }, 400)
+        }
+        ink = raw.map(stroke => stroke.map(({ x, y }: { x: number; y: number }) => ({ x, y })))
+        const { data: previous, error: previousError } = await supabase.from('handwriting_checks')
+          .select('result,wrong_stroke,expected_strokes').eq('id', checkId).eq('session_id', sessionId)
+          .eq('question_id', questionId).eq('participant_id', participantId).eq('character', character).maybeSingle()
+        if (previousError) throw previousError
+        if (previous) return jsonResponse({ check: previous })
+        const [question, passage, quiz] = await Promise.all([
+          supabase.from('questions').select('status').eq('id', questionId).eq('session_id', sessionId).maybeSingle(),
+          supabase.from('reading_passages').select('vocabulary').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle(),
+          supabase.from('quizzes').select('id,requested_type').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle(),
+        ])
+        if (question.error || passage.error || quiz.error) throw question.error || passage.error || quiz.error
+        if (!question.data || question.data.status === 'draft') return jsonResponse({ message: '找不到已派送的手寫題目。' }, 404)
+        const words: string[] = (passage.data?.vocabulary || []).map((entry: { word: string }) => entry.word)
+        if (quiz.data?.requested_type === 'flashcard') {
+          const { data: items, error: itemError } = await supabase.from('quiz_items')
+            .select('prompt_text,prompt_is_word,options').eq('quiz_id', quiz.data.id)
+          if (itemError) throw itemError
+          for (const item of items || []) words.push(...(item.prompt_is_word ? [item.prompt_text] : item.options || []))
+        }
+        if (!words.some(word => hanCharacters(word).includes(character))) {
+          return jsonResponse({ message: '這個字不屬於此題。' }, 400)
+        }
+      }
+      const url = new URL('https://stroke-order.learningweb.moe.edu.tw/dictView.jsp')
+      url.searchParams.set('ID', String(character.codePointAt(0)))
+      url.searchParams.set('WORD', character)
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
+      if (!response.ok) return jsonResponse({ message: '教育部筆順資料目前無法讀取。' }, 503)
+      const xml = extractMoeStrokeXml(await response.text(), character)
+      if (!xml) return jsonResponse({ message: '教育部筆順網沒有這個字的筆順資料。' }, 404)
+      if (action === 'get_stroke_reference') return jsonResponse({ xml })
+      const tracks = parseMoeStrokeTracks(xml)
+      if (!tracks.length || tracks.some(track => !track.length || track.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y)))) {
+        return jsonResponse({ message: '教育部筆跡格式目前無法讀取。' }, 503)
+      }
+      const result = checkHanWriting(ink, tracks)
+      const check = { result: result.status, wrong_stroke: result.status === 'stroke' ? result.stroke : null, expected_strokes: tracks.length }
+      const { error: savedError } = await supabase.from('handwriting_checks').insert({
+        id: checkId, session_id: sessionId, question_id: questionId, participant_id: participantId, character, ink, ...check,
+      })
+      if (savedError) {
+        if (savedError.code !== '23505') throw savedError
+        const { data: saved, error: retryError } = await supabase.from('handwriting_checks')
+          .select('result,wrong_stroke,expected_strokes').eq('id', checkId).eq('session_id', sessionId)
+          .eq('question_id', questionId).eq('participant_id', participantId).eq('character', character).single()
+        if (retryError) throw retryError
+        return jsonResponse({ check: saved })
+      }
+      return jsonResponse({ check })
+    }
+
+    if (action === 'submit_reading_evidence') {
+      const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
+      if (!participant) return jsonResponse({ message: 'Participant authorization failed.' }, 403)
+      const { questionId } = input
+      const quote = typeof input.quote === 'string' ? input.quote : ''
+      const explanation = typeof input.explanation === 'string' ? input.explanation.trim() : ''
+      if (!validUuid(questionId) || !quote || quote.length > 8000 || !explanation || explanation.length > 500) {
+        return jsonResponse({ message: '請選一句原文，並填寫 500 字以內的理由。' }, 400)
+      }
+      const [room, question, passage] = await Promise.all([
+        supabase.from('sessions').select('status, current_question_id').eq('id', sessionId).maybeSingle(),
+        supabase.from('questions').select('status, teaching_mode').eq('id', questionId).eq('session_id', sessionId).maybeSingle(),
+        supabase.from('reading_passages').select('body').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle(),
+      ])
+      if (room.error || question.error || passage.error) throw room.error || question.error || passage.error
+      if (room.data?.status !== 'active' || room.data.current_question_id !== questionId ||
+        question.data?.status !== 'active' || question.data.teaching_mode !== 'reading_evidence') {
+        return jsonResponse({ message: 'This activity is closed.' }, 409)
+      }
+      if (!passage.data || !readingEvidenceSentences(passage.data.body).includes(quote)) {
+        return jsonResponse({ message: 'Please choose a sentence from the displayed passage.' }, 400)
+      }
+      const { error } = await supabase.from('answers').insert({
+        session_id: sessionId, question_id: questionId, participant_id: participant.id,
+        participant_name: participant.name, answer_value: quote, answer_text: explanation,
+      })
+      if (error && error.code !== '23505') throw error
+      const { data: answer, error: readError } = await supabase.from('answers').select('*')
+        .eq('question_id', questionId).eq('participant_id', participant.id).single()
+      if (readError) throw readError
+      return jsonResponse({ answer })
+    }
+
     if (action === 'get_reading_translation') {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: 'Participant authorization failed.' }, 403)
@@ -290,8 +400,44 @@ Deno.serve(async (req) => {
           if (error) throw error
           coachTurns = data || []
         }
+        let missedWords: string[] = []
+        if (quiz.requested_type === 'flashcard' && attempt) {
+          const { data: tries, error } = await supabase.from('quiz_item_tries').select('item_id')
+            .eq('attempt_id', attempt.id).eq('correct', false)
+          if (error) throw error
+          const missed = new Set((tries || []).map(tryRow => tryRow.item_id))
+          const missedItems = items.filter(item => missed.has(item.id))
+          const needKeys = missedItems.filter(item => !item.prompt_is_word && !reviewAnswers[item.id]).map(item => item.id)
+          if (needKeys.length) {
+            const { data: keys, error: keyError } = await supabase.from('quiz_item_keys')
+              .select('item_id, accepted_answers').in('item_id', needKeys)
+            if (keyError) throw keyError
+            for (const key of keys || []) {
+              const answer = (key.accepted_answers as string[])?.[0]
+              if (answer) reviewAnswers[key.item_id] = answer
+            }
+          }
+          missedWords = [...new Set<string>(missedItems.map(item => item.prompt_is_word ? item.prompt_text : reviewAnswers[item.id]).filter(Boolean))]
+        }
+        if (quiz.requested_type !== 'flashcard' && attempt?.status === 'graded') {
+          const missed = new Set((answers as Array<{ item_id: string; score: number | null }>)
+            .filter(answer => answer.score === 0).map(answer => answer.item_id))
+          const missedItems = items.filter(item => missed.has(item.id) && item.type === 'multiple_choice')
+          if (missedItems.length) {
+            const { data: reading, error: readingError } = await supabase.from('reading_passages')
+              .select('vocabulary, level_framework, level_code').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
+            if (readingError) throw readingError
+            if (reading?.level_framework === 'guoyu108' && /^g[1-6]$/.test(reading.level_code || '') && reading.vocabulary?.length) {
+              const words = new Set((reading.vocabulary as Array<{ word: string }>).map(entry => entry.word))
+              const { data: keys, error: keyError } = await supabase.from('quiz_item_keys')
+                .select('accepted_answers').in('item_id', missedItems.map(item => item.id))
+              if (keyError) throw keyError
+              missedWords = [...new Set((keys || []).flatMap(key => (key.accepted_answers as string[] || []).filter(word => words.has(word))))]
+            }
+          }
+        }
         const translated = await translateQuizFeedback(supabase, sessionId, requestedLocale, attempt, answers)
-        return jsonResponse({ quiz, items: items || [], ...translated, coachTurns, reviewAnswers })
+        return jsonResponse({ quiz, items: items || [], ...translated, coachTurns, reviewAnswers, missedWords })
       }
 
       if (!quiz) return jsonResponse({ message: '自訂測驗仍在出題中，請稍候。' }, 409)

@@ -229,15 +229,15 @@ export function DesktopOverlayPage() {
       // buzzer opened this window used to become click-through, so the X was
       // still visible but could no longer receive a click.
       || isBuzzerPending(buzzerEvent)
-      || (session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer'),
+      || (session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer' && wallQuestion.teaching_mode !== 'reading_evidence'),
     )
     void window.lingoActDesktop?.setLotteryInteraction(interactive)
     return () => {
       if (interactive) void window.lingoActDesktop?.setLotteryInteraction(false)
     }
-  }, [buzzerEvent, lotteryEvent, session?.sentence_wall_enabled, wallQuestion?.type])
+  }, [buzzerEvent, lotteryEvent, session?.sentence_wall_enabled, wallQuestion?.type, wallQuestion?.teaching_mode])
 
-  const wallVisible = Boolean(session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer')
+  const wallVisible = Boolean(session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer' && wallQuestion.teaching_mode !== 'reading_evidence')
   useEffect(() => {
     void window.lingoActDesktop?.setSentenceWallVisible?.(wallVisible)
     return () => { if (wallVisible) void window.lingoActDesktop?.setSentenceWallVisible?.(false) }

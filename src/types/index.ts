@@ -254,7 +254,7 @@ export type SessionEvent = LotterySessionEvent | BuzzerSessionEvent
 export type Question = {
   source_question_id?: string | null
   learning_focus?: string | null
-  teaching_mode?: 'practice' | 'discussion' | 'pair' | null
+  teaching_mode?: 'practice' | 'discussion' | 'pair' | 'reading_evidence' | null
   discussion_samples?: Array<{ label: string; text: string; images: string[] }>
   id: string
   session_id: string
@@ -588,6 +588,7 @@ export type ParticipantQuizData = {
   // Answer keys are revealed only after a flashcard drill is stopped. During
   // practice this contains at most the cards this student has already learned.
   reviewAnswers?: Record<string, string>
+  missedWords?: string[]
 }
 
 // One attempt at one card. A 單字卡 deck is the only thing that produces

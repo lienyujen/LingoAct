@@ -1,3 +1,4 @@
+import { classicalReadingNotes } from './guoyu-classics-library.ts'
 import { regionalPronunciationInstruction, regionalSpeechText } from './mandarin-pronunciation.ts'
 import { speechAccent, englishPronunciationInstruction } from './speech-accent.ts'
 import type { SpeechAccent } from './speech-accent.ts'
@@ -79,6 +80,8 @@ function voiceDescription(voice: Exclude<SpeakerGender, 'unknown'>) {
   return voice === 'male' ? 'adult male' : 'adult female'
 }
 
+import type { ClassicalVoice } from './guoyu-classics.ts'
+
 export function buildVoicePlan(
   kind: ClipKind,
   language: string,
@@ -86,6 +89,7 @@ export function buildVoicePlan(
   speakers: string[],
   speakerGenders: SpeakerGender[] = [],
   text = '',
+  classicalVoice?: ClassicalVoice,
 ): VoicePlan {
   accentChoice = speechAccent(language, accentChoice)
   const mandarinAccent = speechAccent(language.startsWith('zh') ? language : 'zh-tw', accentChoice) as ChineseAccent
@@ -128,6 +132,14 @@ export function buildVoicePlan(
       speechText,
     }
   }
+  if (kind === 'passage' && language === 'zh-tw' && classicalVoice) {
+    return {
+      instruction: ['Recite this Classical Chinese text in standard Taiwan Mandarin. Use measured phrasing, pause at clause boundaries, and follow the cadence of the original. Preserve every supplied character and its order. Read context-specific literary pronunciations. Do not say glosses, paraphrases or commentary.', classicalReadingNotes(text)].filter(Boolean).join(' '),
+      speakers: [],
+      voiceNames: classicalVoice === 'male' ? [MALE_VOICES[0]] : classicalVoice === 'female' ? [FEMALE_VOICES[0]] : [],
+      speechText: text,
+    }
+  }
   if (kind === 'scene') {
     return {
       instruction: [`Describe this in ${accent}, in the warm, clear voice of a teacher introducing a picture to the class. Speak in complete sentences at a pace a learner can follow.`, pronunciation].filter(Boolean).join(' '),
@@ -152,7 +164,7 @@ function speechConfig(plan: VoicePlan) {
       speakers: plan.speakers.map((speaker, index) => ({ speaker, voice: plan.voiceNames[index] })),
     }
   }
-  return [{ voice: NARRATION_VOICE }]
+  return [{ voice: plan.voiceNames[0] || NARRATION_VOICE }]
 }
 
 function ttsModels() {
@@ -577,11 +589,13 @@ export async function contentHash(
   kind: ClipKind,
   speakers: string[] = [],
   speakerGenders: SpeakerGender[] = [],
+  classicalVoice?: ClassicalVoice,
 ) {
-  const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, text)
+  const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, text, classicalVoice)
   const parts = [
     SPEECH_RECIPE_VERSION, kind, language, accent || '', speakers.join('|'),
     speakerGenders.join('|'), text, plan.instruction, plan.speechText,
+    ...(classicalVoice ? plan.voiceNames : []),
   ]
   const digest = await crypto.subtle.digest(
     'SHA-256',

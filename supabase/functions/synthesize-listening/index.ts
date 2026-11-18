@@ -1,3 +1,4 @@
+import { approvedClassicalAudio } from '../_shared/guoyu-classics-library.ts'
 import { requireEnglishMaterial } from '../_shared/english-material.ts'
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
@@ -55,10 +56,51 @@ Deno.serve(async (req) => {
     if (classroom.teaching_language === 'en') { requireEnglishMaterial(transcript, ...speakers); language = 'en'; accent = speechAccent('en', accent); script = null }
     if (classroom.teaching_language === 'ja') { language = 'ja'; accent = speechAccent('ja', null); script = null }
 
+    const approved = classroom.teaching_language === 'guoyu' && kind === 'passage' ? approvedClassicalAudio(transcript) : null
+    if (input.approvedOnly && !approved) return jsonResponse({ message: '找不到與全文相符的校訂音檔。' }, 404)
+    if (approved && !input.realignClipId) {
+      const { data: existing, error: readError } = await supabase.from('listening_clips').select('*')
+        .eq('session_id', sessionId).eq('content_hash', approved.hash).maybeSingle()
+      if (readError) throw readError
+      if (existing) return jsonResponse({ clip: existing, reused: true, approvedAudio: true })
+
+      const base = Deno.env.get('LINGOACT_CLASSICS_ASSET_BASE') || 'https://lingo.ehuayu.org/guoyu-classics/'
+      const url = new URL(approved.file, base.endsWith('/') ? base : base + '/')
+      const asset = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) })
+      if (!asset.ok || !asset.headers.get('content-type')?.startsWith('audio/')) {
+        return jsonResponse({ message: '校訂音檔尚未上線，請稍後再試。' }, 503)
+      }
+
+      // Keep the classroom reference separate from the shared immutable file.
+      // Deleting a classroom only sweeps its own prefix in the listening bucket.
+      const { data: clip, error: insertError } = await supabase.from('listening_clips').upsert({
+        session_id: sessionId,
+        screenshot_id: screenshotId,
+        source: screenshotId ? 'screenshot' : 'text',
+        kind: 'passage',
+        language: 'zh-tw',
+        transcript: approved.transcript,
+        content_hash: approved.hash,
+        storage_path: `${sessionId}/approved-${approved.hash}.wav`,
+        public_url: url.href,
+        duration_ms: approved.durationMs,
+        karaoke_cues: [],
+        voices: { classicalVoice: 'male', voiceNames: [approved.voice], accent: 'standard_guoyu', approvedAudio: approved.hash },
+      }, { onConflict: 'session_id,content_hash' }).select('*').single()
+      if (insertError) throw insertError
+      return jsonResponse({ clip, reused: true, approvedAudio: true })
+    }
+
+    const classicalVoice = classroom.teaching_language === 'guoyu' && kind === 'passage'
+      ? input.classicalVoice === 'male' || input.classicalVoice === 'female' || input.classicalVoice === 'unknown'
+        ? input.classicalVoice : undefined
+      : undefined
+    if (classicalVoice) { language = 'zh-tw'; accent = 'standard_guoyu'; script = null }
+
     // Asking for the same words twice is the common case: a teacher tweaks a
     // question, not the passage. Returning the clip already paid for keeps the
     // second press of the button free.
-    const hash = await contentHash(transcript, language, accent, kind, speakers, speakerGenders)
+    const hash = await contentHash(transcript, language, accent, kind, speakers, speakerGenders, classicalVoice)
     const existingQuery = supabase
       .from('listening_clips')
       .select('*')
@@ -76,7 +118,7 @@ Deno.serve(async (req) => {
           const audioResponse = await fetch(existing.public_url, { signal: AbortSignal.timeout(8_000) })
           if (!audioResponse.ok) throw new Error(`Stored audio returned ${audioResponse.status}.`)
           const storedWav = new Uint8Array(await audioResponse.arrayBuffer())
-          const cachedPlan = buildVoicePlan(existing.kind, existing.language, existing.voices?.accent || null, existing.voices?.speakers || [], existing.voices?.speakerGenders || [], existing.transcript)
+          const cachedPlan = buildVoicePlan(existing.kind, existing.language, existing.voices?.accent || null, existing.voices?.speakers || [], existing.voices?.speakerGenders || [], existing.transcript, existing.voices?.classicalVoice)
           const cues = await karaokeCues(storedWav, existing.transcript, existing.language, existing.duration_ms || 0, cachedPlan.speechText, cachedPlan.speakers)
           const { data: aligned, error: alignError } = await supabase.from('listening_clips')
             .update({ karaoke_cues: cues }).eq('id', existing.id).select('*').single()
@@ -95,7 +137,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ clip: existing, reused: true })
     }
 
-    const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, transcript)
+    const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, transcript, classicalVoice)
     const pcm = await synthesize(transcript, plan)
     const wav = wavFromPcm(pcm)
     const clipDurationMs = durationMs(pcm.length)
@@ -130,7 +172,7 @@ Deno.serve(async (req) => {
         public_url: publicUrl.publicUrl,
         duration_ms: clipDurationMs,
         karaoke_cues: cues,
-        voices: { accent, instruction: plan.instruction, speakers: plan.speakers, voiceNames: plan.voiceNames, speakerGenders },
+        voices: { classicalVoice, accent, instruction: plan.instruction, speakers: plan.speakers, voiceNames: plan.voiceNames, speakerGenders },
         content_hash: hash,
       })
       .select('*')

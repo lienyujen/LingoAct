@@ -62,7 +62,7 @@ export const TEACHING_TRACKS: TeachingTrack[] = [
     label: '國語／國文',
     note: '母語・108課綱・注音',
     language: 'zh-tw',
-    frameworks: ['guoyu108'],
+    frameworks: ['guoyu108', 'collegeChinese'],
     annotation: 'zhuyin',
     annotationChoice: false,
   },

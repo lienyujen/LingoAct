@@ -436,6 +436,25 @@ async function glossNewWords(
 
 export async function generateReadingPassage(input: ReadingInput): Promise<ReadingPassage | null> {
   input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
+  if (resolveTrack(input.teachingLanguage).id === 'guoyu') {
+    const instruction = [
+      trackInstruction('guoyu'),
+      levelInstruction(input.levelFramework, input.levelCode, input.direction),
+      '以教師素材為依據，產出適合本課閱讀目標的文本。遇到古典詩文，逐字保留現有原文，不補寫缺漏，不改動異體字或句讀。若只指定篇名而沒有原文，正文留空。白話說明須與原文分開。在 words 選最多十二個符合所選年級且確實出現在正文中的生詞，每項 text 逐字擷取原文，pinyin 留空。grammar 回傳空陣列。',
+    ].join('\n')
+    const result = await callAiJson(instruction, { source: input.source, direction: input.direction }, passageSchema(), input.image || null, 'deep')
+    if (result.status !== 'success') return null
+    const output = result.output as Record<string, unknown>
+    const body = input.source.trim() || String(output.body || '').trim()
+    if (!body) return null
+    const terms = new Set<string>()
+    for (const entry of Array.isArray(output.words) ? output.words : []) {
+      const word = typeof entry?.text === 'string' ? entry.text.trim() : ''
+      if (word && body.includes(word) && /\p{Unified_Ideograph}/u.test(word)) terms.add(word)
+    }
+    const vocabulary = await glossNewWords([...terms].slice(0, 12).map(word => ({ word, level: 0 })), ['zh_tw', 'en'], '臺灣繁體中文', body)
+    return { title: String(output.title || '').trim(), body, words: [], vocabulary, grammar: [] }
+  }
   if (resolveTrack(input.teachingLanguage).language === 'en') return generateEnglishReading(input)
   if (resolveTrack(input.teachingLanguage).language === 'ja') return generateJapaneseReading(input)
   if (input.levelFramework === 'hsk' && !hskLevelOf(input.levelFramework, input.levelCode)) throw new Error('An HSK level is required for reading.')

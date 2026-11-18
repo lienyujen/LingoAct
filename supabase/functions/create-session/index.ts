@@ -61,14 +61,15 @@ Deno.serve(async (req) => {
         typeof language === 'string' && interpretationLanguagesSupported.has(language) && language !== sourceLanguage
       )))]
       : []
-    const interpretationAudioEnabled = Boolean(input.interpretationAudioEnabled) && interpretationLanguages.length > 0
     // What the class is. Anything unrecognised falls back to the default rather
     // than being written through: the track drives the listening voice, the
     // reading annotation, the proficiency ladder and the language questions are
     // written in, and a junk value would surface much later as a clip in the
     // wrong accent or a quiz in the wrong language.
     const teachingTrack = input.appProfile === 'japanese' ? 'ja' : input.appProfile === 'english' ? 'en' : systemLanguage ? scTrack : teachingTrackIds.has(input.teachingLanguage) ? input.teachingLanguage as string : DEFAULT_TRACK
-    const guidanceLanguage = systemLanguage || (guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : teachingTrack === 'ja' ? 'ja' : 'zh-TW')
+    const interpretationTargets = teachingTrack === 'guoyu' ? interpretationLanguages.filter(language => language === 'en') : interpretationLanguages
+    const interpretationAudioEnabled = Boolean(input.interpretationAudioEnabled) && interpretationTargets.length > 0
+    const guidanceLanguage = teachingTrack === 'guoyu' ? 'zh-TW' : systemLanguage || (guidanceLanguages.has(input.guidanceLanguage) ? input.guidanceLanguage as string : teachingTrack === 'ja' ? 'ja' : 'zh-TW')
 
     // A track offers only its own ladders — English has three, most languages
     // one — and a level only counts if it belongs to the ladder that was
@@ -84,6 +85,7 @@ Deno.serve(async (req) => {
       ? input.readingAnnotation as string
       : track.id === 'guoyu' ? 'zhuyin' : 'none'
     if (levelFramework === 'hsk' && !levelCode) return jsonResponse({ message: '请选择 HSK 级别。 / Choose an HSK level.' }, 400)
+    if (teachingTrack === 'guoyu' && !levelCode) return jsonResponse({ message: '請選擇國語文年級或大學國文級別。' }, 400)
     if (teachingTrack === 'en' && !levelCode) return jsonResponse({ message: 'Choose a level for your English class.' }, 400)
     if (teachingTrack === 'ja' && !levelCode) return jsonResponse({ message: '学習範囲またはレベルを選んでください。' }, 400)
     const presenterToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '')
@@ -108,7 +110,7 @@ Deno.serve(async (req) => {
           caption_position: 'bottom',
           interpretation_enabled: interpretationAudioEnabled,
           interpretation_audio_enabled: interpretationAudioEnabled,
-          interpretation_languages: interpretationAudioEnabled ? interpretationLanguages : [],
+          interpretation_languages: interpretationAudioEnabled ? interpretationTargets : [],
           teaching_language: teachingTrack,
           system_language: systemLanguage,
           guidance_language: guidanceLanguage,

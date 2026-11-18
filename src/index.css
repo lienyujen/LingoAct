@@ -9175,3 +9175,91 @@ h2 {
 .toeic-level-grid > span { min-width: 0; }
 .toeic-level-grid .language-chip { width: 100%; height: 100%; min-width: 0; min-height: 58px; justify-content: center; }
 .toeic-level-grid strong { display: grid; gap: 4px; font-size: 14px; line-height: 1.4; }
+
+.evidence-passage {
+  line-height: 2;
+  margin-block: 1rem;
+}
+.evidence-passage button {
+  display: inline;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: .4rem;
+  font: inherit;
+  line-height: inherit;
+  padding: .1rem .2rem;
+  max-width: 100%;
+  text-align: start;
+}
+.evidence-passage button[aria-pressed="true"] {
+  border-color: currentColor;
+  background: var(--surface-subtle);
+}
+.evidence-passage button:disabled { opacity: 1; }
+.evidence-projection {
+  color: var(--text);
+  background: var(--surface);
+  border: 0;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: clamp(1rem, 5vw, 4rem);
+  font-size: clamp(1.25rem, 2.2vw, 2.5rem);
+}
+.evidence-projection::backdrop { background: var(--surface); }
+.evidence-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+}
+.evidence-comparison article {
+  background: var(--surface-subtle);
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.han-practice-dialog {
+  width: min(100% - 1rem, 40rem);
+  max-height: 94dvh;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+.han-practice-dialog iframe {
+  width: 100%;
+  height: min(62dvh, 35rem);
+  border: 0;
+}
+.han-writing-board canvas {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  margin-block: .75rem;
+  touch-action: none;
+  background-color: var(--surface);
+  background-image: linear-gradient(var(--border), var(--border)), linear-gradient(var(--border), var(--border));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 1px, 1px 100%;
+  outline: 1px solid var(--border-strong);
+}
+
+.handwriting-result-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: .65rem;
+}
+.handwriting-result-cards figure {
+  margin: 0;
+}
+.handwriting-result-cards svg {
+  width: 100%;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+}
+.handwriting-result-cards figcaption small {
+  display: block;
+}

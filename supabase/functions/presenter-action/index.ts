@@ -1700,12 +1700,19 @@ Deno.serve(async (req) => {
       const page = Number.isSafeInteger(input.page) && input.page >= 0 && input.page <= 1000 ? Number(input.page) : 0
       const pageSize = 40
       const { data, error } = await supabase.from('handwriting_checks')
-        .select('id, participant_id, character, ink, result, wrong_stroke, expected_strokes, created_at, participants(name)')
+        .select('id, participant_id, character, ink, result, wrong_stroke, expected_strokes, created_at')
         .eq('question_id', questionId).eq('session_id', sessionId)
         .order('created_at', { ascending: false }).order('id', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize)
       if (error) throw error
-      return jsonResponse({ checks: (data || []).slice(0, pageSize), hasMore: (data || []).length > pageSize })
+      const checks = (data || []).slice(0, pageSize)
+      const ids = [...new Set(checks.map(check => check.participant_id))]
+      const { data: names, error: nameError } = ids.length
+        ? await supabase.from('participants').select('id,name').eq('session_id', sessionId).in('id', ids)
+        : { data: [], error: null }
+      if (nameError) throw nameError
+      const byId = new Map((names || []).map(participant => [participant.id, { name: participant.name }]))
+      return jsonResponse({ checks: checks.map(check => ({ ...check, participants: byId.get(check.participant_id) || null })), hasMore: (data || []).length > pageSize })
     }
 
     if (action === 'get_custom_quiz_results') {

@@ -235,7 +235,7 @@ export function DesktopOverlayPage() {
     return () => {
       if (interactive) void window.lingoActDesktop?.setLotteryInteraction(false)
     }
-  }, [buzzerEvent, lotteryEvent, session?.sentence_wall_enabled, wallQuestion?.type])
+  }, [buzzerEvent, lotteryEvent, session?.sentence_wall_enabled, wallQuestion?.type, wallQuestion?.teaching_mode])
 
   const wallVisible = Boolean(session?.sentence_wall_enabled && wallQuestion?.type === 'short_answer' && wallQuestion.teaching_mode !== 'reading_evidence')
   useEffect(() => {

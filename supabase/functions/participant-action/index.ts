@@ -1,3 +1,4 @@
+import { hasRecordingTranscript, inspectRecording } from '../_shared/recording-validation.ts'
 import { checkHanWriting, hanCharacters } from '../_shared/han-stroke-match.ts'
 import type { Ink } from '../_shared/han-stroke-match.ts'
 import { extractMoeStrokeXml, parseMoeStrokeTracks } from '../_shared/moe-stroke-xml.ts'
@@ -1222,9 +1223,18 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '錄音檔大小不符合限制。' }, 400)
       }
 
+      const audioBuffer = await audioBlob.arrayBuffer()
+      const audio = inspectRecording(audioBuffer)
+      if (!audio?.audible || audio.durationMs > 180_000) {
+        if (existingTake?.id !== recordingId && existingTake?.previous_attempt?.id !== recordingId) await removeRecording(storagePath)
+        return jsonResponse({ message: simplifiedRecording
+          ? '录音中没有可听见的声音，或文件不完整。请检查麦克风后重新录制。'
+          : '錄音中沒有可聽見的聲音，或檔案不完整。請檢查麥克風後重新錄製。' }, 422)
+      }
+
       const { data: saved, error: responseError } = await supabase.rpc('submit_recording_take', { p_take: {
         id: recordingId, session_id: sessionId, question_id: questionId, participant_id: participantId,
-        participant_name: participant.name, storage_path: storagePath, duration_ms: durationMs, file_size: audioBlob.size,
+        participant_name: participant.name, storage_path: storagePath, duration_ms: audio.durationMs, file_size: audioBlob.size,
       } })
       if (responseError) {
         if (existingTake?.id !== recordingId && existingTake?.previous_attempt?.id !== recordingId) await removeRecording(storagePath)
@@ -1255,7 +1265,7 @@ Deno.serve(async (req) => {
           promptText: question.prompt_text,
           learningFocus: question.learning_focus,
           screenshotUrl,
-          audioBytes: new Uint8Array(await audioBlob.arrayBuffer()),
+          audioBytes: new Uint8Array(audioBuffer),
           audioMimeType: 'audio/wav',
         }
         let classInstruction = await classLevelInstruction(supabase, sessionId)
@@ -1278,6 +1288,7 @@ Deno.serve(async (req) => {
           }
         }
         if (!analysis) throw lastError || new Error('Audio analysis failed.')
+        if (!hasRecordingTranscript(analysis.transcript)) throw new Error('NO_RECOGNIZABLE_SPEECH')
         await supabase.from('audio_responses').update({
           analysis_status: 'success',
           detected_language: analysis.detected_language,

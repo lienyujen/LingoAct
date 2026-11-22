@@ -9263,3 +9263,10 @@ h2 {
 .handwriting-result-cards figcaption small {
   display: block;
 }
+
+.assignment-menu-status { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.assignment-menu-status:empty { display: none; }
+
+.metric-row > .metric { min-width: 0; }
+.metric-row .online-count-link { white-space: normal; }
+.metric-actions, .assignment-pending { flex-shrink: 0; flex-wrap: nowrap; }

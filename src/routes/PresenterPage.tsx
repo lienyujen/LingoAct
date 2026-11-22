@@ -1,3 +1,4 @@
+import { AssignmentProgress } from '../components/AssignmentProgress'
 import { createRealtimeSnapshot } from '../lib/realtimeSnapshot'
 import { onlineClassIds } from '../lib/classroomProjection'
 import { captureCrop } from '../lib/captureGeometry'
@@ -2256,6 +2257,10 @@ export function PresenterPage() {
             }}
           >{w[view]}</button>)}
         </nav>
+        {APP_PROFILE.id !== 'full' && workspaceView !== 'activities' && <div className="assignment-menu-status">
+          {raisedCount > 0 && <button type="button" className="roster-hand" onClick={() => void lowerHands()}>✋ {raisedCount}</button>}
+          <AssignmentProgress active={session.status === 'active'} question={questions.find(item => item.id === session.current_question_id) || null} />
+        </div>}
         <PresenterQuestionClock question={session.status === 'active' ? questions.find(item => item.id === session.current_question_id) || null : null} />
         <div hidden={workspaceView !== 'activities'}>
         <PresenterControlPanel
@@ -2264,6 +2269,7 @@ export function PresenterPage() {
           captionError={uiText(captionError)}
           onlineCount={onlineParticipants.length}
           raisedCount={raisedCount}
+          assignmentProgress={APP_PROFILE.id !== 'full' && workspaceView === 'activities' && <AssignmentProgress active={session.status === 'active'} question={questions.find(item => item.id === session.current_question_id) || null} />}
           onLowerHands={() => void lowerHands()}
           session={session}
           onDrawLottery={drawLottery}

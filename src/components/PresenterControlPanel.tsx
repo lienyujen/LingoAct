@@ -14,6 +14,7 @@ type Props = {
   onlineCount: number
   // How many hands are up right now. Zero hides the control entirely, so the
   // panel only mentions it when there is something to deal with.
+  assignmentProgress?: import('react').ReactNode
   raisedCount: number
   busy: boolean
   buzzerActive: boolean
@@ -60,6 +61,7 @@ export function PresenterControlPanel({
   session,
   onlineCount,
   raisedCount,
+  assignmentProgress,
   busy,
   buzzerActive,
   captionError,
@@ -137,6 +139,7 @@ export function PresenterControlPanel({
             </button>
           )}
         </div>
+        {assignmentProgress}
         <div className="metric-actions">
           <button
             aria-label={t('startBuzzer')}

@@ -1,3 +1,5 @@
+import { ArrowClockwise } from '@phosphor-icons/react'
+import { APP_PROFILE } from '../lib/appProfiles'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
@@ -9,7 +11,9 @@ type Need = { finding: string; evidenceIds: string[]; nextPrompt: string }
 type Props = { question: Question; sessionId: string; presenterToken: string; participants: Participant[]; active: boolean; onDispatched: (question: Question) => void }
 
 export function TeachingCyclePanel({ question, sessionId, presenterToken, participants, active, onDispatched }: Props) {
-  const zh = ['zh-TW', 'zh-CN', 'ja'].includes(usePresenterLocale())
+  const locale = usePresenterLocale()
+  const zh = ['zh-TW', 'zh-CN', 'ja'].includes(locale)
+  const redoLabel = locale === 'zh-CN' ? '重新做一次' : locale === 'ja' ? 'もう一度取り組む' : locale === 'en' ? 'Do it again' : '重新做一次'
   const [mode, setMode] = useState('')
   const [focus, setFocus] = useState('')
   const [samples, setSamples] = useState<Sample[]>([])
@@ -55,6 +59,10 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   return <details className="panel teaching-cycle-panel">
     <summary>{zh ? uiText("下一步教學") : 'Follow-up'}</summary>
     <div className="teaching-cycle-actions">
+      {APP_PROFILE.id !== 'full' && <button disabled={busy || !active} type="button" onClick={() => void run(async () => {
+        const data = await call('repeat_assignment', { requestId: crypto.randomUUID() })
+        onDispatched(data.question)
+      })}><ArrowClockwise size={16} /> {redoLabel}</button>}
       {canRepeat && <button disabled={busy || !active} type="button" onClick={() => { setMode('repeat'); setFocus('') }}>{zh ? uiText("再練一次") : "Practice again"}</button>}
       <button disabled={busy} type="button" onClick={() => { setMode('discuss'); void run(loadSamples) }}>{zh ? uiText("挑作品討論") : 'Discuss work'}</button>
       <button disabled={busy} type="button" onClick={() => { setMode('diagnose'); void run(loadSamples) }}>{zh ? uiText("看看全班卡在哪") : 'Learning needs'}</button>

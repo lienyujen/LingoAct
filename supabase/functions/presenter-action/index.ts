@@ -357,6 +357,18 @@ Deno.serve(async (req) => {
     }
     async function isEnglishSession() { return await sessionTrack() === 'en' }
 
+    if (action === 'assignment_progress' || action === 'repeat_assignment') {
+      if (!validUuid(input.questionId) || (action === 'repeat_assignment' && !validUuid(input.requestId))) {
+        return jsonResponse({ message: 'Invalid assignment.' }, 400)
+      }
+      const { data, error } = await supabase.rpc(action, {
+        target_session: sessionId, target_question: input.questionId,
+        ...(action === 'repeat_assignment' ? { request_id: input.requestId } : {}),
+      })
+      if (error) throw error
+      return jsonResponse(action === 'assignment_progress' ? { progress: data } : { question: data })
+    }
+
     if (['teaching_samples', 'teaching_repeat', 'teaching_discuss', 'teaching_diagnose', 'teaching_pair'].includes(action)) {
       return await presenterTeachingCycle(supabase, sessionId, input)
     }

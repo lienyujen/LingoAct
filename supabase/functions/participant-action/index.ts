@@ -1120,25 +1120,6 @@ Deno.serve(async (req) => {
           .maybeSingle()
         if (error) throw error
         if (!response) return jsonResponse({ response: null })
-        if (question.status === 'active' && question.type !== 'pronunciation') {
-          return jsonResponse({ response: {
-            id: response.id,
-            session_id: sessionId,
-            question_id: questionId,
-            participant_id: participantId,
-            participant_name: participant.name,
-            mime_type: response.mime_type,
-            duration_ms: response.duration_ms,
-            analysis_status: response.analysis_status,
-            detected_language: null,
-            transcript: null,
-            score: null,
-            analysis_json: null,
-            error_message: null,
-            submitted_at: response.submitted_at,
-            analyzed_at: null,
-          } })
-        }
         const safeResponse = await recordingForClient(supabase, response)
         const selected = typeof input.responseId === 'string' && input.responseId === (safeResponse.previous_attempt as { id?: string } | undefined)?.id
           ? safeResponse.previous_attempt : safeResponse

@@ -16,9 +16,9 @@ const recorder=component('src/components/AudioRecorder.tsx',{'@phosphor-icons/re
 const analysis={score:82,summary:'发音清楚。',strengths:['声调正确。'],improvements:['注意语速。'],transcript:'你好。',detected_language:'zh',relevance:'切题',clarity:'清楚',completeness:'完整'}
 const response={id:'first',analysis_status:'success',analysis_json:analysis,score:82,attempt_number:1,duration_ms:2000}
 const render=(type='pronunciation',status='active',value=response)=>renderToStaticMarkup(createElement(recorder,{busy:false,question:{id:'q',type,status},response:value,onSubmit:async()=>{},onDiscard:async()=>{},locale:'zh-CN'}))
-test('read-aloud feedback appears while open, a second take retains the first, stop only disables submission; oral assessment timing stays unchanged',()=>{
+test('read-aloud feedback appears while open, a second take retains the first, stop only disables submission; oral feedback also appears while open',()=>{
  const first=render();assert.match(first,/audio-score/);assert.match(first,/82/);assert.match(first,/再录一次（保留第一次）/)
- assert.doesNotMatch(render('oral_response'),/audio-score/)
+ assert.match(render('oral_response'),/audio-score/)
  assert.doesNotMatch(render('pronunciation','stopped'),/再录一次/)
  const second=render('pronunciation','active',{...response,id:'second',score:91,attempt_number:2,analysis_json:{...analysis,score:91},previous_attempt:response})
  assert.match(second,/两次成绩对比/);assert.match(second,/第 1 次：82 分/);assert.match(second,/第 2 次：91 分/);assert.doesNotMatch(second,/再录一次/)

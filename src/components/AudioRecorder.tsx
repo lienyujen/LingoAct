@@ -152,15 +152,12 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
         <RecordingComparison response={response} locale={locale} student />
         {question.type === 'pronunciation' && question.status === 'active' && (response.attempt_number || 1) < 2 && response.analysis_status !== 'pending' && <button type="button" className="ghost-button" disabled={busy} onClick={() => setRetryForId(response.id)}><ArrowCounterClockwise size={17} />{classroomMessage(locale, 'secondAttempt')}</button>}
         {response.translation_status && <p className="muted">{participantText(locale, response.translation_status === 'pending' ? 'translating' : 'translationUnavailable')}</p>}
-        {question.status === 'active' && question.type !== 'pronunciation' ? (
-          <div className="audio-sent-row">
-            <p className="success">{participantText(locale, 'recordingSent')}</p>
-            {response.signed_url && <RecordingPlayer recording={response} locale={locale} student />}
-            <button className="ghost-button" disabled={busy} type="button" onClick={() => void onDiscard()}>
-              <ArrowCounterClockwise size={17} />{participantText(locale, 'recordAgain')}
-            </button>
-          </div>
-        ) : response.analysis_status === 'success' && analysis ? (
+        {question.type === 'oral_response' && question.status === 'active' && response.analysis_status !== 'pending' && (
+          <button className="ghost-button" disabled={busy} type="button" onClick={() => void onDiscard()}>
+            <ArrowCounterClockwise size={17} />{participantText(locale, 'recordAgain')}
+          </button>
+        )}
+        {response.analysis_status === 'success' && analysis ? (
           <>
             <div className="audio-feedback-heading">
               <div>

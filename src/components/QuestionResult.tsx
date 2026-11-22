@@ -881,9 +881,7 @@ export function QuestionResult(props: Props) {
         </div>
         {question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
         <p className="muted">{t('recordedPeople', { n: answers.length })}</p>
-        {question.status === 'active' ? (
-          <p className="muted">{t('audioAfterStop')}</p>
-        ) : audioResponses.length ? (
+        {audioResponses.length ? (
           <div className="audio-result-list">
             {audioResponses.map((response, index) => {
               const result = response.analysis_json

@@ -2641,7 +2641,6 @@ Deno.serve(async (req) => {
         .select('status,type').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
       if (playbackError) throw playbackError
       if (!playbackQuestion || !['pronunciation', 'oral_response'].includes(playbackQuestion.type)) return jsonResponse({ message: '找不到錄音題目。' }, 404)
-      if (playbackQuestion.status === 'active' && playbackQuestion.type !== 'pronunciation') return jsonResponse({ message: '請先停止作答。' }, 409)
       const { data: response, error } = await supabase.from('audio_responses')
         .select('id,storage_path,previous_attempt').or(`id.eq.${responseId},previous_attempt->>id.eq.${responseId}`).eq('session_id', sessionId).eq('question_id', questionId).maybeSingle()
       if (error) throw error
@@ -2664,7 +2663,6 @@ Deno.serve(async (req) => {
       if (!question || !['pronunciation', 'oral_response'].includes(question.type)) {
         return jsonResponse({ message: '找不到錄音題目。' }, 404)
       }
-      if (question.status === 'active' && question.type !== 'pronunciation') return jsonResponse({ responses: [] })
 
       const { data: responses, error } = await supabase
         .from('audio_responses')

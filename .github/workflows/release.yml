@@ -25,6 +25,7 @@ on:
         type: choice
         options:
           - all
+          - languages
           - english
           - japanese
           - guoyu

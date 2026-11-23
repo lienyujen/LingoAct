@@ -380,7 +380,7 @@ jobs:
             notes=$(cat <<'MD'
           ## LingoAct English
 
-          - The desktop workspace keeps the QR code on demand, with a fixed footer and a scrollable activity area.
+          - The desktop workspace keeps the QR code on demand, with a fixed footer and a scrollable activity area. The Current tab shows a quiet pending count while students still owe responses. An expired recording reference timer clears automatically.
           - Teacher-written questions, directions and messages accept multilingual text. AI activities adapt source material into English at the selected class level.
           - Listening can adapt pasted source text into an editable English passage or dialogue. Speech synthesis requests American English by default or British English when selected.
 

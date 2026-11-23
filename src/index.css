@@ -861,6 +861,16 @@ h2 {
   border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
+.is-compact .workspace-navigation button {
+  flex-wrap: wrap;
+  gap: 3px 6px;
+}
+
+.workspace-pending {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 .is-compact .teacher-workspace .panel {
   box-shadow: none;
 }
@@ -6852,6 +6862,15 @@ h2 {
 }
 .presenter-question-clock strong { font-size: 26px; }
 .presenter-question-clock small { width: 100%; }
+.presenter-question-clock.is-compact {
+  position: static;
+  border-width: 1px;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.presenter-question-clock.is-compact strong { font-size: 14px; }
 .presenter-question-clock.spent { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 
 /* 寫作教練 results: the writing itself is what the teacher came to read, so it

@@ -2228,6 +2228,8 @@ export function PresenterPage() {
   const followUp = question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
     presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
     active={session.status === 'active'} onDispatched={showDispatchedQuestion} />
+  const currentQuestion = questions.find(item => item.id === session.current_question_id) || null
+  const classActive = session.status === 'active'
   const nextActivity = workspaceView === 'current' && (
     <button className="workspace-next" type="button" onClick={() => navigateWorkspace('activities')}>{w.next}</button>
   )
@@ -2266,13 +2268,18 @@ export function PresenterPage() {
             onClick={() => {
               navigateWorkspace(view)
             }}
-          >{w[view]}</button>)}
+          >
+            {w[view]}
+            {compactWorkspace && view === 'current' && <AssignmentProgress active={classActive} question={currentQuestion} inline />}
+          </button>)}
         </nav>
         {APP_PROFILE.id !== 'full' && workspaceView !== 'activities' && <div className="assignment-menu-status">
           {raisedCount > 0 && <button type="button" className="roster-hand" onClick={() => void lowerHands()}>✋ {raisedCount}</button>}
-          <AssignmentProgress active={session.status === 'active'} question={questions.find(item => item.id === session.current_question_id) || null} />
+          {!compactWorkspace && <AssignmentProgress active={classActive} question={currentQuestion} />}
         </div>}
-        <PresenterQuestionClock question={session.status === 'active' ? questions.find(item => item.id === session.current_question_id) || null : null} />
+        {(!compactWorkspace || workspaceView === 'current') && (
+          <PresenterQuestionClock question={classActive ? currentQuestion : null} compact={compactWorkspace} />
+        )}
         <div hidden={workspaceView !== 'activities'}>
         <PresenterControlPanel
           busy={busy}
@@ -2280,7 +2287,7 @@ export function PresenterPage() {
           captionError={uiText(captionError)}
           onlineCount={onlineParticipants.length}
           raisedCount={raisedCount}
-          assignmentProgress={APP_PROFILE.id !== 'full' && workspaceView === 'activities' && <AssignmentProgress active={session.status === 'active'} question={questions.find(item => item.id === session.current_question_id) || null} />}
+          assignmentProgress={!compactWorkspace && APP_PROFILE.id !== 'full' && workspaceView === 'activities' && <AssignmentProgress active={classActive} question={currentQuestion} />}
           onLowerHands={() => void lowerHands()}
           session={session}
           onDrawLottery={drawLottery}

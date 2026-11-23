@@ -5,7 +5,7 @@ import { usePresenterLocale } from '../lib/presenterI18n'
 import { requireSupabase } from '../lib/supabase'
 import type { Question } from '../types'
 
-export function AssignmentProgress({ question, active }: { question: Question | null; active: boolean }) {
+export function AssignmentProgress({ question, active, inline = false }: { question: Question | null; active: boolean; inline?: boolean }) {
   const locale = usePresenterLocale()
   const id = question?.id
   const sessionId = question?.session_id
@@ -36,7 +36,10 @@ export function AssignmentProgress({ question, active }: { question: Question | 
   }, [visible, id, sessionId])
 
   if (!visible) return null
-  const count = progress?.id === id ? progress?.remaining ?? '…' : '…'
+  const remaining = progress?.id === id ? progress?.remaining : null
+  if (inline && !remaining) return null
+  const count = remaining ?? '…'
   const label = locale === 'zh-CN' ? '未提交' : locale === 'ja' ? '未提出' : locale === 'en' ? 'Pending' : '未繳交'
+  if (inline) return <span className="workspace-pending">{locale === 'en' ? `${count} ${label.toLowerCase()}` : `${label} ${count}`}</span>
   return <span className="roster-hand assignment-pending" role="status" title={label} aria-label={label + " " + count}><Hourglass size={16} /> {count}</span>
 }

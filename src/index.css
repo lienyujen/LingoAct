@@ -819,12 +819,10 @@ h2 {
 .desktop-shell .presenter-workspace-shell.is-compact {
   display: grid;
   grid-template: auto minmax(0, 1fr) auto / minmax(0, 1fr);
+  gap: 6px;
   height: calc(100vh - 10px);
   min-width: 0;
   overflow: hidden;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
 }
 
 .desktop-shell .settings-open .presenter-workspace-shell.is-compact {
@@ -833,11 +831,8 @@ h2 {
 
 .desktop-shell .is-compact .qr-panel {
   gap: 4px;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  box-shadow: none;
-  padding: 8px 12px;
+  box-shadow: var(--shadow-sm);
+  padding: 8px 10px;
 }
 
 .desktop-shell .presenter-page .is-compact .qr-panel .panel-heading {
@@ -850,15 +845,22 @@ h2 {
 }
 
 .desktop-shell .is-compact .teacher-workspace {
-  gap: 10px;
+  gap: 6px;
   min-height: 0;
   overflow: auto;
-  padding: 0 10px 10px;
-  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
-.is-compact .workspace-navigation {
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
+.is-compact .workspace-navigation.has-raised-hands {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.is-compact .workspace-navigation .roster-hand {
+  background: var(--surface-subtle);
+  color: var(--text);
+  min-height: 30px;
+  align-self: center;
+  padding: 0 6px;
 }
 
 .is-compact .workspace-navigation button {
@@ -872,17 +874,11 @@ h2 {
 }
 
 .is-compact .teacher-workspace .panel {
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .is-compact .presenter-results {
-  gap: 10px;
-}
-
-.is-compact .workspace-footer {
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 8px 10px;
+  gap: 6px;
 }
 
 .is-compact .quiz-result-stats {
@@ -6864,9 +6860,12 @@ h2 {
 .presenter-question-clock small { width: 100%; }
 .presenter-question-clock.is-compact {
   position: static;
-  border-width: 1px;
-  margin: 0;
-  padding: 6px 10px;
+  justify-content: flex-start;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  margin: 0 0 6px;
+  padding: 0;
   font-size: 12px;
 }
 

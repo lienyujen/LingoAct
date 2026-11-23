@@ -371,7 +371,7 @@ jobs:
 
           ## 本次更新
 
-          - 各桌面版整合教師主選單，QR Code 可按需展開。進行中分頁在仍有人未交時顯示人數，交齊或停止收件就隱藏。錄音參考計時到零會自動收起。
+          - 各桌面版保留教師主選單的分格卡片並縮短間距。未交人數顯示於進行中分頁內，交齊或停止收件就隱藏。錄音參考計時在作答卡片內顯示，到零會自動收起。
           - 教師手寫題目、提示及派送文字可保留多語原文。英文課可把多語素材轉成符合班級程度的英文題目、文章與聽力對話。
           - 英文課合成朗讀及對話預設美式，選擇英式會使用英式語系設定。舊安裝請重跑後端部署精靈以套用多語輸入和口音設定。
           - 「下一步教學」可重新派出同一題並保留上一輪紀錄。
@@ -413,7 +413,7 @@ jobs:
             notes=$(cat <<'MD'
           ## LingoAct English
 
-          - The desktop workspace keeps the QR code on demand, with a fixed footer and a scrollable activity area. The Current tab shows a quiet pending count while students still owe responses. An expired recording reference timer clears automatically.
+          - The desktop workspace keeps separate cards with tighter spacing. The Current tab shows a small pending count until all responses arrive or collection stops. The recording reference timer stays inside its activity card and clears at zero.
           - Teacher-written questions, directions and messages accept multilingual text. AI activities adapt source material into English at the selected class level.
           - Listening can adapt pasted source text into an editable English passage or dialogue. Speech synthesis requests American English by default or British English when selected.
 

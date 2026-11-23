@@ -6,7 +6,6 @@ import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   joinUrl: string
-  title?: string
   linkable?: boolean
   onClose?: () => void
   onMinimize?: () => void
@@ -14,12 +13,12 @@ type Props = {
   qrInteractionProps?: Pick<HTMLAttributes<HTMLDivElement>, 'onDoubleClick'>
 }
 
-export function QRCodePanel({ joinUrl, title, linkable, onClose, onMinimize, onCollapse, qrInteractionProps }: Props) {
+export function QRCodePanel({ joinUrl, linkable, onClose, onMinimize, onCollapse, qrInteractionProps }: Props) {
   const t = usePresenterText()
-  const [showCode, setShowCode] = useState(false)
+  const [showCode, setShowCode] = useState(true)
   const codeId = useId()
   const compact = Boolean(onCollapse)
-  useEffect(() => { if (!compact) setShowCode(false) }, [compact])
+  useEffect(() => { if (!compact) setShowCode(true) }, [compact])
   return (
     <section className="panel qr-panel">
       <div className="panel-heading">
@@ -30,7 +29,7 @@ export function QRCodePanel({ joinUrl, title, linkable, onClose, onMinimize, onC
             button off the edge of the window entirely. */}
         <h2>
           <img alt="" className="qr-lingoact-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} />
-          <span className="qr-heading-label">{title || t('joinClass')}</span>
+          <span className="qr-heading-label">{t('joinClass')}</span>
         </h2>
         {(onCollapse || onMinimize || onClose) && (
           <div

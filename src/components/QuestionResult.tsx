@@ -25,10 +25,12 @@ import { usePresenterText, usePresenterLocale } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 import type { Answer, AudioResponse, FileResponse, Question, QuestionAnalysis } from '../types'
 import { QuestionActivityStatus } from './QuestionActivityStatus'
+import { PresenterQuestionClock } from './PresenterQuestionClock'
 const drawingDefaultTitles = new Set(['電寫題', '电写题', '手写题', 'Handwritten response'])
 
 type Props = {
   anonymousEnabled: boolean
+  showRecordingClock?: boolean
   question: Question | null
   // The capture a 圖上點選 question was answered on. Null for every other type.
   screenshotUrl?: string | null
@@ -880,6 +882,7 @@ export function QuestionResult(props: Props) {
           <QuestionStatusActions {...props} question={question} />
         </div>
         {question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
+        {props.showRecordingClock && <PresenterQuestionClock question={question} compact />}
         <p className="muted">{t('recordedPeople', { n: answers.length })}</p>
         {audioResponses.length ? (
           <div className="audio-result-list">

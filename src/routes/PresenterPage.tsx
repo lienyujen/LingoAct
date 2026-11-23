@@ -2229,6 +2229,8 @@ export function PresenterPage() {
     presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
     active={session.status === 'active'} onDispatched={showDispatchedQuestion} />
   const currentQuestion = questions.find(item => item.id === session.current_question_id) || null
+  const showRaisedHands = APP_PROFILE.id !== 'full' && workspaceView !== 'activities' && raisedCount > 0
+  const raisedHands = showRaisedHands && <button type="button" className="roster-hand" title={t('lowerAllHands')} onClick={() => void lowerHands()}>✋ {raisedCount}</button>
   const classActive = session.status === 'active'
   const nextActivity = workspaceView === 'current' && (
     <button className="workspace-next" type="button" onClick={() => navigateWorkspace('activities')}>{w.next}</button>
@@ -2242,7 +2244,6 @@ export function PresenterPage() {
         <aside className="qr-floating">
           <QRCodePanel
             joinUrl={joinUrl}
-            title={compactWorkspace ? w.classroom : undefined}
             onCollapse={compactWorkspace ? () => setControlsOpen(false) : undefined}
             linkable={guoyuJoin}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
@@ -2262,7 +2263,7 @@ export function PresenterPage() {
           className="presenter-controls-overlay teacher-workspace"
           onDoubleClick={(event) => event.stopPropagation()}
         >
-        <nav className="workspace-navigation" aria-label={w.classroom}>
+        <nav className={compactWorkspace && showRaisedHands ? "workspace-navigation has-raised-hands" : "workspace-navigation"} aria-label={w.classroom}>
           {(['activities', 'current', 'history'] as const).map((view) => <button
             key={view} type="button" aria-current={workspaceView === view ? 'page' : undefined}
             onClick={() => {
@@ -2272,14 +2273,13 @@ export function PresenterPage() {
             {w[view]}
             {compactWorkspace && view === 'current' && <AssignmentProgress active={classActive} question={currentQuestion} inline />}
           </button>)}
+          {compactWorkspace && raisedHands}
         </nav>
-        {APP_PROFILE.id !== 'full' && workspaceView !== 'activities' && <div className="assignment-menu-status">
-          {raisedCount > 0 && <button type="button" className="roster-hand" onClick={() => void lowerHands()}>✋ {raisedCount}</button>}
-          {!compactWorkspace && <AssignmentProgress active={classActive} question={currentQuestion} />}
+        {!compactWorkspace && APP_PROFILE.id !== 'full' && workspaceView !== 'activities' && <div className="assignment-menu-status">
+          {raisedHands}
+          <AssignmentProgress active={classActive} question={currentQuestion} />
         </div>}
-        {(!compactWorkspace || workspaceView === 'current') && (
-          <PresenterQuestionClock question={classActive ? currentQuestion : null} compact={compactWorkspace} />
-        )}
+        {!compactWorkspace && <PresenterQuestionClock question={classActive ? currentQuestion : null} />}
         <div hidden={workspaceView !== 'activities'}>
         <PresenterControlPanel
           busy={busy}
@@ -2335,7 +2335,7 @@ export function PresenterPage() {
         </div>
         <div className="presenter-results" hidden={workspaceView === 'activities' || (workspaceView === 'history' && selectedQuestionId === session.current_question_id)}>
         {dispatchWarning && workspaceView === 'current' && <p className="panel" role="status">{uiText(dispatchWarning)}</p>}
-        {!compactWorkspace && followUp}
+        {followUp}
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
             writingContext={{ track: session.teaching_language, framework: session.level_framework, level: session.level_code }}
@@ -2353,6 +2353,7 @@ export function PresenterPage() {
             onResumeQuestion={resumeQuestion}
           />
         ) : <QuestionResult
+          showRecordingClock={compactWorkspace && workspaceView === 'current' && classActive && question?.id === currentQuestion?.id}
           anonymousEnabled={session.anonymous_enabled}
           screenshotUrl={hotspotImageUrl}
           analysis={analysis}
@@ -2387,7 +2388,6 @@ export function PresenterPage() {
             />
           ) : undefined}
         />}
-        {compactWorkspace && followUp}
         {question && ['custom_quiz', 'reading'].includes(question.type) && session.teaching_language === 'guoyu'
           && session.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '') && (
           <HandwritingResults key={question.id} sessionId={sessionId} questionId={question.id}

@@ -1,6 +1,8 @@
 // Reviewed Japanese product copy. Keep separate from generated catalogues so
 // regenerating another language cannot replace the wording used in class.
 export const teacherJapanese = {
+  listeningSourceText: 'リスニング教材の原文', listeningSourcePlaceholder: 'どの言語の文章でも貼り付けられます。',
+  prepareEnglishListening: '英語のスクリプトを作成', editListeningSource: '原文を編集',
   proficiencyFramework: '学習コース', levelLabel: '学習範囲・レベル',
   captionCostNote: '字幕を翻訳する場合はリアルタイム翻訳の接続を使用します。音声通訳も言語ごとに有料の接続を使用します。学習者数が増えても接続数は増えません。',
   writingCoach: '作文コーチ', typeWriting: '作文', classWrapUp: '授業の振り返り',

@@ -2224,7 +2224,7 @@ export function PresenterPage() {
     )
   }
 
-  const compactWorkspace = Boolean(window.lingoActDesktop && APP_PROFILE.id === 'english' && controlsOpen && !selectionMode)
+  const compactWorkspace = Boolean(window.lingoActDesktop && controlsOpen && !selectionMode)
   const followUp = question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
     presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
     active={session.status === 'active'} onDispatched={showDispatchedQuestion} />

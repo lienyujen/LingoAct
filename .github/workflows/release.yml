@@ -13,6 +13,10 @@ on:
         description: 'Publish to the release page (off = build only, so a Mac build can be opened before it goes public)'
         type: boolean
         default: false
+      refresh:
+        description: 'Rebuild every download for this release from the selected revision'
+        type: boolean
+        default: false
       platform:
         description: 'Build every platform, or refresh the macOS downloads'
         type: choice
@@ -46,7 +50,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
           GH_REPO: ${{ github.repository }}
+          REFRESH: ${{ inputs.refresh }}
+          EDITION: ${{ inputs.edition }}
+          PLATFORM: ${{ inputs.platform }}
         run: |
+          if [[ "$REFRESH" == "true" && ( "$EDITION" != "all" || "$PLATFORM" != "all" ) ]]; then
+            echo "::error::Moving the release tag requires rebuilding every download."
+            exit 1
+          fi
           if ! gh api "repos/$GH_REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
             gh api "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$TAG" -f "sha=$GITHUB_SHA"
           fi
@@ -148,7 +159,7 @@ jobs:
         if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'languages' || matrix.profile != 'full') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'guoyu' || matrix.profile == 'guoyu') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ (inputs.publish && inputs.tag) || github.sha }}
+          ref: ${{ (inputs.publish && !inputs.refresh && inputs.tag) || github.sha }}
 
       - name: Setup pnpm
         if: (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest') && (inputs.edition != 'languages' || matrix.profile != 'full') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'guoyu' || matrix.profile == 'guoyu') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
@@ -282,7 +293,7 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSScreenCaptureUsageDescription' "$app/Contents/Info.plist"
 
       - name: Upload build
-        if: ((github.event_name == 'push' || inputs.publish) && (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'languages' || matrix.profile != 'full') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'guoyu' || matrix.profile == 'guoyu') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+        if: (!inputs.refresh && (github.event_name == 'push' || inputs.publish) && (github.event_name == 'push' || inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'languages' || matrix.profile != 'full') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'guoyu' || matrix.profile == 'guoyu') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
@@ -293,8 +304,8 @@ jobs:
           test -f "release/$ARTIFACT"
           gh release upload "$TAG" "release/$ARTIFACT" --clobber
 
-      - name: Save a build-only preview
-        if: (github.event_name == 'workflow_dispatch' && !inputs.publish && (inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'languages' || matrix.profile != 'full') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'guoyu' || matrix.profile == 'guoyu') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
+      - name: Save a build for preview or release refresh
+        if: (github.event_name == 'workflow_dispatch' && (!inputs.publish || inputs.refresh) && (inputs.platform == 'all' || matrix.os == 'macos-latest')) && (inputs.edition != 'languages' || matrix.profile != 'full') && (inputs.edition != 'english' || matrix.profile == 'english') && (inputs.edition != 'japanese' || matrix.profile == 'japanese') && (inputs.edition != 'guoyu' || matrix.profile == 'guoyu') && (inputs.edition != 'mandarin' || contains(fromJSON('["huayu","sc","ncacls"]'), matrix.profile))
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.label }}
@@ -304,6 +315,9 @@ jobs:
 
   publish:
     name: Publish release
+    permissions:
+      actions: read
+      contents: write
     needs: build
     # Pushing a tag publishes, as before. A manual run defaults to building
     # only, so an unsigned Mac build can be downloaded and actually opened on a
@@ -318,9 +332,26 @@ jobs:
           GH_REPO: ${{ github.repository }}
           EDITION: ${{ inputs.edition || 'all' }}
           PLATFORM: ${{ inputs.platform || 'all' }}
+          REFRESH: ${{ inputs.refresh }}
         shell: bash
         run: |
-          gh release download "$TAG" --dir builds --pattern '*.zip' --pattern '*.dmg'
+          if [[ "$REFRESH" == "true" ]]; then
+            gh run download "$GITHUB_RUN_ID" --dir artifacts
+            mkdir builds
+            for artifact in artifacts/*/*; do
+              mv "$artifact" builds/
+            done
+            expected=(LingoAct-{SC,Huayu,JP,English,TC,Guoyu}.{dmg,zip} LingoAct-Full.zip)
+            for name in "${expected[@]}"; do
+              test -s "builds/$name"
+            done
+            # Wait for every build to pass before changing the published source
+            # or downloads. A fast-forward preserves the tag's release history.
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$TAG" -f "sha=$GITHUB_SHA" -F force=false
+            gh release upload "$TAG" "${expected[@]/#/builds/}" --clobber
+          else
+            gh release download "$TAG" --dir builds --pattern '*.zip' --pattern '*.dmg'
+          fi
           (cd builds && shopt -s nullglob && sha256sum -- *.zip *.dmg > SHA256SUMS.txt)
           notes=$(cat <<'MD'
           ## 下載
@@ -340,7 +371,9 @@ jobs:
 
           ## 本次更新
 
-          - 教師主選單在收件期間顯示未繳交人數，停止收件即隱藏。
+          - 各桌面版整合教師主選單，QR Code 可按需展開。進行中分頁在仍有人未交時顯示人數，交齊或停止收件就隱藏。錄音參考計時到零會自動收起。
+          - 教師手寫題目、提示及派送文字可保留多語原文。英文課可把多語素材轉成符合班級程度的英文題目、文章與聽力對話。
+          - 英文課合成朗讀及對話預設美式，選擇英式會使用英式語系設定。舊安裝請重跑後端部署精靈以套用多語輸入和口音設定。
           - 「下一步教學」可重新派出同一題並保留上一輪紀錄。
           - 擋下無聲或不完整的錄音，辨識不到語音時不計分。
           - 口說與朗讀在 AI 完成分析後立即顯示評測，教師可在收件期間播放錄音；停止作答只阻止新提交。

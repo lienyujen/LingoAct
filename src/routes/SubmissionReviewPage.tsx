@@ -46,7 +46,7 @@ export function SubmissionReviewPage() {
     }
     const supabase = requireSupabase()
     const [{ data: sessionRow }, { data: questionRow }, { data, error: loadError }] = await Promise.all([
-      supabase.from('sessions').select('system_language, teaching_language').eq('id', sessionId).maybeSingle(),
+      supabase.from('sessions').select('system_language, teaching_language, guidance_language').eq('id', sessionId).maybeSingle(),
       supabase.from('questions').select('*').eq('id', questionId).maybeSingle(),
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_file_responses', sessionId, presenterToken, questionId },
@@ -56,7 +56,7 @@ export function SubmissionReviewPage() {
       setError(data?.message || t('reviewLoadFailed'))
       return
     }
-    setLocale(presenterLocaleFor(sessionRow?.teaching_language || null, sessionRow?.system_language))
+    setLocale(presenterLocaleFor(sessionRow?.teaching_language || null, sessionRow?.system_language, sessionRow?.guidance_language))
     if (questionRow) setQuestion(questionRow as Question)
     setRawResponses((data?.responses || []) as FileResponse[])
     setError('')

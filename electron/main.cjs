@@ -783,7 +783,11 @@ ipcMain.handle('window:set-expanded', (_event, expanded, settingsOpen = false, i
 
 ipcMain.handle('sentence-wall:set-visible', (event, visible) => {
   if (!overlayWindow || event.sender !== overlayWindow.webContents) return
-  sentenceWallVisible = Boolean(visible)
+  const nextVisible = Boolean(visible)
+  // The overlay reports its initial hidden state when a class opens. Only
+  // expand the controls when a visible sentence wall actually closes.
+  if (nextVisible === sentenceWallVisible) return
+  sentenceWallVisible = nextVisible
   setControlBounds(!sentenceWallVisible, sentenceWallVisible)
   if (!sentenceWallVisible) bringControlToFront(false)
 })

@@ -317,6 +317,7 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
           GH_REPO: ${{ github.repository }}
           EDITION: ${{ inputs.edition || 'all' }}
+          PLATFORM: ${{ inputs.platform || 'all' }}
         shell: bash
         run: |
           gh release download "$TAG" --dir builds --pattern '*.zip' --pattern '*.dmg'
@@ -375,15 +376,35 @@ jobs:
           if [[ "$EDITION" == "mandarin" ]]; then
             notes=$(printf '%s\n' "$notes" | sed '/| 完整教學版 |/d; /| 英語教學版 |/d; /| 日語教學版 |/d; /| 國語教學版 |/d')
           fi
+          if [[ "$EDITION" == "english" ]]; then
+            notes=$(cat <<'MD'
+          ## LingoAct English
+
+          - The join QR window stays compact when a class opens.
+          - The classroom overlay, word cloud, submission review, image response review, and session report follow the English class's guidance language.
+
+          On macOS, open `LingoAct-English.dmg` and drag the app into Applications. The DMG supports Apple Silicon and Intel.
+          MD
+            )
+            if [[ "$PLATFORM" == "all" ]]; then
+              notes=$(printf '%s\n\n%s' "$notes" 'On Windows, extract `LingoAct-English.zip` and run the included executable.')
+            fi
+            notes=$(printf '%s\n\n%s' "$notes" 'Use `SHA256SUMS.txt` to verify the downloads.')
+          fi
+          latest=true
+          if [[ "$EDITION" == "english" ]]; then
+            latest=false
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             # A same-version rebuild is intentional: replace only the assets
             # produced by this run and leave the other platform untouched.
             gh release upload "$TAG" builds/SHA256SUMS.txt --clobber
             printf '%s\n' "$notes" > release-notes.md
-            gh release edit "$TAG" --draft=false --latest --notes-file release-notes.md
+            gh release edit "$TAG" --draft=false --latest="$latest" --notes-file release-notes.md
           else
             gh release create "$TAG" \
               --title "LingoAct $TAG" \
+              --latest="$latest" \
               --notes "$notes" \
               builds/*
           fi

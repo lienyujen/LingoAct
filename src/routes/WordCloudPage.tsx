@@ -15,7 +15,7 @@ export function WordCloudPage() {
   const [session, setSession] = useState<Session | null>(null)
   // Its own window, so it reads the class's teaching language itself rather
   // than inheriting a provider from the presenter page.
-  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language)
+  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language, session?.guidance_language)
   const t = presenterLookup(locale)
   const [messages, setMessages] = useState<Message[]>([])
   // The presenter's own words, kept on this computer beside the class lists. A

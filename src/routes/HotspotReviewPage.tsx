@@ -38,13 +38,13 @@ export function HotspotReviewPage() {
       supabase.functions.invoke('presenter-action', {
         body: { action: 'get_hotspot_result', sessionId, presenterToken, questionId },
       }),
-      supabase.from('sessions').select('system_language, teaching_language, anonymous_enabled').eq('id', sessionId).maybeSingle(),
+      supabase.from('sessions').select('system_language, teaching_language, guidance_language, anonymous_enabled').eq('id', sessionId).maybeSingle(),
     ])
     if (loadError || !data?.question) {
       setError(data?.message || t('cloudUpdateFailed', { message: '' }))
       return
     }
-    setLocale(presenterLocaleFor(sessionRow?.teaching_language || null, sessionRow?.system_language))
+    setLocale(presenterLocaleFor(sessionRow?.teaching_language || null, sessionRow?.system_language, sessionRow?.guidance_language))
     setResult(data as HotspotResult)
     setError('')
   }, [questionId, sessionId, t])

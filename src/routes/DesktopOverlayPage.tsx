@@ -20,7 +20,7 @@ export function DesktopOverlayPage() {
   const [session, setSession] = useState<Session | null>(null)
   // The overlay is its own transparent window, so it resolves the class's
   // teaching language itself and provides it to the overlays it renders.
-  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language)
+  const locale = presenterLocaleFor(session?.teaching_language, session?.system_language, session?.guidance_language)
   const t = presenterLookup(locale)
   const [messages, setMessages] = useState<Message[]>([])
   const [lotteryEvent, setLotteryEvent] = useState<LotterySessionEvent | null>(null)

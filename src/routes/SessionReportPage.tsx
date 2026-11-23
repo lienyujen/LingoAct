@@ -108,7 +108,8 @@ export function SessionReportPage() {
   // the language before the report it is refusing to load.
   const [teachingLanguage, setTeachingLanguage] = useState<string | null>(null)
   const [systemLanguage, setSystemLanguage] = useState<string | null>(null)
-  const locale = presenterLocaleFor(teachingLanguage, systemLanguage)
+  const [guidanceLanguage, setGuidanceLanguage] = useState<string | null>(null)
+  const locale = presenterLocaleFor(teachingLanguage, systemLanguage, guidanceLanguage)
   const t = presenterLookup(locale)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -235,10 +236,11 @@ export function SessionReportPage() {
   // the language of the class it belongs to.
   useEffect(() => {
     let cancelled = false
-    void requireSupabase().from('sessions').select('teaching_language, system_language').eq('id', sessionId).maybeSingle()
+    void requireSupabase().from('sessions').select('teaching_language, system_language, guidance_language').eq('id', sessionId).maybeSingle()
       .then(({ data }) => {
         if (!cancelled) setTeachingLanguage((data?.teaching_language as string | null) ?? '')
         if (!cancelled) setSystemLanguage((data?.system_language as string | null) ?? null)
+        if (!cancelled) setGuidanceLanguage(data?.guidance_language ?? null)
       })
     return () => { cancelled = true }
   }, [sessionId])

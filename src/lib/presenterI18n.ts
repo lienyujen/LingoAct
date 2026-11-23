@@ -411,6 +411,7 @@ const messages = {
     // 歷史題目、QR、對話框
     pastQuestions: '歷史題目', backToCurrent: '回到目前題目',
     questionNumber: '第 {n} 題', answerCount: '{n} 份作答',
+    listeningSourceText: '聽力素材', listeningSourcePlaceholder: '可貼上任何語言的內容。', prepareEnglishListening: '轉製英文聽力稿', editListeningSource: '編輯原始素材',
     joinClass: '加入場次', minimize: '最小化', processing: '處理中...',
 
     // Exit Ticket
@@ -930,6 +931,7 @@ const messages = {
 
     pastQuestions: 'Earlier questions', backToCurrent: "Back to current question",
     questionNumber: 'Question {n}', answerCount: "{n} responses",
+    listeningSourceText: 'Listening source', listeningSourcePlaceholder: 'Paste material in any language.', prepareEnglishListening: 'Prepare English script', editListeningSource: 'Edit source material',
     joinClass: 'Join the class', minimize: "Minimize", processing: "Working…",
 
     catLessonSummary: "Lesson summary", catLearningAssessment: "Learning check",

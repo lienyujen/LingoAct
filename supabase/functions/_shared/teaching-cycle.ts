@@ -113,8 +113,6 @@ export async function presenterTeachingCycle(db: Db, sessionId: string, input: I
   }
   if (session.status !== 'active') return jsonResponse({ message: '請在上課中派送。' }, 409)
   const focus = clean(input.focus, 500)
-  const english = session.teaching_language === 'en'
-  if (english) requireEnglishMaterial(focus, input.materialA, input.materialB)
   const id = crypto.randomUUID()
   const question = { ...source, id, status: 'draft', created_at: new Date().toISOString(), started_at: null, stopped_at: null,
     source_question_id: source.id, learning_focus: focus || null, teaching_mode: 'practice',

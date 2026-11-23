@@ -1,18 +1,25 @@
 import { QRCodeSVG } from 'qrcode.react'
-import { Minus, X } from '@phosphor-icons/react'
+import { CaretUp, Minus, QrCode, X } from '@phosphor-icons/react'
+import { useEffect, useId, useState } from 'react'
 import type { HTMLAttributes } from 'react'
 import { usePresenterText } from '../lib/presenterI18n'
 
 type Props = {
   joinUrl: string
+  title?: string
   linkable?: boolean
   onClose?: () => void
   onMinimize?: () => void
+  onCollapse?: () => void
   qrInteractionProps?: Pick<HTMLAttributes<HTMLDivElement>, 'onDoubleClick'>
 }
 
-export function QRCodePanel({ joinUrl, linkable, onClose, onMinimize, qrInteractionProps }: Props) {
+export function QRCodePanel({ joinUrl, title, linkable, onClose, onMinimize, onCollapse, qrInteractionProps }: Props) {
   const t = usePresenterText()
+  const [showCode, setShowCode] = useState(false)
+  const codeId = useId()
+  const compact = Boolean(onCollapse)
+  useEffect(() => { if (!compact) setShowCode(false) }, [compact])
   return (
     <section className="panel qr-panel">
       <div className="panel-heading">
@@ -23,15 +30,25 @@ export function QRCodePanel({ joinUrl, linkable, onClose, onMinimize, qrInteract
             button off the edge of the window entirely. */}
         <h2>
           <img alt="" className="qr-lingoact-icon" src={`${import.meta.env.BASE_URL}favicon.svg`} />
-          <span className="qr-heading-label">{t('joinClass')}</span>
+          <span className="qr-heading-label">{title || t('joinClass')}</span>
         </h2>
-        {(onMinimize || onClose) && (
+        {(onCollapse || onMinimize || onClose) && (
           <div
             className="qr-window-actions"
             onDoubleClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onPointerUp={(event) => event.stopPropagation()}
           >
+            {onCollapse && (
+              <>
+                <button aria-label={t('joinClass')} aria-controls={codeId} aria-expanded={showCode} title={t('joinClass')} type="button" onClick={() => setShowCode(open => !open)}>
+                  <QrCode size={18} />
+                </button>
+                <button aria-label={t('collapse')} title={t('collapse')} type="button" onClick={onCollapse}>
+                  <CaretUp size={18} />
+                </button>
+              </>
+            )}
             {onMinimize && (
               <button aria-label={t('minimize')} title={t('minimize')} type="button" onClick={onMinimize}>
                 <Minus size={18} />
@@ -45,12 +62,14 @@ export function QRCodePanel({ joinUrl, linkable, onClose, onMinimize, qrInteract
           </div>
         )}
       </div>
+      <div id={codeId} className="qr-code-content" hidden={compact && !showCode}>
       <div className="qr-box" {...qrInteractionProps}>
         <QRCodeSVG marginSize={2} value={joinUrl} size={172} />
       </div>
       {linkable
         ? <a className="join-url" href={joinUrl} target="_blank" rel="noreferrer" title={joinUrl}>{joinUrl}</a>
         : <p className="join-url" title={joinUrl}>{joinUrl}</p>}
+      </div>
     </section>
   )
 }

@@ -167,6 +167,8 @@ export function ListeningStudioModal({
   const nextAccent = (current: ListeningAccent) => ACCENTS[(ACCENTS.findIndex(choice => choice.value === current) + 1) % ACCENTS.length].value
   const [source, setSource] = useState<'screenshot' | 'text'>('screenshot')
   const [transcript, setTranscript] = useState('')
+  const [pastedSource, setPastedSource] = useState('')
+  const [preparedTextKind, setPreparedTextKind] = useState<StudioKind | null>(null)
   const [classicalSelection, setClassicalSelection] = useState('auto')
   const [kind, setKind] = useState<StudioKind>('passage')
   const [accent, setAccent] = useState<ListeningAccent>('standard_guoyu')
@@ -189,17 +191,20 @@ export function ListeningStudioModal({
     if (!open) return
     setClassicalSelection('auto')
     if (initialTranscript) setSource('text')
-    setTranscript(initialTranscript)
+    setPastedSource(teachingTrack === 'en' ? initialTranscript : '')
+    setTranscript(teachingTrack === 'en' ? '' : initialTranscript)
     setKind(initialKind)
+    setPreparedTextKind(null)
     setAccent(speechAccent(levelFramework === 'hsk' ? 'zh-cn' : teachingLanguage, initialAccent))
     setReplayLimit(initialReplayLimit)
     setPrepareSeconds(initialPrepareSeconds)
     setAnswerSeconds(initialAnswerSeconds)
-  }, [teachingLanguage, levelFramework, initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open])
+  }, [teachingLanguage, levelFramework, initialAccent, initialAnswerSeconds, initialKind, initialPrepareSeconds, initialReplayLimit, initialTranscript, open, teachingTrack])
 
   useEffect(() => {
     if (open) return
     setSource('screenshot')
+    setPastedSource('')
     setTranscript('')
     setKind('passage')
     setAccent('standard_guoyu')
@@ -259,6 +264,7 @@ export function ListeningStudioModal({
     try {
       const id = await uploadListeningScreenshot(sessionId, presenterToken, file, t)
       setScreenshotId(id)
+      if (teachingTrack === 'en') setSource('screenshot')
       setTranscript('')
       setClip(null)
     } catch (caught) {
@@ -268,21 +274,36 @@ export function ListeningStudioModal({
     }
   }
 
-  async function analyzeScreenshot() {
-    if (!screenshotId) return
+  function switchSource(next: typeof source) {
+    if (next === source) return
+    setSource(next)
+    if (teachingTrack === 'en') {
+      setTranscript('')
+      setPreparedTextKind(null)
+      setClip(null)
+      setError('')
+    }
+  }
+
+  async function prepareScript() {
+    const fromText = source === 'text'
+    const requestSource = fromText ? { sourceText: pastedSource.trim() } : { screenshotId: screenshotId || undefined }
+    if (!requestSource.sourceText && !requestSource.screenshotId) return
     setError('')
     setBusy(t('recognising'))
     try {
       const analysis = await analyzeListeningSource({
         sessionId,
         presenterToken,
-        screenshotId,
+        ...requestSource,
         teachingTrack,
         requestedKind: kind,
         levelFramework,
         levelCode,
       })
       setTranscript(analysis.transcript)
+      setClip(null)
+      if (fromText) setPreparedTextKind(kind)
       const names = analysis.speakers.slice(0, VOICE_LIMIT)
       setSpeakers(names)
       setSpeakerGenders(names.map((name, index) => analysedSpeakerGender(analysis.speakerGenders[index], name, index)))
@@ -393,7 +414,9 @@ export function ListeningStudioModal({
     }
   }
 
-  const canSynthesize = transcript.trim().length > 0 && !busy
+  const englishTextSource = teachingTrack === 'en' && source === 'text'
+  const needsEnglishScript = englishTextSource && preparedTextKind !== kind
+  const canSynthesize = (needsEnglishScript ? pastedSource : transcript).trim().length > 0 && !busy
 
   return (
     <div
@@ -414,20 +437,26 @@ export function ListeningStudioModal({
 
         <div className="ls-body">
           <div className="ls-tabs" role="tablist">
-            <button role="tab" aria-selected={source === 'screenshot'} className={source === 'screenshot' ? 'is-on' : ''} type="button" onClick={() => setSource('screenshot')}>{t('fromScreenshot')}</button>
-            <button role="tab" aria-selected={source === 'text'} className={source === 'text' ? 'is-on' : ''} type="button" onClick={() => setSource('text')}>{t('pasteText')}</button>
+            <button role="tab" disabled={Boolean(busy)} aria-selected={source === 'screenshot'} className={source === 'screenshot' ? 'is-on' : ''} type="button" onClick={() => switchSource('screenshot')}>{t('fromScreenshot')}</button>
+            <button role="tab" disabled={Boolean(busy)} aria-selected={source === 'text'} className={source === 'text' ? 'is-on' : ''} type="button" onClick={() => switchSource('text')}>{t('pasteText')}</button>
             <span className="ls-spacer" />
-            {source === 'text' && <span className="ls-hint">{t('textCheaperHint')}</span>}
+            {source === 'text' && !englishTextSource && <span className="ls-hint">{t('textCheaperHint')}</span>}
           </div>
 
           <div className="ls-chips">
             {(Object.keys(KIND_LABELS) as StudioKind[]).map((value) => (
-              <button key={value} className={kind === value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => { setKind(value); setClip(null) }}>
+              <button key={value} disabled={Boolean(busy)} className={kind === value ? 'ls-chip is-on' : 'ls-chip'} type="button" onClick={() => { setKind(value); setClip(null) }}>
                 {t(KIND_LABELS[value])}
               </button>
             ))}
             {(teachingLanguage.startsWith('zh') || teachingLanguage.startsWith('en')) && (
               <div className="ls-accent-set" aria-label={t(teachingLanguage.startsWith('en') ? 'accentEnglishLabel' : 'accentLabel')}>
+                {teachingLanguage.startsWith('en') ? ACCENTS.map(({ value, label }) => (
+                  <button key={value} className={value === accent ? 'ls-chip is-on' : 'ls-chip'} type="button"
+                    aria-pressed={value === accent} disabled={Boolean(busy)} onClick={() => { setAccent(value); setClip(null) }}>
+                    {t(label)}
+                  </button>
+                )) : (
                 <button
                   className="ls-chip is-on ls-accent-cycle"
                   type="button"
@@ -437,6 +466,7 @@ export function ListeningStudioModal({
                 >
                   {t(ACCENTS.find((choice) => choice.value === accent)?.label ?? 'accentStandardGuoyu')}
                 </button>
+                )}
               </div>
             )}
           </div>
@@ -461,7 +491,7 @@ export function ListeningStudioModal({
           )}
 
           {source === 'screenshot' && screenshotId && !transcript && (
-            <button className="ls-synth" disabled={Boolean(busy)} type="button" onClick={() => void analyzeScreenshot()}>
+            <button className="ls-synth" disabled={Boolean(busy)} type="button" onClick={() => void prepareScript()}>
               {busy || t('generateListeningText')}
             </button>
           )}
@@ -471,17 +501,29 @@ export function ListeningStudioModal({
               <div className="ls-transcript">
                 <div className="ls-transcript-head">
                   <HiddenIcon />
-                  <span>{t('transcriptHidden')}</span>
+                  <span>{t(needsEnglishScript ? 'listeningSourceText' : 'transcriptHidden')}</span>
                   <span className="ls-spacer" />
-                  <span className="ls-count">{t('charCount', { n: transcript.length })}</span>
+                  <span className="ls-count">{t('charCount', { n: (needsEnglishScript ? pastedSource : transcript).length })}</span>
                 </div>
                 <textarea
                   maxLength={4000}
-                  placeholder={t('transcriptPlaceholder')}
-                  value={transcript}
-                  onChange={(event) => { setTranscript(event.target.value); setClip(null) }}
+                  disabled={Boolean(busy)}
+                  placeholder={t(needsEnglishScript ? 'listeningSourcePlaceholder' : 'transcriptPlaceholder')}
+                  value={needsEnglishScript ? pastedSource : transcript}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    if (needsEnglishScript) setPastedSource(value)
+                    else setTranscript(value)
+                    setClip(null)
+                  }}
                 />
               </div>
+
+              {englishTextSource && !needsEnglishScript && (
+                <button className="ghost-button" disabled={Boolean(busy)} type="button" onClick={() => { setPreparedTextKind(null); setClip(null) }}>
+                  {t('editListeningSource')}
+                </button>
+              )}
 
               {source === 'screenshot' && screenshotId && (
                 <label className="ls-include-shot">
@@ -568,8 +610,8 @@ export function ListeningStudioModal({
                   <audio ref={audioRef} controls preload="metadata" src={clip.public_url} />
                 </div>
               ) : (
-                <button className="ls-synth" disabled={!canSynthesize} type="button" onClick={() => void synthesize()}>
-                  {busy || (approved ? '載入校訂音檔' : t('toSpeech'))}
+                <button className="ls-synth" disabled={!canSynthesize} type="button" onClick={() => void (needsEnglishScript ? prepareScript() : synthesize())}>
+                  {busy || (approved ? '載入校訂音檔' : t(needsEnglishScript ? 'prepareEnglishListening' : 'toSpeech'))}
                 </button>
               )}
 

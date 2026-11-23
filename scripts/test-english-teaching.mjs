@@ -42,13 +42,19 @@ import { FRAMEWORKS as server, dispatchLevelCode, levelInstruction } from '../su
 import { resolveFramework, trackInstruction } from '../supabase/functions/_shared/teaching.ts'
 import { speechAccent } from '../supabase/functions/_shared/speech-accent.ts'
 import { accentChoices } from '../src/lib/speechAccent.ts'
-import { buildVoicePlan, contentHash } from '../supabase/functions/_shared/listening.ts'
+import { buildVoicePlan, contentHash, synthesize } from '../supabase/functions/_shared/listening.ts'
 import { englishWord, englishWords, englishReadingTargets, englishNewWords } from '../supabase/functions/_shared/english.ts'
 import { generateReadingPassage, writeMissingGrammarNotes } from '../supabase/functions/_shared/reading.ts'
 import { feedbackSystemPrompt } from '../supabase/functions/_shared/feedback-language.ts'
 import { protectLearningReferences } from '../supabase/functions/_shared/learning-translation.ts'
 import { ENGLISH_GRAMMAR } from '../supabase/functions/_shared/english-grammar.generated.ts'
 import { englishMaterialIssue, requireEnglishMaterial } from '../supabase/functions/_shared/english-material.ts'
+
+registerHooks({
+  resolve(specifier, context, next) {
+    return next(specifier.startsWith('npm:@supabase/supabase-js@') ? '@supabase/supabase-js' : specifier, context)
+  },
+})
 
 test('English grammar references contain curriculum points rather than extracted headings', () => {
   assert.equal(ENGLISH_GRAMMAR.length,76)
@@ -75,19 +81,19 @@ test('English student guidance offers only English and Traditional Chinese on th
 })
 
 test('English matching quizzes retry wrong-language columns and never dispatch a failed correction', async () => {
-  registerHooks({resolve(specifier,context,next){return next(specifier.startsWith('npm:@supabase/supabase-js@')?'@supabase/supabase-js':specifier,context)}})
   const {generateCustomQuiz}=await import('../supabase/functions/_shared/custom-quiz.ts')
   const oldFetch=globalThis.fetch,oldDeno=globalThis.Deno
   globalThis.Deno={env:{get:()=> 'test-key'}}
-  let calls=0,correct=false,instructions=''
+  let calls=0,correct=false,instructions='', requestSource
   globalThis.fetch=async(_url,options)=> {
     calls++
     const request=JSON.parse(options.body)
     instructions=request.systemInstruction.parts[0].text
+    requestSource=request.contents[0].parts.map(part=>part.text).join('\n')
     const result={title:'Match the words',items:[{type:'matching',prompt_text:'Match each word to its meaning.',pair_prompts:correct&&calls>1 ? ['book','school','park'] : ['書本','school','park'],options:['Something you read','A place to learn','A place to walk'],accepted_answers:[],rubric:''}]}
     return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(result)}]}}]}),{status:200})
   }
-  const input={sourceText:'Books are useful at school.',direction:'請用中文出題',requestedType:'matching',requestedCount:1,teachingLanguage:'English',guidanceLanguage:'Traditional Chinese',levelFramework:'cefr',levelCode:'A2'}
+  const input={sourceText:'學校圖書館有很多書。',direction:'請用中文出題',requestedType:'matching',requestedCount:1,teachingLanguage:'English',guidanceLanguage:'Traditional Chinese',levelFramework:'cefr',levelCode:'A2'}
   try {
     await assert.rejects(()=>generateCustomQuiz(input),/must stay in English/)
     assert.equal(calls,2)
@@ -95,7 +101,10 @@ test('English matching quizzes retry wrong-language columns and never dispatch a
     const quiz=await generateCustomQuiz(input)
     assert.deepEqual(quiz.items[0].pair_prompts,['book','school','park'])
     assert.equal(calls,2)
-    assert.match(instructions,/cannot switch the teaching language/)
+    assert.match(instructions,/source material and directions in any language/)
+    assert.doesNotMatch(instructions,/教學原文，不得翻譯/)
+    assert.match(requestSource,/學校圖書館有很多書。/)
+    assert.match(requestSource,/請用中文出題/)
   } finally {globalThis.fetch=oldFetch;globalThis.Deno=oldDeno}
 })
 
@@ -181,6 +190,8 @@ test('American and British voices are distinct without changing supplied text or
   const text='Amy: Robert lives near the park.\nRobert: I work here.'
   const american=buildVoicePlan('dialogue','en','american',['Amy','Robert'],[],text)
   const british=buildVoicePlan('dialogue','en','british',['Amy','Robert'],[],text)
+  assert.equal(american.locale,'en-US')
+  assert.equal(british.locale,'en-GB')
   assert.equal(american.speechText,text)
   assert.equal(british.speechText,text)
   assert.match(american.instruction,/General American/)
@@ -188,6 +199,28 @@ test('American and British voices are distinct without changing supplied text or
   assert.notEqual(await contentHash(text,'en','american','dialogue'),await contentHash(text,'en','british','dialogue'))
   assert.match(buildVoicePlan('passage','zh-cn','american',[],[],'中国').instruction,/Putonghua/)
   assert.match(buildVoicePlan('passage','zh-tw','taiwanese',[],[],'臺灣').instruction,/unmistakably Taiwanese/)
+
+  const originalFetch = globalThis.fetch
+  const originalDeno = globalThis.Deno
+  const requests = []
+  globalThis.Deno = { env: { get: key => key === 'GEMINI_API_KEY' ? 'test-key' : undefined } }
+  globalThis.fetch = async (_url, options) => {
+    requests.push(JSON.parse(options.body))
+    return Response.json({ steps: [{ content: [{ type: 'audio', data: btoa('test') }] }] })
+  }
+  try {
+    await synthesize(text, american)
+    await synthesize(text, british)
+    const passage = 'Read this at the park.'
+    await synthesize(passage, buildVoicePlan('passage', 'en', null, [], [], passage))
+    assert.deepEqual(requests[0].generation_config.speech_config.speakers.map(speaker => speaker.language), ['en-US', 'en-US'])
+    assert.deepEqual(requests[1].generation_config.speech_config.speakers.map(speaker => speaker.language), ['en-GB', 'en-GB'])
+    assert.equal(requests[2].generation_config.speech_config[0].language, 'en-US')
+    assert.equal(requests[2].input[0].content[0].text, passage)
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.Deno = originalDeno
+  }
 })
 
 test('English source vocabulary and exact tokenisation stay separate from CEFR stretch', () => {
@@ -246,7 +279,6 @@ test('English reading UI never offers Pinyin or marks word fragments', () => {
 })
 
 test('English class creation requires a valid level and defaults captions to English', async () => {
-  registerHooks({resolve(specifier,context,next){return next(specifier.startsWith('npm:@supabase/supabase-js@')?'@supabase/supabase-js':specifier,context)}})
   const savedFetch=globalThis.fetch,savedDeno=globalThis.Deno
   let handler,stored,insertions=0
   globalThis.Deno={env:{get:key=>({SUPABASE_URL:'https://example.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test-placeholder'})[key]},serve:callback=>{handler=callback}}
@@ -337,4 +369,83 @@ test('English short-answer grading carries class policy through the actual grade
     assert.equal(savedAttempt.status,'graded')
     assert.equal(savedAttempt.feedback.en,'Keep practising.')
   } finally {globalThis.fetch=originalFetch;globalThis.Deno=originalDeno}
+})
+
+test('English listening adapts pasted source using the stored class level', async () => {
+  const originalFetch = globalThis.fetch
+  const originalDeno = globalThis.Deno
+  let handler
+  let request
+  let level = 'A2'
+  const ownerKey = 'test-owner'
+  const transcript = 'Amy: Is the library open?\nBen: Yes. It closes at five.'
+  const sourceText = '圖書館下午五點關門。'
+  globalThis.Deno = {
+    env: { get: key => ({
+      SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-service',
+      LINGOACT_OWNER_KEY: ownerKey, GEMINI_API_KEY: 'test-key',
+    })[key] },
+    serve: callback => { handler = callback },
+  }
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes('/rest/v1/sessions')) {
+      return Response.json({ teaching_language: 'en', level_framework: 'cefr', level_code: level })
+    }
+    assert.match(String(url), /generativelanguage\.googleapis\.com/)
+    request = JSON.parse(options.body)
+    const result = { transcript, kind: 'dialogue', language: 'en', script: 'none', speakers: ['Amy', 'Ben'], speaker_genders: ['female', 'male'] }
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })
+  }
+  try {
+    await import('../supabase/functions/analyze-listening-source/index.ts')
+    const send = () => handler(new Request('https://example.supabase.co/functions/v1/analyze-listening-source', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: 'class', ownerKey, sourceText, requestedKind: 'dialogue', levelCode: 'C2' }),
+    }))
+    const response = await send()
+    assert.equal(response.status, 200, await response.clone().text())
+    assert.equal((await response.json()).transcript, transcript)
+    assert.deepEqual(JSON.parse(request.contents[0].parts[0].text), { source: sourceText })
+    assert.match(request.systemInstruction.parts[0].text, /CEFR A2/)
+    level = 'B1'
+    assert.equal((await send()).status, 200)
+    assert.match(request.systemInstruction.parts[0].text, /CEFR B1/)
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.Deno = originalDeno
+  }
+})
+
+test('teacher text dispatch preserves multilingual material verbatim', async () => {
+  const originalFetch = globalThis.fetch
+  const originalDeno = globalThis.Deno
+  const body = '明天帶課本。 Please bring your book tomorrow.'
+  let handler
+  let published
+  globalThis.Deno = {
+    env: { get: key => ({
+      SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-service',
+      LINGOACT_OWNER_KEY: 'test-owner',
+    })[key] },
+    serve: callback => { handler = callback },
+  }
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /\/rest\/v1\/shared_contents/)
+    assert.equal(options.method, 'POST')
+    published = JSON.parse(options.body)
+    return Response.json(published, { status: 201 })
+  }
+  try {
+    await import('../supabase/functions/presenter-action/index.ts')
+    const response = await handler(new Request('https://example.supabase.co/functions/v1/presenter-action', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'share_content', sessionId: 'class', ownerKey: 'test-owner', body }),
+    }))
+    assert.equal(response.status, 200, await response.clone().text())
+    assert.equal(published.body, body)
+    assert.equal((await response.json()).content.body, body)
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.Deno = originalDeno
+  }
 })

@@ -3,7 +3,6 @@ import { recordingForClient } from '../_shared/recording-results.ts'
 import { notifyHandsLowered } from '../_shared/classroom-sync.ts'
 import { activityTitle } from '../_shared/activity-language.ts'
 import { quizGenerationFailed } from '../_shared/quiz-state.ts'
-import { englishMaterialIssue, requireEnglishMaterial } from '../_shared/english-material.ts'
 import { corsHeaders, jsonResponse, errorDetail } from '../_shared/ai.ts'
 import { attachBoardUrls, BOARD_KINDS } from '../_shared/board.ts'
 const boardKinds = new Set<string>(BOARD_KINDS)
@@ -603,7 +602,6 @@ Deno.serve(async (req) => {
 
     if (action === 'create_file_request') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       const { error: stopError } = await stopActiveQuestions(supabase, sessionId, new Date().toISOString())
       if (stopError) throw stopError
       const { data: question, error } = await supabase.from('questions').insert({
@@ -852,7 +850,6 @@ Deno.serve(async (req) => {
     // whatever the student walks up to, which is the point of the activity.
     if (action === 'open_photo_task') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       if (!promptText) return jsonResponse({ message: '請先寫出要學生拍什麼、說明什麼。' }, 400)
 
       // Classroom materials stay in the language the teacher dispatched.
@@ -887,7 +884,6 @@ Deno.serve(async (req) => {
     // and put the sentences on the projector.
     if (action === 'open_sentence_wall') {
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       if (!promptText) return jsonResponse({ message: '請先寫出要學生造句的題目。' }, 400)
       const answerSeconds = timingSeconds(input.answerSeconds, 600)
       if (answerSeconds === undefined) return jsonResponse({ message: '時間設定不正確。' }, 400)
@@ -1020,7 +1016,6 @@ Deno.serve(async (req) => {
       const title = typeof input.title === 'string' && input.title.trim()
         ? input.title.trim().slice(0, 200)
         : activityTitle(await sessionTrack(), 'picture_story', '排序寫作題')
-      if (await isEnglishSession()) requireEnglishMaterial(title, promptText)
       const aiGrading = input.aiGrading === true
 
       const stoppedAt = new Date().toISOString()
@@ -2030,7 +2025,6 @@ Deno.serve(async (req) => {
       const zhuyin = clip.annotation === 'zhuyin'
       const readingText = zhuyin ? (clip.annotation_text || clip.transcript) : clip.transcript
       const promptText = audioOnly ? readingText.slice(0, 4000) : readAloud ? readingText.slice(0, 1000) : teacherPrompt
-      if (await isEnglishSession()) requireEnglishMaterial(clip.transcript, teacherPrompt)
       let readingRuby: string[] | null = null
       if ((readAloud || audioOnly) && clip.annotation === 'pinyin' && clip.annotation_text) {
         try {
@@ -2374,8 +2368,6 @@ Deno.serve(async (req) => {
       const screenshotId = input.screenshotId
       const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
       const type = typeof input.questionType === 'string' ? input.questionType : ''
-      const english = await isEnglishSession()
-      if (english) requireEnglishMaterial(input.promptText, ...(Array.isArray(input.options) ? input.options : []))
       // A backdrop is optional. Asking the class 「你今天學到什麼？」 used to mean
       // screenshotting some irrelevant corner of the screen first, because this
       // was the only way to create a question at all — 拍照描述 already inserts
@@ -2443,7 +2435,6 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '時間設定不正確。' }, 400)
       }
       const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      if (await isEnglishSession()) requireEnglishMaterial(promptText)
       const titles: Record<string, string> = {
         send_screen: '派送畫面',
         poll: '投票題',
@@ -2841,7 +2832,6 @@ Deno.serve(async (req) => {
     if (action === 'share_content') {
       const body = typeof input.body === 'string' ? input.body.trim().slice(0, 5000) : ''
       const url = normalizedUrl(input.url)
-      if (await isEnglishSession()) requireEnglishMaterial(body)
       if (!body && !url) return jsonResponse({ message: '請輸入文字或網址。' }, 400)
 
       const { data, error } = await supabase
@@ -3133,7 +3123,6 @@ Deno.serve(async (req) => {
 
       // The languages the annotations have to exist in: the two that are always
       // hand-written in the app, plus whatever this class's students can pick.
-      if (classRow?.teaching_language === 'en' && verbatim) requireEnglishMaterial(sourceText)
       const locales = [...new Set(['zh_tw', 'en', String(classRow?.guidance_language || 'en').toLowerCase().replace('-', '_')])]
 
       if (verbatim && !sourceText) {
@@ -3143,7 +3132,7 @@ Deno.serve(async (req) => {
       // Written by the teacher, kept as written. No annotations, because
       // working out which words are new is the rewrite call they just declined.
       const passage = verbatim
-        ? { title: classRow?.teaching_language === 'en' && englishMaterialIssue(direction) ? 'Reading' : direction || (classRow?.teaching_language === 'ja' ? '読解' : classRow?.teaching_language === 'en' ? 'Reading' : '閱讀'), body: sourceText, vocabulary: [], grammar: [] }
+        ? { title: direction || (classRow?.teaching_language === 'ja' ? '読解' : classRow?.teaching_language === 'en' ? 'Reading' : '閱讀'), body: sourceText, vocabulary: [], grammar: [] }
         : await generateReadingPassage({
         source: sourceText,
         image,

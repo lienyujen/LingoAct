@@ -2224,13 +2224,24 @@ export function PresenterPage() {
     )
   }
 
+  const compactWorkspace = Boolean(window.lingoActDesktop && APP_PROFILE.id === 'english' && controlsOpen && !selectionMode)
+  const followUp = question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
+    presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
+    active={session.status === 'active'} onDispatched={showDispatchedQuestion} />
+  const nextActivity = workspaceView === 'current' && (
+    <button className="workspace-next" type="button" onClick={() => navigateWorkspace('activities')}>{w.next}</button>
+  )
+
   return (
     <PresenterLanguageScope value={presenterLocaleFor(session.teaching_language, session.system_language, session.guidance_language)}>
     <main className={`presenter-page${controlsOpen ? ' controls-open' : ''}${settingsOpen ? ' settings-open' : ''}${selectionMode ? ' selecting-capture' : ''}`}>
+      <div className={compactWorkspace ? "presenter-workspace-shell is-compact" : "presenter-workspace-shell"}>
       {!selectionMode && (
         <aside className="qr-floating">
           <QRCodePanel
             joinUrl={joinUrl}
+            title={compactWorkspace ? w.classroom : undefined}
+            onCollapse={compactWorkspace ? () => setControlsOpen(false) : undefined}
             linkable={guoyuJoin}
             onClose={window.lingoActDesktop ? () => setCloseConfirmOpen(true) : undefined}
             onMinimize={window.lingoActDesktop ? () => window.lingoActDesktop?.minimize() : undefined}
@@ -2317,11 +2328,7 @@ export function PresenterPage() {
         </div>
         <div className="presenter-results" hidden={workspaceView === 'activities' || (workspaceView === 'history' && selectedQuestionId === session.current_question_id)}>
         {dispatchWarning && workspaceView === 'current' && <p className="panel" role="status">{uiText(dispatchWarning)}</p>}
-        {question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
-          presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
-          active={session.status === 'active'} onDispatched={(next) => {
-            showDispatchedQuestion(next)
-          }} />}
+        {!compactWorkspace && followUp}
         {question?.type === 'custom_quiz' ? (
           <CustomQuizResult
             writingContext={{ track: session.teaching_language, framework: session.level_framework, level: session.level_code }}
@@ -2373,6 +2380,7 @@ export function PresenterPage() {
             />
           ) : undefined}
         />}
+        {compactWorkspace && followUp}
         {question && ['custom_quiz', 'reading'].includes(question.type) && session.teaching_language === 'guoyu'
           && session.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '') && (
           <HandwritingResults key={question.id} sessionId={sessionId} questionId={question.id}
@@ -2388,9 +2396,11 @@ export function PresenterPage() {
           />
         )}
         </div>
-        {workspaceView === 'current' && <button className="workspace-next" type="button" onClick={() => navigateWorkspace('activities')}>{w.next}</button>}
+        {!compactWorkspace && nextActivity}
       </aside>
       )}
+      {compactWorkspace && nextActivity && <footer className="workspace-footer">{nextActivity}</footer>}
+      </div>
       {!window.lingoActDesktop && session.captions_enabled && (
         <LiveCaptionOverlay
           fontBold={session.caption_font_bold}

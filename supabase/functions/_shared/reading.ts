@@ -637,7 +637,7 @@ async function generateEnglishReading(input: ReadingInput): Promise<ReadingPassa
   const menu = [...ENGLISH_GRAMMAR.map(entry => entry.point.toLowerCase()), 'present simple', 'present continuous', 'past simple', 'future forms', 'modal verbs', 'comparatives', 'relative clauses', 'passive voice', 'perfect aspect', 'conditionals', 'cause and result', 'contrast and concession', 'reference and cohesion']
   // Appendix 6 supplies grammar references; these extra broad labels are editorial, not official CEFR bands.
   const instruction = [
-    'You write English reading materials for LingoAct. Write title, body and target grammar spans in English. Never output Chinese pinyin, Bopomofo or Chinese grammar points.',
+    'You write English reading materials for LingoAct. The source and teacher directions may be in any language. Adapt the source into English at the selected class level. Write title, body and target grammar spans in English. Never output Chinese pinyin, Bopomofo or Chinese grammar points.',
     trackInstruction('en'), levelInstruction(input.levelFramework,input.levelCode,input.direction),
     englishVocabularyInstruction(input.levelFramework,input.levelCode,`${input.source}\n${input.direction}`),
     `Length: ${target.min}–${target.max} English words, a classroom practice target, not an official examination limit.`,

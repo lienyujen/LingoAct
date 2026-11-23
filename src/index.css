@@ -811,6 +811,81 @@ h2 {
   object-fit: contain;
 }
 
+.presenter-workspace-shell,
+.qr-code-content:not([hidden]) {
+  display: contents;
+}
+
+.desktop-shell .presenter-workspace-shell.is-compact {
+  display: grid;
+  grid-template: auto minmax(0, 1fr) auto / minmax(0, 1fr);
+  height: calc(100vh - 10px);
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.desktop-shell .settings-open .presenter-workspace-shell.is-compact {
+  grid-column: 2;
+}
+
+.desktop-shell .is-compact .qr-panel {
+  gap: 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px 12px;
+}
+
+.desktop-shell .presenter-page .is-compact .qr-panel .panel-heading {
+  justify-content: flex-start;
+  min-height: 36px;
+}
+
+.is-compact .qr-panel .panel-heading h2 {
+  max-width: calc(100% - 152px);
+}
+
+.desktop-shell .is-compact .teacher-workspace {
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 10px;
+  scrollbar-gutter: stable;
+}
+
+.is-compact .workspace-navigation {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.is-compact .teacher-workspace .panel {
+  box-shadow: none;
+}
+
+.is-compact .presenter-results {
+  gap: 10px;
+}
+
+.is-compact .workspace-footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 8px 10px;
+}
+
+.is-compact .quiz-result-stats {
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.is-compact .quiz-result-stats > div {
+  padding: 8px;
+  font-size: 12px;
+}
+
 /* While an activity is running, its answers come first.
 
    The control panel is what you start something FROM; the results are what you

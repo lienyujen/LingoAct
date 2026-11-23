@@ -322,13 +322,13 @@ export async function generateCustomQuiz(input: {
   const languageInstruction = requestedLanguage === 'auto'
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
     : requestedLanguage === 'English'
-      ? 'ENGLISH TEACHING: All titles, prompts, options, matching columns, reference answers, rubrics and vocabulary-card definitions must be in English. Teacher directions may change the difficulty or topic, but cannot switch the teaching language. Optional translations are stored separately.'
+      ? 'ENGLISH TEACHING: All titles, prompts, options, matching columns, reference answers, rubrics and vocabulary-card definitions must be in English. The teacher may supply source material and directions in any language. Adapt that material into natural English at the specified class level, preserving its meaning. Optional translations are stored separately.'
     : `本課程的教學語言是 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則都必須使用 ${requestedLanguage}，除非教師在出題方向中另外指定。`
 
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard ? 'translation_en 僅翻譯字卡的解釋面，詞語面保留原文。' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard ? 'translation_en 僅翻譯字卡的解釋面，詞語面保留原文。' : requestedLanguage === 'English' ? '' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{

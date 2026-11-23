@@ -22,6 +22,7 @@ export type SpeakerGender = 'male' | 'female' | 'boy' | 'girl' | 'unknown'
 
 export type VoicePlan = {
   instruction: string
+  locale?: 'en-US' | 'en-GB'
   speakers: string[]
   voiceNames: string[]
   speechText: string
@@ -94,6 +95,9 @@ export function buildVoicePlan(
   accentChoice = speechAccent(language, accentChoice)
   const mandarinAccent = speechAccent(language.startsWith('zh') ? language : 'zh-tw', accentChoice) as ChineseAccent
   const accent = accentFor(language, accentChoice)
+  const englishLocale = language === 'en' || language.startsWith('en-')
+    ? accentChoice === 'british' ? 'en-GB' : 'en-US'
+    : undefined
   const pronunciation = language === 'zh-cn' ? 'Use standard Mainland Putonghua. Do not use Taiwan pronunciation or cross-strait vocabulary substitutions.'
     : language.startsWith('zh') ? regionalPronunciationInstruction(text, mandarinAccent)
       : language.startsWith('en') ? englishPronunciationInstruction(accentChoice === 'british' ? 'british' : 'american')
@@ -121,6 +125,7 @@ export function buildVoicePlan(
       return { speaker, gender, voiceName }
     })
     return {
+      locale: englishLocale,
       instruction: [
         `Read this conversation in ${accent}.`,
         assignments.map(({ speaker, gender }) => `${speaker} must use a clearly ${voiceDescription(gender)} voice.`).join(' '),
@@ -142,6 +147,7 @@ export function buildVoicePlan(
   }
   if (kind === 'scene') {
     return {
+      locale: englishLocale,
       instruction: [`Describe this in ${accent}, in the warm, clear voice of a teacher introducing a picture to the class. Speak in complete sentences at a pace a learner can follow.`, pronunciation].filter(Boolean).join(' '),
       speakers: [],
       voiceNames: [],
@@ -149,6 +155,7 @@ export function buildVoicePlan(
     }
   }
   return {
+    locale: englishLocale,
     instruction: [`Read this passage aloud in ${accent}, clearly and at a pace a language learner can follow, with the phrasing and emphasis a native speaker would use.`, pronunciation].filter(Boolean).join(' '),
     speakers: [],
     voiceNames: [],
@@ -157,14 +164,15 @@ export function buildVoicePlan(
 }
 
 function speechConfig(plan: VoicePlan) {
+  const language = plan.locale ? { language: plan.locale } : {}
   if (plan.speakers.length >= 2) {
     return {
       // The service now rejects mode on structured_speech_config. The two
       // assigned speakers and per-turn metadata already describe the dialogue.
-      speakers: plan.speakers.map((speaker, index) => ({ speaker, voice: plan.voiceNames[index] })),
+      speakers: plan.speakers.map((speaker, index) => ({ speaker, voice: plan.voiceNames[index], ...language })),
     }
   }
-  return [{ voice: plan.voiceNames[0] || NARRATION_VOICE }]
+  return [{ voice: plan.voiceNames[0] || NARRATION_VOICE, ...language }]
 }
 
 function ttsModels() {
@@ -593,7 +601,7 @@ export async function contentHash(
 ) {
   const plan = buildVoicePlan(kind, language, accent, speakers, speakerGenders, text, classicalVoice)
   const parts = [
-    SPEECH_RECIPE_VERSION, kind, language, accent || '', speakers.join('|'),
+    SPEECH_RECIPE_VERSION, ...(plan.locale ? [plan.locale] : []), kind, language, accent || '', speakers.join('|'),
     speakerGenders.join('|'), text, plan.instruction, plan.speechText,
     ...(classicalVoice ? plan.voiceNames : []),
   ]

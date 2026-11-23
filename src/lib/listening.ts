@@ -28,7 +28,8 @@ export type SpeakerGender = 'male' | 'female' | 'boy' | 'girl' | 'unknown'
 export async function analyzeListeningSource(input: {
   sessionId: string
   presenterToken: string
-  screenshotId: string
+  screenshotId?: string
+  sourceText?: string
   teachingTrack: string
   requestedKind: 'passage' | 'dialogue'
   levelFramework: string | null

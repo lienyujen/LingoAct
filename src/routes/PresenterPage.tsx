@@ -2400,7 +2400,7 @@ export function PresenterPage() {
         />}
         {question && ['custom_quiz', 'reading'].includes(question.type) && session.teaching_language === 'guoyu'
           && session.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '') && (
-          <HandwritingResults key={question.id} sessionId={sessionId} questionId={question.id}
+          <HandwritingResults key={`handwriting-${question.id}`} sessionId={sessionId} questionId={question.id}
             presenterToken={getPresenterToken(sessionId) || ''} />
         )}
         {session.exit_ticket_prompt && session.exit_ticket_category && (

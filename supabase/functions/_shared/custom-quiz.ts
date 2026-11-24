@@ -265,6 +265,7 @@ export async function generateCustomQuiz(input: {
   // i+1 / i+2. The teacher's decision to stretch the class on purpose, which is
   // not the same as the generator drifting above them by accident.
   levelStretch?: number
+  flashcardContinuation?: { promptIsWord: boolean; covered: string[] }
 }) {
   if (!input.sourceUrl && !input.sourceText) throw new Error('No quiz source was supplied.')
   const apiKey = Deno.env.get('GEMINI_API_KEY')
@@ -279,7 +280,10 @@ export async function generateCustomQuiz(input: {
     sourcePart = { inlineData: { mimeType, data: bytesToBase64(new Uint8Array(await imageResponse.arrayBuffer())) } }
   }
 
-  const countInstruction = input.requestedCount
+  const continuation = input.requestedType === 'flashcard' ? input.flashcardContinuation : undefined
+  const countInstruction = continuation
+    ? `請從同一教材新增最多 ${input.requestedCount} 張詞彙卡，找不到足夠不同詞彙時可以少出。`
+    : input.requestedCount
     ? `必須產生恰好 ${input.requestedCount} 題。`
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
   const flashcard = input.requestedType === 'flashcard'
@@ -318,6 +322,13 @@ export async function generateCustomQuiz(input: {
     : input.requestedType === 'random'
       ? '可依出題方向與素材混合使用選擇、填充與簡答題。'
       : `每一題都必須是 ${input.requestedType}。`
+  const continuationInstruction = continuation
+    ? [
+        '沿用教師原本的出卡方向、教材和現有卡片格式，只新增教材支持的不同詞彙。不可出句子翻譯、造句或一般閱讀題。',
+        continuation.promptIsWord ? '每張卡的題幹只能是詞彙，選項都是簡短詞義。' : '每張卡的題幹只能是簡短詞義，選項都是詞彙或固定詞組，不能用句子。',
+        `已練習的詞彙（不可做新卡的 target_word）：${JSON.stringify(continuation.covered)}`,
+      ].join('\n')
+    : ''
   const languageInstruction = requestedLanguage === 'auto'
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
     : requestedLanguage === 'English'
@@ -327,7 +338,7 @@ export async function generateCustomQuiz(input: {
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard ? 'translation_en 僅翻譯字卡的解釋面，詞語面保留原文。' : requestedLanguage === 'English' ? '' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard ? 'translation_en 僅翻譯字卡的解釋面，詞語面保留原文。' : requestedLanguage === 'English' ? '' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} ${continuationInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{
@@ -432,6 +443,35 @@ ${input.sourceText}` }] : []),
     vocabularyCeiling ? checkVocabulary(allText(candidate), vocabularyCeiling) : []
   )
 
+  function freshFlashcards(candidate: { items?: unknown }) {
+    if (!continuation || !Array.isArray(candidate.items)) return []
+    const seen = new Set(continuation.covered.map(normalizedAnswer))
+    const word = (value: string) => {
+      const term = normalizedAnswer(value)
+      return Boolean(term) && !/[。！？!?；;，,：:\n]/u.test(value)
+        && !/[.!?]$/u.test(value) && value.trim().split(/\s+/u).length <= 6
+        && (!/^\p{Script=Han}+$/u.test(term) || term.length <= 8)
+    }
+    return candidate.items.filter(raw => {
+      if (!raw || typeof raw !== 'object') return false
+      const item = raw as Record<string, unknown>
+      const target = typeof item.target_word === 'string' ? item.target_word.trim() : ''
+      const prompt = typeof item.prompt_text === 'string' ? item.prompt_text.trim() : ''
+      const options = cleanStrings(item.options, 6)
+      const answers = cleanStrings(item.accepted_answers, 12)
+      const key = normalizedAnswer(target)
+      if (item.type !== 'multiple_choice' || !word(target) || !prompt || seen.has(key)
+        || options.length < 3 || options.length > 4 || new Set(options.map(normalizedAnswer)).size !== options.length
+        || answers.length !== 1 || !options.includes(answers[0])) return false
+      if (continuation.promptIsWord) {
+        if (!word(prompt) || !promptIsTargetWord(prompt, target) || options.some(option => normalizedAnswer(option) === key)) return false
+      } else if (normalizedAnswer(answers[0]) !== key || normalizedAnswer(prompt) === key
+        || !options.every(word) || promptIsTargetWord(prompt, target)) return false
+      seen.add(key)
+      return true
+    }).slice(0, input.requestedCount ?? 10)
+  }
+
   let output = await generate()
   const wrongLanguage = requestedLanguage === 'English' ? englishMaterialIssue(output.title, allText(output)) : ''
   const offenders = overLength(output)
@@ -458,10 +498,25 @@ ${input.sourceText}` }] : []),
       console.warn(`Level retry failed, keeping the first attempt: ${errorDetail(error, 'unknown error')}`)
     }
   }
+  if (continuation) {
+    const items = freshFlashcards(output)
+    if (items.length < (input.requestedCount ?? 1)) {
+      try {
+        const retry = await generate('只加符合原卡方向的生詞卡；不可重複已出詞，也不要放句子當成要學的詞。')
+        const retried = freshFlashcards(retry)
+        if (retried.length > items.length && (requestedLanguage !== 'English' || !englishMaterialIssue(retry.title, allText({items: retried})))) {
+          output = { ...retry, items: retried }
+        } else output = { ...output, items }
+      } catch {
+        output = { ...output, items }
+      }
+    } else output = { ...output, items }
+    if (!(output.items as unknown[]).length) return { title: '', items: [] }
+  }
   if (requestedLanguage === 'English') requireEnglishMaterial(output.title, allText(output))
   if (!Array.isArray(output.items)) throw new Error('AI returned an invalid quiz item list.')
   if (output.items.length < 1 || output.items.length > 10) throw new Error('AI returned an unsupported question count.')
-  if (input.requestedCount && output.items.length !== input.requestedCount) throw new Error('AI did not follow the requested question count.')
+  if (!continuation && input.requestedCount && output.items.length !== input.requestedCount) throw new Error('AI did not follow the requested question count.')
 
   const basePoints = Math.floor(100 / output.items.length)
   const remainder = 100 % output.items.length

@@ -482,14 +482,13 @@ export function CustomQuizResult({ anonymousEnabled, writingContext, question, r
             .sort((a, b) => (missesByItem.get(b.id) || 0) - (missesByItem.get(a.id) || 0))
             .map((item) => {
               const misses = missesByItem.get(item.id) || 0
+              const answer = results.keys.find(key => key.item_id === item.id)?.accepted_answers[0]
+              const word = item.prompt_is_word ? item.prompt_text : answer
+              const reading = item.prompt_is_word ? item.prompt_reading : item.option_readings?.[item.options.indexOf(answer || '')]
               return (
                 <div className={misses ? 'flashcard-card-row is-missed' : 'flashcard-card-row'} key={item.id}>
-                  <span>{item.prompt_text}</span>
-                  {/* Whichever side the word is on. A 看詞選解釋 deck has the
-                      reading on the prompt and nothing on the glosses. */}
-                  {item.prompt_reading
-                    ? <em className="card-reading">{item.prompt_reading}</em>
-                    : item.option_readings?.length > 0 && <em className="card-reading">{item.option_readings.join('・')}</em>}
+                  <span>{word || item.prompt_text}</span>
+                  {reading && <em className="card-reading">{reading}</em>}
                   <strong>{misses ? t('missedNTimes', { n: misses }) : t('noMisses')}</strong>
                   <button
                     aria-label={t('removeCard')}

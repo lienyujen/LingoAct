@@ -1557,7 +1557,7 @@ Deno.serve(async (req) => {
       if (!validUuid(questionId)) return jsonResponse({ message: '測驗資料格式不正確。' }, 400)
       const { data: quiz } = await supabase.from('quizzes').select('*')
         .eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
-      if (!quiz) return jsonResponse({ message: '找不到這份測驗。' }, 404)
+      if (!quiz || quiz.requested_type !== 'flashcard') return jsonResponse({ message: '找不到這疊字詞卡。' }, 404)
 
       const removeId = typeof input.removeItemId === 'string' ? input.removeItemId : ''
       const addCount = Number(input.addCount)
@@ -1576,24 +1576,30 @@ Deno.serve(async (req) => {
       // schema comment in custom-quiz.ts. The deck itself may reach thirty.
       if (Number.isInteger(addCount) && addCount > 0 && addCount <= 10) {
         const { data: existing } = await supabase.from('quiz_items')
-          .select('id, position, prompt_text, options').eq('quiz_id', quiz.id).order('position')
+          .select('id, position, prompt_text, prompt_is_word').eq('quiz_id', quiz.id).order('position')
         const taken = (existing || []).length
         if (taken + addCount > 30) return jsonResponse({ message: '一疊最多 30 張。' }, 400)
 
         const { data: question } = await supabase.from('questions')
-          .select('screenshot_id').eq('id', questionId).maybeSingle()
-        // Back to whatever the deck was built from, screenshot or shared file.
+          .select('screenshot_id, listening_clip_id').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
+        // Listening decks use the transcript even if an optional image was shown.
         let sourceUrl = ''
-        if (question?.screenshot_id) {
+        let sourceText = ''
+        if (question?.listening_clip_id) {
+          const { data: clip, error } = await supabase.from('listening_clips')
+            .select('transcript').eq('id', question.listening_clip_id).eq('session_id', sessionId).maybeSingle()
+          if (error) throw error
+          sourceText = clip?.transcript || ''
+        } else if (question?.screenshot_id) {
           const { data: screenshot } = await supabase.from('screenshots')
-            .select('public_url').eq('id', question.screenshot_id).maybeSingle()
+            .select('public_url').eq('id', question.screenshot_id).eq('session_id', sessionId).maybeSingle()
           sourceUrl = screenshot?.public_url || ''
         } else if (quiz.source_file_id) {
           const { data: file } = await supabase.from('shared_files')
-            .select('storage_path').eq('id', quiz.source_file_id).maybeSingle()
+            .select('storage_path').eq('id', quiz.source_file_id).eq('session_id', sessionId).maybeSingle()
           if (file) sourceUrl = supabase.storage.from('lingoact-files').getPublicUrl(file.storage_path).data.publicUrl
         }
-        if (!sourceUrl) return jsonResponse({ message: '找不到原始教材，無法再出卡。' }, 400)
+        if (!sourceUrl && !sourceText) return jsonResponse({ message: '找不到原始教材，無法再出卡。' }, 400)
 
         const { data: classRow } = await supabase.from('sessions')
           .select('teaching_language, guidance_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
@@ -1601,19 +1607,21 @@ Deno.serve(async (req) => {
         // options are distractors drawn from the same lesson by design, so
         // treating them as covered makes a thirteen-word lesson look exhausted
         // after five cards and every 再出 refuse.
-        const { data: existingKeys } = await supabase.from('quiz_item_keys')
-          .select('accepted_answers').in('item_id', (existing || []).map((item) => item.id))
-        const covered = (existingKeys || [])
-          .map((key) => (key.accepted_answers as string[])?.[0])
-          .filter(Boolean)
-          .slice(0, 100)
+        const { data: existingKeys, error: existingKeyError } = await supabase.from('quiz_item_keys')
+          .select('item_id, accepted_answers').in('item_id', (existing || []).map((item) => item.id))
+        if (existingKeyError) throw existingKeyError
+        const answersByItem = new Map((existingKeys || []).map(key => [key.item_id, key.accepted_answers?.[0]]))
+        const covered = (existing || []).flatMap(item => {
+          const word = item.prompt_is_word ? item.prompt_text : answersByItem.get(item.id)
+          return typeof word === 'string' && word ? [word] : []
+        })
         try {
           const generated = await generateCustomQuiz({
-            sourceUrl,
+            sourceUrl: sourceUrl || undefined,
+            sourceText: sourceText || undefined,
             extraInstruction: [
               trackInstruction(classRow?.teaching_language),
-              levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null),
-              covered.length ? `These are already on cards in this deck; choose different ones: ${covered.join('、')}` : '',
+              levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null, quiz.direction),
             ].filter(Boolean).join('\n'),
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
             teachingTrack: classRow?.teaching_language,
@@ -1622,25 +1630,19 @@ Deno.serve(async (req) => {
             levelCode: classRow?.level_code ?? null,
             direction: quiz.direction,
             requestedCount: addCount,
-            requestedType: quiz.requested_type as 'flashcard',
+            requestedType: 'flashcard',
+            flashcardContinuation: { promptIsWord: existing?.[0]?.prompt_is_word === true, covered },
           })
-          // Asked for more than the material holds, the model repeats itself
-          // rather than returning fewer — and the same word twice in one deck
-          // is worse than a shorter deck. Whatever is already here is dropped.
-          const seen = new Set(covered)
-          const fresh = generated.items.filter((item) => {
-            const answer = (item.accepted_answers || [])[0] || item.prompt_text
-            if (seen.has(answer)) return false
-            seen.add(answer)
-            return true
-          })
+          const fresh = generated.items
           if (!fresh.length) {
             return jsonResponse({ message: '這份教材裡的詞已經都出過了，沒有新的可以再出。' }, 409)
           }
+          const occupied = new Set((existing || []).map(item => item.position))
+          const positions = Array.from({ length: 30 }, (_, index) => index + 1).filter(position => !occupied.has(position))
           const added = fresh.map((item, index) => ({
             id: item.id,
             quiz_id: quiz.id,
-            position: taken + index + 1,
+            position: positions[index],
             type: item.type,
             prompt_text: item.prompt_text,
             options: item.options,
@@ -1658,7 +1660,11 @@ Deno.serve(async (req) => {
             accepted_answers: item.accepted_answers,
             rubric: item.rubric,
           })))
-          if (keyError) throw keyError
+          if (keyError) {
+            const { error: cleanupError } = await supabase.from('quiz_items').delete().eq('quiz_id', quiz.id).in('id', added.map(item => item.id))
+            if (cleanupError) console.error('Could not clean up unkeyed flashcards', cleanupError)
+            throw keyError
+          }
           await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
         } catch (error) {
           return jsonResponse({ message: errorDetail(error, '再出卡失敗，請再試一次。') }, 503)

@@ -54,7 +54,7 @@ jobs:
           EDITION: ${{ inputs.edition }}
           PLATFORM: ${{ inputs.platform }}
         run: |
-          if [[ "$REFRESH" == "true" && ( "$EDITION" != "all" || "$PLATFORM" != "all" ) ]]; then
+          if [[ "$REFRESH" == "true" && ( ( "$EDITION" != "all" && "$EDITION" != "languages" ) || "$PLATFORM" != "all" ) ]]; then
             echo "::error::Moving the release tag requires rebuilding every download."
             exit 1
           fi
@@ -341,7 +341,16 @@ jobs:
             for artifact in artifacts/*/*; do
               mv "$artifact" builds/
             done
-            expected=(LingoAct-{SC,Huayu,JP,English,TC,Guoyu}.{dmg,zip} LingoAct-Full.zip)
+            expected=(LingoAct-{SC,Huayu,JP,English,TC,Guoyu}.{dmg,zip})
+            if [[ "$EDITION" == "all" ]]; then
+              expected+=(LingoAct-Full.zip)
+            else
+              release_assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+              if [[ -n "$release_assets" ]] && ! diff -q                 <(printf '%s\n' "$release_assets" | sed '/^SHA256SUMS\.txt$/d' | sort)                 <(printf '%s\n' "${expected[@]}" | sort); then
+                echo "::error::Refresh must cover every published package."
+                exit 1
+              fi
+            fi
             for name in "${expected[@]}"; do
               test -s "builds/$name"
             done
@@ -370,6 +379,8 @@ jobs:
           **macOS：** 開啟 dmg，把 App 拖進「應用程式」。同一個檔案支援 Apple Silicon 與 Intel。
 
           ## 本次更新
+
+          - 字詞卡追加沿用原教材和出卡方向，排除已練習詞，並修正國小國語目前活動的重複面板。現有安裝請更新後端部署。
 
           - 各桌面版保留教師主選單的分格卡片並縮短間距。未交人數顯示於進行中分頁內，交齊或停止收件就隱藏。錄音參考計時在作答卡片內顯示，到零會自動收起。
           - 教師手寫題目、提示及派送文字可保留多語原文。英文課可把多語素材轉成符合班級程度的英文題目、文章與聽力對話。

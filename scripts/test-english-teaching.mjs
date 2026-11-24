@@ -458,3 +458,71 @@ test('teacher text dispatch preserves multilingual material verbatim', async () 
     globalThis.Deno = originalDeno
   }
 })
+
+test('continuing vocabulary cards keeps the original direction and rejects repeated words and sentence cards', async () => {
+  const { generateCustomQuiz } = await import('../supabase/functions/_shared/custom-quiz.ts')
+  const oldFetch = globalThis.fetch
+  const oldDeno = globalThis.Deno
+  globalThis.Deno = { env: { get: () => 'test-key' } }
+  const card = (target_word, prompt_text, options, answer) => ({
+    type: 'multiple_choice', target_word, prompt_text, options, accepted_answers: [answer],
+    pair_prompts: [], rubric: '',
+  })
+  const direction = '只使用課文詞語，維持看詞選解釋。'
+  const sourceText = '秒針帶動機芯。齒輪推動指針。'
+  let calls = 0
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(init.body)
+    assert.ok(request.contents[0].parts.some(part => part.text.includes(direction)))
+    assert.ok(request.contents[0].parts.some(part => part.text.includes(sourceText)))
+    assert.match(request.systemInstruction.parts[0].text, /題幹只能是詞彙/)
+    const items = calls++ === 0
+      ? [card('「秒針」', '秒針', ['計秒的指針', '轉動的零件', '手指'], '計秒的指針'),
+         card('指針', '顯示數值的細針', ['指針', '機芯', '齒輪'], '指針'),
+         card('他拿起了鐘。', '他拿起了鐘。', ['拿起物品', '看時間', '放下鐘'], '拿起物品')]
+      : [card('機芯', '機芯', ['鐘的內部機件', '鐘的外殼', '顯示秒數的針'], '鐘的內部機件'),
+         card('齒輪', '齒輪', ['邊緣有齒的輪子', '轉動的指針', '固定的底座'], '邊緣有齒的輪子')]
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ title: '鐘錶字詞卡', items }) }] } }] }))
+  }
+  try {
+    const quiz = await generateCustomQuiz({ sourceText, direction, requestedType: 'flashcard', requestedCount: 3,
+      teachingLanguage: 'Traditional Chinese', flashcardContinuation: { promptIsWord: true, covered: ['秒針'] } })
+    assert.equal(calls, 2)
+    assert.deepEqual(quiz.items.map(item => item.prompt_text), ['機芯', '齒輪'])
+    assert.ok(quiz.items.every(item => item.prompt_is_word))
+  } finally {
+    globalThis.fetch = oldFetch
+    globalThis.Deno = oldDeno
+  }
+})
+
+test('continuing image-sourced cards keeps the glossary-first format and original image', async () => {
+  const { generateCustomQuiz } = await import('../supabase/functions/_shared/custom-quiz.ts')
+  const oldFetch = globalThis.fetch
+  const oldDeno = globalThis.Deno
+  const sourceUrl = 'https://example.test/original.png'
+  globalThis.Deno = { env: { get: () => 'test-key' } }
+  globalThis.fetch = async (url, init) => {
+    if (url === sourceUrl) return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } })
+    const request = JSON.parse(init.body)
+    assert.deepEqual(request.contents[0].parts[1].inlineData, { mimeType: 'image/png', data: 'AQID' })
+    assert.match(request.systemInstruction.parts[0].text, /題幹只能是簡短詞義/)
+    const card = (target_word, prompt_text, options) => ({
+      type: 'multiple_choice', target_word, prompt_text, options, accepted_answers: [target_word], pair_prompts: [], rubric: '',
+    })
+    const items = [
+      card('機芯', '鐘的內部機件', ['機芯', '齒輪', '指針']),
+      card('秒針', '用來計秒的針', ['秒針', '齒輪', '指針']),
+      card('齒輪', '邊緣有齒的輪子', ['齒輪', '林老師今天教我們認識齒輪', '機芯']),
+    ]
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ title: '鐘錶字詞卡', items }) }] } }] }))
+  }
+  try {
+    const quiz = await generateCustomQuiz({ sourceUrl, direction: '看解釋選詞', requestedType: 'flashcard', requestedCount: 5,
+      teachingLanguage: 'Traditional Chinese', flashcardContinuation: { promptIsWord: false, covered: ['秒針'] } })
+    assert.deepEqual(quiz.items.map(item => [item.prompt_is_word, item.accepted_answers]), [[false, ['機芯']]])
+  } finally {
+    globalThis.fetch = oldFetch
+    globalThis.Deno = oldDeno
+  }
+})

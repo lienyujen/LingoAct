@@ -1,7 +1,7 @@
 import { requireEnglishMaterial } from './english-material.ts'
 import { callAiJson, errorDetail } from './ai.ts'
 import { levelInstruction } from './proficiency.ts'
-import { trackInstruction } from './teaching.ts'
+import { trackInstruction, usesLevelledPrompts } from './teaching.ts'
 import { usesMainlandFeedback } from './feedback-language.ts'
 import type { FeedbackSettings } from './feedback-language.ts'
 
@@ -147,8 +147,8 @@ export async function describePictureSource(input: {
 }): Promise<PictureStoryboard & { caution: string }> {
   const systemPrompt = [
     pictureLanguageRules(DESCRIBE_RULES, input),
-    trackInstruction(input.trackId),
-    levelInstruction(input.framework, input.levelCode, input.direction),
+    trackInstruction(input.trackId, usesLevelledPrompts(input.trackId)),
+    levelInstruction(input.framework, input.levelCode, usesLevelledPrompts(input.trackId) ? '' : input.direction),
   ].join('\n\n')
 
   const result = await callAiJson(
@@ -189,8 +189,8 @@ export async function planPictureStory(input: {
 }): Promise<PictureStoryboard> {
   const systemPrompt = [
     pictureLanguageRules(STORYBOARD_RULES, input),
-    trackInstruction(input.trackId),
-    levelInstruction(input.framework, input.levelCode, input.direction),
+    trackInstruction(input.trackId, usesLevelledPrompts(input.trackId)),
+    levelInstruction(input.framework, input.levelCode, usesLevelledPrompts(input.trackId) ? '' : input.direction),
   ].join('\n\n')
 
   const result = await callAiJson(

@@ -1,5 +1,4 @@
 import { approvedClassicalAudio } from '../_shared/guoyu-classics-library.ts'
-import { requireEnglishMaterial } from '../_shared/english-material.ts'
 import { corsHeaders, errorDetail, jsonResponse } from '../_shared/ai.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { buildVoicePlan, contentHash, durationMs, karaokeCues, needsKaraokeAlignment, synthesize, wavFromPcm } from '../_shared/listening.ts'
@@ -53,7 +52,7 @@ Deno.serve(async (req) => {
     if (classError) throw classError
     if (classroom.level_framework === 'hsk') { language = 'zh-cn'; accent = 'putonghua'; script = 'simplified' }
 
-    if (classroom.teaching_language === 'en') { requireEnglishMaterial(transcript, ...speakers); language = 'en'; accent = speechAccent('en', accent); script = null }
+    if (classroom.teaching_language === 'en') { language = 'en'; accent = speechAccent('en', accent); script = null }
     if (classroom.teaching_language === 'ja') { language = 'ja'; accent = speechAccent('ja', null); script = null }
 
     const approved = classroom.teaching_language === 'guoyu' && kind === 'passage' ? approvedClassicalAudio(transcript) : null

@@ -3,7 +3,7 @@ import { corsHeaders, errorDetail, geminiThinkingConfig, jsonResponse, requestGe
 import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from '../_shared/proficiency.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from '../_shared/tbcl-check.ts'
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
-import { resolveTrack, trackInstruction } from '../_shared/teaching.ts'
+import { resolveTrack, trackInstruction, usesLevelledPrompts } from '../_shared/teaching.ts'
 import { hskLevelOf, hskOverLevelWords, hskOverLevelComplaint } from '../_shared/hsk.ts'
 
 // Reading the teacher's source and shaping it for this particular class.
@@ -61,7 +61,9 @@ Deno.serve(async (req) => {
     if (classError) throw classError
     teachingTrack = classroom.teaching_language
     levelFramework = classroom.level_framework
-    levelCode = dispatchLevelCode(levelFramework, classroom.level_code, typeof input.direction === 'string' ? input.direction : '')
+    const fixedLevel = usesLevelledPrompts(teachingTrack)
+    levelCode = fixedLevel ? classroom.level_code
+      : dispatchLevelCode(levelFramework, classroom.level_code, typeof input.direction === 'string' ? input.direction : '')
     const track = resolveTrack(teachingTrack)
     const resolvedLevel = resolveLevel(levelFramework, levelCode)
 
@@ -86,7 +88,7 @@ Deno.serve(async (req) => {
 
     const instruction = [
       'You are preparing listening material for a language class.',
-      trackInstruction(teachingTrack),
+      trackInstruction(teachingTrack, fixedLevel),
       levelInstruction(levelFramework, levelCode),
       'This is material the class will hear rather than read, which makes the level harder to hold, not easier: a listener cannot go back over a sentence that was too long or a word they have not met.',
       '',

@@ -1,3 +1,4 @@
+import { adaptStudentPrompt } from '../_shared/student-prompt.ts'
 import { readingQuizFailureMessage } from '../_shared/reading-failure.ts'
 import { recordingForClient } from '../_shared/recording-results.ts'
 import { notifyHandsLowered } from '../_shared/classroom-sync.ts'
@@ -16,7 +17,7 @@ import { analyzeFileResponse, isAnalyzableFile } from '../_shared/file-analysis.
 import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
-import { classLevelInstruction, resolveFramework, resolveTrack, teachingTrackIds, trackInstruction } from '../_shared/teaching.ts'
+import { classLevelInstruction, resolveFramework, resolveTrack, teachingTrackIds, trackInstruction, usesLevelledPrompts } from '../_shared/teaching.ts'
 import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
@@ -345,14 +346,19 @@ Deno.serve(async (req) => {
       : null
     if (!keyRecord && !owner) return jsonResponse({ message: '講者權限驗證失敗。' }, 403)
 
-    let dispatchTrack: string | null | undefined
-    async function sessionTrack() {
-      if (dispatchTrack === undefined) {
-        const { data, error } = await supabase.from('sessions').select('teaching_language').eq('id', sessionId).single()
+    let dispatchContext: { teaching_language: string | null; level_framework: string | null; level_code: string | null } | null | undefined
+    async function sessionContext() {
+      if (dispatchContext === undefined) {
+        const { data, error } = await supabase.from('sessions').select('teaching_language, level_framework, level_code').eq('id', sessionId).single()
         if (error) throw error
-        dispatchTrack = data?.teaching_language || null
+        dispatchContext = data
       }
-      return dispatchTrack
+      return dispatchContext
+    }
+    async function sessionTrack() { return (await sessionContext())?.teaching_language || null }
+    async function rewritePrompt(activity: string, prompt: string, maxLength = 1000) {
+      if (!prompt || input.useOriginalPrompt === true) return prompt
+      return (await adaptStudentPrompt(await sessionContext(), activity, prompt, { maxLength })).prompt
     }
     async function isEnglishSession() { return await sessionTrack() === 'en' }
 
@@ -601,7 +607,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create_file_request') {
-      const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      const promptText = await rewritePrompt('file upload', typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : '')
       const { error: stopError } = await stopActiveQuestions(supabase, sessionId, new Date().toISOString())
       if (stopError) throw stopError
       const { data: question, error } = await supabase.from('questions').insert({
@@ -849,8 +855,9 @@ Deno.serve(async (req) => {
     // 拍照描述. An upload question with no screenshot behind it: the material is
     // whatever the student walks up to, which is the point of the activity.
     if (action === 'open_photo_task') {
-      const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      if (!promptText) return jsonResponse({ message: '請先寫出要學生拍什麼、說明什麼。' }, 400)
+      const draftPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (!draftPrompt) return jsonResponse({ message: '請先寫出要學生拍什麼、說明什麼。' }, 400)
+      const promptText = await rewritePrompt('photo description', draftPrompt)
 
       // Classroom materials stay in the language the teacher dispatched.
       const translations = {}
@@ -883,8 +890,9 @@ Deno.serve(async (req) => {
     // because the two halves are one action to a teacher: ask for the sentence
     // and put the sentences on the projector.
     if (action === 'open_sentence_wall') {
-      const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
-      if (!promptText) return jsonResponse({ message: '請先寫出要學生造句的題目。' }, 400)
+      const draftPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      if (!draftPrompt) return jsonResponse({ message: '請先寫出要學生造句的題目。' }, 400)
+      const promptText = await rewritePrompt('sentence-writing practice', draftPrompt)
       const answerSeconds = timingSeconds(input.answerSeconds, 600)
       if (answerSeconds === undefined) return jsonResponse({ message: '時間設定不正確。' }, 400)
 
@@ -1010,12 +1018,15 @@ Deno.serve(async (req) => {
         return jsonResponse({ message: '找不到已上傳的四格圖片。' }, 400)
       }
 
-      const promptText = typeof input.promptText === 'string' && input.promptText.trim()
+      const draftPrompt = typeof input.promptText === 'string' && input.promptText.trim()
         ? input.promptText.trim().slice(0, 1000)
         : await sessionTrack() === 'ja' ? '4枚の絵を順番に並べて、それぞれの絵の下に物語を書いてください。' : await isEnglishSession() ? 'Arrange the four pictures, then write the story below each picture.' : await sessionTrack() === 'putonghua' ? '请先排列四张图片，再根据每张图片写出故事。' : '請自行安排四張圖的順序，並在每張圖下寫出故事。'
       const title = typeof input.title === 'string' && input.title.trim()
         ? input.title.trim().slice(0, 200)
         : activityTitle(await sessionTrack(), 'picture_story', '排序寫作題')
+      const suffix = typeof input.promptSuffix === 'string' ? input.promptSuffix.trim().slice(0, 500) : ''
+      const adapted = await rewritePrompt('picture story ordering and writing', draftPrompt)
+      const promptText = [adapted, suffix].filter(Boolean).join('\n\n')
       const aiGrading = input.aiGrading === true
 
       const stoppedAt = new Date().toISOString()
@@ -1114,9 +1125,11 @@ Deno.serve(async (req) => {
       // how a Japanese class ends up with Chinese questions.
       const { data: classRow } = await supabase.from('sessions')
         .select('teaching_language, guidance_language, level_framework, level_code').eq('id', sessionId).maybeSingle()
+      const fixedLevel = usesLevelledPrompts(classRow?.teaching_language)
+      const quizPreviewPrompt = fixedLevel ? null : direction
       const classInstruction = [
-        trackInstruction(classRow?.teaching_language),
-        levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null, direction),
+        trackInstruction(classRow?.teaching_language, fixedLevel),
+        levelInstruction(classRow?.level_framework ?? null, classRow?.level_code ?? null, fixedLevel ? '' : direction),
       ].join('\n')
       // A quiz can be built from a screenshot or from a file the teacher shared;
       // the two differ only in where the source comes from and whether a
@@ -1217,9 +1230,9 @@ Deno.serve(async (req) => {
         type: 'custom_quiz',
         status: 'active',
         title: classRow?.teaching_language === 'ja' ? '問題を準備中…' : classRow?.teaching_language === 'en' ? 'Preparing questions…' : '出題中，請稍候',
-        prompt_text: ['en', 'ja'].includes(classRow?.teaching_language) ? null : direction,
+        prompt_text: quizPreviewPrompt,
         options: [],
-        translations: { en: { title: 'Preparing questions, please wait', prompt_text: ['en', 'ja'].includes(classRow?.teaching_language) ? null : direction, options: [] } },
+        translations: { en: { title: 'Preparing questions, please wait', prompt_text: quizPreviewPrompt, options: [] } },
         allow_multiple: false,
       }).select('*').single()
       if (questionError) throw questionError
@@ -1235,6 +1248,7 @@ Deno.serve(async (req) => {
             sourceText: sourceText || undefined,
             extraInstruction: [classInstruction, extraInstruction].filter(Boolean).join('\n'),
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+            teachingTrack: classRow?.teaching_language,
             guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
             levelFramework: classRow?.level_framework ?? null,
             levelCode: classRow?.level_code ?? null,
@@ -1298,7 +1312,7 @@ Deno.serve(async (req) => {
 
           const { error: questionUpdateError } = await supabase.from('questions').update({
             title: generated.title,
-            translations: { en: { title: 'AI custom quiz', prompt_text: ['en', 'ja'].includes(classRow?.teaching_language) ? null : direction, options: [] } },
+            translations: { en: { title: 'AI custom quiz', prompt_text: quizPreviewPrompt, options: [] } },
           }).eq('id', questionId)
           if (questionUpdateError) throw questionUpdateError
         } catch (error) {
@@ -1311,7 +1325,7 @@ Deno.serve(async (req) => {
             }).eq('id', screenshotId),
             supabase.from('questions').update({
               title: classRow?.teaching_language === 'ja' ? '問題を生成できませんでした。もう一度配信してください。' : classRow?.teaching_language === 'en' ? 'Question generation failed. Please try again.' : '出題失敗，請重新派送',
-              translations: { en: { title: 'Question generation failed. Please send it again.', prompt_text: ['en', 'ja'].includes(classRow?.teaching_language) ? null : direction, options: [] } },
+              translations: { en: { title: 'Question generation failed. Please send it again.', prompt_text: quizPreviewPrompt, options: [] } },
             }).eq('id', questionId),
           ])
         }
@@ -1602,6 +1616,7 @@ Deno.serve(async (req) => {
               covered.length ? `These are already on cards in this deck; choose different ones: ${covered.join('、')}` : '',
             ].filter(Boolean).join('\n'),
             teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+            teachingTrack: classRow?.teaching_language,
             guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
             levelFramework: classRow?.level_framework ?? null,
             levelCode: classRow?.level_code ?? null,
@@ -2024,7 +2039,7 @@ Deno.serve(async (req) => {
       // It travels in reading_ruby instead and the prompt stays the sentence.
       const zhuyin = clip.annotation === 'zhuyin'
       const readingText = zhuyin ? (clip.annotation_text || clip.transcript) : clip.transcript
-      const promptText = audioOnly ? readingText.slice(0, 4000) : readAloud ? readingText.slice(0, 1000) : teacherPrompt
+      const promptText = audioOnly ? readingText.slice(0, 4000) : readAloud ? readingText.slice(0, 1000) : await rewritePrompt('listening comprehension', teacherPrompt)
       let readingRuby: string[] | null = null
       if ((readAloud || audioOnly) && clip.annotation === 'pinyin' && clip.annotation_text) {
         try {
@@ -2396,7 +2411,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const options = normalizedOptions(input.options)
+      const originalOptions = normalizedOptions(input.options)
       const allowMultiple = Boolean(input.allowMultiple) && ['poll', 'multiple_choice'].includes(type)
       // Only a spoken answer has preparation, and only a type students answer
       // has a clock at all; storing either on any other type would leave a
@@ -2434,7 +2449,14 @@ Deno.serve(async (req) => {
       if (prepareSeconds === undefined || answerSeconds === undefined) {
         return jsonResponse({ message: '時間設定不正確。' }, 400)
       }
-      const promptText = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      const draftPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      const suffix = typeof input.promptSuffix === 'string' ? input.promptSuffix.trim().slice(0, 500) : ''
+      const adaptOptions = ['poll', 'multiple_choice'].includes(type)
+      const { prompt, options } = await adaptStudentPrompt(
+        type === 'pronunciation' || input.useOriginalPrompt === true || (!draftPrompt && !originalOptions.length) ? null : await sessionContext(),
+        type, draftPrompt, { options: adaptOptions ? originalOptions : [] },
+      )
+      const promptText = [prompt, suffix].filter(Boolean).join('\n\n')
       const titles: Record<string, string> = {
         send_screen: '派送畫面',
         poll: '投票題',
@@ -2488,7 +2510,7 @@ Deno.serve(async (req) => {
           status: 'active',
           title: activityTitle(await sessionTrack(), type, titles[type]),
           prompt_text: promptText || null,
-          options,
+          options: adaptOptions ? options : originalOptions,
           translations,
           allow_multiple: allowMultiple,
           prepare_seconds: prepareSeconds,
@@ -3058,6 +3080,7 @@ Deno.serve(async (req) => {
       if (evidencePrompt && (await sessionTrack() !== 'guoyu' || !sourceText)) {
         return jsonResponse({ message: '請在國語文場次貼上原文，並填寫圈選證據的題目。' }, 400)
       }
+      const studentEvidencePrompt = await rewritePrompt('find evidence in the passage', evidencePrompt)
       const verbatim = Boolean(evidencePrompt) || input.verbatim === true
       const accent = ['american', 'british', 'standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
         ? input.accent as import('../_shared/speech-accent.ts').SpeechAccent
@@ -3119,10 +3142,11 @@ Deno.serve(async (req) => {
         .select('teaching_language, guidance_language, level_framework, level_code, reading_annotation')
         .eq('id', sessionId).maybeSingle()
 
-      if (classRow) classRow.level_code = dispatchLevelCode(classRow.level_framework, classRow.level_code, direction)
-
       // The languages the annotations have to exist in: the two that are always
       // hand-written in the app, plus whatever this class's students can pick.
+      if (classRow && !usesLevelledPrompts(classRow.teaching_language)) {
+        classRow.level_code = dispatchLevelCode(classRow.level_framework, classRow.level_code, direction)
+      }
       const locales = [...new Set(['zh_tw', 'en', String(classRow?.guidance_language || 'en').toLowerCase().replace('-', '_')])]
 
       if (verbatim && !sourceText) {
@@ -3207,7 +3231,7 @@ Deno.serve(async (req) => {
         share_screenshot: shareScreenshot,
         status: 'active',
         title: passage.title || (classRow?.teaching_language === 'ja' ? '読解' : classRow?.teaching_language === 'en' ? 'Reading' : classRow?.level_framework === 'hsk' ? '阅读' : '閱讀'),
-        prompt_text: evidencePrompt || (withQuiz ? (classRow?.teaching_language === 'ja' ? '文章を読んで、次の質問に答えてください。' : classRow?.teaching_language === 'en' ? 'Read the passage, then answer the questions below.' : classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : ''),
+        prompt_text: studentEvidencePrompt || (withQuiz ? (classRow?.teaching_language === 'ja' ? '文章を読んで、次の質問に答えてください。' : classRow?.teaching_language === 'en' ? 'Read the passage, then answer the questions below.' : classRow?.level_framework === 'hsk' ? '读完后回答下面的问题。' : '讀完後回答下面的問題。') : ''),
         options: [],
         allow_multiple: false,
       }).select('*').single()
@@ -3256,6 +3280,7 @@ Deno.serve(async (req) => {
                 comprehensionInstruction(comprehension, quizCount),
               ].filter(Boolean).join('\n'),
               teachingLanguage: resolveTrack(classRow?.teaching_language).promptLanguage,
+              teachingTrack: classRow?.teaching_language,
               guidanceLanguage: guidanceLanguageName(classRow?.guidance_language),
               levelFramework: classRow?.level_framework ?? null,
               levelCode: classRow?.level_code ?? null,

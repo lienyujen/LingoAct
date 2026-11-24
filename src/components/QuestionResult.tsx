@@ -31,6 +31,7 @@ const drawingDefaultTitles = new Set(['電寫題', '电写题', '手写题', 'Ha
 type Props = {
   anonymousEnabled: boolean
   showRecordingClock?: boolean
+  showStudentPrompt?: boolean
   question: Question | null
   // The capture a 圖上點選 question was answered on. Null for every other type.
   screenshotUrl?: string | null
@@ -828,6 +829,7 @@ export function QuestionResult(props: Props) {
             <h2>{t('typeShortAnswer')}</h2>
             <QuestionStatusActions {...props} question={question} />
           </div>
+          {props.showStudentPrompt && question.prompt_text && <p className="detected-question">{activityNotice(question.prompt_text, locale)}</p>}
           <p className="muted">{t('answeredPeople', { n: answers.length })}</p>
           <div className="answer-list">
             {answers.map((answer, index) => (

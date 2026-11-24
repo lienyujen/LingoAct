@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { screenDispatchQuestion, supportingScreenQuestion } from '../src/lib/screenDispatch.ts'
+import { adaptStudentPrompt } from '../supabase/functions/_shared/student-prompt.ts'
 
 const source = readFileSync('supabase/functions/presenter-action/index.ts', 'utf8')
 const participant = readFileSync('src/routes/ParticipantPage.tsx', 'utf8')
@@ -62,7 +63,7 @@ test('the real create_question handler keeps current tasks and boards alive for 
     const context = vm.createContext({
       input: { questionType: type, screenshotId: 'shot', storagePath: 'sessions/class/screenshots/shot.png', boardFormats: ['text'] },
       action: 'create_question', sessionId: 'class', supabase: database(rows),
-      isEnglishSession: async () => false, requireEnglishMaterial() {}, questionTypes: new Set(['send_screen', 'short_answer', 'board']),
+      adaptStudentPrompt, sessionContext: async () => rows.sessions[0], questionTypes: new Set(['send_screen', 'short_answer', 'board']),
       validUuid: () => true, normalizedOptions: () => [], timedTypes: new Set(), spokenTypes: new Set(), boardKinds: new Set(['text']),
       timingSeconds: () => null, storedObject: async () => ({ ok: true }), sessionTrack: async () => 'mandarin',
       activityTitle: (_, __, title) => title, jsonResponse: (data, status = 200) => ({ data, status }),

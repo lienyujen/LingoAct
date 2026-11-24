@@ -1,3 +1,4 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import type { Question } from '../types'
 import { uiText } from '../lib/uiText'
 import { pictureStudentPrompt } from '../lib/pictureStudentPrompt'
@@ -6,7 +7,7 @@ import { ArrowsClockwise, CardsThree, Crop, Image as ImageIcon, Microphone, Pape
 import { TimingRow } from './TimingRow'
 import { dispatchPictureWriting, describePicture, generatePicture } from '../lib/picture'
 import type { GeneratedPicture, PictureStoryboard } from '../lib/picture'
-import { usePresenterText } from '../lib/presenterI18n'
+import { presenterLookup, usePresenterText } from '../lib/presenterI18n'
 import type { QuestionDraft } from './QuestionEditor'
 
 type Props = {
@@ -18,6 +19,7 @@ type Props = {
   initialAnswerSeconds?: number | null
   sessionId: string
   presenterToken: string
+  teachingLanguage: string | null
   // A picture the teacher grabbed off their own screen — a textbook page, a
   // photograph in a slide. Read by the AI rather than drawn by it, so it comes
   // with prompts but no storyboard.
@@ -58,6 +60,7 @@ export function PictureStudioModal({
   initialAnswerSeconds = null,
   sessionId,
   presenterToken,
+  teachingLanguage,
   suspended = false,
   capturedScreen,
   onCapturedScreenRead,
@@ -71,6 +74,7 @@ export function PictureStudioModal({
   const [picture, setPicture] = useState<GeneratedPicture | null>(null)
   const [mode, setMode] = useState<Mode>('spoken')
   const [promptText, setPromptText] = useState('')
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
   // The teacher may have rewritten the instruction; flipping between speaking
   // and writing should not silently throw that away.
   const [promptTouched, setPromptTouched] = useState(false)
@@ -91,6 +95,7 @@ export function PictureStudioModal({
     setPicture(null)
     setMode(initialMode)
     setPromptText('')
+    setUseOriginalPrompt(false)
     setPromptTouched(false)
     setPrepareSeconds(initialPrepareSeconds)
     setAnswerSeconds(initialAnswerSeconds)
@@ -166,13 +171,19 @@ export function PictureStudioModal({
     setError('')
     setBusy(mode === 'ordering' ? t('cuttingPanels') : t('sending'))
     try {
-      const studentPrompt = pictureStudentPrompt(promptText, picture.storyboard, { words: t('pictureVocabulary'), pattern: t('picturePattern') })
+      const adjustsPrompt = ['en', 'huayu', 'putonghua', 'ja'].includes(teachingLanguage || '')
+      const studentText = teachingLanguage === 'en' ? presenterLookup('en') : t
+      const labels = { words: studentText('pictureVocabulary'), pattern: studentText('picturePattern') }
+      const dispatchPrompt = adjustsPrompt ? promptText.trim() : pictureStudentPrompt(promptText, picture.storyboard, labels)
+      const promptSuffix = adjustsPrompt ? pictureStudentPrompt('', picture.storyboard, labels) : undefined
       if (mode === 'ordering') {
         const created = await dispatchPictureWriting({
           sessionId,
           presenterToken,
           file: picture.file,
-          promptText: studentPrompt,
+          promptText: dispatchPrompt,
+          promptSuffix,
+          useOriginalPrompt,
           title: picture.storyboard.title,
           aiGrading,
         }, t)
@@ -183,8 +194,9 @@ export function PictureStudioModal({
         type: mode === 'spoken' ? 'oral_response' : 'short_answer',
         options: [],
         allowMultiple: false,
-        promptText: studentPrompt,
-        preservePromptLanguage: true,
+        promptText: dispatchPrompt,
+        promptSuffix,
+        useOriginalPrompt,
         prepareSeconds: mode === 'spoken' ? prepareSeconds : null,
         answerSeconds,
       })
@@ -339,6 +351,7 @@ export function PictureStudioModal({
             </>
           )}
 
+          {picture && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
           {error && <p className="ps-error">{uiText(error)}</p>}
         </div>
 

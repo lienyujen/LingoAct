@@ -1,3 +1,4 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import { uiText } from '../lib/uiText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -22,7 +23,7 @@ type Props = {
   onClose: () => void
   onShareFiles: (files: File[]) => Promise<void>
   onDeleteSharedFile: (fileId: string) => Promise<void>
-  onStartCollect: (promptText: string) => Promise<void>
+  onStartCollect: (promptText: string, useOriginalPrompt: boolean) => Promise<void>
   onStopCollect: () => Promise<void>
   onRefreshResponses: () => Promise<void>
   onAnalyzeResponse: (responseId: string) => Promise<void>
@@ -75,6 +76,7 @@ export function FileTransferModal({
   const [tab, setTab] = useState<Tab>('share')
   const [dragging, setDragging] = useState(false)
   const [prompt, setPrompt] = useState('')
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [expanded, setExpanded] = useState<string>('')
@@ -232,13 +234,14 @@ export function FileTransferModal({
                 onChange={(event) => setPrompt(event.target.value)}
               />
             </label>
+            {!collecting && prompt.trim() && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
             <div className="file-transfer-controls">
               {collecting ? (
                 <button disabled={busy} type="button" onClick={() => void guard(onStopCollect)}>
                   <Square size={16} />{t('stopCollect')}
                 </button>
               ) : (
-                <button disabled={busy} type="button" onClick={() => void guard(() => onStartCollect(prompt))}>
+                <button disabled={busy} type="button" onClick={() => void guard(() => onStartCollect(prompt, useOriginalPrompt))}>
                   <PaperPlaneTilt size={16} />{t('sendUpload')}
                 </button>
               )}

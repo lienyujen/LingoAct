@@ -1,4 +1,5 @@
 import { notifyQuizScoreChanged } from './classroom-sync.ts'
+import { usesLevelledPrompts } from './teaching.ts'
 import { englishMaterialIssue, requireEnglishMaterial } from './english-material.ts'
 import { mainlandFeedbackInstruction, feedbackSystemPrompt } from './feedback-language.ts'
 import { callAiJson, geminiModels, geminiThinkingConfig, errorDetail } from './ai.ts'
@@ -251,6 +252,7 @@ export async function generateCustomQuiz(input: {
   // The class's own language, named for the model. Settled when the session was
   // created, so the teacher does not have to say it in every 出題方向.
   teachingLanguage?: string
+  teachingTrack?: string | null
   // What the class is EXPLAINED in, named for the model. A 單字卡 gloss is for
   // understanding rather than for practising, so it goes in this and not in the
   // language being taught.
@@ -281,18 +283,15 @@ export async function generateCustomQuiz(input: {
     ? `必須產生恰好 ${input.requestedCount} 題。`
     : '題數由出題方向決定；若沒有指定，請依素材產生 5 題，最多 10 題。'
   const flashcard = input.requestedType === 'flashcard'
+  const fixedLevel = usesLevelledPrompts(input.teachingTrack ?? (input.teachingLanguage === 'English' ? 'en' : null))
   const defaultCode = input.levelCode
-  input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
+  if (!fixedLevel) input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
   const level = levelCeiling(input.levelFramework ?? null, input.levelCode ?? null)
   const writing = input.requestedType === 'writing'
-  // The class's language decides this, and the teacher's direction can still
-  // override it — a 華語文 teacher does sometimes want an English gloss. Reading
-  // it out of the direction text was the wrong way round: it made the default
-  // "whatever the material happens to be in", so a Japanese class working from
-  // a Chinese textbook page got Chinese questions.
-  const requestedLanguage = /(?:英文|英語|english)/i.test(input.direction)
-    ? 'English'
-    : input.teachingLanguage || 'auto'
+  // A word such as "English" in the teacher's prompt may describe the source.
+  // The classroom language decides what the learners receive.
+  const requestedLanguage = !fixedLevel && /(?:英文|英語|english)/i.test(input.direction)
+    ? 'English' : input.teachingLanguage || 'auto'
   // A vocabulary card is bilingual by nature and was being written in one
   // language: a TBCL 1 learner cannot read a Chinese definition of 差異, so the
   // three options came out harder than the word they were glossing.
@@ -323,7 +322,7 @@ export async function generateCustomQuiz(input: {
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
     : requestedLanguage === 'English'
       ? 'ENGLISH TEACHING: All titles, prompts, options, matching columns, reference answers, rubrics and vocabulary-card definitions must be in English. The teacher may supply source material and directions in any language. Adapt that material into natural English at the specified class level, preserving its meaning. Optional translations are stored separately.'
-    : `本課程的教學語言是 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則都必須使用 ${requestedLanguage}，除非教師在出題方向中另外指定。`
+    : `本課程的教學語言是 ${requestedLanguage}；題目標題、題幹、選項、答案與評分準則使用 ${requestedLanguage}${fixedLevel ? '。教師可以使用任何語言提供素材和出題方向，遵守班級程度。' : '，除非教師在出題方向中另外指定。'}`
 
   const requestPayload = {
     systemInstruction: {

@@ -1,3 +1,4 @@
+import { edgeFunctionErrorMessage } from './edgeError'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
@@ -17,12 +18,13 @@ export async function openSentenceWall(input: {
   sessionId: string
   presenterToken: string
   promptText: string
+  useOriginalPrompt?: boolean
   answerSeconds: number | null
 }, t: PresenterT = presenterLookup('zh-TW')) {
   const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
     body: { action: 'open_sentence_wall', ...input },
   })
-  if (error) throw error
+  if (error) throw new Error(await edgeFunctionErrorMessage(error, t('wallOpenFailed')))
   if (!data?.question) throw new Error(data?.message || t('wallOpenFailed'))
   return data as { question: Question; session: Session | null }
 }

@@ -52,6 +52,7 @@ type Props = {
   onOpenSettings: () => void
   onToggleRecording: () => void
   onToggleCaptionVisibility: () => void
+  exitTicketError?: string
   onGenerateExitTicket: () => void
   onLowerHands: () => void
   onEndClass: () => void
@@ -91,6 +92,7 @@ export function PresenterControlPanel({
   onOpenSettings,
   onToggleRecording,
   onToggleCaptionVisibility,
+  exitTicketError,
   onGenerateExitTicket,
   onLowerHands,
   onEndClass,
@@ -119,6 +121,7 @@ export function PresenterControlPanel({
 
   return (
     <section className="panel control-panel">
+      {exitTicketError && <p className="error" role="alert">{exitTicketError}</p>}
       <div className="metric-row">
         <div className="metric">
           <span className="metric-icon"><Users size={18} /></span>

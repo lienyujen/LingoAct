@@ -1,5 +1,7 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import { ArrowClockwise } from '@phosphor-icons/react'
 import { APP_PROFILE } from '../lib/appProfiles'
+import { edgeFunctionErrorMessage } from '../lib/edgeError'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
@@ -16,6 +18,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   const redoLabel = locale === 'zh-CN' ? '重新做一次' : locale === 'ja' ? 'もう一度取り組む' : locale === 'en' ? 'Do it again' : '重新做一次'
   const [mode, setMode] = useState('')
   const [focus, setFocus] = useState('')
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
   const [samples, setSamples] = useState<Sample[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [needs, setNeeds] = useState<Need[]>([])
@@ -29,11 +32,11 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
       body: { action, sessionId, presenterToken, questionId: question.id, ...fields },
     })
-    if (error) throw error
+    if (error) throw new Error(await edgeFunctionErrorMessage(error, 'Could not prepare the activity.'))
     if (data?.message) throw new Error(data.message)
     return data
   }
-  useEffect(() => { setMode(''); setFocus(''); setSelected([]); setSamples([]); setNeeds([]); setPairs([]); setError('') }, [question.id])
+  useEffect(() => { setMode(''); setFocus(''); setUseOriginalPrompt(false); setSelected([]); setSamples([]); setNeeds([]); setPairs([]); setError('') }, [question.id])
   async function run(work: () => Promise<void>) {
     setBusy(true); setError('')
     try { await work() } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
@@ -51,7 +54,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   }
   async function dispatch() {
     const data = await call(mode === 'repeat' || mode === 'followup' ? 'teaching_repeat' : mode === 'pair' ? 'teaching_pair' : 'teaching_discuss', {
-      focus, responseType: mode === 'followup' ? 'short_answer' : undefined, sampleIds: selected, participantIds: roster, materialA, materialB,
+      focus, useOriginalPrompt, responseType: mode === 'followup' ? 'short_answer' : undefined, sampleIds: selected, participantIds: roster, materialA, materialB,
     })
     onDispatched(data.question)
   }
@@ -101,6 +104,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
         {participants.map(p => <label className="teaching-sample" key={p.id}><input type="checkbox" checked={roster.includes(p.id)} onChange={e => setRoster(v => e.target.checked ? [...v, p.id] : v.filter(id => id !== p.id))} />{p.name}</label>)}
         <p>{participants.filter(p => roster.includes(p.id)).map((p, i) => `${Math.floor(i / 2) + 1}${i % 2 ? 'B' : 'A'}: ${p.name}`).join(' · ')}</p>
       </>}
+      {['repeat', 'followup', 'pair', 'discuss'].includes(mode) && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
       {mode !== 'diagnose' && <button disabled={busy || !active || !focus.trim() || (mode === 'discuss' && !selected.length) || (mode === 'pair' && (!materialA.trim() || !materialB.trim() || roster.length < 2 || roster.length % 2 !== 0))} type="button" onClick={() => void run(dispatch)}>{busy ? (zh ? uiText("派送中…") : 'Sending…') : (zh ? uiText("派送給全班") : 'Send to class')}</button>}
     </div>}
     {pairs.map((p, i) => <article key={p.id}><strong>{zh ? uiText("第") : 'Pair'} {i + 1} {zh ? uiText("組") : ''}: {participants.find(v => v.id === p.participant_a)?.name} / {participants.find(v => v.id === p.participant_b)?.name}</strong><p>{p.result || (zh ? uiText("尚未送出") : 'Not submitted')}</p></article>)}

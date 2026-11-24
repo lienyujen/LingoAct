@@ -1,3 +1,4 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import { readingEvidenceExamples, readingEvidenceText } from '../lib/readingEvidenceExamples'
 import { reusableReadingWords } from '../lib/readingAnnotationReuse'
 import { accentChoices, speechAccent } from '../lib/speechAccent'
@@ -86,6 +87,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
   const [sourceText, setSourceText] = useState('')
   const [direction, setDirection] = useState('')
   const [evidence, setEvidence] = useState(false)
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
   const [stretch, setStretch] = useState(0)
   const [withQuiz, setWithQuiz] = useState(true)
   const [quizCount, setQuizCount] = useState(5)
@@ -120,6 +122,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
     setSourceText('')
     setDirection('')
     setEvidence(false)
+    setUseOriginalPrompt(false)
     setStretch(saved.stretch ?? 0)
     setWithQuiz(saved.withQuiz ?? true)
     setQuizCount(saved.quizCount ?? 5)
@@ -195,6 +198,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
           sourceText: sourceText.trim(),
           direction: evidence ? '' : direction.trim(),
           evidencePrompt: evidence ? direction.trim() : undefined,
+          useOriginalPrompt: evidence && useOriginalPrompt,
           levelStretch: stretch,
           withQuiz: !evidence && withQuiz,
           quizCount,
@@ -363,6 +367,7 @@ export function ReadingModal({ open, sessionId, presenterToken, screenshotId, ca
 
         {/* 超綱: i+1 and i+2. Off by default, because a class is set to a level
             for a reason and stretching them is a decision, not a default. */}
+        {evidence && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
         {!evidence && !verbatim && (
         <div className="reading-field">
           {t('readingStretch')}

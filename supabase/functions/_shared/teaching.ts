@@ -105,14 +105,18 @@ export const teachingTrackIds = new Set(Object.keys(TEACHING_TRACKS))
 // What every generated question has to obey before anything about the material.
 // The teacher picked the track when the class was created; they should not have
 // to restate it in 出題方向 every time they dispatch.
-export function trackInstruction(trackId: string | null | undefined) {
+export function usesLevelledPrompts(trackId: string | null | undefined) {
+  return trackId === 'en' || trackId === 'huayu' || trackId === 'putonghua' || trackId === 'ja'
+}
+
+export function trackInstruction(trackId: string | null | undefined, fixedLanguage = false) {
   const track = resolveTrack(trackId)
   return [
     track.id === 'guoyu'
       ? 'Write teaching materials, tasks, answer keys, and teacher analysis in Taiwan Traditional Chinese. English is a separate student translation for EMI.'
       : track.id === 'en'
       ? 'This is an English class. Every teaching passage, question, option, task instruction and reference answer must remain in English, even when the teacher gives directions in another language. Only separate explanatory notes may use the selected guidance language.'
-      : `This class is a ${track.promptLanguage} class. Every question, option, instruction and reference answer must be written in ${track.promptLanguage} unless the teacher's direction explicitly asks for another language.`,
+      : `This class is a ${track.promptLanguage} class. Every question, option, instruction and reference answer must be written in ${track.promptLanguage}${fixedLanguage ? '.' : " unless the teacher's direction explicitly asks for another language."}`,
     track.audience,
   ].join('\n')
 }

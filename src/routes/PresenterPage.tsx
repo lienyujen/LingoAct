@@ -157,6 +157,7 @@ export function PresenterPage() {
   const [hotspotImageUrl, setHotspotImageUrl] = useState<string | null>(null)
   const [analysisBusy, setAnalysisBusy] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
+  const [exitTicketError, setExitTicketError] = useState('')
   const [dispatchWarning, setDispatchWarning] = useState('')
   const [endClassConfirmOpen, setEndClassConfirmOpen] = useState(false)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
@@ -1102,7 +1103,8 @@ export function PresenterPage() {
             options,
             allowMultiple,
             promptText,
-            preservePromptLanguage: draft.preservePromptLanguage,
+            useOriginalPrompt: draft.useOriginalPrompt,
+            promptSuffix: draft.promptSuffix,
             prepareSeconds: draft.prepareSeconds,
             answerSeconds: draft.answerSeconds,
             maxPins,
@@ -1118,7 +1120,7 @@ export function PresenterPage() {
       }
       if (draft.interaction) {
         const { data, error } = await supabase.functions.invoke('presenter-action', { body: {
-          action: 'interaction_dispatch', sessionId, presenterToken, image: await fileDataUrl(file), direction: promptText, ...draft.interaction,
+          action: 'interaction_dispatch', sessionId, presenterToken, image: await fileDataUrl(file), direction: promptText, useOriginalPrompt: draft.useOriginalPrompt, ...draft.interaction,
         } })
         if (error) throw new Error(await edgeFunctionErrorMessage(error, t('captureSendFailed')))
         if (!data?.question) throw new Error(data?.message || t('questionCreateFailed'))
@@ -1167,7 +1169,8 @@ export function PresenterPage() {
           options,
           allowMultiple,
           promptText,
-          preservePromptLanguage: draft.preservePromptLanguage,
+          useOriginalPrompt: draft.useOriginalPrompt,
+          promptSuffix: draft.promptSuffix,
           prepareSeconds: draft.prepareSeconds,
           answerSeconds: draft.answerSeconds,
           maxPins,
@@ -1601,25 +1604,30 @@ export function PresenterPage() {
 
   async function generateExitTicket(lessonGoal = '') {
     if (session?.exit_ticket_prompt) return
-    const presenterToken = getPresenterToken(sessionId)
-    if (!presenterToken) {
-      setAnalysisError(t('oldSessionNoAi'))
+    const presenterToken = getPresenterCredential(sessionId)
+    if (presenterToken === null) {
+      setExitTicketError(t('oldSessionNoAi'))
       return
     }
 
     setBusy(true)
-    setAnalysisError('')
+    setExitTicketError('')
     try {
       const { data, error } = await requireSupabase().functions.invoke('generate-exit-ticket', {
         body: { sessionId, presenterToken, lessonGoal: lessonGoal.trim().slice(0, 200) },
       })
-      if (error) throw error
+      if (error) throw new Error(await edgeFunctionErrorMessage(error, t('exitTicketFailed')))
       if (!data?.prompt) throw new Error(data?.message || t('noExitTicket'))
+      const locale = presenterLocaleFor(session?.teaching_language, session?.system_language, session?.guidance_language)
+      const fallbackNotice = locale === 'zh-TW' ? '已派送備用的退出票題目。'
+        : locale === 'zh-CN' ? '已发送备用的退出票题目。'
+          : locale === 'ja' ? '予備の振り返り問題を配信しました。' : 'A fallback exit-ticket question was sent.'
+      setDispatchWarning(data.fallback ? fallbackNotice : '')
       await loadAll()
       navigateWorkspace('current')
       setControlsOpen(true)
     } catch (error) {
-      setAnalysisError(error instanceof Error ? error.message : t('exitTicketFailed'))
+      setExitTicketError(error instanceof Error ? error.message : t('exitTicketFailed'))
     } finally {
       setBusy(false)
     }
@@ -2007,12 +2015,12 @@ export function PresenterPage() {
     return () => window.clearInterval(timer)
   }, [question?.id, question?.status, question?.type, refreshFileResponses])
 
-  async function startFileCollect(promptText: string) {
+  async function startFileCollect(promptText: string, useOriginalPrompt: boolean) {
     const presenterToken = requirePresenterToken()
     setBusy(true)
     try {
       const data = await callPresenter({
-        action: 'create_file_request', sessionId, presenterToken, promptText,
+        action: 'create_file_request', sessionId, presenterToken, promptText, useOriginalPrompt,
       }, t('collectStartFailed'))
       if (!data.question) throw new Error(t('questionCreateFailed'))
       setCollectQuestion(data.question as Question)
@@ -2062,7 +2070,7 @@ export function PresenterPage() {
       markingRef.current = false
     }
   }
-  async function openWall(promptText: string, answerSeconds: number | null) {
+  async function openWall(promptText: string, answerSeconds: number | null, useOriginalPrompt: boolean) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
       setSentenceWallError(t('noRightsRejoin'))
@@ -2072,7 +2080,7 @@ export function PresenterPage() {
     setSentenceWallError('')
     try {
       const { question: created, session: updated } = await openSentenceWall({
-        sessionId, presenterToken, promptText, answerSeconds,
+        sessionId, presenterToken, promptText, answerSeconds, useOriginalPrompt,
       }, t)
       if (updated) setSession(updated)
       showDispatchedQuestion(created)
@@ -2085,7 +2093,7 @@ export function PresenterPage() {
     }
   }
 
-  async function openPhotoTask(promptText: string) {
+  async function openPhotoTask(promptText: string, useOriginalPrompt: boolean) {
     const presenterToken = getPresenterToken(sessionId)
     if (!presenterToken) {
       setPhotoTaskError(t('noRightsRejoin'))
@@ -2095,7 +2103,7 @@ export function PresenterPage() {
     setPhotoTaskError('')
     try {
       const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
-        body: { action: 'open_photo_task', sessionId, presenterToken, promptText },
+        body: { action: 'open_photo_task', sessionId, presenterToken, promptText, useOriginalPrompt },
       })
       if (error) throw new Error(await edgeFunctionErrorMessage(error, t('photoTaskFailed')))
       if (!data?.question) throw new Error(data?.message || t('photoTaskFailed'))
@@ -2304,6 +2312,7 @@ export function PresenterPage() {
           onCaptureDrawing={window.lingoActDesktop ? () => openActivity('drawing') : undefined}
           onOpenPicture={() => openActivity('pictureTalk')}
           onOpenPictureWriting={() => openActivity('storyOrdering')}
+          exitTicketError={uiText(exitTicketError)}
           onGenerateExitTicket={() => openActivity('exitTicket')}
           onEndClass={() => setEndClassConfirmOpen(true)}
           onOpenFileTransfer={() => openActivity('fileTransfer')}
@@ -2353,6 +2362,7 @@ export function PresenterPage() {
             onResumeQuestion={resumeQuestion}
           />
         ) : <QuestionResult
+          showStudentPrompt={['en', 'huayu', 'putonghua', 'ja'].includes(session.teaching_language || '')}
           showRecordingClock={compactWorkspace && workspaceView === 'current' && classActive && question?.id === currentQuestion?.id}
           anonymousEnabled={session.anonymous_enabled}
           screenshotUrl={hotspotImageUrl}
@@ -2525,6 +2535,7 @@ export function PresenterPage() {
         }}
       />
       <PictureStudioModal
+        teachingLanguage={session.teaching_language}
         initialMode={pictureInitialMode}
         initialDirection={(plannedActivity?.kind === 'pictureTalk' || plannedActivity?.kind === 'storyOrdering') ? plannedPrompt : ''}
         initialAiGrading={plannedActivity?.kind === 'storyOrdering' && plannedActivity.aiGrading === true}

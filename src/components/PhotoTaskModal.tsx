@@ -1,3 +1,4 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { Camera, PaperPlaneTilt, X } from '@phosphor-icons/react'
@@ -9,7 +10,7 @@ type Props = {
   error: string
   open: boolean
   onCancel: () => void
-  onOpen: (promptText: string) => void
+  onOpen: (promptText: string, useOriginalPrompt: boolean) => void
 }
 
 // 拍照描述. No screenshot behind it and no timer: the material is whatever the
@@ -17,9 +18,11 @@ type Props = {
 export function PhotoTaskModal({ busy, error, open, onCancel, onOpen, initialPrompt = '' }: Props) {
   const t = usePresenterText()
   const [promptText, setPromptText] = useState('')
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
 
   useEffect(() => {
     setPromptText(open ? initialPrompt : '')
+    setUseOriginalPrompt(false)
   }, [open, initialPrompt])
 
   if (!open) return null
@@ -30,7 +33,7 @@ export function PhotoTaskModal({ busy, error, open, onCancel, onOpen, initialPro
         className="modal photo-task-modal"
         onSubmit={(event) => {
           event.preventDefault()
-          if (promptText.trim()) onOpen(promptText.trim())
+          if (promptText.trim()) onOpen(promptText.trim(), useOriginalPrompt)
         }}
       >
         <div className="modal-heading">
@@ -53,6 +56,7 @@ export function PhotoTaskModal({ busy, error, open, onCancel, onOpen, initialPro
           />
         </label>
         <p className="muted photo-task-hint">{t('photoTaskHint')}</p>
+        <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />
         {error && <p className="error">{uiText(error)}</p>}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>{t('cancel')}</button>

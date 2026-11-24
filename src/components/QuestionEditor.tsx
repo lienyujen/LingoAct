@@ -1,3 +1,4 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import { uiText } from '../lib/uiText'
 import { Image, NotePencil, PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
@@ -28,7 +29,8 @@ export type QuestionDraft = {
   options: string[]
   allowMultiple: boolean
   promptText: string
-  preservePromptLanguage?: boolean
+  useOriginalPrompt?: boolean
+  promptSuffix?: string
   quizSettings?: CustomQuizSettings
   // Null on both means untimed, which stays the default.
   prepareSeconds: number | null
@@ -95,6 +97,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
   const [allowMultiple, setAllowMultiple] = useState(false)
   const [promptText, setPromptText] = useState('')
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
   const [maxPins, setMaxPins] = useState(1)
   const [boardFormats, setBoardFormats] = useState<BoardPostKind[]>([])
   const [boardMaxPosts, setBoardMaxPosts] = useState<number | null>(1)
@@ -155,6 +158,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
     setOptions(initialDraft?.options?.length ? initialDraft.options : ['A', 'B', 'C', 'D'])
     setAllowMultiple(initialDraft?.allowMultiple === true)
     setPromptText(initialDraft?.promptText || '')
+    setUseOriginalPrompt(initialDraft?.useOriginalPrompt === true)
     setQuizCount(quiz?.requestedCount == null ? 'auto' : String(quiz.requestedCount))
     setQuizType(initialDraft?.interaction?.kind || quiz?.requestedType || preset || 'random')
     setQuizDirection(quiz?.direction || initialDraft?.promptText || '')
@@ -188,7 +192,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
           if (type === 'custom_quiz') {
             const direction = quizDirection.trim()
             if (isInteraction) {
-              onCreate({ sendScreenshot, type, options: [], allowMultiple: false, promptText: direction, prepareSeconds: null, answerSeconds: null,
+              onCreate({ sendScreenshot, type, options: [], allowMultiple: false, promptText: direction, useOriginalPrompt, prepareSeconds: null, answerSeconds: null,
                 interaction: { ...interaction, kind: quizType as 'ordering' | 'matching' } })
               return
             }
@@ -213,6 +217,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             // A board is a topic, so its prompt is the topic rather than
             // nothing — that is the one thing a plain dispatch does not have.
             promptText: type === 'send_screen' && !isBoard ? '' : promptText.trim(),
+            useOriginalPrompt,
             boardFormats: isBoard ? boardFormats : [],
             boardMaxPosts: isBoard ? boardMaxPosts : null,
             boardSelfPaced: isBoard && boardSelfPaced,
@@ -418,6 +423,9 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
               onChange={(event) => setPromptText(event.target.value)}
             />
           </label>
+        )}
+        {(isInteraction || (type !== 'pronunciation' && type !== 'custom_quiz' && (type !== 'send_screen' || isBoard))) && (
+          <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />
         )}
         {timed && (
           <details className="teacher-disclosure timing-editor">

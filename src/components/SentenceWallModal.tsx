@@ -1,3 +1,4 @@
+import { OriginalPromptOption } from './OriginalPromptOption'
 import { uiText } from '../lib/uiText'
 import { useEffect, useState } from 'react'
 import { PaperPlaneTilt, PencilLine, X } from '@phosphor-icons/react'
@@ -11,7 +12,7 @@ type Props = {
   error: string
   open: boolean
   onCancel: () => void
-  onOpen: (promptText: string, answerSeconds: number | null) => void
+  onOpen: (promptText: string, answerSeconds: number | null, useOriginalPrompt: boolean) => void
 }
 
 // 即時 means improvised: a teacher reaches for this in the middle of explaining
@@ -21,10 +22,12 @@ const ANSWER_PRESETS: Array<number | null> = [null, 60, 120, 180]
 export function SentenceWallModal({ busy, error, open, onCancel, onOpen, initialPrompt = '', initialAnswerSeconds = 120 }: Props) {
   const t = usePresenterText()
   const [promptText, setPromptText] = useState('')
+  const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(120)
 
   useEffect(() => {
     setPromptText(open ? initialPrompt : '')
+    setUseOriginalPrompt(false)
     setAnswerSeconds(initialAnswerSeconds)
   }, [initialAnswerSeconds, open, initialPrompt])
 
@@ -36,7 +39,7 @@ export function SentenceWallModal({ busy, error, open, onCancel, onOpen, initial
         className="modal sentence-wall-modal"
         onSubmit={(event) => {
           event.preventDefault()
-          if (promptText.trim()) onOpen(promptText.trim(), answerSeconds)
+          if (promptText.trim()) onOpen(promptText.trim(), answerSeconds, useOriginalPrompt)
         }}
       >
         <div className="modal-heading">
@@ -65,6 +68,7 @@ export function SentenceWallModal({ busy, error, open, onCancel, onOpen, initial
           value={answerSeconds}
           onChange={setAnswerSeconds}
         />
+        <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />
         {error && <p className="error">{uiText(error)}</p>}
         <div className="modal-actions">
           <button className="ghost-button" type="button" onClick={onCancel}>{t('cancel')}</button>

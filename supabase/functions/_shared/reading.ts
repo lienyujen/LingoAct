@@ -22,7 +22,7 @@ import { GRAMMAR_BY_LEVEL } from './tbcl-levels.generated.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
 import { wordLevel } from './tbcl-levels.generated.ts'
 import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
-import { resolveTrack, trackInstruction } from './teaching.ts'
+import { resolveTrack, trackInstruction, usesLevelledPrompts } from './teaching.ts'
 import { applyRegionalWordPinyin, regionalPronunciationInstruction } from './mandarin-pronunciation.ts'
 import type { MandarinAccent } from './mandarin-pronunciation.ts'
 import type { SpeechAccent } from './speech-accent.ts'
@@ -435,7 +435,9 @@ async function glossNewWords(
 }
 
 export async function generateReadingPassage(input: ReadingInput): Promise<ReadingPassage | null> {
-  input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
+  if (!usesLevelledPrompts(input.teachingLanguage)) {
+    input = { ...input, levelCode: dispatchLevelCode(input.levelFramework, input.levelCode, input.direction) }
+  }
   if (resolveTrack(input.teachingLanguage).id === 'guoyu') {
     const instruction = [
       trackInstruction('guoyu'),
@@ -476,7 +478,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
 
   const instruction = [
     '你是 LingoAct 的閱讀教材編寫助理。根據教師提供的素材與方向，為這個班寫一篇他們讀得懂的短文，並標注出他們還沒學過的詞與語法點。',
-    trackInstruction(input.teachingLanguage),
+    trackInstruction(input.teachingLanguage, usesLevelledPrompts(input.teachingLanguage)),
     levelInstruction(input.levelFramework, input.levelCode),
     stretchNote,
     hsk ? `Length: between ${length.min} and ${length.max} characters, a classroom practice target rather than an official HSK exam limit.`
@@ -583,7 +585,7 @@ async function generateJapaneseReading(input: ReadingInput): Promise<ReadingPass
     required: [...schema.required, 'vocabulary'],
   }
   const instruction = [
-    trackInstruction('ja'), levelInstruction(input.levelFramework, input.levelCode, input.direction),
+    trackInstruction('ja', true), levelInstruction(input.levelFramework, input.levelCode),
     `Write one coherent Japanese passage of about ${target.min}–${target.max} Japanese characters. This is an editorial classroom target, not an official examination specification.`,
     target.instruction, JAPANESE_READINGS,
     'Use the supplied material or image as the source. In kana-entry classes, write very short kana-only expressions within the selected practice range.',
@@ -638,7 +640,7 @@ async function generateEnglishReading(input: ReadingInput): Promise<ReadingPassa
   // Appendix 6 supplies grammar references; these extra broad labels are editorial, not official CEFR bands.
   const instruction = [
     'You write English reading materials for LingoAct. The source and teacher directions may be in any language. Adapt the source into English at the selected class level. Write title, body and target grammar spans in English. Never output Chinese pinyin, Bopomofo or Chinese grammar points.',
-    trackInstruction('en'), levelInstruction(input.levelFramework,input.levelCode,input.direction),
+    trackInstruction('en', true), levelInstruction(input.levelFramework, input.levelCode),
     englishVocabularyInstruction(input.levelFramework,input.levelCode,`${input.source}\n${input.direction}`),
     `Length: ${target.min}–${target.max} English words, a classroom practice target, not an official examination limit.`,
     input.levelStretch ? `i+${input.levelStretch}: keep the course level unchanged. Add a small, context-supported amount of unfamiliar vocabulary, more complex syntax or inference. Do not advance an entire CEFR band.` : 'Keep lexical and syntactic load within the selected course level.',

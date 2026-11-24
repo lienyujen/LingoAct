@@ -1,3 +1,4 @@
+import { edgeFunctionErrorMessage } from './edgeError'
 import type { Question } from '../types'
 import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
@@ -142,6 +143,8 @@ export async function dispatchPictureWriting(input: {
   presenterToken: string
   file: File
   promptText: string
+  promptSuffix?: string
+  useOriginalPrompt?: boolean
   title: string
   aiGrading: boolean
 }, t: PresenterT = presenterLookup('zh-TW')) {
@@ -183,11 +186,13 @@ export async function dispatchPictureWriting(input: {
       presenterToken: input.presenterToken,
       panels: uploaded,
       promptText: input.promptText,
+      promptSuffix: input.promptSuffix,
+      useOriginalPrompt: input.useOriginalPrompt,
       title: input.title,
       aiGrading: input.aiGrading,
     },
   })
-  if (error) throw error
+  if (error) throw new Error(await edgeFunctionErrorMessage(error, t('sendFailed')))
   if (!data?.question) throw new Error(data?.message || t('sendFailed'))
   return data.question as Question
 }

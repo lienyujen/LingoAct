@@ -43,8 +43,9 @@ test('all seven English quiz modes carry the selected level through the actual A
           const item = { type, prompt_text: 'Choose the word.', options: ['book', 'pen', 'desk'], pair_prompts: ['read', 'write', 'sit'], accepted_answers: ['book'], rubric: 'Use the passage.' }
           return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ title: 'Practice', items: [item] }) }] } }] }), { status: 200 })
         }
-        const generated = await generateCustomQuiz({ sourceText: 'I read a book at my desk.', direction: 'Practice the passage.', requestedCount: 1, requestedType: mode, teachingLanguage: 'English', guidanceLanguage: 'English', levelFramework: framework, levelCode: code })
+        const generated = await generateCustomQuiz({ sourceText: 'I read a book at my desk.', direction: framework === 'cefr' ? '用日文出 C2 的題目。Practice the passage.' : 'Practice the passage.', requestedCount: 1, requestedType: mode, teachingLanguage: 'English', guidanceLanguage: 'English', levelFramework: framework, levelCode: code })
         assert.ok(prompt.includes(levelInstruction(framework, code)), `${framework}/${mode}: selected level missing from AI prompt`)
+        if (framework === 'cefr') assert.doesNotMatch(prompt, /working at C2/)
         assert.equal(generated.items[0].type, type)
         assert.equal(generated.items[0].points, 100)
       }

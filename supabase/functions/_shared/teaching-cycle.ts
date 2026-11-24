@@ -1,4 +1,6 @@
 import { activityTitle } from './activity-language.ts'
+import { usesLevelledPrompts } from './teaching.ts'
+import { adaptStudentPrompt } from './student-prompt.ts'
 import { requireEnglishMaterial } from './english-material.ts'
 import { callAiJson, jsonResponse } from './ai.ts'
 import { levelInstruction } from './proficiency.ts'
@@ -125,12 +127,16 @@ export async function presenterTeachingCycle(db: Db, sessionId: string, input: I
       reading_ruby: null, karaoke_cues: [], card_font_url: null, options: [], correct_answer: null, correct_answers: [],
       translations: {}, prepare_seconds: null, answer_seconds: null, discussion_samples: [] })
   }
-  if (followup) Object.assign(question, { title: activityTitle(session.teaching_language, 'followup', '重點延伸練習'), prompt_text: focus, teaching_mode: 'practice' })
+  const learnerPrompt = (await adaptStudentPrompt(session, String(action), focus, {
+    original: input.useOriginalPrompt === true, maxLength: 500,
+  })).prompt
+  if (usesLevelledPrompts(session.teaching_language)) question.learning_focus = repeat && !followup ? learnerPrompt || null : null
+  if (followup) Object.assign(question, { title: activityTitle(session.teaching_language, 'followup', '重點延伸練習'), prompt_text: learnerPrompt, teaching_mode: 'practice' })
   if (action === 'teaching_discuss') {
     const selected = Array.isArray(input.sampleIds) ? input.sampleIds : []
     const samples = (await samplesFor(db, source.id)).filter(s => selected.includes(s.id))
     if (samples.length < 1 || samples.length > 3 || !focus) return jsonResponse({ message: '請選 1–3 份作品並填寫討論問題。' }, 400)
-    Object.assign(question, { title: activityTitle(session.teaching_language, 'discussion', '作品討論'), teaching_mode: 'discussion', prompt_text: focus,
+    Object.assign(question, { title: activityTitle(session.teaching_language, 'discussion', '作品討論'), teaching_mode: 'discussion', prompt_text: learnerPrompt,
       discussion_samples: samples.map((s, i) => ({ label: String.fromCharCode(65 + i), text: s.text, images: s.images })) })
   }
   let participants: Array<{ id: string }> = []
@@ -141,7 +147,7 @@ export async function presenterTeachingCycle(db: Db, sessionId: string, input: I
     const selected = Array.isArray(input.participantIds) ? input.participantIds : []
     participants = (roster.data || []).filter(p => selected.includes(p.id))
     if (participants.length < 2 || participants.length % 2) return jsonResponse({ message: '請選擇偶數位學生，兩人一組。' }, 400)
-    Object.assign(question, { title: activityTitle(session.teaching_language, 'pair', 'A / B 資訊差'), teaching_mode: 'pair', prompt_text: focus })
+    Object.assign(question, { title: activityTitle(session.teaching_language, 'pair', 'A / B 資訊差'), teaching_mode: 'pair', prompt_text: learnerPrompt })
   }
   if (repeat && (source.teaching_mode === 'pair' || !['short_answer', 'pronunciation', 'oral_response', 'custom_quiz'].includes(source.type))) return jsonResponse({ message: '此活動尚不支援再練一次。' }, 400)
   if (repeat && !followup) question.title = source.title

@@ -130,10 +130,11 @@ test('English reading retries mixed-language AI passages once before accepting o
 
 test('English exit tickets replace stale Chinese cache and store English questions', async () => {
   const oldFetch=globalThis.fetch,oldDeno=globalThis.Deno
-  let handler,saved,instruction=''
+  let handler,saved,instruction='', failGeneration=false
   globalThis.Deno={env:{get:key=>({SUPABASE_URL:'https://example.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test-placeholder',GEMINI_API_KEY:'test-key'})[key]},serve:callback=>{handler=callback}}
   globalThis.fetch=async(url,options)=> {
     if(!String(url).includes('example.supabase.co')) {
+      if (failGeneration) return new Response('Unavailable', {status:503})
       const request=JSON.parse(options.body)
       instruction=request.systemInstruction.parts.map(part=>part.text).join('\n')
       return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({category:'lesson_summary',prompt:'What did you learn about recycling today?',prompt_en:'What did you learn about recycling today?'})}]}}]}),{status:200})
@@ -159,6 +160,14 @@ test('English exit tickets replace stale Chinese cache and store English questio
     assert.equal(contentModule.exitTicketPrompt({teaching_language:'en',exit_ticket_prompt:saved.exit_ticket_prompt,exit_ticket_prompt_translations:{zh_tw:'今天學到什麼？'}},'zh-TW'),saved.exit_ticket_prompt)
     assert.match(instruction,/Both prompt and prompt_en must contain the same natural English/)
     assert.doesNotMatch(instruction,/繁體中文題目/)
+    failGeneration = true
+    const fallback = await handler(new Request('https://example.supabase.co/functions/v1/generate-exit-ticket', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: 'class', presenterToken: 'test-token' }),
+    }))
+    assert.equal(fallback.status, 200)
+    assert.equal((await fallback.json()).fallback, true)
+    assert.equal(saved.exit_ticket_prompt, 'What did you learn today? Write one thing.')
   } finally {globalThis.fetch=oldFetch;globalThis.Deno=oldDeno}
 })
 

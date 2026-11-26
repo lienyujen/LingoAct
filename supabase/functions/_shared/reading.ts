@@ -20,7 +20,7 @@ import { englishMaterialIssue, requireEnglishMaterial } from './english-material
 import { callAiJson } from './ai.ts'
 import { GRAMMAR_BY_LEVEL } from './tbcl-levels.generated.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
-import { matchChineseVocabulary } from './chinese-word-matching.ts'
+import { chineseVocabularySegments, matchChineseVocabulary } from './chinese-word-matching.ts'
 import { wordLevel } from './tbcl-levels.generated.ts'
 import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
 import { resolveTrack, trackInstruction, usesLevelledPrompts } from './teaching.ts'
@@ -361,10 +361,12 @@ function overJoined(words: ReadingWord[], lookup = wordLevel) {
 // loanword, a compound the benchmark never covered. 閱讀是讀詞不是讀字, so an
 // unlisted word counts as new even when every character in it is easy: 資料夾
 // is not 資料 + 夾 to someone meeting it for the first time.
-export function newWords(words: ReadingWord[], classLevel: number, lookup = wordLevel) {
+export function newWords(words: ReadingWord[], classLevel: number, lookup = wordLevel, locale = 'zh-TW', body?: string) {
   const seen = new Set<string>()
   const out: Array<{ word: string; level: number }> = []
-  for (const { word, level } of matchChineseVocabulary(words, lookup)) {
+  const matched = body === undefined ? matchChineseVocabulary(words, lookup, locale)
+    : chineseVocabularySegments(body, locale, lookup, words)
+  for (const { word, level } of matched) {
     if (seen.has(word) || (level && level < classLevel)) continue
     seen.add(word)
     out.push({ word, level })
@@ -536,10 +538,10 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   const words = hsk ? applyHskWordPinyin(settleWords(output.words, body)) : applyRegionalWordPinyin(body, settleWords(output.words, body), input.accent as MandarinAccent)
 
   // 國教院's list decides which of them are new, and a second call says what
-  // they mean. Without a usable segmentation there is nothing to judge, so the
-  // passage goes out unmarked rather than marked wrongly.
+  // they mean. If the model's readings do not align, tokenize the actual body
+  // independently; a failed pinyin response is not a vocabulary decision.
   const vocabulary = await glossNewWords(
-    newWords(words, tbcl || 4, lookup),
+    newWords(words, tbcl || 4, lookup, hsk ? 'zh-CN' : 'zh-TW', body),
     locales,
     resolveTrack(input.teachingLanguage).promptLanguage,
     body,

@@ -1,10 +1,11 @@
-import { chineseReadingKey } from './chinese-word-matching.ts'
+import { chineseReadingKey, chineseWordKey } from './chinese-word-matching.ts'
 import { HSK_WORDS_BY_LEVEL, HSK_WORD_SENSES } from './hsk-word-levels.generated.ts'
 
 let levels: Map<string, number> | undefined
 
 export function hskWordLevel(word: string, reading = '') {
-  const senses = reading && HSK_WORD_SENSES[word]
+  const keyWord = chineseWordKey(word)
+  const senses = reading && HSK_WORD_SENSES[keyWord]
   if (Array.isArray(senses)) {
     const key = chineseReadingKey(reading)
     const level = senses.reduce((best, [pinyin, band]) => (
@@ -13,7 +14,7 @@ export function hskWordLevel(word: string, reading = '') {
     if (level < 8) return level
   }
   levels ??= new Map(HSK_WORDS_BY_LEVEL.flatMap((words, index) => words.split(' ').map((entry) => [entry, index + 1])))
-  return levels.get(word) || 0
+  return levels.get(keyWord) || 0
 }
 
 export function hskLevelOf(framework: string | null | undefined, code: string | null | undefined) {

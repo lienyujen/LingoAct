@@ -1,3 +1,4 @@
+import { readingVocabularyContext } from '../_shared/chinese-word-matching.ts'
 import { adaptStudentPrompt } from '../_shared/student-prompt.ts'
 import { readingQuizFailureMessage } from '../_shared/reading-failure.ts'
 import { recordingForClient } from '../_shared/recording-results.ts'
@@ -1775,7 +1776,7 @@ Deno.serve(async (req) => {
         supabase.from('quiz_attempts').select('*').eq('quiz_id', quiz.id).order('submitted_at'),
         supabase.from('questions').select('screenshot_id, share_screenshot, karaoke_cues').eq('id', questionId).eq('session_id', sessionId).single(),
         supabase.from('reading_passages').select('*').eq('question_id', questionId).eq('session_id', sessionId).maybeSingle(),
-        supabase.from('sessions').select('anonymous_enabled').eq('id', sessionId).single(),
+        supabase.from('sessions').select('anonymous_enabled, level_framework, level_code').eq('id', sessionId).single(),
       ])
       if (itemError || attemptError || questionError || passageError || sessionViewError) throw itemError || attemptError || questionError || passageError || sessionViewError
       const itemIds = (items || []).map((item) => item.id)
@@ -1817,7 +1818,7 @@ Deno.serve(async (req) => {
         tries: tries || [],
         coachTurns: coachTurns || [],
         screenshot: screenshot || null,
-        readingPassage: readingPassage || null,
+        readingPassage: readingPassage ? readingVocabularyContext(readingPassage, sessionView) : null,
         readingClip: readingClip || null,
         readingCues: Array.isArray(question.karaoke_cues) ? question.karaoke_cues : [],
         readingImageUrl: readingPassage && question.share_screenshot ? screenshot?.public_url || null : null,

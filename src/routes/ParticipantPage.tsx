@@ -1,3 +1,4 @@
+import { readingVocabularyContext } from '../../supabase/functions/_shared/chinese-word-matching.ts'
 import { classroomChanges, createClassroomReconnect } from '../lib/classroomBroadcast'
 import { classroomRetryDelay, createClassroomReadCache } from '../lib/classroomReadCache'
 import { createMessageSubmission } from '../lib/messageSubmission'
@@ -349,7 +350,7 @@ export function ParticipantPage() {
       const { data: passageData } = await read(`reading_passages:${currentQuestion.id}`, () => supabase
         .from('reading_passages').select('*')
         .eq('question_id', currentQuestion.id).maybeSingle(), 60_000, 15_000)
-      const nextPassage = (passageData || null) as ReadingPassageRow | null
+      const nextPassage = passageData ? readingVocabularyContext(passageData as ReadingPassageRow, nextSession) : null
       setPassage(nextPassage)
       // Only when the teacher said so: share_screenshot is their decision about
       // whether the class should see the material or only the passage.
@@ -419,7 +420,7 @@ export function ParticipantPage() {
         .from('reading_passages').select('*').in('question_id', dispatchedIds)
       if (requestId !== loadSequence.current) return
       for (const row of (historyPassageData || []) as ReadingPassageRow[]) {
-        passagesByQuestion[row.question_id] = row
+        passagesByQuestion[row.question_id] = readingVocabularyContext(row, nextSession)
         answeredQuestionIds.add(row.question_id)
       }
     }

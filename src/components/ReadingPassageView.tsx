@@ -1,6 +1,6 @@
 import { useReadingTranslation, type LearningCredentials } from '../lib/useReadingTranslation'
 import { uiText } from '../lib/uiText'
-import { chineseReadingKey, readingVocabularyLevel } from '../../supabase/functions/_shared/chinese-word-matching.ts'
+import { chineseVocabularySegments } from '../../supabase/functions/_shared/chinese-word-matching.ts'
 import { hskLevelOf, hskWordLevel } from '../../supabase/functions/_shared/hsk-word-level.ts'
 import { wordLevel } from '../../supabase/functions/_shared/tbcl-levels.generated.ts'
 import { readingPartOfSpeech } from '../../supabase/functions/_shared/reading-pos'
@@ -166,10 +166,13 @@ function spansOf(body: string, entries: Array<{ span: string }>) {
 }
 
 // Word marks inside one stretch of the passage.
-function wordRuns(text: string, vocabulary: ReadingVocabulary[], base: number): WordRun[] {
+function wordRuns(text: string, vocabulary: ReadingVocabulary[], base: number, approvedSpans?: ReadonlySet<string>): WordRun[] {
   const marks: Array<[number, number, ReadingVocabulary]> = []
   for (const entry of vocabulary) {
-    for (const [from, to] of occurrences(text, entry.word)) marks.push([from, to, entry])
+    for (const [from, to] of occurrences(text, entry.word)) {
+      if (approvedSpans && !approvedSpans.has(`${base + from}:${base + to}`)) continue
+      marks.push([from, to, entry])
+    }
   }
   // Longest first at the same place, so 有禮貌 is not cut in half by 禮貌.
   marks.sort((a, b) => a[0] - b[0] || b[1] - a[1])
@@ -186,7 +189,7 @@ function wordRuns(text: string, vocabulary: ReadingVocabulary[], base: number): 
   return runs
 }
 
-function layout(passage: ReadingPassage, showGrammar: boolean): Run[] {
+function layout(passage: ReadingPassage, showGrammar: boolean, approvedSpans?: ReadonlySet<string>): Run[] {
   const vocabulary = passage.vocabulary || []
   const grammar = showGrammar ? (passage.grammar || []) : []
   const spans = spansOf(passage.body, grammar)
@@ -197,38 +200,46 @@ function layout(passage: ReadingPassage, showGrammar: boolean): Run[] {
   for (const [from, to, entryIndex] of spans) {
     if (from < cursor) continue
     if (from > cursor) {
-      runs.push({ grammar: null, words: wordRuns(passage.body.slice(cursor, from), vocabulary, cursor), key: `p${index += 1}` })
+      runs.push({ grammar: null, words: wordRuns(passage.body.slice(cursor, from), vocabulary, cursor, approvedSpans), key: `p${index += 1}` })
     }
     runs.push({
       grammar: grammar[entryIndex],
-      words: wordRuns(passage.body.slice(from, to), vocabulary, from),
+      words: wordRuns(passage.body.slice(from, to), vocabulary, from, approvedSpans),
       key: `g${index += 1}`,
     })
     cursor = to
   }
   if (cursor < passage.body.length) {
-    runs.push({ grammar: null, words: wordRuns(passage.body.slice(cursor), vocabulary, cursor), key: `p${index += 1}` })
+    runs.push({ grammar: null, words: wordRuns(passage.body.slice(cursor), vocabulary, cursor, approvedSpans), key: `p${index += 1}` })
   }
   return runs
 }
 
-function withVocabularyLevels(passage: ReadingPassage): ReadingPassage {
+function verifiedVocabulary(passage: ReadingPassage) {
   const framework = passage.level_framework
-  if (framework !== 'tbcl' && framework !== 'hsk') return passage
-  const level = framework === 'hsk' ? hskLevelOf(framework, passage.level_code) : Number(passage.level_code)
-  const lookup = framework === 'hsk' ? hskWordLevel : wordLevel
-  const readings = new Map<string, string>()
-  for (const { text, pinyin } of passage.words || []) {
-    const key = chineseReadingKey(pinyin || '')
-    if (!readings.has(text)) readings.set(text, key)
-    else if (readings.get(text) !== key) readings.set(text, '')
+  if (framework !== 'tbcl' && framework !== 'tocfl' && framework !== 'hsk') return { passage }
+
+  const hsk = framework === 'hsk'
+  const code = passage.level_code || ''
+  const classLevel = hsk ? hskLevelOf(framework, code)
+    : framework === 'tocfl' ? (/^level[1-6]$/.test(code) ? Number(code.slice(-1)) + 1 : 1)
+      : Number(code) || 1
+  const lookup = hsk ? hskWordLevel : wordLevel
+  const eligible = new Map<string, number>()
+  const approvedSpans = new Set<string>()
+  for (const { word, level, at } of chineseVocabularySegments(passage.body, hsk ? 'zh-CN' : 'zh-TW', lookup, passage.words)) {
+    if (level && level < classLevel) continue
+    eligible.set(word, Math.max(eligible.get(word) || 0, level))
+    approvedSpans.add(`${at}:${at + word.length}`)
   }
 
+  // Glosses stay in their stored locale. Recompute colours against the official
+  // list and aligned spans, never against the saved level, AI or substrings.
   const vocabulary = (passage.vocabulary || []).flatMap((entry) => {
-    const band = readingVocabularyLevel(entry.word, readings.get(entry.word) || '', level || 1, lookup)
-    return band === null ? [] : [{ ...entry, level: band }]
+    const level = eligible.get(entry.word)
+    return level === undefined ? [] : [{ ...entry, level }]
   })
-  return { ...passage, vocabulary }
+  return { passage: { ...passage, vocabulary }, approvedSpans }
 }
 
 function glossFor(gloss: Record<string, string> | undefined, locale: ParticipantLocale) {
@@ -249,7 +260,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   const [englishGloss, setEnglishGloss] = useState(false)
   const glossLocale = englishGlossOption && englishGloss ? 'en' : locale
   const translation = useReadingTranslation(originalPassage, glossLocale, learningCredentials, locked)
-  const passage = useMemo(() => withVocabularyLevels(translation.passage), [translation.passage])
+  const { passage, approvedSpans } = useMemo(() => verifiedVocabulary(translation.passage), [translation.passage])
   const open: Mark | null = selection?.kind === 'word'
     ? { kind: 'word', entry: passage.vocabulary.find(entry => entry.word === selection.entry.word) || selection.entry }
     : selection?.kind === 'grammar' ? { kind: 'grammar', entry: passage.grammar.find(entry => entry.point === selection.entry.point && entry.span === selection.entry.span) || selection.entry } : null
@@ -265,8 +276,8 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   const rubyOn = showRuby && !locked
 
   const runs = useMemo(
-    () => layout(passage, grammarOn && hasGrammar),
-    [passage, grammarOn, hasGrammar],
+    () => layout(passage, grammarOn && hasGrammar, approvedSpans),
+    [passage, grammarOn, hasGrammar, approvedSpans],
   )
 
   const readings = useMemo(() => perCharacter(passage), [passage])
@@ -422,12 +433,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
             <span key={`${run.key}-w${at}`}>{annotated(word.text, word.at, true)}</span>
           ) : word.entry ? (
             <button
-              // Coloured by the level the word is learned at, so a reader can see at
-              // a glance which of the new words are the ones for this term and
-              // which are reaching further. Level 0 is a word on no TBCL list at
-              // all — a name, a loanword — and gets its own quiet green ground
-              // rather than a level colour it does not have.
-              className={`reading-mark is-word level-${word.entry.level || 0}${open?.kind === 'word' && open.entry === word.entry ? ' is-open' : ''}`}
+              className={`reading-mark is-word ${word.entry.level ? `level-${word.entry.level}` : approvedSpans ? 'level-0' : 'is-aid'}${open?.kind === 'word' && open.entry === word.entry ? ' is-open' : ''}`}
               key={`${run.key}-w${at}`}
               type="button"
               onClick={(event) => {

@@ -1,3 +1,4 @@
+import { readingVocabularyContext } from '../../supabase/functions/_shared/chinese-word-matching.ts'
 import { useEffect, useState } from 'react'
 import { X } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
@@ -23,13 +24,14 @@ async function loadReading(sessionId: string, questionId: string): Promise<Readi
   ])
   if (questionError || passageError || !question || !passage) throw new Error('Reading material unavailable')
 
-  const [image, clip] = await Promise.all([
+  const [image, clip, context] = await Promise.all([
     question.share_screenshot && question.screenshot_id
       ? supabase.from('screenshots').select('public_url').eq('id', question.screenshot_id).eq('session_id', sessionId).maybeSingle()
       : null,
     question.listening_clip_id ? fetchListeningClip(question.listening_clip_id).catch(() => null) : null,
+    passage.level_framework ? null : supabase.from('sessions').select('level_framework, level_code').eq('id', sessionId).maybeSingle(),
   ])
-  return { question, passage, imageUrl: image?.data?.public_url ?? null, clip }
+  return { question, passage: readingVocabularyContext(passage, context?.data), imageUrl: image?.data?.public_url ?? null, clip }
 }
 
 export function ReadingReviewPage() {

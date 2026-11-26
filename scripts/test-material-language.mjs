@@ -98,3 +98,23 @@ test('previously saved reading marks take their levels from the selected Chinese
     await server.close()
   }
 })
+
+test('a legacy green mark cannot attach to a fragment crossing word boundaries', async () => {
+  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } })
+  try {
+    const { ReadingPassageView } = await server.ssrLoadModule('/src/components/ReadingPassageView.tsx')
+    const passage = {
+      title: '試讀', body: '老師給我們卡片卡片。', level_framework: 'tbcl', level_code: '2', grammar: [],
+      words: ['老師給我們', '卡片', '卡片', '。'].map(text => ({ text, pinyin: '' })),
+      vocabulary: ['老師給我們', '老師', '卡片', '片卡'].map(word => ({ word, level: 0, pos: '', gloss: {} })),
+    }
+    const html = renderToStaticMarkup(React.createElement(ReadingPassageView, { passage, locale: 'zh-TW' }))
+    assert.equal((html.match(/reading-mark is-word level-0/g) || []).length, 2)
+    assert.doesNotMatch(html, /level-0[^>]*>片卡/)
+    const noStandard = renderToStaticMarkup(React.createElement(ReadingPassageView, { passage: { ...passage, level_framework: null }, locale: 'zh-TW' }))
+    assert.doesNotMatch(noStandard, /reading-mark is-word level-0/)
+    assert.match(noStandard, /reading-mark is-word is-aid/)
+  } finally {
+    await server.close()
+  }
+})

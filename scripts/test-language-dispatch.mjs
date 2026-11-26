@@ -171,7 +171,7 @@ test('dialogue synthesis sends names verbatim and ASR differences do not block i
 })
 
 test('TOCFL A2 marks current-level words, higher words and unlisted words', () => {
-  const words = ['拍', '享受', '秋季', '資料夾', '的'].map((text) => ({ text, pinyin: '' }))
+  const words = ['拍', '享受', '秋季', '注音', '的'].map((text) => ({ text, pinyin: '' }))
   const level = tbclLevelOf('tocfl', 'level2')
   assert.equal(level, 3)
   const marked = newWords(words, level)

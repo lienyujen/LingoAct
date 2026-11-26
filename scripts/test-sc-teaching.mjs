@@ -44,8 +44,8 @@ test('official HSK entries and new-word marks use their own table', () => {
   assert.equal(hskWordLevel('中国'), 1)
   const same = HSK_SYLLABUS.vocabulary.find((entry) => entry.level === 2 && hskWordLevel(entry.word) === 2).word
   const higher = HSK_SYLLABUS.vocabulary.find((entry) => entry.level === 5 && hskWordLevel(entry.word) === 5).word
-  assert.deepEqual(newWords([{ text: '爱', pinyin: 'ài' }, { text: same, pinyin: '' }, { text: higher, pinyin: '' }, { text: '火星猫猫', pinyin: '' }], 2, hskWordLevel),
-    [{ word: same, level: 2 }, { word: higher, level: 5 }, { word: '火星猫猫', level: 0 }])
+  assert.deepEqual(newWords([{ text: '爱', pinyin: 'ài' }, { text: same, pinyin: '' }, { text: higher, pinyin: '' }, { text: '火星', pinyin: '' }], 2, hskWordLevel),
+    [{ word: same, level: 2 }, { word: higher, level: 5 }, { word: '火星', level: 0 }])
   assert.ok(hskOverLevelWords(higher, 2).some((entry) => entry.level > 2))
 })
 

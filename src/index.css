@@ -7164,7 +7164,12 @@ h2 {
 
 /* 數位 Flashcard: one card, filling the screen, answered with a thumb. The
    whole activity is about speed, so nothing here should need aiming at. */
-.participant-flashcards { display: flex; flex-direction: column; gap: 16px; }
+.participant-flashcards {
+  --flashcard-image-size: clamp(56px, 17vw, 108px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .flashcard-progress {
   color: var(--muted);
   display: flex;
@@ -7184,6 +7189,23 @@ h2 {
   height: 100%;
   transition: width 220ms ease;
 }
+.flashcard-image-link {
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.flashcard-image-link img {
+  display: block;
+  height: var(--flashcard-image-size);
+  object-fit: contain;
+  width: var(--flashcard-image-size);
+}
+.flashcard-prompt-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.flashcard-prompt-row > p { min-width: 0; }
 .flashcard-prompt {
   font-size: 1.4rem;
   font-weight: 600;
@@ -7317,6 +7339,16 @@ h2 {
   text-align: center;
 }
 .flashcard-review-front { background: var(--surface); }
+.flashcard-review-stage > .flashcard-image-link {
+  inset-inline-start: 12px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.flashcard-review-stage:has(.flashcard-image-link) .flashcard-review-front {
+  padding-inline-start: calc(var(--flashcard-image-size) + 24px);
+}
 .flashcard-review-front > strong { color: var(--primary-dark); font-size: clamp(2.8rem, 10vw, 5.2rem); line-height: 1.3; }
 .flashcard-review-face > small { color: var(--muted); font-size: 13px; font-weight: 750; letter-spacing: .08em; }
 .flashcard-review-face em { color: var(--muted); font-size: 13px; font-style: normal; }

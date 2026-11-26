@@ -1138,6 +1138,7 @@ export const scParticipantMessages: Record<string, string> = {
   "flashcardFlipHint": "点一下翻面看解释",
   "flashcardFront": "字词",
   "flashcardBack": "解释",
+  "flashcardImageSearch": "在 Google 图片搜索“{word}”（新标签页）",
   "flashcardPrevious": "上一张",
   "flashcardCardCount": "第 {current} / {total} 张",
   "writingHint": "完成每个写作栏后再提交。老师会批改文章，评语和分数将保存在作答记录中。",

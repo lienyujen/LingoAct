@@ -244,6 +244,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "drawImportTooLarge": "画像が20 MBを超えています。サイズを小さくしてからアップロードしてください。"
   },
   "ko": {
+    "flashcardImageSearch": "Google 이미지에서 ‘{word}’ 검색 (새 탭)",
     "language": "언어",
     "chinese": "繁體中文",
     "english": "English",
@@ -482,6 +483,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "drawImportTooLarge": "이미지가 20 MB를 초과합니다. 크기를 줄인 후 업로드하세요."
   },
   "es": {
+    "flashcardImageSearch": "Buscar «{word}» en Google Imágenes (nueva pestaña)",
     "language": "Idioma",
     "chinese": "繁體中文",
     "english": "Inglés",
@@ -787,6 +789,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "translationUnavailable": "La traducción no está disponible. Se muestra la explicación en inglés."
   },
   "fr": {
+    "flashcardImageSearch": "Rechercher « {word} » dans Google Images (nouvel onglet)",
     "language": "Langue",
     "chinese": "繁體中文",
     "english": "Anglais",
@@ -1021,6 +1024,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "translationUnavailable": "La traduction est indisponible. L’explication en anglais est affichée."
   },
   "de": {
+    "flashcardImageSearch": "„{word}“ in Google Bilder suchen (neuer Tab)",
     "language": "Sprache",
     "chinese": "繁體中文",
     "english": "Englisch",
@@ -1255,6 +1259,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "translationUnavailable": "Die Übersetzung ist derzeit nicht verfügbar. Die englische Erklärung wird angezeigt."
   },
   "vi": {
+    "flashcardImageSearch": "Tìm “{word}” trên Google Hình ảnh (thẻ mới)",
     "language": "Ngôn ngữ",
     "chinese": "繁體中文",
     "english": "English",
@@ -1493,6 +1498,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "drawImportTooLarge": "Ảnh lớn hơn 20 MB. Hãy giảm kích thước trước khi tải lên."
   },
   "th": {
+    "flashcardImageSearch": "ค้นหารูปภาพ “{word}” ใน Google รูปภาพ (แท็บใหม่)",
     "listeningHideFurigana": "ซ่อนฟุริงานะ",
     "listeningShowFurigana": "แสดงฟุริงานะ",
     "translating": "กำลังแปล…",
@@ -1809,6 +1815,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "บันทึกเสียงใหม่อีกครั้ง"
   },
   "id": {
+    "flashcardImageSearch": "Cari gambar “{word}” di Google Gambar (tab baru)",
     "listeningHideFurigana": "Sembunyikan furigana",
     "listeningShowFurigana": "Tampilkan furigana",
     "translating": "Menerjemahkan…",
@@ -2125,6 +2132,7 @@ export const generatedLocales: Record<string, Record<string, string>> = {
     "recordAgain": "Rekam lagi"
   },
   "my": {
+    "flashcardImageSearch": "Google ပုံများတွင် “{word}” ကို ရှာရန် (တဘ်အသစ်)",
     "translating": "ဘာသာပြန်နေသည်…",
     "translationUnavailable": "ဘာသာပြန်ခြင်း ယာယီမရနိုင်ပါ။ အင်္ဂလိပ်ရှင်းလင်းချက်ကို ပြသနေပါသည်။",
     "language": "ဘာသာစကား",

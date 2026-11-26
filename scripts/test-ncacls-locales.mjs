@@ -26,7 +26,7 @@ test('NCACLS keeps Traditional teaching with every requested student guidance la
   assert.ok(translation.length > 0)
   assert.deepEqual(placeholders(translation),placeholders(english),key)
  }
- assert.equal(Object.keys(generated.generatedLocales.my).length,312)
+ assert.equal(Object.keys(generated.generatedLocales.my).length,313)
  assert.match(catalog.participantText('my','language'), /[\u1000-\u109f]/)
  const font = load('src/lib/classChineseFont.ts')
  assert.equal(font.classChineseFont({system_language:'zh-TW',guidance_language:'my'}),'tc')

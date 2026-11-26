@@ -38,3 +38,40 @@ test('legacy translations never replace classroom questions, options, matching c
     }
   } finally { await server.close() }
 })
+
+test('flashcard pictures are bundled, optional and only shown beside a visible word', async () => {
+  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } })
+  try {
+    const { ParticipantFlashcards } = await server.ssrLoadModule('/src/components/ParticipantFlashcards.tsx')
+    const { flashcardPicture } = await server.ssrLoadModule('/src/lib/flashcardPictures.ts')
+    const quiz = { id: 'deck', requested_type: 'flashcard' }
+    const item = { id: 'card', prompt_text: '雨傘', prompt_is_word: true, options: ['Umbrella', 'Backpack'] }
+    const renderCard = ({ active = true, card = item, reviewAnswers = {} } = {}) => renderToStaticMarkup(React.createElement(ParticipantFlashcards, {
+      active, data: { quiz, items: [card], answers: [], reviewAnswers }, locale: 'zh-TW',
+    }))
+
+    const link = new URL(flashcardPicture('雨傘').searchUrl)
+    assert.equal(link.origin, 'https://www.google.com')
+    assert.equal(link.searchParams.get('q'), '雨傘')
+    assert.equal(link.searchParams.get('tbm'), 'isch')
+    assert.equal(link.searchParams.get('safe'), 'active')
+    for (const word of ['雨傘', '雨伞', '傘', 'Umbrella']) {
+      assert.match(flashcardPicture(word).src, /flashcard-images\/umbrella\.png$/)
+    }
+    const activeWordCard = renderCard()
+    assert.match(activeWordCard, /class="flashcard-image-link"/)
+    assert.match(activeWordCard, /target="_blank"/)
+    assert.match(activeWordCard, /rel="noopener noreferrer"/)
+    assert.ok(activeWordCard.indexOf('class="flashcard-image-link"') < activeWordCard.indexOf('class="flashcard-prompt is-word'))
+
+    const definitionFirst = { ...item, prompt_text: 'Something that keeps rain off you', prompt_is_word: false, options: ['雨傘', '背包'] }
+    assert.doesNotMatch(renderCard({ card: definitionFirst, reviewAnswers: { card: '雨傘' } }), /flashcard-image-link/)
+    assert.match(renderCard({ active: false, card: definitionFirst, reviewAnswers: { card: '雨傘' } }), /flashcard-images\/umbrella\.png/)
+    for (const word of ['拿起雨傘', '聽說', 'https://example.com/image.png']) {
+      assert.equal(flashcardPicture(word), null)
+      assert.doesNotMatch(renderCard({ card: { ...item, prompt_text: word } }), /flashcard-image-link/)
+    }
+  } finally {
+    await server.close()
+  }
+})

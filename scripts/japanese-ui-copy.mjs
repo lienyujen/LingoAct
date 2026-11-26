@@ -152,6 +152,7 @@ export const studentJapanese = {
   listeningShowText: '本文を表示', listeningHidePinyin: 'ピンインを隠す', listeningHideZhuyin: '注音符号を隠す', listeningAudioBroken: '音声を再生できません',
   listeningPause: '一時停止', listeningResume: '再開', listeningHideFurigana: 'ふりがなを隠す', listeningShowFurigana: 'ふりがなを表示',
   pictureWritingPlaceholder: 'このコマで起きていることを書きましょう…', flashcardReview: '単語カードの復習', flashcardFlipHint: 'タップすると意味が表示されます',
+  flashcardImageSearch: 'Google 画像検索で「{word}」を検索（新しいタブ）',
   flashcardFront: '語句', flashcardBack: '意味', flashcardPrevious: '前のカード', flashcardCardCount: '{total}枚中 {current}枚目',
 }
 

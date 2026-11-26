@@ -825,6 +825,11 @@ h2 {
   overflow: hidden;
 }
 
+.desktop-shell .presenter-workspace-shell.is-compact.is-waiting-for-quiz {
+  align-content: start;
+  grid-template-rows: auto minmax(0, max-content) auto;
+}
+
 .desktop-shell .settings-open .presenter-workspace-shell.is-compact {
   grid-column: 2;
 }

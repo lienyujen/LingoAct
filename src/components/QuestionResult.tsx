@@ -798,6 +798,24 @@ export function QuestionResult(props: Props) {
     )
   }
 
+  if (question.type === 'reading') {
+    return (
+      <section className="panel result-panel">
+        <div className="result-heading">
+          <h2>{question.title}</h2>
+          <div>
+            <QuestionActivityStatus audioOnly question={question} />
+            <button aria-label={t('expandReading')} className="icon-button" title={t('expandReading')} type="button"
+              onClick={() => void window.lingoActDesktop?.openReadingReview(question.session_id, question.id)}>
+              <ArrowsOut size={20} />
+            </button>
+          </div>
+        </div>
+        {question.prompt_text && <p className="muted">{uiText(question.prompt_text)}</p>}
+      </section>
+    )
+  }
+
   if (question.type === 'listening') {
     return (
       <section className="panel result-panel">

@@ -32,6 +32,7 @@ declare global {
       openWordCloud: (sessionId: string) => Promise<void>
       openRoster: (sessionId: string) => Promise<void>
       openCustomQuizReview: (sessionId: string, questionId: string) => Promise<void>
+      openReadingReview: (sessionId: string, questionId: string) => Promise<void>
       openHotspotReview: (sessionId: string, questionId: string) => Promise<void>
       openSubmissionReview: (sessionId: string, questionId: string) => Promise<void>
       openBoardReview?: (sessionId: string, questionId: string) => Promise<void>

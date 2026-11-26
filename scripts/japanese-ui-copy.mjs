@@ -32,6 +32,7 @@ export const teacherJapanese = {
   readingSourcePlaceholder: '教科書の本文や記事などを貼り付けてください。AIがクラスのレベルに合わせて文章を作成します。',
   readingDirection: 'テーマ・学習目標（任意）', readingDirectionPlaceholder: '例：「〜てから」を使って、一日の行動を説明する',
   readingFromCapture: '直前に取り込んだ画面を資料として使います。', readingShareShot: 'この画像も配信',
+  expandReading: '読解教材を拡大表示', loadingReading: '読解教材を読み込み中…', readingLoadFailed: '読解教材を読み込めませんでした。',
   readingUploading: '画像をアップロード中…', readingSpeaking: '音声を生成中…', readingAnnotating: '読み方を付けています…',
   readingAnnotateFailed: '文章は配信されましたが、読み方を付けられませんでした。学習者には本文のみ表示されます。',
   readingAnnotateFailedWith: '文章は配信されましたが、読み方を付けられませんでした：{message}',

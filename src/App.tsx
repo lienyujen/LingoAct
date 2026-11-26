@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-d
 import { DesktopWindowChrome } from './components/DesktopWindowChrome'
 import { ErrorBoundary } from './ErrorBoundary'
 import { DesktopOverlayPage } from './routes/DesktopOverlayPage'
+import { ReadingReviewPage } from './routes/ReadingReviewPage'
 import { CustomQuizReviewPage } from './routes/CustomQuizReviewPage'
 import { BoardReviewPage } from './routes/BoardReviewPage'
 import { HotspotReviewPage } from './routes/HotspotReviewPage'
@@ -49,6 +50,7 @@ function AppRoutes() {
   const isDesktop = Boolean(window.lingoActDesktop)
   const isDesktopOverlay = location.pathname.startsWith('/desktop-overlay/')
   const isCustomQuizReview = location.pathname.startsWith('/custom-quiz-review/')
+  const isReadingReview = location.pathname.startsWith('/reading-review/')
   const isHotspotReview = location.pathname.startsWith('/hotspot-review/')
   const isSubmissionReview = location.pathname.startsWith('/submission-review/')
   const isBoardReview = location.pathname.startsWith('/board-review/')
@@ -70,7 +72,7 @@ function AppRoutes() {
 
   return (
     <div className={isDesktop ? 'desktop-shell' : undefined}>
-      {!isDesktopOverlay && !isDesktopPresenter && !isCustomQuizReview && !isHotspotReview && !isSubmissionReview && !isBoardReview && !isRoster && (
+      {!isDesktopOverlay && !isDesktopPresenter && !isCustomQuizReview && !isReadingReview && !isHotspotReview && !isSubmissionReview && !isBoardReview && !isRoster && (
         <DesktopWindowChrome
           confirmClose={!isWordCloud}
           onBack={isSessionReport ? returnFromSessionReport : undefined}
@@ -82,6 +84,7 @@ function AppRoutes() {
         <Route path="/presenter/:sessionId" element={isDesktop ? <PresenterPage /> : <Navigate to="/" replace />} />
         <Route path="/desktop-overlay/:sessionId" element={isDesktop ? <DesktopOverlayPage /> : <Navigate to="/" replace />} />
         <Route path="/custom-quiz-review/:sessionId/:questionId" element={isDesktop ? <CustomQuizReviewPage /> : <Navigate to="/" replace />} />
+        <Route path="/reading-review/:sessionId/:questionId" element={isDesktop ? <ReadingReviewPage key={location.pathname} /> : <Navigate to="/" replace />} />
         <Route path="/hotspot-review/:sessionId/:questionId" element={isDesktop ? <HotspotReviewPage /> : <Navigate to="/" replace />} />
         <Route path="/submission-review/:sessionId/:questionId" element={isDesktop ? <SubmissionReviewPage /> : <Navigate to="/" replace />} />
         <Route path="/board-review/:sessionId/:questionId" element={isDesktop ? <BoardReviewPage /> : <Navigate to="/" replace />} />

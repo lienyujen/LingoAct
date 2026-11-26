@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('lingoActDesktop', {
   openWordCloud: (sessionId) => ipcRenderer.invoke('window:open-word-cloud', sessionId),
   openRoster: (sessionId) => ipcRenderer.invoke('window:open-roster', sessionId),
   openCustomQuizReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-custom-quiz-review', sessionId, questionId),
+  openReadingReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-reading-review', sessionId, questionId),
   openHotspotReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-hotspot-review', sessionId, questionId),
   openSubmissionReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-submission-review', sessionId, questionId),
   openBoardReview: (sessionId, questionId) => ipcRenderer.invoke('window:open-board-review', sessionId, questionId),

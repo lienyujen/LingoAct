@@ -2233,6 +2233,8 @@ export function PresenterPage() {
   }
 
   const compactWorkspace = Boolean(window.lingoActDesktop && controlsOpen && !selectionMode)
+  const waitingForQuiz = workspaceView === 'current' && question?.id === session.current_question_id
+    && question?.type === 'custom_quiz' && !quizResults?.quiz
   const followUp = question && <TeachingCyclePanel key={question.id} question={question} sessionId={sessionId}
     presenterToken={getPresenterToken(sessionId) || ''} participants={sortedByJoinedAt(participants)}
     active={session.status === 'active'} onDispatched={showDispatchedQuestion} />
@@ -2247,7 +2249,7 @@ export function PresenterPage() {
   return (
     <PresenterLanguageScope value={presenterLocaleFor(session.teaching_language, session.system_language, session.guidance_language)}>
     <main className={`presenter-page${controlsOpen ? ' controls-open' : ''}${settingsOpen ? ' settings-open' : ''}${selectionMode ? ' selecting-capture' : ''}`}>
-      <div className={compactWorkspace ? "presenter-workspace-shell is-compact" : "presenter-workspace-shell"}>
+      <div className={`presenter-workspace-shell${compactWorkspace ? ' is-compact' : ''}${waitingForQuiz ? ' is-waiting-for-quiz' : ''}`}>
       {!selectionMode && (
         <aside className="qr-floating">
           <QRCodePanel

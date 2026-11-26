@@ -602,7 +602,7 @@ function createCustomQuizReviewWindow(sessionId, questionId, route = 'custom-qui
     maximizable: true,
     alwaysOnTop: true,
     backgroundColor: '#f7f8fb',
-    title: APP_PROFILE_ID === 'japanese' ? 'LingoAct クイズの回答' : 'LingoAct 自訂測驗檢視',
+    title: route === 'reading-review' ? 'LingoAct' : APP_PROFILE_ID === 'japanese' ? 'LingoAct クイズの回答' : 'LingoAct 自訂測驗檢視',
     icon: APP_WINDOW_ICON_PATH,
     webPreferences: {
       contextIsolation: true,
@@ -864,6 +864,11 @@ ipcMain.handle('window:open-custom-quiz-review', (_event, sessionId, questionId)
   requireUuid(sessionId)
   requireUuid(questionId, 'question')
   createCustomQuizReviewWindow(sessionId, questionId)
+})
+ipcMain.handle('window:open-reading-review', (_event, sessionId, questionId) => {
+  requireUuid(sessionId)
+  requireUuid(questionId, 'question')
+  createCustomQuizReviewWindow(sessionId, questionId, 'reading-review')
 })
 ipcMain.handle('window:open-hotspot-review', (_event, sessionId, questionId) => {
   requireUuid(sessionId)

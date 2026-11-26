@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { screenDispatchQuestion, supportingScreenQuestion } from '../src/lib/screenDispatch.ts'
+import { readingVocabularyContext } from '../supabase/functions/_shared/chinese-word-matching.ts'
 import { adaptStudentPrompt } from '../supabase/functions/_shared/student-prompt.ts'
 
 const source = readFileSync('supabase/functions/presenter-action/index.ts', 'utf8')
@@ -84,7 +85,8 @@ test('the student loader retains quiz, answer, reading passage and source image 
     const state = {}, calls = []
     const rows = { questions: [task, screen], screenshots: [{ id: 'image', public_url: 'supplement' }, { id: 'source-image', public_url: 'original' }], reading_passages: [{ question_id: task.id, text: 'Reading text' }] }
     const context = {
-      nextSession: { current_question_id: legacyPointer ? screen.id : task.id }, allQuestions: rows.questions,
+      nextSession: { current_question_id: legacyPointer ? screen.id : task.id, level_framework: 'tbcl', level_code: '2' }, allQuestions: rows.questions,
+      readingVocabularyContext,
       allAnswers: [{ question_id: task.id, answer_text: 'my answer' }], screenDispatchQuestion, supportingScreenQuestion,
       supabase: { ...database(rows), functions: { invoke: async (_, { body }) => { calls.push(body); return { data: { quiz: 'ready' } } } } },
       read: (_, load) => load(), requestId: 1, loadSequence: { current: 1 }, participantToken: 'token', sessionId: 'class', participantId: 'student', locale: 'vi',
@@ -97,6 +99,8 @@ test('the student loader retains quiz, answer, reading passage and source image 
     assert.equal(state.setSupportingScreen.public_url, 'supplement')
     assert.equal(state.setScreenshot.public_url, 'original')
     assert.equal(state.setPassage.text, 'Reading text')
+    assert.equal(state.setPassage.level_framework, 'tbcl')
+    assert.equal(state.setPassage.level_code, '2')
     assert.equal(state.setPassageImageUrl, 'original')
     assert.equal(state.setQuizData.questionId, task.id)
     assert.equal(calls[0].questionId, task.id)

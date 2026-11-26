@@ -75,3 +75,26 @@ test('flashcard pictures are bundled, optional and only shown beside a visible w
     await server.close()
   }
 })
+
+test('previously saved reading marks take their levels from the selected Chinese vocabulary table', async () => {
+  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } })
+  try {
+    const { ReadingPassageView } = await server.ssrLoadModule('/src/components/ReadingPassageView.tsx')
+    const renderPassage = (framework, words) => renderToStaticMarkup(React.createElement(ReadingPassageView, {
+      locale: 'zh-TW',
+      passage: {
+        title: '字詞測試', body: words.join('。'), level_framework: framework, level_code: '2', grammar: [],
+        vocabulary: words.map((word) => ({ word, level: 0, pos: '', gloss: {} })),
+      },
+    }))
+    const tbcl = renderPassage('tbcl', ['看', '和', '好', '第二', '了', '一下', '卡片'])
+    assert.equal((tbcl.match(/reading-mark is-word level-0/g) || []).length, 1)
+    assert.equal((tbcl.match(/reading-mark is-word level-2/g) || []).length, 1)
+    const hsk = renderPassage('hsk', ['好看', '第四', '图片', '卡片'])
+    assert.doesNotMatch(hsk, /reading-mark is-word level-0/)
+    assert.match(hsk, /reading-mark is-word level-4/)
+    assert.match(hsk, /reading-mark is-word level-6/)
+  } finally {
+    await server.close()
+  }
+})

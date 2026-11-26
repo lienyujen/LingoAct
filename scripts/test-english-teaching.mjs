@@ -269,6 +269,7 @@ test('English reading UI never offers Pinyin or marks word fragments', () => {
   const exports={}
   new Function('require','exports',compiled)(name=>{
     if(name==='../../supabase/functions/_shared/reading-pos') return {readingPartOfSpeech}
+    if (name.startsWith('../../supabase/functions/_shared/') && name.endsWith('.ts')) return require(name.slice(3))
     if(name==='../lib/englishText') return {englishTextRuns}
     if(name==='../lib/uiText') return {uiText:text=>text}
     if(name==='@phosphor-icons/react') return {BookOpen:()=>null,Translate:()=>null,X:()=>null}

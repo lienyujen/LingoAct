@@ -50,6 +50,7 @@ test('the actual vocabulary popup follows the passage script even when the stude
     const exports = {}
     new Function('require', 'exports', compiled)(name => {
       if (name === '../../supabase/functions/_shared/reading-pos') return { readingPartOfSpeech }
+      if (name.startsWith('../../supabase/functions/_shared/') && name.endsWith('.ts')) return require(name.slice(3))
       if (name === '../lib/englishText') return { englishTextRuns: () => [] }
       if (name === '../lib/uiText') return { uiText: text => text }
       if (name === 'react') return { ...require(name), useState: initial => [initial === null ? { kind: 'word', entry } : typeof initial === 'function' ? initial() : initial, () => {}] }

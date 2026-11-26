@@ -58,3 +58,16 @@ test('HSK uses official unambiguous readings and no Taiwan speech substitutions'
   assert.match(plan.instruction, /Putonghua|Mainland/)
   assert.doesNotMatch(plan.instruction, /Taiwanese Mandarin accent/)
 })
+
+test('HSK keeps its own levels when a reading or tokenizer splits a listed word', () => {
+  assert.equal(hskWordLevel('卡片'), 6)
+  assert.equal(hskWordLevel('图片'), 4)
+  assert.equal(hskWordLevel('好看'), 1)
+  assert.equal(hskWordLevel('看', 'kàn'), 1)
+  assert.equal(hskWordLevel('看', 'kān'), 5)
+  assert.deepEqual(hskOverLevelWords('图书馆', 2), [{ word: '图书馆', level: 3 }])
+  assert.deepEqual(newWords([
+    { text: '图书', pinyin: 'túshū' }, { text: '馆', pinyin: 'guǎn' },
+    { text: '。', pinyin: '' }, { text: '第四', pinyin: 'dì-sì' },
+  ], 2, hskWordLevel), [{ word: '图书馆', level: 3 }])
+})

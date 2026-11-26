@@ -1,5 +1,8 @@
 import { useReadingTranslation, type LearningCredentials } from '../lib/useReadingTranslation'
 import { uiText } from '../lib/uiText'
+import { chineseReadingKey, readingVocabularyLevel } from '../../supabase/functions/_shared/chinese-word-matching.ts'
+import { hskLevelOf, hskWordLevel } from '../../supabase/functions/_shared/hsk-word-level.ts'
+import { wordLevel } from '../../supabase/functions/_shared/tbcl-levels.generated.ts'
 import { readingPartOfSpeech } from '../../supabase/functions/_shared/reading-pos'
 import { englishTextRuns } from '../lib/englishText'
 import { useMemo, useState } from 'react'
@@ -209,6 +212,25 @@ function layout(passage: ReadingPassage, showGrammar: boolean): Run[] {
   return runs
 }
 
+function withVocabularyLevels(passage: ReadingPassage): ReadingPassage {
+  const framework = passage.level_framework
+  if (framework !== 'tbcl' && framework !== 'hsk') return passage
+  const level = framework === 'hsk' ? hskLevelOf(framework, passage.level_code) : Number(passage.level_code)
+  const lookup = framework === 'hsk' ? hskWordLevel : wordLevel
+  const readings = new Map<string, string>()
+  for (const { text, pinyin } of passage.words || []) {
+    const key = chineseReadingKey(pinyin || '')
+    if (!readings.has(text)) readings.set(text, key)
+    else if (readings.get(text) !== key) readings.set(text, '')
+  }
+
+  const vocabulary = (passage.vocabulary || []).flatMap((entry) => {
+    const band = readingVocabularyLevel(entry.word, readings.get(entry.word) || '', level || 1, lookup)
+    return band === null ? [] : [{ ...entry, level: band }]
+  })
+  return { ...passage, vocabulary }
+}
+
 function glossFor(gloss: Record<string, string> | undefined, locale: ParticipantLocale) {
   if (!gloss) return ''
   return gloss[contentLocaleKey(locale)] || gloss.en || gloss.zh_tw || ''
@@ -227,7 +249,7 @@ export function ReadingPassageView({ passage: originalPassage, learningCredentia
   const [englishGloss, setEnglishGloss] = useState(false)
   const glossLocale = englishGlossOption && englishGloss ? 'en' : locale
   const translation = useReadingTranslation(originalPassage, glossLocale, learningCredentials, locked)
-  const passage = translation.passage
+  const passage = useMemo(() => withVocabularyLevels(translation.passage), [translation.passage])
   const open: Mark | null = selection?.kind === 'word'
     ? { kind: 'word', entry: passage.vocabulary.find(entry => entry.word === selection.entry.word) || selection.entry }
     : selection?.kind === 'grammar' ? { kind: 'grammar', entry: passage.grammar.find(entry => entry.point === selection.entry.point && entry.span === selection.entry.span) || selection.entry } : null

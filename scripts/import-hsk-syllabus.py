@@ -2,6 +2,8 @@
 
 Run with the PDF linked from chinesetest.cn and an output directory. Only
 upright text is used for grammar cells, excluding the diagonal watermark.
+After importing, run node scripts/build-hsk-word-levels.mjs to refresh the
+word levels used by the reader.
 """
 import argparse
 import hashlib

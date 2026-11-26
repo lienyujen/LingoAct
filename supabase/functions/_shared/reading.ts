@@ -20,6 +20,7 @@ import { englishMaterialIssue, requireEnglishMaterial } from './english-material
 import { callAiJson } from './ai.ts'
 import { GRAMMAR_BY_LEVEL } from './tbcl-levels.generated.ts'
 import { ceilingFor, overLevelComplaint, overLevelWords } from './tbcl-check.ts'
+import { matchChineseVocabulary } from './chinese-word-matching.ts'
 import { wordLevel } from './tbcl-levels.generated.ts'
 import { dispatchLevelCode, levelInstruction, resolveLevel, tbclLevelOf } from './proficiency.ts'
 import { resolveTrack, trackInstruction, usesLevelledPrompts } from './teaching.ts'
@@ -346,9 +347,9 @@ function applyOrthography(words: ReadingWord[]) {
 // are overwhelmingly one to three characters, and a four-character run that it
 // does not list is nearly always a phrase. 每天早上 came back as one word
 // spelled měitiānzǎoshang, which is exactly the shape this catches.
-function overJoined(words: ReadingWord[]) {
+function overJoined(words: ReadingWord[], lookup = wordLevel) {
   return words
-    .filter((word) => /^[\p{Script=Han}]{4,}$/u.test(word.text) && !wordLevel(word.text))
+    .filter((word) => /^[\p{Script=Han}]{4,}$/u.test(word.text) && !lookup(word.text, word.pinyin))
     .map((word) => `${word.text}（${word.pinyin}）`)
 }
 
@@ -363,18 +364,13 @@ function overJoined(words: ReadingWord[]) {
 export function newWords(words: ReadingWord[], classLevel: number, lookup = wordLevel) {
   const seen = new Set<string>()
   const out: Array<{ word: string; level: number }> = []
-  for (const { text } of words) {
-    const word = (text || '').trim()
-    if (!word || seen.has(word) || !HAN_WORD.test(word)) continue
-    const level = lookup(word)
-    if (level && level < classLevel) continue
+  for (const { word, level } of matchChineseVocabulary(words, lookup)) {
+    if (seen.has(word) || (level && level < classLevel)) continue
     seen.add(word)
     out.push({ word, level })
   }
   return out
 }
-
-const HAN_WORD = /^[\p{Script=Han}]+$/u
 
 // What each new word means, asked for once the list is settled.
 //
@@ -462,6 +458,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   if (input.levelFramework === 'hsk' && !hskLevelOf(input.levelFramework, input.levelCode)) throw new Error('An HSK level is required for reading.')
   const hsk = input.levelFramework === 'hsk'
   const tbcl = hsk ? hskLevelOf(input.levelFramework, input.levelCode) : tbclLevelOf(input.levelFramework, input.levelCode)
+  const lookup = hsk ? hskWordLevel : wordLevel
   const checkWords = hsk ? hskOverLevelWords : overLevelWords
   const complaint = hsk ? hskOverLevelComplaint : overLevelComplaint
   const ceiling = tbcl ? ceilingFor(tbcl, input.levelStretch) : 0
@@ -519,14 +516,14 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
       complaints.push(complaint(above, label, ceiling))
     }
   }
-  const joined = overJoined((Array.isArray(output.words) ? output.words : []) as ReadingWord[])
+  const joined = overJoined((Array.isArray(output.words) ? output.words : []) as ReadingWord[], lookup)
   if (joined.length) {
     console.warn(`Reading segmentation ran words together: ${joined.slice(0, 8).join(' ')}`)
     complaints.push(`這幾項把兩個詞併成一個了：${joined.slice(0, 12).join('、')}。請照《漢語拼音正詞法基本規則》重新切開，例如 每天早上 要切成 每天 (měitiān) 和 早上 (zǎoshang)，以後都 要切成 以後 (yǐhòu) 和 都 (dōu)。`)
   }
   if (complaints.length) {
     const retried = await ask(complaints.join('\n'))
-    if (retried && !overJoined((Array.isArray(retried.words) ? retried.words : []) as ReadingWord[]).length) output = retried
+    if (retried && !overJoined((Array.isArray(retried.words) ? retried.words : []) as ReadingWord[], lookup).length) output = retried
   }
 
   const body = String(output.body || '').trim()
@@ -542,7 +539,7 @@ export async function generateReadingPassage(input: ReadingInput): Promise<Readi
   // they mean. Without a usable segmentation there is nothing to judge, so the
   // passage goes out unmarked rather than marked wrongly.
   const vocabulary = await glossNewWords(
-    newWords(words, tbcl || 4, hsk ? hskWordLevel : wordLevel),
+    newWords(words, tbcl || 4, lookup),
     locales,
     resolveTrack(input.teachingLanguage).promptLanguage,
     body,

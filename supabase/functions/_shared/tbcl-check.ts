@@ -8,18 +8,16 @@
 // A word is either on 國教院's list for a level or it is not. That is checkable,
 // it is checkable in a few milliseconds, and it can be handed back to the model
 // as the actual words to replace rather than another paragraph of instruction.
+import { chineseVocabularySegments } from './chinese-word-matching.ts'
 import { characterLevel, wordLevel } from './tbcl-levels.generated.ts'
 
 export type OverLevelWord = {
   word: string
-  // The TBCL level the word is learned at, or 0 when it is on no list at all —
-  // a name, a loanword, a technical term the benchmarks never covered.
+  // An unlisted word can still contain above-level characters. Keep that
+  // evidence separate from the official level assigned to a listed word.
   level: number
+  characterBased?: true
 }
-
-// Names, numbers, punctuation and Latin script are not vocabulary the benchmark
-// governs, and flagging them would bury the words that matter.
-const HAN = /^[一-鿿]+$/
 
 /**
  * Words in `text` above `ceiling`, most severe first.
@@ -31,17 +29,11 @@ const HAN = /^[一-鿿]+$/
  */
 export function overLevelWords(text: string, ceiling: number): OverLevelWord[] {
   if (!text || ceiling <= 0) return []
-  const segmenter = new Intl.Segmenter('zh-TW', { granularity: 'word' })
-  const worst = new Map<string, number>()
+  const worst = new Map<string, OverLevelWord>()
 
-  for (const segment of segmenter.segment(text)) {
-    if (!segment.isWordLike) continue
-    const word = segment.segment.trim()
-    if (!word || !HAN.test(word)) continue
-
-    const listed = wordLevel(word)
+  for (const { word, level: listed } of chineseVocabularySegments(text, 'zh-TW', wordLevel)) {
     if (listed) {
-      if (listed > ceiling) worst.set(word, listed)
+      if (listed > ceiling) worst.set(word, { word, level: listed })
       continue
     }
     // Not a listed word. Judge it by the hardest character in it; an unlisted
@@ -52,19 +44,20 @@ export function overLevelWords(text: string, ceiling: number): OverLevelWord[] {
       hardest = level === 0 ? 8 : Math.max(hardest, level)
       if (hardest === 8) break
     }
-    if (hardest > ceiling) worst.set(word, hardest === 8 ? 0 : hardest)
+    if (hardest > ceiling) worst.set(word, { word, level: hardest === 8 ? 0 : hardest, characterBased: true })
   }
 
-  return [...worst.entries()]
-    .map(([word, level]) => ({ word, level }))
+  return [...worst.values()]
     // Unlisted (0) first, then the furthest above the class.
-    .sort((a, b) => (a.level === 0 ? -1 : b.level === 0 ? 1 : b.level - a.level))
+    .sort((a, b) => (b.level || 8) - (a.level || 8))
 }
 
 /** What to say to the model about words it used above the level. */
 export function overLevelComplaint(offenders: OverLevelWord[], levelLabel: string, ceiling: number) {
   const named = offenders.slice(0, 24).map((entry) => (
-    entry.level ? `${entry.word}（TBCL 第${entry.level}級）` : `${entry.word}（不在基準詞表內）`
+    entry.characterBased
+      ? `${entry.word}（詞表未收錄，${entry.level ? `有第${entry.level}級漢字` : '含字表未收錄的字'}）`
+      : `${entry.word}（TBCL 第${entry.level}級）`
   )).join('、')
   return [
     `These words are above ${levelLabel}, which is the level this class is working at: ${named}.`,

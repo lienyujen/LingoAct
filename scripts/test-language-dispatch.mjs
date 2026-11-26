@@ -74,6 +74,7 @@ test('pinyin control remains available when the passage has no new vocabulary', 
   const exports = {}
   new Function('require', 'exports', compiled)((name) => {
     if (name === '../../supabase/functions/_shared/reading-pos') return { readingPartOfSpeech }
+    if (name.startsWith('../../supabase/functions/_shared/') && name.endsWith('.ts')) return require(name.slice(3))
     if (name === '../lib/englishText') return { englishTextRuns }
     if (name === '../lib/uiText') return { uiText: (text) => text }
     if (name === '@phosphor-icons/react') return { BookOpen: () => null, Translate: () => null, X: () => null }
@@ -101,6 +102,7 @@ test('zhuyin passages use IVS readings for new words and never fall back to piny
     let state = 0
     new Function('require', 'exports', compiled)((name) => {
       if (name === '../../supabase/functions/_shared/reading-pos') return { readingPartOfSpeech }
+      if (name.startsWith('../../supabase/functions/_shared/') && name.endsWith('.ts')) return require(name.slice(3))
       if (name === '../lib/englishText') return { englishTextRuns }
     if (name === '../lib/uiText') return { uiText: (text) => text }
       if (name === 'react') return { ...require(name), useState: (initial) => [state++ === 2 ? all : typeof initial === 'function' ? initial() : initial, () => {}] }
@@ -234,4 +236,15 @@ test('font subsetting retains the IVS glyphs for 調 and 和', async () => {
   }
   assert.ok(supported.has('調'.codePointAt(0)))
   assert.ok(supported.has('和'.codePointAt(0)))
+})
+
+test('TBCL numbered senses and spelling variants have the levels in the official spreadsheet', () => {
+  for (const word of ['看', '和', '哪', '好']) assert.equal(wordLevel(word), 1, word)
+  assert.equal(wordLevel('看', 'kān'), 5)
+  assert.equal(wordLevel('看', 'Kàn'), 1)
+  assert.equal(wordLevel('和', 'hàn'), 1)
+  assert.equal(wordLevel('哪', 'na'), 2)
+  for (const word of ['第一', '聲音', '聲', '需要', '一下']) assert.equal(wordLevel(word), 2, word)
+  const words = ['看', '第一', '第二', '第三', '第四', '有人', '。', '看了', '。', '好看', '圖片'].map((text) => ({ text, pinyin: '' }))
+  assert.deepEqual(newWords(words, 2), [{ word: '第一', level: 2 }, { word: '圖片', level: 0 }])
 })

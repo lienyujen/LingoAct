@@ -1,3 +1,4 @@
+import { asksForTranslation, splitWrittenAssessmentPrompt } from '../../supabase/functions/_shared/written-assessment'
 import { OriginalPromptOption } from './OriginalPromptOption'
 import { uiText } from '../lib/uiText'
 import { Image, NotePencil, PaperPlaneTilt, Plus, Sparkle, Trash, X } from '@phosphor-icons/react'
@@ -5,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { BoardPostKind, QuestionType, QuizRequestedType } from '../types'
 import { CustomQuizFields } from './CustomQuizFields'
 import { quizSettingsFrom } from '../lib/customQuiz'
-import { usePresenterText } from '../lib/presenterI18n'
+import { usePresenterLocale, usePresenterText } from '../lib/presenterI18n'
 import type { PresenterMessageKey } from '../lib/presenterI18n'
 import { TimingRow } from './TimingRow'
 import type { CustomQuizSettings } from '../lib/customQuiz'
@@ -29,6 +30,7 @@ export type QuestionDraft = {
   options: string[]
   allowMultiple: boolean
   promptText: string
+  gradeWrittenAnswer?: boolean
   useOriginalPrompt?: boolean
   promptSuffix?: string
   quizSettings?: CustomQuizSettings
@@ -92,6 +94,14 @@ const questionTypes: Array<{ type: QuestionType; label: PresenterMessageKey }> =
 
 export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, onCancel, onCreate, onPictureTalk, onGenerateInteraction }: Props) {
   const t = usePresenterText()
+  const locale = usePresenterLocale()
+  const assessmentCopy = locale === 'ja'
+    ? ['AIで採点する', '例：画像の文章を英語に訳してください。\n採点基準：意味70点、表現30点。', '翻訳問題は提出後にAIが採点します。']
+    : locale === 'en'
+      ? ['Grade with AI', 'Example: Translate the second paragraph into Japanese.\nRubric: Meaning 70 points, expression 30 points.', 'AI grades translation answers after submission.']
+      : locale === 'zh-CN'
+        ? ['启用 AI 评分', '例如：请把图中第二段翻译成英语。\n评分标准：意思 70 分，表达 30 分。', '翻译题提交后由 AI 评分。']
+        : ['啟用 AI 評分', '例如：請把圖中第二段翻譯成英文。\n評分標準：意思 70 分，表達 30 分。', '翻譯題送出後由 AI 評分。']
   const w = useWorkspaceText()
   const [type, setType] = useState<QuestionType>('multiple_choice')
   const [options, setOptions] = useState(['A', 'B', 'C', 'D'])
@@ -117,6 +127,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   // Ticked by default: a screen question is usually about the screen. Unticking
   // it sends the question on its own, which is what 不用背景 used to be for.
   const [sendScreenshot, setSendScreenshot] = useState(true)
+  const [gradeWrittenAnswer, setGradeWrittenAnswer] = useState(false)
   const [interactionBusy, setInteractionBusy] = useState(false)
   const isInteraction = type === 'custom_quiz' && (quizType === 'ordering' || quizType === 'matching') && Boolean(onGenerateInteraction)
   // 派送畫面 has nothing to send, 自訂測驗 has nothing to read and 圖上點選 has
@@ -159,6 +170,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
     setAllowMultiple(initialDraft?.allowMultiple === true)
     setPromptText(initialDraft?.promptText || '')
     setUseOriginalPrompt(initialDraft?.useOriginalPrompt === true)
+    setGradeWrittenAnswer(initialDraft?.gradeWrittenAnswer === true)
     setQuizCount(quiz?.requestedCount == null ? 'auto' : String(quiz.requestedCount))
     setQuizType(initialDraft?.interaction?.kind || quiz?.requestedType || preset || 'random')
     setQuizDirection(quiz?.direction || initialDraft?.promptText || '')
@@ -178,6 +190,9 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
     return options.map((option) => option.trim()).filter(Boolean)
   }, [options, type])
 
+  const writtenPrompt = splitWrittenAssessmentPrompt(promptText)
+  const translation = type === 'short_answer' && asksForTranslation(writtenPrompt.prompt)
+  const gradedWritten = type === 'short_answer' && (gradeWrittenAnswer || translation)
   const timed = TIMED_TYPES.includes(type)
 
   if (!open) return null
@@ -218,6 +233,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             // nothing — that is the one thing a plain dispatch does not have.
             promptText: type === 'send_screen' && !isBoard ? '' : promptText.trim(),
             useOriginalPrompt,
+            gradeWrittenAnswer: gradedWritten,
             boardFormats: isBoard ? boardFormats : [],
             boardMaxPosts: isBoard ? boardMaxPosts : null,
             boardSelfPaced: isBoard && boardSelfPaced,
@@ -409,7 +425,14 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
               ? (type === 'pronunciation' ? t('readAloudNeeded') : type === 'file_upload' ? t('uploadPromptNeeded') : t('promptNeeded'))
               : type === 'pronunciation' ? t('readAloudLabel') : type === 'file_upload' ? t('uploadPromptLabel') : type === 'drawing' ? t('drawingPromptLabel') : t('promptLabel')}
             {promptIsTheQuestion && <small className="muted">{t('promptNeededHint')}</small>}
-            <input
+            {type === 'short_answer' ? (
+              <textarea
+                value={promptText}
+                maxLength={2000}
+                placeholder={withPicture || gradedWritten ? assessmentCopy[1] : t('promptPlaceholder')}
+                onChange={(event) => setPromptText(event.target.value)}
+              />
+            ) : <input
               value={promptText}
               placeholder={type === 'pronunciation'
                 ? t('readAloudPlaceholder')
@@ -421,7 +444,13 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
                       ? t('hotspotPromptPlaceholder')
                     : t('promptPlaceholder')}
               onChange={(event) => setPromptText(event.target.value)}
-            />
+            />}
+          </label>
+        )}
+        {type === 'short_answer' && (
+          <label className="multi-select-setting">
+            <input type="checkbox" checked={gradedWritten} disabled={translation} onChange={(event) => setGradeWrittenAnswer(event.target.checked)} />
+            {assessmentCopy[translation ? 2 : 0]}
           </label>
         )}
         {(isInteraction || (type !== 'pronunciation' && type !== 'custom_quiz' && (type !== 'send_screen' || isBoard))) && (
@@ -454,6 +483,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
           </button>
           <button disabled={interactionBusy
             || (promptIsTheQuestion && !promptText.trim())
+            || (gradedWritten && !writtenPrompt.prompt)
             || (isInteraction ? quizType === 'ordering' && Math.max(interaction.items.length, interaction.tiles.length) < 2 : type === 'custom_quiz' && !quizDirection.trim())} type="submit">
             {type === 'custom_quiz' ? <Sparkle size={17} /> : <PaperPlaneTilt size={17} />}
             {type === 'custom_quiz' ? t('generateAndSend') : t('send')}

@@ -1,3 +1,5 @@
+import { isWrittenAssessment } from '../../supabase/functions/_shared/written-assessment'
+import { useSecondsLeft } from '../lib/questionTiming'
 import { StrokePracticeLinks } from './StrokePracticeLinks'
 import type { StrokeCredentials } from './StrokePracticeLinks'
 import { useEffect, useMemo, useState } from 'react'
@@ -19,6 +21,8 @@ export type QuizSubmission = Array<{ itemId: string; answerText?: string; answer
 type Props = {
   data: ParticipantQuizData
   busy: boolean
+  assessmentDeadline?: number | null
+  assessmentClosed?: boolean
   strokeCredentials?: StrokeCredentials
   locale: ParticipantLocale
   onRetry: () => Promise<void>
@@ -30,7 +34,7 @@ type Props = {
 // limit is actually enforced; this only decides what the button says.
 const COACH_ROUNDS = 3
 
-export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, onAskCoach, strokeCredentials }: Props) {
+export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, onAskCoach, strokeCredentials, assessmentDeadline = null, assessmentClosed = false }: Props) {
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({})
   const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>({})
   // Seeded from the shuffled fragments the server sent, so an untouched item is
@@ -43,6 +47,9 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
   // 寫作教練: the article the fields add up to. Held apart from the answers
   // because it is not the answer to any one of them.
   const [composition, setComposition] = useState('')
+  const writtenAssessment = isWrittenAssessment(data.quiz)
+  const secondsLeft = useSecondsLeft(writtenAssessment ? assessmentDeadline : null)
+  const acceptingAnswers = !writtenAssessment || (!assessmentClosed && secondsLeft !== 0)
   const pictureWriting = data.quiz.requested_type === 'picture_writing'
   const writing = data.quiz.graded === false && !pictureWriting && !data.quiz.interaction_mode
   const coaching = writing && data.quiz.coaching === true
@@ -76,7 +83,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!complete || busy) return
+    if (!complete || busy || !acceptingAnswers) return
     await onSubmit(data.items.map((item) => {
       if (item.type === 'multiple_choice') return { itemId: item.id, answerValues: [choiceAnswers[item.id]] }
       // The sequence itself is the answer, so it travels as ordered values.
@@ -191,17 +198,24 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
   return (
     <section className="panel participant-question participant-custom-quiz">
       <h2>{data.quiz.title}</h2>
-      {!data.quiz.interaction_mode && <p className="muted">{writing
+      {(!data.quiz.interaction_mode || writtenAssessment) && <p className="muted">{writing
         ? participantText(locale, coaching ? 'coachIntro' : 'writingHint')
         : usesAiGrading
           ? participantText(locale, 'quizHintAi')
           : participantText(locale, 'quizHintKey')}</p>}
+      {writtenAssessment && assessmentClosed && <p className="muted">{participantText(locale, 'questionEnded')}</p>}
+      {writtenAssessment && !assessmentClosed && secondsLeft !== null && (
+        <p className={secondsLeft === 0 ? 'answer-countdown spent' : 'answer-countdown'} aria-live="off">
+          <span>{participantText(locale, secondsLeft === 0 ? 'answerClosed' : 'answerTimeLeft')}</span>
+          {secondsLeft > 0 && <strong>{secondsLeft}</strong>}
+        </p>
+      )}
       <form className="custom-quiz-form" onSubmit={submit}>
         {data.items.map((item, index) => {
           const options = item.options
           return (
             <fieldset className="custom-quiz-item" key={item.id}>
-              <legend><span>{index + 1}</span>{item.prompt_text}{!writing && data.quiz.graded && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
+              <legend>{!writtenAssessment && <span>{index + 1}</span>}{item.prompt_text}{!writing && data.quiz.graded && <small>{item.points} {participantText(locale, 'points')}</small>}</legend>
               {item.type === 'multiple_choice' ? (
                 <div className="quiz-choice-list">
                   {item.options.map((option, optionIndex) => (
@@ -279,7 +293,7 @@ export function ParticipantCustomQuiz({ data, busy, locale, onRetry, onSubmit, o
             </button>
           </fieldset>
         )}
-        <button disabled={!complete || busy} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, busy ? 'submitting' : 'submitAnswers')}</button>
+        <button disabled={!complete || busy || !acceptingAnswers} type="submit"><PaperPlaneTilt size={18} />{participantText(locale, busy ? 'submitting' : 'submitAnswers')}</button>
       </form>
     </section>
   )

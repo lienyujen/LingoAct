@@ -19863,7 +19863,15 @@ begin
   if not exists(select 1 from questions where id = target_question and session_id = target_session and status = 'draft') then
     raise exception 'Draft question not found.';
   end if;
-  update questions set status = 'stopped', stopped_at = now() where session_id = target_session and status = 'active';
+  -- A written assessment is dispatched from the regular question editor;
+  -- its classroom discussion board stays open just as for other questions there.
+  update questions set status = 'stopped', stopped_at = now()
+  where session_id = target_session and status = 'active' and (
+    type <> 'board' or not exists (
+      select 1 from quizzes where question_id = target_question
+      and requested_type = 'short_answer' and graded and interaction_mode
+    )
+  );
   update questions set status = 'active', started_at = now(), stopped_at = null where id = target_question;
   update sessions set current_question_id = target_question where id = target_session;
 end;

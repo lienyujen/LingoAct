@@ -1,3 +1,4 @@
+import { asksForTranslation, splitWrittenAssessmentPrompt } from '../_shared/written-assessment.ts'
 import { readingVocabularyContext } from '../_shared/chinese-word-matching.ts'
 import { adaptStudentPrompt } from '../_shared/student-prompt.ts'
 import { readingQuizFailureMessage } from '../_shared/reading-failure.ts'
@@ -2453,11 +2454,16 @@ Deno.serve(async (req) => {
       if (prepareSeconds === undefined || answerSeconds === undefined) {
         return jsonResponse({ message: '時間設定不正確。' }, 400)
       }
-      const draftPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 1000) : ''
+      const rawPrompt = typeof input.promptText === 'string' ? input.promptText.trim().slice(0, 2000) : ''
+      const writtenPrompt = type === 'short_answer' ? splitWrittenAssessmentPrompt(rawPrompt) : null
+      const gradeWritten = writtenPrompt !== null && input.gradeWrittenAnswer === true
+      const translation = gradeWritten && asksForTranslation(writtenPrompt.prompt)
+      const draftPrompt = (gradeWritten ? writtenPrompt.prompt : rawPrompt).slice(0, 1000)
+      if (gradeWritten && !draftPrompt) return jsonResponse({ message: '請填寫要給學生作答的題目。' }, 400)
       const suffix = typeof input.promptSuffix === 'string' ? input.promptSuffix.trim().slice(0, 500) : ''
       const adaptOptions = ['poll', 'multiple_choice'].includes(type)
       const { prompt, options } = await adaptStudentPrompt(
-        type === 'pronunciation' || input.useOriginalPrompt === true || (!draftPrompt && !originalOptions.length) ? null : await sessionContext(),
+        type === 'pronunciation' || translation || input.useOriginalPrompt === true || (!draftPrompt && !originalOptions.length) ? null : await sessionContext(),
         type, draftPrompt, { options: adaptOptions ? originalOptions : [] },
       )
       const promptText = [prompt, suffix].filter(Boolean).join('\n\n')
@@ -2483,14 +2489,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // A screenshot without replies is supporting material, so the class can
-      // keep answering its current assignment while looking at the new image.
-      if (type !== 'send_screen') {
-        const stoppedAt = new Date().toISOString()
-        const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
-        if (stopError) throw stopError
-      }
-
       if (hasBackdrop) {
         const { data: publicData } = supabase.storage.from('lingoact-screenshots').getPublicUrl(storagePath)
         const { error: screenshotError } = await supabase
@@ -2503,6 +2501,57 @@ Deno.serve(async (req) => {
             ai_status: 'skipped',
           })
         if (screenshotError) throw screenshotError
+      }
+
+      if (gradeWritten) {
+        const { data: room, error: roomError } = await supabase.from('sessions')
+          .select('status, current_question_id, teaching_language').eq('id', sessionId).single()
+        if (roomError) throw roomError
+        if (room.status !== 'active') return jsonResponse({ message: '請在上課中派送。' }, 409)
+        const title = activityTitle(room.teaching_language, translation ? 'translation' : 'graded_short_answer', translation ? '翻譯題' : 'AI 評分問答題')
+        const questionId = crypto.randomUUID(), quizId = crypto.randomUUID(), itemId = crypto.randomUUID()
+        try {
+          const { error: draftError } = await supabase.from('questions').insert({
+            id: questionId, session_id: sessionId, type: 'custom_quiz', status: 'draft',
+            screenshot_id: hasBackdrop ? screenshotId : null, title, prompt_text: promptText,
+            answer_seconds: answerSeconds,
+          })
+          if (draftError) throw draftError
+          const { error: quizError } = await supabase.from('quizzes').insert({
+            id: quizId, session_id: sessionId, question_id: questionId, title,
+            direction: draftPrompt, requested_type: 'short_answer', requested_count: 1,
+            graded: true, interaction_mode: true,
+          })
+          if (quizError) throw quizError
+          const { error: itemError } = await supabase.from('quiz_items').insert({
+            id: itemId, quiz_id: quizId, position: 1, type: 'short_answer',
+            prompt_text: promptText, options: [], points: 100,
+          })
+          if (itemError) throw itemError
+          const { error: keyError } = await supabase.from('quiz_item_keys').insert({
+            item_id: itemId, accepted_answers: [], rubric: writtenPrompt.rubric,
+          })
+          if (keyError) throw keyError
+          const { error: publishError } = await supabase.rpc('publish_teaching_question', {
+            target_session: sessionId, target_question: questionId, expected_current: room.current_question_id,
+          })
+          if (publishError) throw publishError
+        } catch (error) {
+          await supabase.from('questions').delete().eq('id', questionId).eq('status', 'draft')
+          if (hasBackdrop) await supabase.from('screenshots').delete().eq('id', screenshotId)
+          throw error
+        }
+        const { data: published, error } = await supabase.from('questions').select('*').eq('id', questionId).single()
+        if (error) throw error
+        return jsonResponse({ question: published })
+      }
+
+      // A screenshot without replies is supporting material, so the class can
+      // keep answering its current assignment while looking at the new image.
+      if (type !== 'send_screen') {
+        const stoppedAt = new Date().toISOString()
+        const { error: stopError } = await stopActiveQuestions(supabase, sessionId, stoppedAt)
+        if (stopError) throw stopError
       }
 
       const { data: question, error: questionError } = await supabase

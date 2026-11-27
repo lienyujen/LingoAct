@@ -1,3 +1,4 @@
+import { isWrittenAssessment } from '../_shared/written-assessment.ts'
 import { flashcardReviewTerm, translateFlashcardReview } from '../_shared/flashcard-review.ts'
 import { hasRecordingTranscript, inspectRecording } from '../_shared/recording-validation.ts'
 import { checkHanWriting, hanCharacters, usesTraditionalFlashcardHandwriting } from '../_shared/han-stroke-match.ts'
@@ -315,7 +316,7 @@ Deno.serve(async (req) => {
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
       if (!validUuid(questionId)) return jsonResponse({ message: '測驗資料格式不正確。' }, 400)
       const { data: question, error: questionError } = await supabase.from('questions')
-        .select('id, session_id, status, type, title').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
+        .select('id, session_id, status, type, title, started_at, answer_seconds').eq('id', questionId).eq('session_id', sessionId).maybeSingle()
       if (questionError) throw questionError
       if (!question || question.type !== 'custom_quiz') return jsonResponse({ message: '找不到自訂測驗。' }, 404)
       const { data: quiz, error: quizError } = await supabase.from('quizzes').select('*')
@@ -666,6 +667,10 @@ Deno.serve(async (req) => {
 
       if (activeSession?.status !== 'active' || question.status !== 'active') {
         return jsonResponse({ message: '測驗已停止作答。' }, 409)
+      }
+      if (isWrittenAssessment(quiz) && question.answer_seconds && question.started_at &&
+        Date.now() > Date.parse(question.started_at) + (question.answer_seconds + 3) * 1000) {
+        return jsonResponse({ message: '作答時間已到。' }, 409)
       }
       const submittedAnswers = Array.isArray(input.answers) ? input.answers : []
       const { data: items, error: itemError } = await supabase.from('quiz_items').select('*')

@@ -1,3 +1,4 @@
+import { answerDeadline } from '../lib/questionTiming'
 import { usesTraditionalFlashcardHandwriting } from '../lib/hanStrokePractice'
 import { readingVocabularyContext } from '../../supabase/functions/_shared/chinese-word-matching.ts'
 import { classroomChanges, createClassroomReconnect } from '../lib/classroomBroadcast'
@@ -1278,7 +1279,7 @@ export function ParticipantPage() {
       {question?.teaching_mode === 'pair' || question?.teaching_mode === 'reading_evidence' || question?.type === 'board' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
         quizData.quiz.requested_type === 'flashcard'
           ? <ParticipantFlashcards strokePractice={flashcardStrokePractice} learningCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
-          : <ParticipantCustomQuiz strokeCredentials={strokePractice && participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
+          : <ParticipantCustomQuiz assessmentDeadline={answerDeadline(question)} assessmentClosed={question.status !== 'active'} strokeCredentials={strokePractice && participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
           <h2>{participantText(locale, 'customQuiz')}</h2>

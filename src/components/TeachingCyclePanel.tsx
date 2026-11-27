@@ -16,6 +16,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   const locale = usePresenterLocale()
   const zh = ['zh-TW', 'zh-CN', 'ja'].includes(locale)
   const redoLabel = locale === 'zh-CN' ? '重新做一次' : locale === 'ja' ? 'もう一度取り組む' : locale === 'en' ? 'Do it again' : '重新做一次'
+  const resendLabel = locale === 'zh-CN' ? '原题重派' : locale === 'ja' ? '同じ問題を再配信' : locale === 'en' ? 'Resend original' : '原題重派'
   const [mode, setMode] = useState('')
   const [focus, setFocus] = useState('')
   const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
@@ -58,15 +59,24 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
     })
     onDispatched(data.question)
   }
-  const canRepeat = ['short_answer', 'pronunciation', 'oral_response', 'custom_quiz'].includes(question.type) && question.teaching_mode !== 'pair'
+  async function resendOriginal() {
+    const data = await call('repeat_assignment', { requestId: crypto.randomUUID() })
+    onDispatched(data.question)
+  }
+  const canResend = APP_PROFILE.id !== 'full'
+  const canSetFocus = ['short_answer', 'pronunciation', 'oral_response', 'custom_quiz'].includes(question.type) && question.teaching_mode !== 'pair'
   return <details className="panel teaching-cycle-panel">
     <summary>{zh ? uiText("下一步教學") : 'Follow-up'}</summary>
     <div className="teaching-cycle-actions">
-      {APP_PROFILE.id !== 'full' && <button disabled={busy || !active} type="button" onClick={() => void run(async () => {
-        const data = await call('repeat_assignment', { requestId: crypto.randomUUID() })
-        onDispatched(data.question)
-      })}><ArrowClockwise size={16} /> {redoLabel}</button>}
-      {canRepeat && <button disabled={busy || !active} type="button" onClick={() => { setMode('repeat'); setFocus('') }}>{zh ? uiText("再練一次") : "Practice again"}</button>}
+      {(canResend || canSetFocus) && <button disabled={busy || !active} type="button" onClick={() => {
+        if (!canSetFocus) {
+          void run(resendOriginal)
+          return
+        }
+        setMode('repeat')
+        setFocus('')
+        setUseOriginalPrompt(false)
+      }}><ArrowClockwise size={16} /> {redoLabel}</button>}
       <button disabled={busy} type="button" onClick={() => { setMode('discuss'); void run(loadSamples) }}>{zh ? uiText("挑作品討論") : 'Discuss work'}</button>
       <button disabled={busy} type="button" onClick={() => { setMode('diagnose'); void run(loadSamples) }}>{zh ? uiText("看看全班卡在哪") : 'Learning needs'}</button>
       <button disabled={busy || !active || participants.length < 2} type="button" onClick={openPair}>{zh ? uiText("兩人共同任務") : 'Pair task'}</button>
@@ -93,7 +103,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
           <strong>{n.finding}</strong>
           {n.evidenceIds.map(id => <blockquote key={id}>{samples.find(s => s.id === id)?.text}</blockquote>)}
           <p>{n.nextPrompt}</p>
-          <button type="button" disabled={!active || !canRepeat} onClick={() => { setFocus(n.nextPrompt); setMode('followup') }}>{zh ? uiText("用這個重點再練") : "Practice this skill"}</button>
+          <button type="button" disabled={!active || !canSetFocus} onClick={() => { setFocus(n.nextPrompt); setMode('followup') }}>{zh ? uiText("用這個重點再練") : "Practice this skill"}</button>
         </article>)}
       </>}
       {mode === 'pair' && <>
@@ -105,6 +115,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
         <p>{participants.filter(p => roster.includes(p.id)).map((p, i) => `${Math.floor(i / 2) + 1}${i % 2 ? 'B' : 'A'}: ${p.name}`).join(' · ')}</p>
       </>}
       {['repeat', 'followup', 'pair', 'discuss'].includes(mode) && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
+      {mode === 'repeat' && canResend && <button className="ghost-button" disabled={busy || !active} type="button" onClick={() => void run(resendOriginal)}>{resendLabel}</button>}
       {mode !== 'diagnose' && <button disabled={busy || !active || !focus.trim() || (mode === 'discuss' && !selected.length) || (mode === 'pair' && (!materialA.trim() || !materialB.trim() || roster.length < 2 || roster.length % 2 !== 0))} type="button" onClick={() => void run(dispatch)}>{busy ? (zh ? uiText("派送中…") : 'Sending…') : (zh ? uiText("派送給全班") : 'Send to class')}</button>}
     </div>}
     {pairs.map((p, i) => <article key={p.id}><strong>{zh ? uiText("第") : 'Pair'} {i + 1} {zh ? uiText("組") : ''}: {participants.find(v => v.id === p.participant_a)?.name} / {participants.find(v => v.id === p.participant_b)?.name}</strong><p>{p.result || (zh ? uiText("尚未送出") : 'Not submitted')}</p></article>)}

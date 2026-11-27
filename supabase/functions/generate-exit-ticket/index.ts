@@ -204,7 +204,6 @@ Deno.serve(async (req) => {
       .update({
         exit_ticket_prompt: prompt,
         exit_ticket_prompt_en: promptEn,
-        ...(fixedLevel ? { exit_ticket_prompt_translations: {} } : {}),
         exit_ticket_category: output.category,
         exit_ticket_response_type: responseType,
       })

@@ -19,7 +19,7 @@ import { getAdminClient, hashPresenterToken } from '../_shared/supabase.ts'
 import { isOwner, ownerKeyConfigured, ownerRefusalMessage } from '../_shared/owner.ts'
 import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts'
 import { classLevelInstruction, resolveFramework, resolveTrack, teachingTrackIds, trackInstruction, usesLevelledPrompts } from '../_shared/teaching.ts'
-import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
+import { prepareFlashcardAudioInBackground } from '../_shared/flashcard-audio.ts'
 import { presenterTeachingCycle } from '../_shared/teaching-cycle.ts'
 import { screenshotInteraction } from '../_shared/screenshot-interactions.ts'
 import { CLASSICS_REVIEW_REQUIRED, isUnreviewedClassic } from '../_shared/guoyu-classics-library.ts'
@@ -1307,15 +1307,14 @@ Deno.serve(async (req) => {
           })))
           if (keyError) throw keyError
 
-          if (requestedType === 'flashcard') {
-            await ensureFlashcardAudio(sessionId, quizId, classRow?.teaching_language)
-          }
-
           const { error: questionUpdateError } = await supabase.from('questions').update({
             title: generated.title,
             translations: { en: { title: 'AI custom quiz', prompt_text: quizPreviewPrompt, options: [] } },
           }).eq('id', questionId)
           if (questionUpdateError) throw questionUpdateError
+          if (requestedType === 'flashcard') {
+            await prepareFlashcardAudioInBackground(sessionId, quizId, questionId, classRow?.teaching_language)
+          }
         } catch (error) {
           const detail = errorDetail(error, 'AI quiz generation failed.')
           console.error('custom quiz generation failed', detail)
@@ -1666,7 +1665,6 @@ Deno.serve(async (req) => {
             if (cleanupError) console.error('Could not clean up unkeyed flashcards', cleanupError)
             throw keyError
           }
-          await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
         } catch (error) {
           return jsonResponse({ message: errorDetail(error, '再出卡失敗，請再試一次。') }, 503)
         }
@@ -1691,6 +1689,7 @@ Deno.serve(async (req) => {
       const { error: notifyError } = await supabase.from('questions')
         .update({ card_font_url: null }).eq('id', questionId).eq('session_id', sessionId)
       if (notifyError) throw notifyError
+      if (addCount) EdgeRuntime.waitUntil(prepareFlashcardAudioInBackground(sessionId, quiz.id, questionId))
       return jsonResponse({ count: (finalItems || []).length })
     }
 
@@ -1766,11 +1765,6 @@ Deno.serve(async (req) => {
         }
         return jsonResponse({ message: '找不到自訂測驗。' }, 404)
       }
-      if (quiz.requested_type === 'flashcard') {
-        const { data: classRow } = await supabase.from('sessions')
-          .select('teaching_language').eq('id', sessionId).maybeSingle()
-        await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
-      }
       const [{ data: items, error: itemError }, { data: attempts, error: attemptError }, { data: question, error: questionError }, { data: readingPassage, error: passageError }, { data: sessionView, error: sessionViewError }] = await Promise.all([
         supabase.from('quiz_items').select('*').eq('quiz_id', quiz.id).order('position'),
         supabase.from('quiz_attempts').select('*').eq('quiz_id', quiz.id).order('submitted_at'),
@@ -1779,6 +1773,9 @@ Deno.serve(async (req) => {
         supabase.from('sessions').select('anonymous_enabled, level_framework, level_code').eq('id', sessionId).single(),
       ])
       if (itemError || attemptError || questionError || passageError || sessionViewError) throw itemError || attemptError || questionError || passageError || sessionViewError
+      if (quiz.requested_type === 'flashcard' && items?.some(item => !item.audio_url && item.audio_status === 'pending')) {
+        EdgeRuntime.waitUntil(prepareFlashcardAudioInBackground(sessionId, quiz.id, questionId))
+      }
       const itemIds = (items || []).map((item) => item.id)
       const attemptIds = (attempts || []).map((attempt) => attempt.id)
       const [{ data: keys, error: keyError }, { data: answers, error: answerError }, { data: screenshot, error: screenshotError }, { data: tries }] = await Promise.all([

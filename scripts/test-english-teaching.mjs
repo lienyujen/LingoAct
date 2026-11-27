@@ -128,9 +128,9 @@ test('English reading retries mixed-language AI passages once before accepting o
   } finally {globalThis.fetch=oldFetch;globalThis.Deno=oldDeno}
 })
 
-test('English exit tickets replace stale Chinese cache and store English questions', async () => {
+test('English and Huayu exit tickets save against the deployed schema, including fallbacks', async () => {
   const oldFetch=globalThis.fetch,oldDeno=globalThis.Deno
-  let handler,saved,instruction='', failGeneration=false
+  let handler,saved,instruction='', failGeneration=false, huayu=false
   globalThis.Deno={env:{get:key=>({SUPABASE_URL:'https://example.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test-placeholder',GEMINI_API_KEY:'test-key'})[key]},serve:callback=>{handler=callback}}
   globalThis.fetch=async(url,options)=> {
     if(!String(url).includes('example.supabase.co')) {
@@ -140,9 +140,18 @@ test('English exit tickets replace stale Chinese cache and store English questio
       return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({category:'lesson_summary',prompt:'What did you learn about recycling today?',prompt_en:'What did you learn about recycling today?'})}]}}]}),{status:200})
     }
     const table=new URL(url).pathname.split('/').at(-1)
-    if(options.method==='PATCH') {saved=JSON.parse(options.body);return new Response(null,{status:204})}
+    if(options.method==='PATCH') {
+      saved=JSON.parse(options.body)
+      if ('exit_ticket_prompt_translations' in saved) {
+        return Response.json({code:'PGRST204',message:'Column not found'}, {status:400})
+      }
+      return new Response(null,{status:204})
+    }
     const row=table==='presenter_session_keys' ? {session_id:'class'} : table==='sessions'
-      ? {id:'class',title:'English A2',teaching_language:'en',guidance_language:'en',level_framework:'cefr',level_code:'A2',exit_ticket_prompt:'今天學到什麼？'} : []
+      ? huayu
+        ? {id:'class',title:'華語',teaching_language:'huayu',guidance_language:'zh-TW',level_framework:'tbcl',level_code:'2',exit_ticket_prompt:null}
+        : {id:'class',title:'English A2',teaching_language:'en',guidance_language:'en',level_framework:'cefr',level_code:'A2',exit_ticket_prompt:'今天學到什麼？'}
+      : []
     return new Response(JSON.stringify(row),{status:200,headers:{'Content-Type':'application/json','Content-Range':'0-0/0'}})
   }
   try {
@@ -152,7 +161,7 @@ test('English exit tickets replace stale Chinese cache and store English questio
     assert.equal((await response.json()).cached,false)
     assert.equal(saved.exit_ticket_prompt,'What did you learn about recycling today?')
     assert.equal(saved.exit_ticket_prompt_en,saved.exit_ticket_prompt)
-    assert.deepEqual(saved.exit_ticket_prompt_translations,{})
+    assert.ok(!('exit_ticket_prompt_translations' in saved))
     const contentModule={}
     const source=readFileSync(new URL('../src/lib/sessionContent.ts',import.meta.url),'utf8')
     const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText
@@ -168,6 +177,15 @@ test('English exit tickets replace stale Chinese cache and store English questio
     assert.equal(fallback.status, 200)
     assert.equal((await fallback.json()).fallback, true)
     assert.equal(saved.exit_ticket_prompt, 'What did you learn today? Write one thing.')
+    huayu = true
+    const huayuFallback = await handler(new Request('https://example.supabase.co/functions/v1/generate-exit-ticket', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'class', presenterToken: 'test-token' }),
+    }))
+    assert.equal(huayuFallback.status, 200, await huayuFallback.clone().text())
+    assert.equal((await huayuFallback.json()).fallback, true)
+    assert.equal(saved.exit_ticket_prompt, '今天你學到了什麼？請寫一件事。')
+
   } finally {globalThis.fetch=oldFetch;globalThis.Deno=oldDeno}
 })
 

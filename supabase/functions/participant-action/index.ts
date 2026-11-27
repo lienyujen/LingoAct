@@ -14,7 +14,7 @@ import { guidanceLanguageName, guidanceLanguages } from '../_shared/languages.ts
 import { cachedLearningTranslation, demandTranslationLocales, explanationSource, translateQuizFeedback, translateFileFeedback, translateAudioFeedback, type TranslationSource } from '../_shared/learning-translation.ts'
 import { classFeedbackSettings } from '../_shared/feedback-language.ts'
 import { classLevelInstruction } from '../_shared/teaching.ts'
-import { ensureFlashcardAudio } from '../_shared/flashcard-audio.ts'
+import { prepareFlashcardAudioInBackground } from '../_shared/flashcard-audio.ts'
 import { quizGenerationFailed } from '../_shared/quiz-state.ts'
 import { participantTeachingCycle } from '../_shared/teaching-cycle.ts'
 
@@ -327,17 +327,19 @@ Deno.serve(async (req) => {
         ])
         if (itemError || attemptError) throw itemError || attemptError
         let items = loadedItems || []
-        // Decks made before stored speech existed are upgraded once when first
-        // reopened. The per-row claim inside ensureFlashcardAudio prevents a
-        // whole class loading together from paying for the same word twice.
-        if (quiz.requested_type === 'flashcard' && items.some((item) => !item.audio_url)) {
-          const { data: classRow } = await supabase.from('sessions')
-            .select('teaching_language').eq('id', sessionId).maybeSingle()
-          await ensureFlashcardAudio(sessionId, quiz.id, classRow?.teaching_language)
-          const { data: refreshed, error: refreshError } = await supabase.from('quiz_items')
-            .select('*').eq('quiz_id', quiz.id).order('position')
-          if (refreshError) throw refreshError
-          items = refreshed || items
+        // The card and its answer are usable while TTS runs. The audio worker
+        // claims each pending card once and nudges the parent when URLs arrive.
+        if (quiz.requested_type === 'flashcard' && items.some(item => !item.audio_url && item.audio_status === 'pending')) {
+          const audio = prepareFlashcardAudioInBackground(sessionId, quiz.id, questionId)
+          if (question.status === 'active') {
+            EdgeRuntime.waitUntil(audio)
+          } else {
+            // History has no live question refresh once the class ends.
+            await audio
+            const { data, error } = await supabase.from('quiz_items').select('*').eq('quiz_id', quiz.id).order('position')
+            if (error) throw error
+            items = data || []
+          }
         }
         const requestedLocale = guidanceLanguages.has(input.locale) ? input.locale as string : ''
         const contentLocale = requestedLocale === 'zh-TW' ? 'zh_tw' : requestedLocale

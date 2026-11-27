@@ -1,3 +1,4 @@
+import { errorDetail } from './ai.ts'
 import { buildVoicePlan, contentHash, durationMs, synthesize, wavFromPcm } from './listening.ts'
 import { getAdminClient } from './supabase.ts'
 import { resolveTrack } from './teaching.ts'
@@ -67,10 +68,11 @@ async function storeCardAudio(sessionId: string, card: Card, language: string) {
   }
 }
 
-export async function ensureFlashcardAudio(sessionId: string, quizId: string, teachingTrack: string | null | undefined) {
+async function prepareFlashcardAudio(sessionId: string, quizId: string, questionId: string, teachingTrack?: string | null) {
   const supabase = getAdminClient()
   const { data: items, error: itemError } = await supabase.from('quiz_items')
-    .select('id, prompt_text, prompt_is_word, audio_url, audio_status').eq('quiz_id', quizId).order('position')
+    .select('id, prompt_text, prompt_is_word, audio_url, audio_status')
+    .eq('quiz_id', quizId).eq('audio_status', 'pending').is('audio_url', null).order('position')
   if (itemError) throw itemError
   if (!items?.length) return
   const { data: keys, error: keyError } = await supabase.from('quiz_item_keys')
@@ -78,8 +80,30 @@ export async function ensureFlashcardAudio(sessionId: string, quizId: string, te
   if (keyError) throw keyError
   const keyByItem = new Map((keys || []).map((key) => [key.item_id, key.accepted_answers as string[]]))
   const cards = (items || []).map((item) => ({ ...item, accepted_answers: keyByItem.get(item.id) || [] }))
+  if (teachingTrack === undefined) {
+    const { data, error } = await supabase.from('sessions')
+      .select('teaching_language').eq('id', sessionId).maybeSingle()
+    if (error) throw error
+    teachingTrack = data?.teaching_language
+  }
   const language = resolveTrack(teachingTrack).language
   const results = await Promise.allSettled(cards.map((card) => storeCardAudio(sessionId, card, language)))
   const failed = results.filter((result) => result.status === 'rejected')
   if (failed.length) console.warn(`flashcard audio: ${failed.length}/${cards.length} clips failed`)
+  if (!results.some((result) => result.status === 'fulfilled' && result.value)) return
+
+  // The quiz item table does not publish change events. An update of the
+  // parent wakes the same classroom listeners as an appended card does.
+  const { data: question, error: questionError } = await supabase.from('questions').select('title')
+    .eq('session_id', sessionId).eq('id', questionId).maybeSingle()
+  if (questionError) throw questionError
+  if (!question) return
+  const { error: notifyError } = await supabase.from('questions').update({ title: question.title })
+    .eq('session_id', sessionId).eq('id', questionId).eq('title', question.title)
+  if (notifyError) throw notifyError
+}
+
+export function prepareFlashcardAudioInBackground(sessionId: string, quizId: string, questionId: string, teachingTrack?: string | null) {
+  return prepareFlashcardAudio(sessionId, quizId, questionId, teachingTrack)
+    .catch((error: unknown) => console.warn('Could not prepare flashcard audio', errorDetail(error, 'unknown error')))
 }

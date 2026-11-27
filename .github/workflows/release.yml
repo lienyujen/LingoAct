@@ -361,6 +361,11 @@ jobs:
           else
             gh release download "$TAG" --dir builds --pattern '*.zip' --pattern '*.dmg'
           fi
+          if [[ "$PLATFORM" == "all" && ( "$EDITION" == "all" || "$EDITION" == "languages" ) ]]; then
+            for name in LingoAct-{SC,Huayu,JP,English,TC,Guoyu}.{dmg,zip}; do
+              test -s "builds/$name"
+            done
+          fi
           (cd builds && shopt -s nullglob && sha256sum -- *.zip *.dmg > SHA256SUMS.txt)
           notes=$(cat <<'MD'
           ## 下載
@@ -380,7 +385,11 @@ jobs:
 
           ## 本次更新
 
-          - 字詞卡追加沿用原教材和出卡方向，排除已練習詞，並修正國小國語目前活動的重複面板。現有安裝請更新後端部署。
+          - 修正華語等版本的 Exit Ticket 派送問題。
+          - 字詞卡使用純文字。可作答的卡片先顯示，發音在背景準備，進入複習才載入直譯。
+          - 卡背並列直接詞義與完整解釋。新標音的華語字詞卡遵循漢語拼音正詞法。
+          - 正體字詞卡提供教育部筆順連結與手寫檢查，涵蓋華語、TC 和國語的正體字課程。
+          - 使用自有 Supabase 的教師請用新版部署精靈更新後端。
 
           - 各桌面版保留教師主選單的分格卡片並縮短間距。未交人數顯示於進行中分頁內，交齊或停止收件就隱藏。錄音參考計時在作答卡片內顯示，到零會自動收起。
           - 教師手寫題目、提示及派送文字可保留多語原文。英文課可把多語素材轉成符合班級程度的英文題目、文章與聽力對話。

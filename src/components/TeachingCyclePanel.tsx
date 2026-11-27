@@ -1,9 +1,8 @@
 import { OriginalPromptOption } from './OriginalPromptOption'
 import { ArrowClockwise } from '@phosphor-icons/react'
-import { APP_PROFILE } from '../lib/appProfiles'
 import { edgeFunctionErrorMessage } from '../lib/edgeError'
 import { uiText } from '../lib/uiText'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
 import { usePresenterLocale } from '../lib/presenterI18n'
 import type { Participant, Question } from '../types'
@@ -16,7 +15,6 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   const locale = usePresenterLocale()
   const zh = ['zh-TW', 'zh-CN', 'ja'].includes(locale)
   const redoLabel = locale === 'zh-CN' ? '重新做一次' : locale === 'ja' ? 'もう一度取り組む' : locale === 'en' ? 'Do it again' : '重新做一次'
-  const resendLabel = locale === 'zh-CN' ? '原题重派' : locale === 'ja' ? '同じ問題を再配信' : locale === 'en' ? 'Resend original' : '原題重派'
   const [mode, setMode] = useState('')
   const [focus, setFocus] = useState('')
   const [useOriginalPrompt, setUseOriginalPrompt] = useState(false)
@@ -28,6 +26,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   const [materialB, setMaterialB] = useState('')
   const [pairs, setPairs] = useState<Array<{ id: string; participant_a: string; participant_b: string; result: string | null }>>([])
   const [busy, setBusy] = useState(false)
+  const running = useRef(false)
   const [error, setError] = useState('')
   async function call(action: string, fields = {}) {
     const { data, error } = await requireSupabase().functions.invoke('presenter-action', {
@@ -39,8 +38,18 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
   }
   useEffect(() => { setMode(''); setFocus(''); setUseOriginalPrompt(false); setSelected([]); setSamples([]); setNeeds([]); setPairs([]); setError('') }, [question.id])
   async function run(work: () => Promise<void>) {
-    setBusy(true); setError('')
-    try { await work() } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
+    if (running.current) return
+    running.current = true
+    setBusy(true)
+    setError('')
+    try {
+      await work()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      running.current = false
+      setBusy(false)
+    }
   }
   async function loadSamples() {
     const data = await call('teaching_samples')
@@ -54,7 +63,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
     setRoster(participants.slice(0, participants.length - participants.length % 2).map(p => p.id))
   }
   async function dispatch() {
-    const data = await call(mode === 'repeat' || mode === 'followup' ? 'teaching_repeat' : mode === 'pair' ? 'teaching_pair' : 'teaching_discuss', {
+    const data = await call(mode === 'followup' ? 'teaching_repeat' : mode === 'pair' ? 'teaching_pair' : 'teaching_discuss', {
       focus, useOriginalPrompt, responseType: mode === 'followup' ? 'short_answer' : undefined, sampleIds: selected, participantIds: roster, materialA, materialB,
     })
     onDispatched(data.question)
@@ -63,30 +72,20 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
     const data = await call('repeat_assignment', { requestId: crypto.randomUUID() })
     onDispatched(data.question)
   }
-  const canResend = APP_PROFILE.id !== 'full'
   const canSetFocus = ['short_answer', 'pronunciation', 'oral_response', 'custom_quiz'].includes(question.type) && question.teaching_mode !== 'pair'
   return <details className="panel teaching-cycle-panel">
     <summary>{zh ? uiText("下一步教學") : 'Follow-up'}</summary>
     <div className="teaching-cycle-actions">
-      {(canResend || canSetFocus) && <button disabled={busy || !active} type="button" onClick={() => {
-        if (!canSetFocus) {
-          void run(resendOriginal)
-          return
-        }
-        setMode('repeat')
-        setFocus('')
-        setUseOriginalPrompt(false)
-      }}><ArrowClockwise size={16} /> {redoLabel}</button>}
+      <button disabled={busy || !active} type="button" onClick={() => void run(resendOriginal)}><ArrowClockwise size={16} /> {redoLabel}</button>
       <button disabled={busy} type="button" onClick={() => { setMode('discuss'); void run(loadSamples) }}>{zh ? uiText("挑作品討論") : 'Discuss work'}</button>
       <button disabled={busy} type="button" onClick={() => { setMode('diagnose'); void run(loadSamples) }}>{zh ? uiText("看看全班卡在哪") : 'Learning needs'}</button>
       <button disabled={busy || !active || participants.length < 2} type="button" onClick={openPair}>{zh ? uiText("兩人共同任務") : 'Pair task'}</button>
       {question.teaching_mode === 'pair' && <button disabled={busy} type="button" onClick={() => void run(loadSamples)}>{zh ? uiText("更新各組結果") : 'Refresh pair results'}</button>}
     </div>
     {mode && <div className="teaching-cycle-editor">
-      <label>{zh ? mode === 'repeat' ? uiText("這一輪只練什麼？") : mode === 'pair' ? uiText("共同任務") : uiText("討論問題") : mode === 'pair' ? 'Shared task' : 'Focus / discussion prompt'}
+      <label>{zh ? mode === 'pair' ? uiText("共同任務") : uiText("討論問題") : mode === 'pair' ? 'Shared task' : 'Focus / discussion prompt'}
         <textarea maxLength={500} value={focus} onChange={e => setFocus(e.target.value)} placeholder={zh ? uiText("例如：加上一句原因，讓讀者更容易理解。") : 'For example: add a reason to make your meaning clearer.'} />
       </label>
-      {mode === 'repeat' && <p className="muted">{zh ? uiText("沿用原教材，保留上一輪作答。派送後，全班開始新的一輪。") : "Reuse the same material. Previous responses are saved, and sending the activity starts a new round for the class."}</p>}
       {mode === 'discuss' && <>
         <p className="muted">{zh ? uiText("選 1–3 份；派送前請確認原文內沒有姓名等個人資訊。") : "Choose 1–3 samples of student work. Check for names and other personal information before sharing them."}</p>
         {!samples.length && <p>{zh ? uiText("目前沒有可選作品。") : 'No work available yet.'}</p>}
@@ -114,8 +113,7 @@ export function TeachingCyclePanel({ question, sessionId, presenterToken, partic
         {participants.map(p => <label className="teaching-sample" key={p.id}><input type="checkbox" checked={roster.includes(p.id)} onChange={e => setRoster(v => e.target.checked ? [...v, p.id] : v.filter(id => id !== p.id))} />{p.name}</label>)}
         <p>{participants.filter(p => roster.includes(p.id)).map((p, i) => `${Math.floor(i / 2) + 1}${i % 2 ? 'B' : 'A'}: ${p.name}`).join(' · ')}</p>
       </>}
-      {['repeat', 'followup', 'pair', 'discuss'].includes(mode) && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
-      {mode === 'repeat' && canResend && <button className="ghost-button" disabled={busy || !active} type="button" onClick={() => void run(resendOriginal)}>{resendLabel}</button>}
+      {['followup', 'pair', 'discuss'].includes(mode) && <OriginalPromptOption checked={useOriginalPrompt} error={error} onChange={setUseOriginalPrompt} />}
       {mode !== 'diagnose' && <button disabled={busy || !active || !focus.trim() || (mode === 'discuss' && !selected.length) || (mode === 'pair' && (!materialA.trim() || !materialB.trim() || roster.length < 2 || roster.length % 2 !== 0))} type="button" onClick={() => void run(dispatch)}>{busy ? (zh ? uiText("派送中…") : 'Sending…') : (zh ? uiText("派送給全班") : 'Send to class')}</button>}
     </div>}
     {pairs.map((p, i) => <article key={p.id}><strong>{zh ? uiText("第") : 'Pair'} {i + 1} {zh ? uiText("組") : ''}: {participants.find(v => v.id === p.participant_a)?.name} / {participants.find(v => v.id === p.participant_b)?.name}</strong><p>{p.result || (zh ? uiText("尚未送出") : 'Not submitted')}</p></article>)}

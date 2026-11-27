@@ -2,15 +2,14 @@ import { presenterLookup } from './presenterI18n'
 import type { PresenterT } from './presenterI18n'
 import { requireSupabase } from './supabase'
 import { annotateReading } from './listening'
-import type { QuizItem } from '../types'
+import type { QuizItem, ReadingWord } from '../types'
 
 // 標音 on a 單字卡 deck.
 //
 // The words are annotated in ONE call, not one per card: they are joined with
-// newlines, marked up together and split back. A newline has no reading in
-// either mode, so it survives both — 注音 inserts variation selectors after Han
-// characters and leaves everything else alone, and 拼音 returns an empty slot
-// for anything that is not a Han character.
+// newlines, marked up together and split back. 注音 inserts variation
+// selectors after Han characters. 拼音 returns word spans, so the syllables
+// inside a word stay together and spaces mark boundaries within a phrase.
 //
 // The two modes end up in the same shape — a string per annotated text — which
 // is what keeps the card renderer simple: 注音 is the word with its readings
@@ -22,6 +21,22 @@ import type { QuizItem } from '../types'
 // one word in the prompt and three glosses beside it, and annotating those
 // glosses put 注音 on 「不同之處」 under a question about 「差異」.
 const SEPARATOR = '\n'
+
+export function flashcardPinyinLines(source: string, spans: ReadingWord[] | undefined) {
+  if (!spans?.length || spans.map(span => span.text).join('') !== source) return null
+  const lines: string[][] = [[]]
+  for (const span of spans) {
+    const parts = span.text.split(SEPARATOR)
+    const pinyin = span.pinyin.trim()
+    if (parts.length > 1 && pinyin) return null
+    for (const [index, part] of parts.entries()) {
+      if (index) lines.push([])
+      if (pinyin) lines[lines.length - 1].push(pinyin)
+      else if (/[\p{Script=Latin}\p{Number}]/u.test(part)) lines[lines.length - 1].push(part.trim())
+    }
+  }
+  return lines.map(line => line.join(' '))
+}
 
 export async function annotateCardDeck(input: {
   sessionId: string
@@ -52,6 +67,7 @@ export async function annotateCardDeck(input: {
     presenterToken: input.presenterToken,
     text: joined,
     mode: input.mode,
+    ...(input.mode === 'pinyin' ? { granularity: 'words', headwords: true } as const : {}),
   })
 
   let perWord: string[]
@@ -71,16 +87,9 @@ export async function annotateCardDeck(input: {
       }
     }
   } else {
-    // A syllable per character of the joined text; walk it back into words.
-    const syllables = JSON.parse(marked.annotationText) as string[]
-    const characters = [...joined]
-    perWord = []
-    let buffer: string[] = []
-    for (let index = 0; index < characters.length; index += 1) {
-      if (characters[index] === SEPARATOR) { perWord.push(buffer.join(' ').trim()); buffer = []; continue }
-      if (syllables[index]) buffer.push(syllables[index])
-    }
-    perWord.push(buffer.join(' ').trim())
+    const lines = flashcardPinyinLines(joined, marked.words)
+    if (!lines) throw new Error(t('readingCountMismatch'))
+    perWord = lines
   }
   // A split that does not line up would put one word's reading on another.
   if (perWord.length !== words.length) throw new Error(t('readingCountMismatch'))

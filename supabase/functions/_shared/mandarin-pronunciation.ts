@@ -540,7 +540,7 @@ function applyWordSandhi<T extends { text: string; pinyin: string }>(input: T[],
 // regional reading of standalone 和 deterministic without guessing from the
 // neighbouring characters: 和 is one word when it means and/with, but part of
 // 和平、溫和、和尚 or 和麵 in its other senses.
-export function applyRegionalWordPinyin<T extends { text: string; pinyin: string }>(text: string, words: T[], accent: MandarinAccent | null): T[] {
+export function applyRegionalWordPinyin<T extends { text: string; pinyin: string }>(text: string, words: T[], accent: MandarinAccent | null, applySandhi = true): T[] {
   const mainland = usesMainlandStandard(accent)
   const { protectedHe } = heContextIndexes(text)
   const targets = new Map<number, { wanted: string; alternatives: string[] }>()
@@ -592,7 +592,7 @@ export function applyRegionalWordPinyin<T extends { text: string; pinyin: string
     cursor += length
     return pinyin === word.pinyin ? word : { ...word, pinyin }
   })
-  return applyWordSandhi(regional, accent)
+  return applySandhi ? applyWordSandhi(regional, accent) : regional
 }
 
 export function regionalPinyinOverrides(text: string, accent: MandarinAccent | null) {

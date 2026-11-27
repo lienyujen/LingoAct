@@ -7,7 +7,7 @@ import { participantText } from '../lib/participantI18n'
 import { useReadingFont } from '../lib/readingFont'
 import type { ParticipantLocale } from '../lib/participantI18n'
 import { localizedFields } from '../lib/localizedContent'
-import { flashcardPicture } from '../lib/flashcardPictures'
+import { useFlashcardReviewTranslations } from '../lib/useFlashcardReviewTranslations'
 import type { ParticipantQuizData, QuizItem } from '../types'
 
 type Props = {
@@ -17,26 +17,13 @@ type Props = {
   locale: ParticipantLocale
   active: boolean
   strokePractice?: boolean
-  strokeCredentials?: StrokeCredentials
+  learningCredentials?: StrokeCredentials
   onTry: (itemId: string, answerValue: string) => Promise<{ correct: boolean; correctAnswer: string | null }>
 }
 
 type Verdict = { correct: boolean; correctAnswer: string | null; chosen: string }
 
 const REQUEUE_GAP = 2
-
-function FlashcardPictureLink({ word, locale, hidden = false }: { word: string; locale: ParticipantLocale; hidden?: boolean }) {
-  const [unavailable, setUnavailable] = useState(false)
-  const picture = flashcardPicture(word)
-  if (!picture || unavailable) return null
-
-  const label = participantText(locale, 'flashcardImageSearch', { word })
-  return (
-    <a aria-label={label} className="flashcard-image-link" hidden={hidden} href={picture.searchUrl} rel="noopener noreferrer" target="_blank" title={label}>
-      <img alt="" decoding="async" src={picture.src} width={108} height={108} onError={() => setUnavailable(true)} />
-    </a>
-  )
-}
 
 function learnedFrom(data: ParticipantQuizData) {
   return Object.fromEntries(data.answers
@@ -68,7 +55,7 @@ function reviewSides(item: QuizItem, answer: string, locale: ParticipantLocale) 
 // During answering this is retrieval practice. Once the teacher stops it, the
 // same deck becomes a reference students can keep turning over instead of a
 // completion screen that makes the vocabulary disappear.
-export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry, strokePractice, strokeCredentials }: Props) {
+export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry, strokePractice, learningCredentials }: Props) {
   const readingFamily = useReadingFont(cardFontUrl)
   const initialLearned = useMemo(() => learnedFrom(data), [data])
   const [queue, setQueue] = useState<string[]>(() => data.items.map((item) => item.id).filter((id) => !initialLearned[id]))
@@ -124,6 +111,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
   const current = queue.length ? itemById.get(queue[0]) : undefined
   const done = queue.length === 0
   const reviewMode = !active || done
+  const directTranslations = useFlashcardReviewTranslations(data.quiz.question_id, itemSignature, locale, learningCredentials, reviewMode)
 
   async function answer(option: string) {
     if (!current || busy || verdict || !active) return
@@ -185,13 +173,16 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
   const remediation = strokePractice && missedWords.length > 0 && (
     <section aria-label={locale === 'en' ? 'Missed words' : '易錯字重練'}>
       <strong>{locale === 'en' ? 'Practise characters from missed cards' : '易錯字重練'}</strong>
-      <StrokePracticeLinks text={missedWords.join(' ')} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />
+      <StrokePracticeLinks text={missedWords.join(' ')} locale={locale} credentials={learningCredentials ? { ...learningCredentials, questionId: data.quiz.question_id } : undefined} />
     </section>
   )
 
   if (reviewMode) {
     const reviewItem = data.items[reviewIndex]
     const sides = reviewSides(reviewItem, learnedAnswers[reviewItem.id] || '', locale)
+    const directTranslation = directTranslations?.[reviewItem.id]
+    const explanation = directTranslations?.[`definition:${reviewItem.id}`] || sides.explanation
+    const bilingual = typeof directTranslation === 'string' && directTranslation.trim() && directTranslation.trim() !== explanation.trim()
     return (
       <section className="panel participant-question participant-flashcards flashcard-review">
         <div className="flashcard-review-heading">
@@ -202,7 +193,6 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
           <span>{participantText(locale, 'flashcardCardCount', { current: reviewIndex + 1, total: data.items.length })}</span>
         </div>
         <div className="flashcard-review-stage">
-          <FlashcardPictureLink key={sides.word} word={sides.word} locale={locale} hidden={flipped} />
           <button className="flashcard-speaker" type="button" aria-label={`Play pronunciation: ${sides.word}`} onClick={() => void speak(reviewItem)}>
             {speakingId === reviewItem.id ? <SpinnerGap className="spin" size={25} /> : <SpeakerHigh size={25} weight="fill" />}
           </button>
@@ -221,15 +211,21 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
               <em>{participantText(locale, 'flashcardFlipHint')}</em>
             </span>
             <span className="flashcard-review-face flashcard-review-back">
+              {bilingual && (
+                <span className="flashcard-direct-translation">
+                  <small>{participantText(locale, 'flashcardDirectTranslation')}</small>
+                  <strong>{directTranslation}</strong>
+                </span>
+              )}
               <small>{participantText(locale, 'flashcardBack')}</small>
-              <strong>{sides.explanation || '—'}</strong>
+              <strong>{explanation || '—'}</strong>
               <em>{sides.word}</em>
             </span>
             </span>
           </button>
         </div>
         {error && <p className="error">{uiText(error)}</p>}
-        {strokePractice && <StrokePracticeLinks text={sides.word} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />}
+        {strokePractice && <StrokePracticeLinks text={sides.word} locale={locale} credentials={learningCredentials ? { ...learningCredentials, questionId: data.quiz.question_id } : undefined} />}
         {remediation}
         <div className="flashcard-review-controls">
           <button className="ghost-button" disabled={reviewIndex === 0} type="button" onClick={() => { setReviewIndex((value) => value - 1); setFlipped(false) }}>
@@ -255,15 +251,12 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
         <span>{participantText(locale, 'flashcardProgress', { done: cleared.length, total: data.items.length })}</span>
         <div className="flashcard-bar"><span style={{ width: `${(cleared.length / data.items.length) * 100}%` }} /></div>
       </div>
-      <div className="flashcard-prompt-row">
-        {promptIsWord && <FlashcardPictureLink key={promptText} word={promptText} locale={locale} />}
-        <p className={promptIsWord ? `flashcard-prompt is-word${promptReading ? ' has-reading' : ''}` : 'flashcard-prompt'}>
-          {readingFamily && promptReading
-            ? <span style={{ fontFamily: readingFamily }}>{promptReading}</span>
-            : <span className="flashcard-word">{promptText}{promptReading && <small>{promptReading}</small>}</span>}
-        </p>
-      </div>
-      {strokePractice && promptIsWord && <StrokePracticeLinks text={promptText} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />}
+      <p className={promptIsWord ? `flashcard-prompt is-word${promptReading ? ' has-reading' : ''}` : 'flashcard-prompt'}>
+        {readingFamily && promptReading
+          ? <span style={{ fontFamily: readingFamily }}>{promptReading}</span>
+          : <span className="flashcard-word">{promptText}{promptReading && <small>{promptReading}</small>}</span>}
+      </p>
+      {strokePractice && promptIsWord && <StrokePracticeLinks text={promptText} locale={locale} credentials={learningCredentials ? { ...learningCredentials, questionId: data.quiz.question_id } : undefined} />}
       <div className="flashcard-options">
         {current.options.map((option, index) => {
           const chosen = verdict?.chosen === option
@@ -287,7 +280,7 @@ export function ParticipantFlashcards({ active, cardFontUrl, data, locale, onTry
       {remediation}
       {verdict && (
         <div className="flashcard-verdict">
-          {strokePractice && !promptIsWord && <StrokePracticeLinks text={(verdict.correct ? verdict.chosen : verdict.correctAnswer) || ''} locale={locale} credentials={strokeCredentials ? { ...strokeCredentials, questionId: data.quiz.question_id } : undefined} />}
+          {strokePractice && !promptIsWord && <StrokePracticeLinks text={(verdict.correct ? verdict.chosen : verdict.correctAnswer) || ''} locale={locale} credentials={learningCredentials ? { ...learningCredentials, questionId: data.quiz.question_id } : undefined} />}
           <p className={verdict.correct ? 'success' : 'muted'}>{participantText(locale, verdict.correct ? 'flashcardRight' : 'flashcardWrong')}</p>
           <button type="button" onClick={next}>{participantText(locale, verdict.correct ? 'flashcardNext' : 'flashcardTryLater')}<ArrowRight size={17} /></button>
         </div>

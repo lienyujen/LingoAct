@@ -77,18 +77,7 @@ function shuffledIndices(length: number, avoidIdentity = false) {
   return order
 }
 
-const translatedFieldsSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    prompt_text: { type: 'string' },
-    options: { type: 'array', items: { type: 'string' } },
-    pair_prompts: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['prompt_text', 'options', 'pair_prompts'],
-}
-
-function quizGenerationSchema(flashcard: boolean) {
+function quizGenerationSchema() {
   return {
   type: 'object',
   additionalProperties: false,
@@ -117,10 +106,9 @@ function quizGenerationSchema(flashcard: boolean) {
           // is worked out by matching rather than declared — see below.
           target_word: { type: 'string' },
           rubric: { type: 'string' },
-          ...(flashcard ? { translation_en: translatedFieldsSchema } : {}),
         },
         required: [
-          'type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'target_word', 'rubric', ...(flashcard ? ['translation_en'] : []),
+          'type', 'prompt_text', 'options', 'pair_prompts', 'accepted_answers', 'target_word', 'rubric',
         ],
       },
     },
@@ -302,7 +290,7 @@ export async function generateCustomQuiz(input: {
   const guidanceName = requestedLanguage === 'English' ? 'English' : input.guidanceLanguage || requestedLanguage
   const typeInstruction = flashcard
     ? [
-        '這是單字卡練習，不是測驗。每一張卡片都必須是 multiple_choice，題幹只放要辨認的提示，選項放 3 到 4 個候選答案，accepted_answers 只放唯一正確的那一個。卡片之間互相獨立，不要互相參照；重點是能不能立刻反應出來，所以題幹要短，不要考長篇理解。',
+        '每張卡是獨立的 multiple_choice，放 3 個互不重複的選項，accepted_answers 只放唯一正確選項原文。題幹和選項都要短；pair_prompts 留空，rubric 留空。',
         `一張卡片一定分成「詞彙」與「解釋」兩邊。詞彙是要學的那個詞，用 ${requestedLanguage} 寫；解釋是它的意思，用 ${guidanceName} 寫，讓學生看得懂。解釋要說出這個詞是什麼意思，不要只換一個同義詞。`,
         // 「讓學生看得懂」was the only thing pinning the explanation side, and it
         // pins nothing: the level rules elsewhere are written about question
@@ -329,7 +317,9 @@ export async function generateCustomQuiz(input: {
         `已練習的詞彙（不可做新卡的 target_word）：${JSON.stringify(continuation.covered)}`,
       ].join('\n')
     : ''
-  const languageInstruction = requestedLanguage === 'auto'
+  const languageInstruction = flashcard && requestedLanguage !== 'auto'
+    ? `標題使用 ${requestedLanguage}，教師可用任何語言提供素材及出卡方向。詞彙與解釋須符合班級程度。`
+    : requestedLanguage === 'auto'
     ? '題目、選項、答案與評分準則必須使用教師在出題方向中指定的語言；若未指定，使用出題方向與教材的主要語言。'
     : requestedLanguage === 'English'
       ? 'ENGLISH TEACHING: All titles, prompts, options, matching columns, reference answers, rubrics and vocabulary-card definitions must be in English. The teacher may supply source material and directions in any language. Adapt that material into natural English at the specified class level, preserving its meaning. Optional translations are stored separately.'
@@ -338,7 +328,7 @@ export async function generateCustomQuiz(input: {
   const requestPayload = {
     systemInstruction: {
       parts: [{
-        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard ? 'translation_en 僅翻譯字卡的解釋面，詞語面保留原文。' : requestedLanguage === 'English' ? '' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} ${continuationInstruction} 選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
+        text: `你是 LingoAct 的測驗設計助理。請根據教師提供的教材和出題方向建立適合課堂即時作答的測驗。${languageInstruction} ${flashcard || requestedLanguage === 'English' ? '' : '題目、選項與配對內容均只用教學原文，不得翻譯。'}${countInstruction}${typeInstruction} ${continuationInstruction} ${flashcard ? '' : '選擇題須有 2 至 6 個互不重複的選項，accepted_answers 只能包含正確選項原文。填充題請在題幹使用 ____ 標示作答處，accepted_answers 提供可接受答案與常見同義答案。簡答題提供參考答案於 accepted_answers，並在 rubric 寫出具體評分準則。排序題請把要重組的片段依「正確順序」放進 options（3 至 8 段，可以是詞語、句子或段落），accepted_answers 留空即可，系統會自動打亂後再呈現給學生；題幹寫清楚要學生依什麼邏輯排列。配對題請把左欄（要被配對的項目，3 至 6 個，例如生詞、圖說、人物）依序放進 pair_prompts，並把每個左欄項目對應的正確答案「依相同順序」放進 options；系統會打亂 options 後呈現。左右兩欄都不得重複，且每個右欄項目只對應一個左欄項目。'} 不得捏造教材無法支持的專有事實；若教材資訊有限，應依教師的出題方向設計可合理回答的理解題。`,
       }],
     },
     contents: [{
@@ -367,7 +357,7 @@ ${input.sourceText}` }] : []),
     // different, restricted schema dialect and rejects JSON Schema keywords.
     const generationConfig = {
       thinkingConfig: geminiThinkingConfig('realtime'),
-      responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: quizGenerationSchema(flashcard) } },
+      responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: quizGenerationSchema() } },
     }
     const payload = complaint
       ? {
@@ -546,7 +536,6 @@ ${input.sourceText}` }] : []),
       if (options.length !== pairPrompts.length) throw new Error(`Item ${index + 1} has mismatched columns.`)
     }
     if (type === 'fill_blank' && !acceptedAnswers.length) throw new Error(`Item ${index + 1} needs an accepted answer.`)
-    const rawTranslations = flashcard ? { en: item.translation_en } : {}
     // Every type with options gets them in a different order from the one the
     // model produced; what differs is why.
     //
@@ -557,9 +546,7 @@ ${input.sourceText}` }] : []),
     // answer on screen — and it has to be moved. The model puts the right
     // answer first almost every time, which turned a 單字卡 deck into "tap the
     // top one" and taught the class nothing about the words.
-    //
-    // The permutation is applied to the translation as well, or an English
-    // reader would be reading options that no longer line up with the Chinese.
+
     const withOptions = type === 'multiple_choice' || type === 'ordering' || type === 'matching'
     const permutation = withOptions && options.length > 1
       ? shuffledIndices(options.length, type !== 'multiple_choice')
@@ -567,21 +554,6 @@ ${input.sourceText}` }] : []),
     const shownOptions = withOptions
       ? (permutation ? permutation.map((from) => options[from]) : options)
       : []
-    const translations = Object.fromEntries(Object.entries(rawTranslations).map(([locale, raw]) => {
-      const translation = (raw || {}) as Record<string, unknown>
-      const translatedPrompt = typeof translation.prompt_text === 'string' ? translation.prompt_text.trim().slice(0, 2000) : ''
-      const translatedOptions = cleanStrings(translation.options, 8)
-      const translatedPairPrompts = cleanStrings(translation.pair_prompts, 6)
-      const alignedOptions = translatedOptions.length === options.length ? translatedOptions : options
-      return [locale, {
-        prompt_text: translatedPrompt || promptText,
-        options: withOptions
-          ? (permutation ? permutation.map((from) => alignedOptions[from]) : alignedOptions)
-          : [],
-        pair_prompts: translatedPairPrompts.length === pairPrompts.length ? translatedPairPrompts : pairPrompts,
-      }]
-    }))
-
     return {
       id: crypto.randomUUID(),
       position: index + 1,
@@ -593,7 +565,7 @@ ${input.sourceText}` }] : []),
       options: shownOptions,
       pair_prompts: pairPrompts,
       points: basePoints + (index < remainder ? 1 : 0),
-      translations,
+      translations: {},
       // The correct sequence — for 配對, the right-hand item for each left-hand
       // one in left-hand order — lives in the key table, which students cannot read.
       accepted_answers: type === 'ordering' || type === 'matching' ? options : acceptedAnswers,

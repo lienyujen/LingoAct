@@ -3,7 +3,7 @@ import { callAiJson, corsHeaders, errorDetail, jsonResponse } from '../_shared/a
 import { getAdminClient, presenterAuthorized } from '../_shared/supabase.ts'
 import { applyRegionalPinyin, applyRegionalWordPinyin, pinyinToBopomofo, regionalPinyinOverrides, regionalPronunciationInstruction, unavailableRegionalBopomofoReadings } from '../_shared/mandarin-pronunciation.ts'
 import type { MandarinAccent } from '../_shared/mandarin-pronunciation.ts'
-import { orthographyRules, settleWords } from '../_shared/reading.ts'
+import { settleWords } from '../_shared/reading.ts'
 import { HSK_PRONUNCIATION, applyHskWordPinyin, hskPinyinInstruction } from '../_shared/hsk.ts'
 import { JAPANESE_READINGS, settleJapaneseWords } from '../_shared/japanese.ts'
 
@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
     // Defaults to characters, which is what every caller wanted before 朗讀 and
     // 聽力 began spelling their readings as words.
     const granularity = input.granularity === 'words' ? 'words' : 'characters'
+    const headwords = input.headwords === true
     let accent: MandarinAccent = ['standard_guoyu', 'putonghua', 'taiwanese'].includes(input.accent)
       ? input.accent
       : 'standard_guoyu'
@@ -105,12 +106,8 @@ Deno.serve(async (req) => {
 
     const characters = [...text]
 
-    // Words for prose a learner reads, characters for a flashcard. Asking for
-    // both in one response is what broke 標音 on a full-length article: it
-    // roughly doubles the output, and this runs on the realtime profile with a
-    // short interaction budget, so the call timed out and the teacher was told
-    // 標音失敗 about an article that had already gone out. Each caller needs
-    // one of the two anyway.
+    // A card line is an independent headword or phrase, with dictionary
+    // capitalization. Passages use sentence capitalization instead.
     if (mode === 'pinyin' && granularity === 'words') {
       const parts = await annotateReadingChunks(text, async (chunk, context) => {
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -121,8 +118,10 @@ Deno.serve(async (req) => {
               attempt ? 'The previous segmentation did not reassemble to text. Copy every character of text exactly, including punctuation, and return ALL words in order.' : '',
               hsk ? hskPinyinInstruction(chunk) : regionalPronunciationInstruction(chunk, accent),
               'Use word-based Hanyu Pinyin with tone marks. Capitalize proper names. Keep punctuation as separate entries with empty pinyin. Use context for polyphonic characters.',
+              headwords ? 'These are independent flashcard headwords, one per line. Never join a span across a newline. Write a standalone common word in lowercase, e.g. 學校 → xuéxiào, 檔案 → dàng\'àn; capitalize actual proper names. Join syllables within a word, separate genuine phrases by word, and insert an apostrophe before a following a/o/e syllable within a word. Use GB/T 16159–2012 spelling with original dictionary tones (including yī and bù). Separate verbs from their objects (kàn diànyǐng), numbers from classifiers (sān gè), and sentence-final particles (ma).' : '',
             ].join('\n'),
-            { text: chunk, ...context, instruction: 'Annotate only text. Use neighboring context for polyphonic readings and sentence-start capitalization; do not include context in the output.' },
+            headwords ? { text: chunk }
+              : { text: chunk, ...context, instruction: 'Annotate only text. Use neighboring context for polyphonic readings and sentence-start capitalization; do not include context in the output.' },
             wordSchema,
             null,
             'deep',
@@ -131,12 +130,12 @@ Deno.serve(async (req) => {
           )
           if (result.status !== 'success') throw new Error(`${hsk ? 'AI 标音失败' : 'AI 標音失敗'}：${errorDetail(result.output, hsk ? 'AI 暂时没有返回结果，请重试。' : 'AI 暫時沒有返回結果，請重試。')}`)
           const words = settleWords((result.output as { words?: unknown })?.words, chunk, false)
-          if (words.length) return words
+          if (words.length && (!headwords || words.every(word => !word.pinyin || !word.text.includes('\n')))) return words
         }
         throw new Error(hsk ? '拼音分词与原文不一致，请重试。' : '拼音分詞與原文不一致，請重試。')
-      })
-      const segmented = settleWords(parts.flat(), text)
-      const words = hsk ? applyHskWordPinyin(segmented) : applyRegionalWordPinyin(text, segmented, accent)
+      }, headwords)
+      const segmented = settleWords(parts.flat(), text, !headwords)
+      const words = hsk ? applyHskWordPinyin(segmented) : applyRegionalWordPinyin(text, segmented, accent, !headwords)
       if (!words.length) throw new Error('AI 標音的分詞對不上原文。')
       return jsonResponse({ mode, annotationText: '', words })
     }

@@ -38,6 +38,7 @@ type Props = {
   // is locked here: history only holds questions that are over, and the words
   // and grammar notes are the entire reason to return to a passage.
   passages: Record<string, ReadingPassage>
+  flashcardStrokePractice?: boolean
   strokePractice?: boolean
   unlimitedListening?: boolean
 }
@@ -77,6 +78,7 @@ export function ParticipantQuestionHistory({ analyses,
   screenshots,
   passages,
   strokePractice = false,
+  flashcardStrokePractice = strokePractice,
   unlimitedListening = false,
 }: Props) {
   const history = useMemo(() => questions.filter((item) => item.status !== 'draft' && item.id !== activeQuestionId).slice().reverse(), [activeQuestionId, questions])
@@ -247,8 +249,8 @@ export function ParticipantQuestionHistory({ analyses,
                     )}
                     {question.type === 'custom_quiz' && quiz?.quiz.requested_type === 'flashcard' ? (
                       <ParticipantFlashcards
-                        strokePractice={strokePractice}
-                        strokeCredentials={teachingCredentials}
+                        strokePractice={flashcardStrokePractice}
+                        learningCredentials={teachingCredentials}
                         active={false}
                         cardFontUrl={question.card_font_url}
                         data={quiz}

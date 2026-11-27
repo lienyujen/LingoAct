@@ -1,3 +1,4 @@
+import { usesTraditionalFlashcardHandwriting } from '../lib/hanStrokePractice'
 import { readingVocabularyContext } from '../../supabase/functions/_shared/chinese-word-matching.ts'
 import { classroomChanges, createClassroomReconnect } from '../lib/classroomBroadcast'
 import { classroomRetryDelay, createClassroomReadCache } from '../lib/classroomReadCache'
@@ -87,6 +88,7 @@ export function ParticipantPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [searchParams] = useSearchParams()
   const teachingLanguage = session?.teaching_language || (searchParams.get('b') === 'guoyu' ? 'guoyu' : undefined)
+  const flashcardStrokePractice = usesTraditionalFlashcardHandwriting(teachingLanguage)
   const strokePractice = teachingLanguage === 'guoyu' && session?.level_framework === 'guoyu108' && /^g[1-6]$/.test(session.level_code || '')
   useClassChineseFont(session)
   const [question, setQuestion] = useState<Question | null>(null)
@@ -287,7 +289,7 @@ export function ParticipantPage() {
 
       if (nextQuestion?.type === 'custom_quiz' && participantToken) {
         const { data: loadedQuiz, error: quizError } = await supabase.functions.invoke('participant-action', {
-          body: { action: 'get_custom_quiz', sessionId, participantId, participantToken, questionId: nextQuestion.id, locale },
+          body: { action: 'get_custom_quiz', sessionId, participantId, participantToken, questionId: nextQuestion.id, locale, deferFlashcardTranslations: true },
         })
         if (requestId !== loadSequence.current) return
         if (quizError) {
@@ -508,7 +510,7 @@ export function ParticipantPage() {
     try {
       const action = historyQuestion.type === 'custom_quiz' ? 'get_custom_quiz' : 'get_recording_result'
       const { data, error: detailError } = await requireSupabase().functions.invoke('participant-action', {
-        body: { action, sessionId, participantId, participantToken, questionId: historyQuestion.id, locale },
+        body: { action, sessionId, participantId, participantToken, questionId: historyQuestion.id, locale, deferFlashcardTranslations: true },
       })
       if (detailError) throw detailError
       if (localeRef.current !== locale) return
@@ -1061,6 +1063,7 @@ export function ParticipantPage() {
         {/* Files stay downloadable after class until the presenter deletes the session. */}
         <ParticipantSharedFiles locale={locale} sessionId={sessionId} live={false} />
         <ParticipantQuestionHistory
+          flashcardStrokePractice={flashcardStrokePractice}
           strokePractice={strokePractice}
           analyses={questionAnalyses}
           teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
@@ -1274,7 +1277,7 @@ export function ParticipantPage() {
           and a stored title is not. */}
       {question?.teaching_mode === 'pair' || question?.teaching_mode === 'reading_evidence' || question?.type === 'board' ? null : question?.type === 'custom_quiz' ? (quizData?.quiz?.question_id === question.id ? (
         quizData.quiz.requested_type === 'flashcard'
-          ? <ParticipantFlashcards strokePractice={strokePractice} strokeCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
+          ? <ParticipantFlashcards strokePractice={flashcardStrokePractice} learningCredentials={participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} active={question.status === 'active'} cardFontUrl={question?.card_font_url} data={quizData} locale={locale} onTry={submitFlashcardTry} />
           : <ParticipantCustomQuiz strokeCredentials={strokePractice && participantId && participantToken ? { sessionId, participantId, participantToken } : undefined} key={question.id} data={quizData} busy={quizBusy} locale={locale} onAskCoach={askWritingCoach} onRetry={retryCustomQuiz} onSubmit={submitCustomQuiz} />
       ) : (
         <section className="panel participant-question quiz-loading-panel" aria-live="polite">
@@ -1309,8 +1312,9 @@ export function ParticipantPage() {
         />
       )}
       <ParticipantQuestionHistory
-          strokePractice={strokePractice}
-          analyses={questionAnalyses}
+        flashcardStrokePractice={flashcardStrokePractice}
+        strokePractice={strokePractice}
+        analyses={questionAnalyses}
         teachingCredentials={participant && participantToken ? { sessionId, participantId: participant.id, participantToken } : undefined}
         activeQuestionId={question?.id}
         answers={historyAnswers}

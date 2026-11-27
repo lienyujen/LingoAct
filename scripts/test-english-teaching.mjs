@@ -495,6 +495,7 @@ test('continuing vocabulary cards keeps the original direction and rejects repea
     assert.ok(request.contents[0].parts.some(part => part.text.includes(direction)))
     assert.ok(request.contents[0].parts.some(part => part.text.includes(sourceText)))
     assert.match(request.systemInstruction.parts[0].text, /題幹只能是詞彙/)
+    assert.doesNotMatch(init.body, /translation_en/)
     const items = calls++ === 0
       ? [card('「秒針」', '秒針', ['計秒的指針', '轉動的零件', '手指'], '計秒的指針'),
          card('指針', '顯示數值的細針', ['指針', '機芯', '齒輪'], '指針'),

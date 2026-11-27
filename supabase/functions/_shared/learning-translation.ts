@@ -91,7 +91,14 @@ export async function cachedLearningTranslation(
 ): Promise<{ values: Record<string, string>; status?: 'pending' | 'failed' }> {
   if (!demandTranslationLocales.has(locale) || !Object.keys(sources).length) return { values: {} }
   const text = JSON.stringify(Object.entries(sources).sort(([a], [b]) => a.localeCompare(b)))
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return cachedLearningValues(db, sessionId, locale, text, () => translateLearningTexts(sources, locale))
+}
+
+export async function cachedLearningValues(
+  db: ReturnType<typeof getAdminClient>, sessionId: string, locale: string, source: string,
+  generate: () => Promise<Record<string, string>>,
+): Promise<{ values: Record<string, string>; status?: 'pending' | 'failed' }> {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))
   const hash = [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('')
   const key = { session_id: sessionId, source_hash: hash, locale }
   const query = () => db.from('learning_translations').select('*').match(key).maybeSingle()
@@ -109,7 +116,7 @@ export async function cachedLearningTranslation(
   if (claimed.error && claimed.error.code !== '23505') throw claimed.error
   if (!claimed.data) return { values: {}, status: 'pending' }
   try {
-    const values = await translateLearningTexts(sources, locale)
+    const values = await generate()
     const { error } = await db.from('learning_translations').update({ status: 'ready', result_json: values })
       .match(key).eq('claim_token', token)
     if (error) throw error

@@ -70,3 +70,7 @@ export function checkHanWriting(ink: Ink, reference: Ink) {
   }
   return { status: 'match' } as const
 }
+
+export function usesTraditionalFlashcardHandwriting(track: string | null | undefined) {
+  return track === 'huayu' || track === 'zh-tw' || track === 'guoyu'
+}

@@ -1,5 +1,6 @@
+import { flashcardReviewTerm, translateFlashcardReview } from '../_shared/flashcard-review.ts'
 import { hasRecordingTranscript, inspectRecording } from '../_shared/recording-validation.ts'
-import { checkHanWriting, hanCharacters } from '../_shared/han-stroke-match.ts'
+import { checkHanWriting, hanCharacters, usesTraditionalFlashcardHandwriting } from '../_shared/han-stroke-match.ts'
 import type { Ink } from '../_shared/han-stroke-match.ts'
 import { extractMoeStrokeXml, parseMoeStrokeTracks } from '../_shared/moe-stroke-xml.ts'
 import { readingEvidenceSentences } from '../_shared/reading-evidence.ts'
@@ -133,8 +134,10 @@ Deno.serve(async (req) => {
       const { data: room, error } = await supabase.from('sessions').select('teaching_language, level_framework, level_code')
         .eq('id', sessionId).maybeSingle()
       if (error) throw error
-      if (room?.teaching_language !== 'guoyu' || room.level_framework !== 'guoyu108' || !/^g[1-6]$/.test(room.level_code || '')) {
-        return jsonResponse({ message: '這項練習適用國小國語場次。' }, 403)
+      const elementaryGuoyu = room?.teaching_language === 'guoyu' && room.level_framework === 'guoyu108' && /^g[1-6]$/.test(room.level_code || '')
+      const traditionalDeck = action === 'submit_handwriting_check' && usesTraditionalFlashcardHandwriting(room?.teaching_language)
+      if (!elementaryGuoyu && !traditionalDeck) {
+        return jsonResponse({ message: '這項練習適用正體字詞卡及國小國語場次。' }, 403)
       }
       const { questionId, checkId } = input
       let ink: Ink = []
@@ -159,7 +162,10 @@ Deno.serve(async (req) => {
         ])
         if (question.error || passage.error || quiz.error) throw question.error || passage.error || quiz.error
         if (!question.data || question.data.status === 'draft') return jsonResponse({ message: '找不到已派送的手寫題目。' }, 404)
-        const words: string[] = (passage.data?.vocabulary || []).map((entry: { word: string }) => entry.word)
+        if (!elementaryGuoyu && quiz.data?.requested_type !== 'flashcard') {
+          return jsonResponse({ message: '這項練習適用正體字詞卡。' }, 403)
+        }
+        const words: string[] = (elementaryGuoyu ? passage.data?.vocabulary || [] : []).map((entry: { word: string }) => entry.word)
         if (quiz.data?.requested_type === 'flashcard') {
           const { data: items, error: itemError } = await supabase.from('quiz_items')
             .select('prompt_text,prompt_is_word,options').eq('quiz_id', quiz.data.id)
@@ -303,7 +309,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true })
     }
 
-    if (['get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try', 'ask_writing_coach'].includes(action)) {
+    if (['get_flashcard_word_translations', 'get_custom_quiz', 'submit_custom_quiz', 'retry_custom_quiz_grading', 'submit_flashcard_try', 'ask_writing_coach'].includes(action)) {
       const participant = await verifyParticipant(supabase, sessionId, participantId, participantToken)
       if (!participant) return jsonResponse({ message: '學員權限失效，請重新掃描 QR Code 加入場次。' }, 403)
       const questionId = typeof input.questionId === 'string' ? input.questionId : ''
@@ -315,6 +321,36 @@ Deno.serve(async (req) => {
       const { data: quiz, error: quizError } = await supabase.from('quizzes').select('*')
         .eq('question_id', questionId).eq('session_id', sessionId).maybeSingle()
       if (quizError) throw quizError
+
+      if (action === 'get_flashcard_word_translations') {
+        if (quiz?.requested_type !== 'flashcard' || question.status === 'draft') return jsonResponse({ values: {} })
+        const [{ data: cards, error: cardError }, { data: classroom, error: classError }] = await Promise.all([
+          supabase.from('quiz_items').select('id, prompt_text, prompt_is_word').eq('quiz_id', quiz.id).order('position'),
+          supabase.from('sessions').select('teaching_language, guidance_language').eq('id', sessionId).maybeSingle(),
+        ])
+        if (cardError || classError) throw cardError || classError
+        if (!cards?.length) return jsonResponse({ values: {} })
+        if (question.status === 'active') {
+          const { data: attempt, error: attemptError } = await supabase.from('quiz_attempts').select('id')
+            .eq('quiz_id', quiz.id).eq('participant_id', participantId).maybeSingle()
+          if (attemptError) throw attemptError
+          if (!attempt) return jsonResponse({ values: {} })
+          const { count, error } = await supabase.from('quiz_item_answers').select('item_id', { count: 'exact', head: true })
+            .eq('attempt_id', attempt.id).in('item_id', cards.map(card => card.id)).gt('score', 0)
+          if (error) throw error
+          if (count !== cards.length) return jsonResponse({ values: {} })
+        }
+        const { data: keys, error: keyError } = await supabase.from('quiz_item_keys').select('item_id, accepted_answers')
+          .in('item_id', cards.map(card => card.id))
+        if (keyError) throw keyError
+        const answers = new Map((keys || []).map(key => [key.item_id, key.accepted_answers?.[0] as string | undefined]))
+        const terms = cards.flatMap(card => {
+          const answer = answers.get(card.id)
+          return answer ? [flashcardReviewTerm(card, answer)] : []
+        })
+        const locale = guidanceLanguages.has(input.locale) ? String(input.locale) : 'en'
+        return jsonResponse(await translateFlashcardReview(supabase, sessionId, locale, classroom?.teaching_language, terms, classroom?.guidance_language))
+      }
 
       if (action === 'get_custom_quiz') {
         if (!quiz && quizGenerationFailed(question.title)) {
@@ -343,7 +379,7 @@ Deno.serve(async (req) => {
         }
         const requestedLocale = guidanceLanguages.has(input.locale) ? input.locale as string : ''
         const contentLocale = requestedLocale === 'zh-TW' ? 'zh_tw' : requestedLocale
-        if (quiz.requested_type === 'flashcard' && contentLocale && items.some((item) => !item.translations?.[contentLocale])) {
+        if (input.deferFlashcardTranslations !== true && quiz.requested_type === 'flashcard' && contentLocale && items.some((item) => !item.translations?.[contentLocale])) {
           try {
             const translated = await translateFlashcardItems(items.map((item) => ({
               id: item.id,

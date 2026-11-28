@@ -1,3 +1,4 @@
+import { MAX_RECORDING_SECONDS, recordingLimitMs } from '../_shared/recording-limits.ts'
 import { isWrittenAssessment } from '../_shared/written-assessment.ts'
 import { flashcardReviewTerm, translateFlashcardReview } from '../_shared/flashcard-review.ts'
 import { hasRecordingTranscript, inspectRecording } from '../_shared/recording-validation.ts'
@@ -1145,7 +1146,7 @@ Deno.serve(async (req) => {
 
       const { data: question, error: questionError } = await supabase
         .from('questions')
-        .select('id, session_id, screenshot_id, listening_clip_id, type, status, prompt_text, learning_focus')
+        .select('id, session_id, screenshot_id, listening_clip_id, type, status, prompt_text, learning_focus, answer_seconds')
         .eq('id', questionId)
         .eq('session_id', sessionId)
         .maybeSingle()
@@ -1237,7 +1238,8 @@ Deno.serve(async (req) => {
       const storagePath = typeof input.storagePath === 'string' ? input.storagePath : ''
       const durationMs = Math.round(Number(input.durationMs))
       const expectedPath = `sessions/${sessionId}/recordings/${questionId}/${participantId}/${recordingId}.wav`
-      if (!validUuid(recordingId) || storagePath !== expectedPath || durationMs < 250 || durationMs > 180_000) {
+      const maxDurationMs = Math.min(MAX_RECORDING_SECONDS * 1000, recordingLimitMs(question.answer_seconds) + 1_000)
+      if (!Number.isFinite(durationMs) || !validUuid(recordingId) || storagePath !== expectedPath || durationMs < 250 || durationMs > maxDurationMs) {
         return jsonResponse({ message: '錄音資料格式不正確。' }, 400)
       }
       const { data: audioBlob, error: downloadError } = await supabase.storage.from('lingoact-recordings').download(storagePath)
@@ -1249,7 +1251,11 @@ Deno.serve(async (req) => {
 
       const audioBuffer = await audioBlob.arrayBuffer()
       const audio = inspectRecording(audioBuffer)
-      if (!audio?.audible || audio.durationMs > 180_000) {
+      if (audio && audio.durationMs > maxDurationMs) {
+        if (existingTake?.id !== recordingId && existingTake?.previous_attempt?.id !== recordingId) await removeRecording(storagePath)
+        return jsonResponse({ message: simplifiedRecording ? '录音超过本题的作答时间。' : '錄音超過本題的作答時間。' }, 422)
+      }
+      if (!audio?.audible) {
         if (existingTake?.id !== recordingId && existingTake?.previous_attempt?.id !== recordingId) await removeRecording(storagePath)
         return jsonResponse({ message: simplifiedRecording
           ? '录音中没有可听见的声音，或文件不完整。请检查麦克风后重新录制。'

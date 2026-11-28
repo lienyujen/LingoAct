@@ -1,3 +1,4 @@
+import { MAX_RECORDING_SECONDS } from '../../supabase/functions/_shared/recording-limits'
 import { asksForTranslation, splitWrittenAssessmentPrompt } from '../../supabase/functions/_shared/written-assessment'
 import { OriginalPromptOption } from './OriginalPromptOption'
 import { uiText } from '../lib/uiText'
@@ -194,6 +195,8 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
   const translation = type === 'short_answer' && asksForTranslation(writtenPrompt.prompt)
   const gradedWritten = type === 'short_answer' && (gradeWrittenAnswer || translation)
   const timed = TIMED_TYPES.includes(type)
+  const spoken = SPOKEN_TYPES.includes(type)
+  const selectedAnswerSeconds = !spoken && answerSeconds === MAX_RECORDING_SECONDS ? 180 : answerSeconds
 
   if (!open) return null
 
@@ -240,7 +243,7 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             // Timing a type that cannot be timed would store a limit nothing
             // reads, so the fields are dropped rather than merely hidden.
             prepareSeconds: timed && SPOKEN_TYPES.includes(type) ? prepareSeconds : null,
-            answerSeconds: timed ? answerSeconds : null,
+            answerSeconds: timed ? selectedAnswerSeconds : null,
             maxPins: type === 'hotspot' ? maxPins : null,
           })
         }}
@@ -471,8 +474,8 @@ export function QuestionEditor({ preset, initialDraft, error, open, previewUrl, 
             <TimingRow
               label={t('answerTime')}
               offLabel={t('noTimeLimit')}
-              presets={ANSWER_PRESETS}
-              value={answerSeconds}
+              presets={spoken ? [...ANSWER_PRESETS, MAX_RECORDING_SECONDS] : ANSWER_PRESETS}
+              value={selectedAnswerSeconds}
               onChange={setAnswerSeconds}
             />
           </details>

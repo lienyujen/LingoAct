@@ -134,7 +134,7 @@ create table if not exists public.audio_responses (
   participant_name text not null,
   storage_path text not null unique,
   mime_type text not null,
-  duration_ms integer not null check (duration_ms between 250 and 180000),
+  duration_ms integer not null check (duration_ms between 250 and 300000),
   file_size integer not null check (file_size between 1 and 10485760),
   analysis_status text not null default 'pending' check (analysis_status in ('pending', 'success', 'failed')),
   detected_language text null,
@@ -20419,6 +20419,11 @@ begin
   end loop;
 end;
 $$;
+
+-- Timed oral responses and read-aloud may now run for five minutes.
+alter table public.audio_responses drop constraint if exists audio_responses_duration_ms_check;
+alter table public.audio_responses add constraint audio_responses_duration_ms_check
+  check (duration_ms between 250 and 300000);
 
 -- Keep the first read-aloud take when a learner submits a second one.
 alter table public.audio_responses add column if not exists attempt_number integer not null default 1 check (attempt_number between 1 and 2);

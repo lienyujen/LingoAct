@@ -5,6 +5,7 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import { screenDispatchQuestion, supportingScreenQuestion } from '../src/lib/screenDispatch.ts'
 import { readingVocabularyContext } from '../supabase/functions/_shared/chinese-word-matching.ts'
+import { MAX_RECORDING_SECONDS } from '../supabase/functions/_shared/recording-limits.ts'
 import { adaptStudentPrompt } from '../supabase/functions/_shared/student-prompt.ts'
 import { asksForTranslation, splitWrittenAssessmentPrompt } from '../supabase/functions/_shared/written-assessment.ts'
 
@@ -67,7 +68,7 @@ test('the real create_question handler keeps current tasks and boards alive for 
       action: 'create_question', sessionId: 'class', supabase: database(rows),
       adaptStudentPrompt, asksForTranslation, splitWrittenAssessmentPrompt, sessionContext: async () => rows.sessions[0], questionTypes: new Set(['send_screen', 'short_answer', 'board']),
       validUuid: () => true, normalizedOptions: () => [], timedTypes: new Set(), spokenTypes: new Set(), boardKinds: new Set(['text']),
-      timingSeconds: () => null, storedObject: async () => ({ ok: true }), sessionTrack: async () => 'mandarin',
+      timingSeconds: () => null, MAX_RECORDING_SECONDS, storedObject: async () => ({ ok: true }), sessionTrack: async () => 'mandarin',
       activityTitle: (_, __, title) => title, jsonResponse: (data, status = 200) => ({ data, status }),
     })
     const result = await vm.runInContext(js(`${stop}\n(async()=>{${action}})()`), context)

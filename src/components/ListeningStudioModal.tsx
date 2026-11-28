@@ -1,3 +1,4 @@
+import { MAX_RECORDING_SECONDS } from '../../supabase/functions/_shared/recording-limits'
 import { accentChoices, speechAccent } from '../lib/speechAccent'
 import { uiText } from '../lib/uiText'
 import { useEffect, useRef, useState } from 'react'
@@ -618,7 +619,7 @@ export function ListeningStudioModal({
               {clip && (
                 <div className="ls-timing">
                   <TimingRow label={t('prepareTime')} offLabel={t('noPrepare')} presets={[null, 10, 20, 30]} value={prepareSeconds} onChange={setPrepareSeconds} />
-                  <TimingRow label={t('readAloudTime')} offLabel={t('noTimeLimit')} presets={[null, 30, 60, 90]} value={answerSeconds} onChange={setAnswerSeconds} />
+                  <TimingRow label={t('readAloudTime')} offLabel={t('noTimeLimit')} presets={[null, 30, 60, 90, 180, MAX_RECORDING_SECONDS]} value={answerSeconds} onChange={setAnswerSeconds} />
                   <p className="ls-note">{t('listeningTimingNote')}</p>
                 </div>
               )}

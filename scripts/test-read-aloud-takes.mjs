@@ -7,12 +7,13 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { classroomMessage, activityNotice } from '../src/lib/classroomMessages.ts'
 import { readingQuizFailureMessage } from '../supabase/functions/_shared/reading-failure.ts'
+import { recordingLimitMs } from '../supabase/functions/_shared/recording-limits.ts'
 import { recordingForClient } from '../supabase/functions/_shared/recording-results.ts'
 const require=createRequire(import.meta.url)
 function component(file,dependencies){const source=readFileSync(file,'utf8'),exports={};new Function('require','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText)(name=>dependencies[name]||require(name),exports);return exports}
 const Player=()=>null
 const comparison=component('src/components/RecordingComparison.tsx',{'../lib/classroomMessages':{classroomMessage},'./RecordingPlayer':{RecordingPlayer:Player}}).RecordingComparison
-const recorder=component('src/components/AudioRecorder.tsx',{'@phosphor-icons/react':{ArrowCounterClockwise:()=>null,Microphone:()=>null,StopCircle:()=>null},'./RecordingComparison':{RecordingComparison:comparison},'../lib/classroomMessages':{classroomMessage},'../lib/uiText':{uiText:x=>x},'./RecordingPlayer':{RecordingPlayer:Player},'../lib/audio':{},'../lib/participantI18n':{participantText:(_l,key)=>key},'../lib/localizedContent':{localizedFields:()=>null}}).AudioRecorder
+const recorder=component('src/components/AudioRecorder.tsx',{'../../supabase/functions/_shared/recording-limits':{recordingLimitMs},'@phosphor-icons/react':{ArrowCounterClockwise:()=>null,Microphone:()=>null,StopCircle:()=>null},'./RecordingComparison':{RecordingComparison:comparison},'../lib/classroomMessages':{classroomMessage},'../lib/uiText':{uiText:x=>x},'./RecordingPlayer':{RecordingPlayer:Player},'../lib/audio':{},'../lib/participantI18n':{participantText:(_l,key)=>key},'../lib/localizedContent':{localizedFields:()=>null}}).AudioRecorder
 const analysis={score:82,summary:'发音清楚。',strengths:['声调正确。'],improvements:['注意语速。'],transcript:'你好。',detected_language:'zh',relevance:'切题',clarity:'清楚',completeness:'完整'}
 const response={id:'first',analysis_status:'success',analysis_json:analysis,score:82,attempt_number:1,duration_ms:2000}
 const render=(type='pronunciation',status='active',value=response)=>renderToStaticMarkup(createElement(recorder,{busy:false,question:{id:'q',type,status},response:value,onSubmit:async()=>{},onDiscard:async()=>{},locale:'zh-CN'}))

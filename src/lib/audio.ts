@@ -18,7 +18,7 @@ function downsample(channel: Float32Array, sourceRate: number) {
   return result
 }
 
-export async function recordingToWav(recording: Blob) {
+export async function recordingToWav(recording: Blob, maxDurationMs?: number) {
   const context = new AudioContext()
   try {
     const decoded = await context.decodeAudioData(await recording.arrayBuffer())
@@ -27,7 +27,10 @@ export async function recordingToWav(recording: Blob) {
       const channel = decoded.getChannelData(channelIndex)
       for (let index = 0; index < channel.length; index += 1) mono[index] += channel[index] / decoded.numberOfChannels
     }
-    const samples = downsample(mono, decoded.sampleRate)
+    const downsampled = downsample(mono, decoded.sampleRate)
+    // MediaRecorder can deliver a last chunk just past the countdown.
+    const samples = maxDurationMs === undefined ? downsampled
+      : downsampled.subarray(0, Math.floor(maxDurationMs * TARGET_SAMPLE_RATE / 1000))
     const buffer = new ArrayBuffer(44 + samples.length * 2)
     const view = new DataView(buffer)
     writeAscii(view, 0, 'RIFF')

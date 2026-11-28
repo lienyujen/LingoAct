@@ -1,3 +1,4 @@
+import { MAX_RECORDING_SECONDS } from '../_shared/recording-limits.ts'
 import { asksForTranslation, splitWrittenAssessmentPrompt } from '../_shared/written-assessment.ts'
 import { readingVocabularyContext } from '../_shared/chinese-word-matching.ts'
 import { adaptStudentPrompt } from '../_shared/student-prompt.ts'
@@ -2032,7 +2033,7 @@ Deno.serve(async (req) => {
       const audioOnly = input.mode === 'audio'
 
       const prepareSeconds = readAloud ? timingSeconds(input.prepareSeconds, 300) : null
-      const answerSeconds = readAloud ? timingSeconds(input.answerSeconds, 600) : null
+      const answerSeconds = readAloud ? timingSeconds(input.answerSeconds, MAX_RECORDING_SECONDS) : null
       if (prepareSeconds === undefined || answerSeconds === undefined) {
         return jsonResponse({ message: '時間設定不正確。' }, 400)
       }
@@ -2422,7 +2423,7 @@ Deno.serve(async (req) => {
       // has a clock at all; storing either on any other type would leave a
       // limit behind that nothing reads.
       const prepareSeconds = timedTypes.has(type) && spokenTypes.has(type) ? timingSeconds(input.prepareSeconds, 300) : null
-      const answerSeconds = timedTypes.has(type) ? timingSeconds(input.answerSeconds, 600) : null
+      const answerSeconds = timedTypes.has(type) ? timingSeconds(input.answerSeconds, spokenTypes.has(type) ? MAX_RECORDING_SECONDS : 600) : null
       // How many points one student may drop. Only 圖上點選 reads it, so every
       // other type stores null rather than a number nothing will ever honour.
       const maxPins = type === 'hotspot' ? Math.min(10, Math.max(1, Number(input.maxPins) || 1)) : null

@@ -1,3 +1,4 @@
+import { MAX_RECORDING_SECONDS } from '../../supabase/functions/_shared/recording-limits'
 import { OriginalPromptOption } from './OriginalPromptOption'
 import type { Question } from '../types'
 import { uiText } from '../lib/uiText'
@@ -80,6 +81,7 @@ export function PictureStudioModal({
   const [promptTouched, setPromptTouched] = useState(false)
   const [prepareSeconds, setPrepareSeconds] = useState<number | null>(null)
   const [answerSeconds, setAnswerSeconds] = useState<number | null>(null)
+  const selectedAnswerSeconds = mode === 'written' && answerSeconds === MAX_RECORDING_SECONDS ? 180 : answerSeconds
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
@@ -198,7 +200,7 @@ export function PictureStudioModal({
         promptSuffix,
         useOriginalPrompt,
         prepareSeconds: mode === 'spoken' ? prepareSeconds : null,
-        answerSeconds,
+        answerSeconds: selectedAnswerSeconds,
       })
       onDispatched()
     } catch (caught) {
@@ -343,8 +345,8 @@ export function PictureStudioModal({
                 <TimingRow
                   label={t('answerTime')}
                   offLabel={t('noTimeLimit')}
-                  presets={ANSWER_PRESETS}
-                  value={answerSeconds}
+                  presets={mode === 'spoken' ? [...ANSWER_PRESETS, MAX_RECORDING_SECONDS] : ANSWER_PRESETS}
+                  value={selectedAnswerSeconds}
                   onChange={setAnswerSeconds}
                 />
               </div>

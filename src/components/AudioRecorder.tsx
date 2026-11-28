@@ -1,3 +1,4 @@
+import { recordingLimitMs } from '../../supabase/functions/_shared/recording-limits'
 import { RecordingComparison } from './RecordingComparison'
 import { classroomMessage } from '../lib/classroomMessages'
 import { uiText } from '../lib/uiText'
@@ -20,10 +21,6 @@ type Props = {
   locale?: ParticipantLocale
 }
 
-// The ceiling when a question sets no limit of its own. A timed challenge
-// replaces it with its own, shorter one.
-const DEFAULT_MAX_MS = 180_000
-
 function formatDuration(milliseconds: number) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000))
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
@@ -42,7 +39,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
 
   const answerSeconds = question.answer_seconds ?? null
   const prepareSeconds = question.prepare_seconds ?? null
-  const maxDurationMs = answerSeconds ? answerSeconds * 1000 : DEFAULT_MAX_MS
+  const maxDurationMs = recordingLimitMs(answerSeconds)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const startedAtRef = useRef(0)
@@ -121,7 +118,7 @@ export function AudioRecorder({ busy, question, response, onSubmit, onDiscard, l
         try {
           setProcessing(true)
           const source = new Blob(chunksRef.current, { type: recorder.mimeType })
-          const wav = await recordingToWav(source)
+          const wav = await recordingToWav(source, maxDurationMs)
           if (cancelledRef.current || generation !== generationRef.current) return
           await onSubmit(new File([wav], `lingoact-${question.id}.wav`, { type: 'audio/wav' }), durationMs)
         } catch (caught) {

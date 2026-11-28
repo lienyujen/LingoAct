@@ -1,3 +1,5 @@
+import { MAX_RECORDING_SECONDS } from '../../supabase/functions/_shared/recording-limits'
+import { formatSeconds } from '../lib/questionTiming'
 import { uiText } from '../lib/uiText'
 import { useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Play, Plus, Trash } from '@phosphor-icons/react'
@@ -145,7 +147,8 @@ export function LessonPlan({ courseName, teachingLanguage, busy = false, onStart
   const [notice, setNotice] = useState('')
   const t = usePresenterText()
   const w = useWorkspaceText()
-  const chinese = ['zh-TW', 'zh-CN', 'ja'].includes(usePresenterLocale())
+  const locale = usePresenterLocale()
+  const chinese = ['zh-TW', 'zh-CN', 'ja'].includes(locale)
 
   // The same table the activity menu is built from, so the plan can never offer
   // something the app does not have — or miss something it does.
@@ -240,7 +243,7 @@ export function LessonPlan({ courseName, teachingLanguage, busy = false, onStart
       <select aria-label={chinese ? uiText("預計派送方式") : "Planned activity"} value={draft.dispatchTarget} onChange={(e) => setDraft({ ...draft, dispatchTarget: e.target.value as PlannedActivity['dispatchTarget'] })}><option value="audio">{t('sendAudioOnly')}</option><option value="read_aloud">{t('sendReadAloud')}</option><option value="quiz">{t('sendListeningQuiz')}</option></select>
       <select aria-label={t('replayCount')} value={draft.replayLimit ?? 'unlimited'} onChange={(e) => setDraft({ ...draft, replayLimit: e.target.value === 'unlimited' ? null : Number(e.target.value) })}><option value="unlimited">{chinese ? uiText("不限次") : 'Unlimited'}</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
       {draft.dispatchTarget === 'read_aloud' && <select aria-label={t('prepareTime')} value={draft.prepareSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, prepareSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noPrepare')}</option><option value="10">{uiText("10 秒")}</option><option value="20">{uiText("20 秒")}</option><option value="30">{uiText("30 秒")}</option></select>}
-      {draft.dispatchTarget === 'read_aloud' && <select aria-label={t('readAloudTime')} value={draft.answerSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, answerSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noTimeLimit')}</option><option value="30">{uiText("30 秒")}</option><option value="60">{uiText("60 秒")}</option><option value="90">{uiText("90 秒")}</option></select>}
+      {draft.dispatchTarget === 'read_aloud' && <select aria-label={t('readAloudTime')} value={draft.answerSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, answerSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noTimeLimit')}</option><option value="30">{uiText("30 秒")}</option><option value="60">{uiText("60 秒")}</option><option value="90">{uiText("90 秒")}</option><option value="180">{formatSeconds(180, locale)}</option><option value={MAX_RECORDING_SECONDS}>{formatSeconds(MAX_RECORDING_SECONDS, locale)}</option></select>}
     </div>}
     {has('questionType') && <>
       <div className="lesson-plan-options">
@@ -259,8 +262,12 @@ export function LessonPlan({ courseName, teachingLanguage, busy = false, onStart
     </div>}
     {(has('prepare') || has('answer')) && <div className="lesson-plan-options">
       {has('prepare') && <select aria-label={t('prepareTime')} value={draft.prepareSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, prepareSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noPrepare')}</option><option value="10">{uiText("10 秒")}</option><option value="20">{uiText("20 秒")}</option><option value="30">{uiText("30 秒")}</option></select>}
-      {has('answer') && <select aria-label={t('answerTime')} value={draft.answerSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, answerSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noTimeLimit')}</option><option value="30">{uiText("30 秒")}</option><option value="60">{uiText("60 秒")}</option><option value="90">{uiText("90 秒")}</option><option value="120">{uiText("120 秒")}</option><option value="180">{uiText("180 秒")}</option></select>}
-      {has('pictureMode') && <select aria-label={chinese ? uiText("作答方式") : 'Answer mode'} value={draft.pictureMode} onChange={(e) => setDraft({ ...draft, pictureMode: e.target.value as 'spoken' | 'written' })}><option value="spoken">{t('modeSpoken')}</option><option value="written">{t('modeWritten')}</option></select>}
+      {has('answer') && <select aria-label={t('answerTime')} value={draft.answerSeconds ?? 'none'} onChange={(e) => setDraft({ ...draft, answerSeconds: e.target.value === 'none' ? null : Number(e.target.value) })}><option value="none">{t('noTimeLimit')}</option><option value="30">{uiText("30 秒")}</option><option value="60">{uiText("60 秒")}</option><option value="90">{uiText("90 秒")}</option><option value="120">{uiText("120 秒")}</option><option value="180">{uiText("180 秒")}</option>{(draft.kind === 'pronunciation' || draft.kind === 'oralResponse' || (draft.kind === 'pictureTalk' && draft.pictureMode === 'spoken')) && <option value={MAX_RECORDING_SECONDS}>{formatSeconds(MAX_RECORDING_SECONDS, locale)}</option>}</select>}
+      {has('pictureMode') && <select aria-label={chinese ? uiText("作答方式") : 'Answer mode'} value={draft.pictureMode} onChange={(e) => {
+        const pictureMode = e.target.value as 'spoken' | 'written'
+        const answerSeconds = pictureMode === 'written' && draft.answerSeconds === MAX_RECORDING_SECONDS ? 180 : draft.answerSeconds
+        setDraft({ ...draft, pictureMode, answerSeconds })
+      }}><option value="spoken">{t('modeSpoken')}</option><option value="written">{t('modeWritten')}</option></select>}
     </div>}
     {has('aiGrading') && <label className="lesson-plan-check"><input checked={draft.aiGrading} type="checkbox" onChange={(e) => setDraft({ ...draft, aiGrading: e.target.checked })} />{t('pictureAiGrading')}</label>}
     <label>{uiText(promptMeta[0])}<textarea aria-label={uiText(promptMeta[0])} rows={3} maxLength={draft.kind === 'textDispatch' ? 5000 : 2000} value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={uiText(promptMeta[1])} /></label>
